@@ -1,0 +1,6 @@
+[tools]
+kubectl = "1.36.2"
+
+[tasks."release:render"]
+description = "Render immutable First Mate release manifests"
+file = "firstmate/release/render.ts"

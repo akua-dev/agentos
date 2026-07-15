@@ -16,13 +16,13 @@ Handle provider credentials inside the owning agent's persistent runtime wheneve
 
 ## Pi with a Codex subscription
 
-1. Enter the persistent Pi pane and run Pi's `/login` flow.
-2. Select `OpenAI (ChatGPT Plus/Pro)` and browser login.
-3. Bind Pi's callback inside the pod with `PI_OAUTH_CALLBACK_HOST=0.0.0.0` and create a temporary local Kubernetes port-forward for `localhost:1455` only after approval.
-4. Do not create a public Service or Ingress for the callback.
-5. If the callback cannot complete, use Pi's supported manual redirect-URL input. Offer device code only as an explicit recovery choice.
-6. Let Pi own and refresh `~/.pi/agent/auth.json` on the agent PVC with restrictive file permissions.
-7. Verify the release-selected provider and model with a harmless real request without printing credential contents.
+1. Verify that the persistent Pod binds Pi's fixed `http://localhost:1455/auth/callback` listener with `PI_OAUTH_CALLBACK_HOST=0.0.0.0`.
+2. After approval, start `kubectl --context <context> --namespace agentos port-forward pod/agentos-firstmate-0 1455:1455` on the seed machine.
+3. Attach with `kubectl --context <context> --namespace agentos exec -it pod/agentos-firstmate-0 --container firstmate -- herdr --session agentos-firstmate`.
+4. In Pi, run `/login openai-codex`, choose browser login and complete the developer's ChatGPT Plus/Pro flow.
+5. Never expose the callback through a public Service or Ingress. Stop the port-forward after callback completion. If it cannot complete, use Pi's manual redirect-URL input; offer device code only as an explicit recovery choice.
+6. Let Pi own and refresh `~/.pi/agent/auth.json` on the Agent PVC. Verify mode `0600` and ownership without printing or copying its contents.
+7. In that same pane, request a short fixed response with no tools. Verify the selected `openai-codex` provider and release-selected model, recording only non-secret status.
 
 ## Secret-based fallback
 

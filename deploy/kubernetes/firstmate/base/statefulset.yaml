@@ -63,6 +63,8 @@ spec:
               value: /opt/agentos
             - name: PI_CODING_AGENT_DIR
               value: /home/agent/.pi/agent
+            - name: PI_OAUTH_CALLBACK_HOST
+              value: 0.0.0.0
             - name: PATH
               value: /home/agent/.local/share/mise/shims:/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin
           securityContext: &container-security

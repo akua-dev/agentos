@@ -10,8 +10,8 @@ Install Git and [Mise](https://mise.jdx.dev/), then let the reviewed repository
 configuration provide Bun, Node, and the remaining development tools:
 
 ```console
-git clone https://github.com/akua-dev/agent-os.git
-cd agent-os
+git clone https://github.com/akua-dev/agentos.git
+cd agentos
 mise install
 bun run check
 ```
@@ -77,3 +77,21 @@ bun run check
 Kubernetes behavior must be verified by rendering structured resources or by a
 real lifecycle smoke test. Tests that merely search source files for arbitrary
 strings are not accepted.
+
+## Release manifests
+
+Render release assets only after the multi-platform image has been published
+and its registry digest is known:
+
+```console
+cd deploy/kubernetes
+mise install
+mise run release:render -- \
+  --image ghcr.io/akua-dev/agentos@sha256:<digest> \
+  --version <semver> \
+  --output ../../dist/release
+```
+
+Publish `release.json` and both generated manifests on a draft GitHub release,
+then publish it with release immutability enabled. Never hand-edit a generated
+manifest or reuse a release tag or image digest for different contents.

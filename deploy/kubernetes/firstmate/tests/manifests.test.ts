@@ -93,6 +93,12 @@ describe("First Mate Kubernetes resources", () => {
     const install = pod.initContainers[0];
     const prepare = pod.initContainers[1];
     const firstmate = pod.containers[0];
+    const environment = Object.fromEntries(
+      firstmate.env.map(({ name, value }: { name: string; value: string }) => [
+        name,
+        value,
+      ]),
+    );
     expect(install.image).toBe("agentos-firstmate:dev");
     expect(prepare.image).toBe(install.image);
     expect(firstmate.image).toBe(install.image);
@@ -113,6 +119,7 @@ describe("First Mate Kubernetes resources", () => {
     expect(prepare.args).toEqual(["run", "--skip-tools", "firstmate:prepare"]);
     expect(firstmate.command).toEqual(["mise"]);
     expect(firstmate.args).toEqual(["run", "--skip-tools", "firstmate:run"]);
+    expect(environment.PI_OAUTH_CALLBACK_HOST).toBe("0.0.0.0");
     expect(firstmate.livenessProbe.exec.command).toEqual([
       "mise",
       "run",

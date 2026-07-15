@@ -21,11 +21,15 @@ The model remains the decision-maker. AgentOS supplies the durable state, visibl
 You do not need to clone this repository, install a CLI or understand Kubernetes manifests first. Give the following prompt to an existing coding agent:
 
 ```text
-Fetch and read https://raw.githubusercontent.com/akua-dev/agent-os/main/BOOTSTRAP.md.
+Fetch and read https://raw.githubusercontent.com/akua-dev/agentos/main/BOOTSTRAP.md.
 Inspect my environment read-only first and guide me interactively through establishing a persistent First Mate in Kubernetes.
 ```
 
 The agent inspects what already exists, explains the viable path and asks before credentials, login, cost, cluster creation, RBAC or installation. It can use an existing Kubernetes cluster or offer Akua Zero-to-Cluster as an optional path.
+
+Installation uses a versioned single-file manifest from an immutable GitHub
+release. Its init and runtime containers all use the same public
+`ghcr.io/akua-dev/agentos` image pinned by OCI digest.
 
 For an existing cluster, the temporary local agent needs a working `kubectl`
 context and a browser for interactive provider login. It does not need a local
@@ -256,6 +260,12 @@ The initial model path uses Pi with the developer's Codex subscription through p
 Login happens inside the persistent Pi runtime, not by copying a local token directory.
 Exact package versions and authentication commands belong to release assets and the auth skill.
 
+The seed resolves `release.json` through the latest published GitHub release,
+verifies that release is immutable, and applies only its versioned manifest
+URL. The default manifest grants First Mate administration within `agentos`;
+the separately named dedicated-cluster manifest adds cluster-administrator
+access only after explicit approval.
+
 An existing Kubernetes cluster is fully supported.
 Akua Zero-to-Cluster is an optional path selected by the developer, never an implicit dependency or contact.
 
@@ -318,6 +328,8 @@ Workspace packages depend on each other through `workspace:*`, and the repositor
 - `agents/firstmate/` and `agents/secondmate/` contain the two role instruction surfaces, their Pi configuration and role-scoped skills.
 - `apps/` contains executable entrypoints; `packages/` contains their importable implementation.
 - `deploy/kubernetes/` is authoritative for rendered Kubernetes resources.
+- `deploy/kubernetes/firstmate/release/` is authoritative for the renderer;
+  generated manifests and `release.json` belong only to immutable GitHub releases.
 - `packages/database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `packages/database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
 - `apps/agentos/`, `packages/cli/`, CLI output and their tests define implemented AXI behavior.
 - Release assets pin exact versions, digests and checksums.

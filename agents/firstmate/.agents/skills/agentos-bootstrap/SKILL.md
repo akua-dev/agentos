@@ -15,14 +15,24 @@ Treat the current local agent as a temporary seed and establish the persistent c
 4. Use assets from one immutable AgentOS release. Stop if a required asset is absent.
 5. Never create a second First Mate to resolve ambiguous state.
 
-## Bootstrap
+## Inspect
 
-1. Determine whether the agent already runs in Kubernetes, which explicit `kubectl` contexts are available, and whether an owned First-Mate workload and PVC exist. For an existing cluster, the temporary seed needs only a compatible Kubernetes client and its context authentication; it does not need AgentOS, Mise, Bun, Node, Docker, Helm or PostgreSQL installed locally. If the Kubernetes client or a required external credential plugin is absent, explain the selected release's supported path and ask before installing it.
-2. Let the developer select an existing cluster or explicitly choose optional Akua Zero-to-Cluster.
-3. Load [AgentOS Runtime](../../../../.agents/skills/agentos-runtime/SKILL.md). After approval, establish or reconcile the minimum Herdr, Pi, Mise baseline, PVC, workload, RBAC and attach runtime. The reviewed Mate image contains Mise; sequential init containers from that same image install tools on the PVC and prepare the home before First Mate starts. Install the selected release's root and `agents/` Mise configuration/lock pairs as the Agent-Pod system baseline so Fleet tools remain available in foreign Crewmate worktrees.
-4. Load [AgentOS Authentication](../../../../.agents/skills/agentos-auth/SKILL.md). Authenticate the persistent Pi First Mate inside its cluster runtime and verify a harmless real model request.
-5. Verify pod replacement reuses the PVC, resumes the same native Pi session and resolves released Mise tools by ordinary command name from a foreign worktree.
-6. Hand authority to the cluster First Mate and stop the local seed from performing competing fleet work.
+1. Determine whether the seed already runs in Kubernetes. Enumerate contexts with `kubectl config get-contexts -o name`; never change the user's global current context.
+2. Let the developer choose one explicit existing context or explicitly choose optional Akua Zero-to-Cluster. The existing-cluster path must remain complete without Akua.
+3. Against the selected context, inspect client and server versions, StorageClasses, namespace `agentos`, StatefulSet, Pods, PVCs, ServiceAccount and bindings. Use `kubectl auth can-i` for the exact create and update permissions the selected path needs. Keep this phase read-only.
+4. If an AgentOS First Mate or home PVC already exists, inspect its ownership, release image and health. Reconcile the owned installation; never create a competing First Mate.
+5. Fetch `https://github.com/akua-dev/agentos/releases/latest/download/release.json`. Require a semantic version, an image pinned with `@sha256:`, and both expected manifest names. Inspect GitHub release `v<version>` and require it to be published and immutable. Select only an asset under `/releases/download/v<version>/`, never a branch manifest.
+
+For an existing cluster, the temporary seed needs only a compatible `kubectl`, the selected context's authentication and a browser for interactive provider login. It does not need an AgentOS clone, Mise, Bun, Node, Docker, Helm or PostgreSQL. If `kubectl` or an external credential plugin is absent, explain what is missing and ask before installing it.
+
+## Install and hand off
+
+1. Explain the namespace-scoped `agentos-firstmate.yaml` and the dedicated-cluster `agentos-firstmate-cluster-admin.yaml`, including the recovery operations unavailable in scoped mode. Ask for the selected RBAC and installation approval.
+2. Load [AgentOS Runtime](../../../../.agents/skills/agentos-runtime/SKILL.md). Apply the selected versioned release URL with `kubectl --context <context> apply -f <url>`.
+3. Wait for the StatefulSet and verify a bound retained PVC, two successful sequential init containers, one running First Mate container, exactly one Herdr agent named `firstmate`, and the selected image digest on all three containers.
+4. Load [AgentOS Authentication](../../../../.agents/skills/agentos-auth/SKILL.md). Authenticate Pi inside the persistent pod and verify a harmless real model request.
+5. Replace the Pod once. Verify the same PVC identity, an Agent-home marker, exactly one First Mate pane, the same native Pi session and ordinary Mise tool resolution from a foreign worktree.
+6. Attach the developer to the persistent First Mate, hand it authority and stop the local seed from performing competing Fleet work.
 7. From the cluster First Mate, load [AgentOS Database](../../../../.agents/skills/agentos-database/SKILL.md). Select or provision PostgreSQL with approval and apply only released SQL assets.
 8. Leave bootstrap mode only after runtime, authentication, database identity, schema and RLS checks pass.
 

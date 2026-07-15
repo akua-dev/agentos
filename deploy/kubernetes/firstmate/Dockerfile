@@ -2,6 +2,12 @@ FROM debian:13-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59
 
 ARG TARGETARCH
 ARG MISE_VERSION=2026.4.25
+ARG AGENTOS_VERSION=dev
+
+LABEL org.opencontainers.image.source="https://github.com/akua-dev/agentos" \
+      org.opencontainers.image.description="Persistent engineering agents for Kubernetes" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${AGENTOS_VERSION}"
 
 SHELL ["/bin/sh", "-euxc"]
 
