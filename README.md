@@ -224,22 +224,27 @@ The exact tables, indexes, Functions, Triggers, grants, RLS policies and raw-ses
 The `packages/database/` workspace uses Drizzle Kit only to create and apply journaled custom SQL migrations; it has no Drizzle ORM schema or runtime database client.
 This README does not duplicate them.
 
-PostgreSQL may run at a developer-selected external or managed endpoint; that
-is used directly and remains the shortest path when it already exists. If the
-developer chooses self-hosting, AgentOS uses
+PostgreSQL may run at a developer-selected external or managed endpoint or be
+self-hosted in the selected cluster. AgentOS treats both as complete paths and
+does not rank one ahead of the other. For self-hosting it uses
 [CloudNativePG](https://cloudnative-pg.io/) rather than maintaining a raw
-PostgreSQL StatefulSet. A compatible existing controller is reused; installing
-or upgrading the cluster-scoped controller requires explicit approval.
+PostgreSQL StatefulSet. A compatible existing controller can be reused;
+installing or upgrading the cluster-scoped controller requires explicit
+approval. When a compatible installed controller is older than the newest
+stable release, First Mate presents reuse and upgrade as choices.
 
-The initial released CNPG manifest creates one PostgreSQL 18.4 instance with a
-20 GiB PVC, data checksums, the unprivileged `agentos` application owner and no
-network-enabled superuser. This is the fastest persistent bootstrap path, not
-HA and not yet a reviewed backup topology. CNPG generates the application
-Secret; First Mate uses its `pgpass` entry with `psql` and injects its URI only
-into the Drizzle migration process. Pinned migration dependencies are installed
-from `bun.lock` into a content-addressed workspace on the agent PVC when first
-needed, keeping them out of the runtime image. Topology does not change schema
-or security semantics.
+The released database manifest is version-neutral. At installation time First
+Mate finds the newest stable official CloudNativePG release compatible with the
+selected Kubernetes server and the newest stable PostgreSQL operand it supports,
+verifies immutable image identities, and shows the exact selection before asking
+for approval. It then renders one PostgreSQL instance with a 20 GiB PVC, data
+checksums, the unprivileged `agentos` application owner and no network-enabled
+superuser. This minimal topology is not HA and has no reviewed backup policy yet.
+CNPG generates the application Secret; First Mate uses its `pgpass` entry with
+`psql` and injects its URI only into the Drizzle migration process. Pinned
+migration dependencies are installed from `bun.lock` into a content-addressed
+workspace on the agent PVC when first needed, keeping them out of the runtime
+image. Topology does not change schema or security semantics.
 
 ### Kubernetes and authorization
 
@@ -280,8 +285,9 @@ Login happens inside the persistent Pi runtime, not by copying a local token dir
 Exact package versions and authentication commands belong to release assets and the auth skill.
 
 The seed resolves `release.json` through the latest published GitHub release,
-verifies that release is immutable, and applies only its versioned manifest
-URLs and pinned database dependencies. The default manifest grants First Mate administration within `agentos`;
+verifies that release is immutable, and applies only its versioned AgentOS
+manifest URLs. External database dependencies are discovered and verified by
+First Mate when the developer selects self-hosting. The default manifest grants First Mate administration within `agentos`;
 the separately named dedicated-cluster manifest adds cluster-administrator
 access only after explicit approval.
 

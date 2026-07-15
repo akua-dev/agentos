@@ -18,6 +18,7 @@ the First Mate namespace-wide administration. The `cluster-admin` overlay is
 only for a developer-approved dedicated cluster and must never be applied as an
 implicit bootstrap default.
 
-The optional self-hosted PostgreSQL topology is in [`database/`](database/).
-It uses a pinned CloudNativePG controller and operand image; an external or
-managed PostgreSQL endpoint remains a complete path without CNPG.
+The self-hosted PostgreSQL shape is in [`database/`](database/). First Mate
+discovers current compatible official CloudNativePG and PostgreSQL releases at
+installation time and asks before installing them. An external or managed
+PostgreSQL endpoint is an equally supported path without CNPG.

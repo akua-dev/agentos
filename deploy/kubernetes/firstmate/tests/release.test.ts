@@ -34,20 +34,6 @@ describe("First Mate release artifacts", () => {
     });
 
     expect(release).toEqual({
-      database: {
-        cloudNativePG: {
-          controllerImage:
-            "ghcr.io/cloudnative-pg/cloudnative-pg@sha256:a2701eb97cdd2a34b1fdb2cb51987f544b706e40bec72ae7146cd8580efefebb",
-          manifestSha256:
-            "f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88",
-          manifestUrl:
-            "https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/cnpg-1.30.0.yaml",
-          supportedKubernetesMinorVersions: ["1.34", "1.35", "1.36"],
-          version: "1.30.0",
-        },
-        postgresImage:
-          "ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie@sha256:b2c03bf5c6f8bc16495aacc0bb0765c77fe3e8ce6bc94ade26958f62ab9b4a14",
-      },
       image,
       manifests: {
         clusterAdmin: "agentos-firstmate-cluster-admin.yaml",
@@ -115,7 +101,6 @@ describe("First Mate release artifacts", () => {
             },
           },
           enableSuperuserAccess: false,
-          imageName: release.database.postgresImage,
           instances: 1,
           storage: { size: "20Gi" },
         },

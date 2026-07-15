@@ -14,16 +14,6 @@ type Resource = {
 };
 
 export type Release = {
-  database: {
-    cloudNativePG: {
-      controllerImage: string;
-      manifestSha256: string;
-      manifestUrl: string;
-      supportedKubernetesMinorVersions: readonly string[];
-      version: string;
-    };
-    postgresImage: string;
-  };
   image: string;
   manifests: {
     clusterAdmin: string;
@@ -47,18 +37,6 @@ const databaseDirectory = new URL(
   "../../database",
   import.meta.url,
 ).pathname.replace(/\/$/, "");
-const postgresImage =
-  "ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie@sha256:b2c03bf5c6f8bc16495aacc0bb0765c77fe3e8ce6bc94ade26958f62ab9b4a14";
-const cloudNativePG = {
-  controllerImage:
-    "ghcr.io/cloudnative-pg/cloudnative-pg@sha256:a2701eb97cdd2a34b1fdb2cb51987f544b706e40bec72ae7146cd8580efefebb",
-  manifestSha256:
-    "f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88",
-  manifestUrl:
-    "https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/cnpg-1.30.0.yaml",
-  supportedKubernetesMinorVersions: ["1.34", "1.35", "1.36"],
-  version: "1.30.0",
-} as const;
 
 export async function renderRelease({
   image,
@@ -69,10 +47,6 @@ export async function renderRelease({
   assertVersion(version);
 
   const release: Release = {
-    database: {
-      cloudNativePG: { ...cloudNativePG },
-      postgresImage,
-    },
     image,
     manifests: {
       clusterAdmin: "agentos-firstmate-cluster-admin.yaml",
@@ -100,7 +74,7 @@ export async function renderRelease({
     },
     {
       configure: (resources: Resource[]) =>
-        configureDatabase(resources, postgresImage, version),
+        configureDatabase(resources, version),
       directory: join(databaseDirectory, "base"),
       filename: release.manifests.database,
     },
@@ -171,7 +145,6 @@ function configureFirstMate(resources: Resource[], image: string, version: strin
 
 function configureDatabase(
   resources: Resource[],
-  image: string,
   version: string,
 ) {
   const cluster = resources.find(
@@ -181,8 +154,10 @@ function configureDatabase(
   if (!cluster?.spec) {
     throw new Error("Rendered release is missing Cluster/agentos-postgres.");
   }
-  if (cluster.spec.imageName !== image) {
-    throw new Error("Rendered database image differs from release metadata.");
+  if ("imageName" in cluster.spec) {
+    throw new Error(
+      "Released database manifest must leave PostgreSQL version selection to First Mate.",
+    );
   }
   cluster.metadata.labels = {
     ...cluster.metadata.labels,

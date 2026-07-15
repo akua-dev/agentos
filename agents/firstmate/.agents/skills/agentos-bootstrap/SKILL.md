@@ -21,7 +21,7 @@ Treat the current local agent as a temporary seed and establish the persistent c
 2. Let the developer choose one explicit existing context or explicitly choose optional Akua Zero-to-Cluster. The existing-cluster path must remain complete without Akua.
 3. Against the selected context, inspect client and server versions, StorageClasses, namespace `agentos`, StatefulSet, Pods, PVCs, ServiceAccount and bindings. Use `kubectl auth can-i` for the exact create and update permissions the selected path needs. Keep this phase read-only.
 4. If an AgentOS First Mate or home PVC already exists, inspect its ownership, release image and health. Reconcile the owned installation; never create a competing First Mate.
-5. Fetch `https://github.com/akua-dev/agentos/releases/latest/download/release.json`. Require a semantic version, an image pinned with `@sha256:`, and every manifest and database dependency field required by the selected path. Inspect GitHub release `v<version>` and require it to be published and immutable. Select only assets under `/releases/download/v<version>/`, never a branch manifest.
+5. Fetch `https://github.com/akua-dev/agentos/releases/latest/download/release.json`. Require a semantic version, an image pinned with `@sha256:`, and every AgentOS manifest required by the selected path. Inspect GitHub release `v<version>` and require it to be published and immutable. Select only assets under `/releases/download/v<version>/`, never a branch manifest. Do not expect CNPG or PostgreSQL versions in AgentOS release metadata; the database skill discovers current compatible official releases when that path is chosen.
 
 For an existing cluster, the temporary seed needs only a compatible `kubectl`, the selected context's authentication and a browser for interactive provider login. It does not need an AgentOS clone, Mise, Bun, Node, Docker, Helm or PostgreSQL. If `kubectl` or an external credential plugin is absent, explain what is missing and ask before installing it.
 
@@ -33,7 +33,7 @@ For an existing cluster, the temporary seed needs only a compatible `kubectl`, t
 4. Load [AgentOS Authentication](../../../../.agents/skills/agentos-auth/SKILL.md). Authenticate Pi inside the persistent pod and verify a harmless real model request.
 5. Replace the Pod once. Verify the same PVC identity, an Agent-home marker, exactly one First Mate pane, the same native Pi session and ordinary Mise tool resolution from a foreign worktree.
 6. Attach the developer to the persistent First Mate, hand it authority and stop the local seed from performing competing Fleet work.
-7. From the cluster First Mate, load [AgentOS Database](../../../../.agents/skills/agentos-database/SKILL.md). Select an external endpoint or provision the released CloudNativePG path with approval, then apply only released SQL assets.
+7. From the cluster First Mate, load [AgentOS Database](../../../../.agents/skills/agentos-database/SKILL.md). Present external PostgreSQL and self-hosted CloudNativePG without an implicit preference. After the developer chooses, use the released AgentOS database shape and SQL assets; for self-hosting, discover and verify the current compatible official CNPG and PostgreSQL releases before requesting installation approval.
 8. Leave bootstrap mode only after runtime, authentication, database identity, schema and every security check implemented by the selected release pass.
 
 Repeat safely from the first incomplete verified boundary after interruption.

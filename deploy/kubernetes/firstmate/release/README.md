@@ -7,12 +7,13 @@ from the reviewed Kustomize resources:
   `agentos` namespace.
 - `agentos-firstmate-cluster-admin.yaml` adds cluster-wide administration for a
   developer-approved dedicated cluster.
-- `agentos-postgres.yaml` creates the optional minimal self-hosted CloudNativePG
+- `agentos-postgres.yaml` creates the minimal self-hosted CloudNativePG
   database after its controller has been approved and verified.
 
 All three First-Mate container references are replaced with the same immutable
-AgentOS OCI digest and use `IfNotPresent`. The database manifest carries its
-separate pinned PostgreSQL operand digest. Generate the assets from
+AgentOS OCI digest and use `IfNotPresent`. The database manifest is deliberately
+version-neutral; First Mate discovers and injects current compatible official
+CNPG and PostgreSQL versions only if the developer selects self-hosting. Generate the assets from
 `deploy/kubernetes/`:
 
 ```console
@@ -23,7 +24,6 @@ mise run release:render -- \
   --output ../../dist/release
 ```
 
-The renderer also writes `release.json`, including pinned CloudNativePG
-controller provenance and PostgreSQL image metadata. Publish all four files on
-an immutable GitHub release. Never hand-edit a
+The renderer also writes `release.json` with the immutable AgentOS image and
+asset names. Publish all four files on an immutable GitHub release. Never hand-edit a
 generated manifest or reuse a release tag.

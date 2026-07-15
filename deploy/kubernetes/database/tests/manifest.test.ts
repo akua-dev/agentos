@@ -51,8 +51,6 @@ describe("AgentOS self-hosted PostgreSQL", () => {
         },
       },
       enableSuperuserAccess: false,
-      imageName:
-        "ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie@sha256:b2c03bf5c6f8bc16495aacc0bb0765c77fe3e8ce6bc94ade26958f62ab9b4a14",
       instances: 1,
       storage: { size: "20Gi" },
     });

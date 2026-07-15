@@ -48,9 +48,9 @@ carry their small burst, claim and reconciliation state. There is no external
 link table, reconciliation table, outbox or database wrapper service.
 
 Database topology is deliberately outside this package. A developer-selected
-external endpoint is used directly; the optional self-hosted path is the
-versioned CloudNativePG resource in `deploy/kubernetes/database/`. Both paths
-apply this same migration journal and security contract.
+external endpoint and the self-hosted CloudNativePG shape in
+`deploy/kubernetes/database/` are equal supported paths. Both apply this same
+migration journal and security contract.
 
 `tests/migration.test.ts` starts a fresh in-memory PGlite database, executes the
 real migration and then runs `tests/0000_initial_fleet_schema.sql` against it.

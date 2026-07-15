@@ -8,7 +8,6 @@ metadata:
     app.kubernetes.io/part-of: agentos
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie@sha256:b2c03bf5c6f8bc16495aacc0bb0765c77fe3e8ce6bc94ade26958f62ab9b4a14
   enableSuperuserAccess: false
   bootstrap:
     initdb:
