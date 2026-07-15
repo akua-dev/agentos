@@ -81,3 +81,12 @@ event coordination rows remain forbidden.
 `tests/runtime-authorization.test.ts` applies all migrations around both
 already-registered and later-registered roles, then exercises those allowed and
 forbidden paths against PGlite.
+
+`0003_initialize_fleet_owner.sql` requires the migration `session_user` to own
+the released AgentOS tables. It creates the root `firstmate` Agent when absent,
+or adopts one existing unbound active First Mate, and registers that row to the
+same owner login. It rejects a separate migrator, multiple active First Mates or
+a root already bound to another role, and its partial unique index preserves one
+active Fleet root afterward. It creates neither roles nor credentials.
+`tests/fleet-initialization.test.ts` verifies each initialization and recovery
+path against isolated PGlite databases.

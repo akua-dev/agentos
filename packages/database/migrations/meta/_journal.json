@@ -22,6 +22,13 @@
       "when": 1784138679947,
       "tag": "0002_runtime_mutation_authorization",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784139850586,
+      "tag": "0003_initialize_fleet_owner",
+      "breakpoints": true
     }
   ]
 }

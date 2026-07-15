@@ -63,13 +63,17 @@ For direct `psql`, copy only the Secret's `pgpass` value into `~/.pgpass` on the
 
 For an external endpoint, prefer an approved Kubernetes Secret or mode-`0600` file owned by the persistent agent. Keep the connection URI out of prompts, command arguments, shell history and normal logs.
 
-Create Agent PostgreSQL logins through the selected database platform's approved
-role-management path, outside AgentOS migrations. Bind First Mate to the login
-that owns the Fleet's released AgentOS tables. This makes First Mate the Fleet
+Apply the migration chain with the login that owns the Fleet's released AgentOS
+tables. The released initialization migration creates or adopts the root
+First-Mate row and binds it to that same `session_user`; never add a separate
+migrator or manually map First Mate. This makes First Mate the Fleet
 database/schema administrator, but does not require PostgreSQL cluster
-`SUPERUSER`, `CREATEDB`, `CREATEROLE` or `BYPASSRLS`. Require every other Agent
-login to have none of those privileges and no inherited owner capability. After
-creating the Agent row, bind the exact role name with
+`SUPERUSER`, `CREATEDB`, `CREATEROLE` or `BYPASSRLS`.
+
+Create every other Agent login through the selected database platform's
+approved role-management path, outside AgentOS migrations. Require it to have
+none of those privileges and no inherited owner capability. After creating the
+Agent row, bind the exact role name with
 `agentos.register_agent_principal(agent_id, database_role)`. Keep the credential
 in that Agent's approved Secret or mode-`0600` file; never store it in Fleet rows.
 An active registered Agent receives the complete released Fleet read view; RLS
@@ -101,7 +105,7 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
 1. Ask before provisioning PostgreSQL, creating a database or role, changing grants, or applying migrations.
 2. Apply the topology selected by the developer. Do not rank external PostgreSQL ahead of self-hosted CloudNativePG, or vice versa.
 3. Before the first migration on an agent, explain that the pinned Drizzle and PostgreSQL driver dependencies will occupy about 90 MB on its PVC and ask for tooling-installation approval. From the selected release's `packages/database/` directory, run `mise run database:prepare`. It installs only `@agentos/database` production dependencies from the release `bun.lock` into a content-addressed persistent workspace and reuses a completed workspace on later runs. Trust its printed package path; do not run a second ad hoc `bun install` in that workspace.
-4. Apply pending migrations from the path printed by `database:prepare` with `bun run --cwd <prepared-path> migrate`, injecting `DATABASE_URL` into only that process from the approved secret source. Drizzle Kit owns ordering and the applied-migration journal.
+4. Apply pending migrations as the selected Fleet-owner login from the path printed by `database:prepare` with `bun run --cwd <prepared-path> migrate`, injecting `DATABASE_URL` into only that process from the approved secret source. Drizzle Kit owns ordering and the applied-migration journal. Stop on a separate migration identity instead of weakening the automatic root binding.
 5. Use released Functions and Triggers for shared invariants instead of rewriting equivalent ad hoc SQL in every agent session.
 6. Use released RLS policies and role grants; never bypass them to make a failing workflow pass.
 
@@ -109,7 +113,7 @@ AgentOS is SQL-first. Never use `drizzle-kit push`, `pull`, or non-custom `gener
 
 ## Verify
 
-- Confirm schema version and migration checksums.
+- Confirm schema version and migration checksums, then verify that `current_agent_id()` resolves the single active root First Mate for the Fleet-owner session.
 - Exercise allowed and forbidden access with actual Agent roles when the selected release defines them. Until then, do not admit mutually untrusted agents to the database.
 - Verify the invariants defined by the installed SQL tests and confirm direct `psql` access through the approved non-superuser identity.
 - Verify the owning agent can reconnect after pod replacement without exposing credentials.

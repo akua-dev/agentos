@@ -187,7 +187,10 @@ Agents use SQL or `psql` directly; AgentOS does not add a database wrapper servi
 First Mate uses the Fleet owner role and is therefore the administrator of the
 Fleet database and released AgentOS schema. This does not require PostgreSQL
 cluster `SUPERUSER`, `CREATEDB`, `CREATEROLE` or `BYPASSRLS` privileges.
-The first authorization migration binds each remaining Agent to an existing,
+The migration chain runs as that Fleet-owner login, creates or adopts the root
+First-Mate row and binds it to the same `session_user`; there is no separate
+migrator identity or manual First-Mate mapping. The authorization migration
+binds each remaining Agent to an existing,
 non-privileged PostgreSQL `session_user` and applies grants plus Row-Level
 Security to the Fleet tables. Every active registered Agent receives the same
 complete read view with no hidden rows. Writes remain narrower: First Mate can
