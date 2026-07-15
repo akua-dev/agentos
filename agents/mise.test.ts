@@ -99,7 +99,7 @@ const fleetTools = {
   gh: "2.96.0",
   "github:kunchenguid/no-mistakes": "1.37.0",
   "github:ogulcancelik/herdr": "0.7.3",
-  "github:oven-sh/bun": "canary",
+  "github:oven-sh/bun": "bun-v1.3.14",
   jq: "1.8.2",
   kubectl: "1.36.2",
   node: "24",

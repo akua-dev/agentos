@@ -125,6 +125,7 @@ function buildResources(options: Required<RenderSecondMateOptions>): Resource[] 
                 name: "install-tools",
                 image: options.image,
                 imagePullPolicy: "IfNotPresent",
+                workingDir: "/opt/agentos/agents/secondmate",
                 command: ["mise"],
                 args: [
                   "install",
@@ -143,6 +144,7 @@ function buildResources(options: Required<RenderSecondMateOptions>): Resource[] 
                 name: "prepare-home",
                 image: options.image,
                 imagePullPolicy: "IfNotPresent",
+                workingDir: "/opt/agentos/agents/secondmate",
                 command: ["mise"],
                 args: ["run", "--skip-tools", "secondmate:prepare"],
                 env: environment,
@@ -162,6 +164,7 @@ function buildResources(options: Required<RenderSecondMateOptions>): Resource[] 
                 name: "secondmate",
                 image: options.image,
                 imagePullPolicy: "IfNotPresent",
+                workingDir: "/opt/agentos/agents/secondmate",
                 command: ["mise"],
                 args: ["run", "--skip-tools", "secondmate:run"],
                 env: environment,
@@ -321,7 +324,7 @@ function isDnsLabel(value: string): boolean {
 
 function serializeResources(resources: Resource[]): string {
   return `${resources
-    .map((resource) => Bun.YAML.stringify(resource).trimEnd())
+    .map((resource) => JSON.stringify(resource, null, 2))
     .join("\n---\n")}\n`;
 }
 

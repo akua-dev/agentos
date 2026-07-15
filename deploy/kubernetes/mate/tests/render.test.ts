@@ -36,7 +36,7 @@ describe("Second Mate manifest renderer", () => {
       agentId: "20000000-0000-4000-8000-000000000002",
       databaseSecret: "delivery-second-postgres",
       databaseUrl:
-        "postgresql://runtime_delivery_second@agentos-postgres-rw.agentos.svc:5432/agentos",
+        "postgresql://runtime_delivery_second@agentos-postgres-rw.agentos.svc:5432/agentos?sslmode=require",
       handle: "delivery-second",
       image:
         "ghcr.io/akua-dev/agentos@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -53,6 +53,33 @@ describe("Second Mate manifest renderer", () => {
 
     const rendered = await readFile(firstOutput, "utf8");
     expect(await readFile(secondOutput, "utf8")).toBe(rendered);
+    const kubectl = Bun.spawn(
+      [
+        "kubectl",
+        "apply",
+        "--dry-run=client",
+        "--validate=false",
+        "--filename",
+        firstOutput,
+        "--output",
+        "name",
+      ],
+      { stderr: "pipe", stdout: "pipe" },
+    );
+    const [kubectlExitCode, kubectlStdout, kubectlStderr] = await Promise.all([
+      kubectl.exited,
+      new Response(kubectl.stdout).text(),
+      new Response(kubectl.stderr).text(),
+    ]);
+    expect({ kubectlExitCode, kubectlStderr }).toEqual({
+      kubectlExitCode: 0,
+      kubectlStderr: "",
+    });
+    expect(kubectlStdout.trim().split("\n")).toEqual([
+      "serviceaccount/agentos-delivery-second",
+      "service/agentos-delivery-second",
+      "statefulset.apps/agentos-delivery-second",
+    ]);
     const resources = Bun.YAML.parse(rendered) as Resource[];
     expect(resources.map(({ kind, metadata }) => `${kind}/${metadata.name}`)).toEqual([
       "ServiceAccount/agentos-delivery-second",
@@ -99,6 +126,7 @@ describe("Second Mate manifest renderer", () => {
     for (const container of [install, prepare, secondMate]) {
       expect(container.image).toBe(options.image);
       expect(container.imagePullPolicy).toBe("IfNotPresent");
+      expect(container.workingDir).toBe("/opt/agentos/agents/secondmate");
     }
     expect(prepare.args).toEqual([
       "run",

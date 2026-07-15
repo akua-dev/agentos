@@ -66,7 +66,7 @@ bun test
 bun run agentos --help
 ```
 
-Bun reports the release-selected `1.4.0` baseline. Package-specific instructions live with the package they govern.
+Bun reports the release-selected `1.3.14` baseline. Package-specific instructions live with the package they govern.
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the local Kubernetes workflow and
 repository conventions.
 
@@ -152,7 +152,11 @@ If the selected release lacks that wake capability, the Mate reports the unsuppo
 
 Mise supplies tools to every AgentOS agent, including First Mates, Second Mates and Crewmates.
 The release-owned root `mise.toml`/`mise.lock` own Bun and Node; `agents/mise.toml`/`agents/mise.lock` add pinned Fleet tools for Pi, Herdr, Kubernetes, GitHub, validation, AXI helpers and command-line inspection.
-Until Bun 1.4 has a stable release, the root pair resolves the official Bun Canary through Mise's GitHub backend and requires the runtime to report `1.4.0`. Refreshing that moving release is an explicit reviewed update.
+The root pair resolves the latest reviewed stable Bun release through Mise's
+GitHub backend. Moving Canary tags are forbidden because a fresh Agent PVC must
+be able to reproduce the locked checksum. Upgrade to Bun 1.4 only after its
+official immutable release tag exists and a cold locked install succeeds on
+every released platform.
 
 Agent Pods install the root pair as `/etc/mise/config.toml` and `/etc/mise/mise.lock`.
 They seed the Fleet pair as `~/.config/mise/config.toml` and `~/.config/mise/mise.lock` on the agent PVC; agent-owned additions live separately under `~/.config/mise/conf.d/`.
