@@ -20,6 +20,23 @@ Treat versioned SQL and its tests as the database contract. Use direct PostgreSQ
 
 Present an existing external or managed PostgreSQL endpoint and self-hosted CloudNativePG as equal viable paths. Neither is the implicit default. Explain the observed infrastructure, ownership, availability, backup and cost trade-offs, then let the developer choose. Validate any selected existing endpoint read-only with its approved credential source; do not copy it into Kubernetes merely to normalize the topology.
 
+### Official CloudNativePG version guidance
+
+Resolve versions from primary sources at installation time:
+
+- [latest CloudNativePG release](https://github.com/cloudnative-pg/cloudnative-pg/releases/latest)
+- [supported CloudNativePG, Kubernetes and PostgreSQL versions](https://cloudnative-pg.io/docs/current/supported_releases/)
+- [installation and upgrade guidance](https://cloudnative-pg.io/docs/current/installation_upgrade/)
+- [official PostgreSQL image catalogs](https://cloudnative-pg.io/docs/current/image_catalog/)
+- [PostgreSQL container image requirements](https://cloudnative-pg.io/docs/current/container_images/)
+- [published CloudNativePG image-catalog artifacts](https://github.com/cloudnative-pg/artifacts/tree/main/image-catalogs)
+- [PostgreSQL versioning policy](https://www.postgresql.org/support/versioning/)
+
+The `current` documentation and the artifacts branch move over time. Use them
+to discover candidates, then reopen the selected CNPG version's documentation
+and resolve mutable catalog entries to the exact observed commit and image
+digests before proposing an installation.
+
 When the developer selects self-hosted PostgreSQL:
 
 1. Use CloudNativePG. Do not deploy a raw PostgreSQL Pod, StatefulSet, chart or embedded server.
@@ -45,6 +62,13 @@ Use the CNPG-generated `agentos-postgres-app` identity for self-hosted PostgreSQ
 For direct `psql`, copy only the Secret's `pgpass` value into `~/.pgpass` on the owning agent PVC without exposing stdout, then set mode `0600`. From an Agent Pod in `agentos`, connect directly through the `agentos-postgres-rw` Service with explicit database and user names; do not create a port-forward inside the cluster. Refresh that file after credential rotation.
 
 For an external endpoint, prefer an approved Kubernetes Secret or mode-`0600` file owned by the persistent agent. Keep the connection URI out of prompts, command arguments, shell history and normal logs.
+
+Create each Agent's PostgreSQL login through the selected database platform's
+approved role-management path, outside AgentOS migrations. Require a login role
+with no superuser, database-creation, role-creation, RLS-bypass or inherited
+owner capability. After creating the Agent row, bind the exact role name with
+`agentos.register_agent_principal(agent_id, database_role)`. Keep the credential
+in that Agent's approved Secret or mode-`0600` file; never store it in Fleet rows.
 
 ## Apply released assets
 

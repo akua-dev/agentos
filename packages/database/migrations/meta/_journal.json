@@ -8,6 +8,13 @@
       "when": 1784120250263,
       "tag": "0000_initial_fleet_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784136281608,
+      "tag": "0001_agent_authorization",
+      "breakpoints": true
     }
   ]
 }

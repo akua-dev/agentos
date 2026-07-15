@@ -17,6 +17,9 @@ This package is SQL-first. Read the architecture section in `../../README.md` an
 - Preserve accepted provider payloads intact in `external_events.payload`. The same event rows own their small burst, claim and reconciliation state; do not add a reconciliation table or background outbox.
 - Agents invoke provider CLIs directly and synchronously. PostgreSQL coordinates durable local state but does not hide provider failures behind a service.
 - Never hold a transaction open while a model reasons or a provider command runs. In the final short transaction, mutate coupled Tasks and Inbox rows and call the released claim-completion Function so stale work rolls back atomically.
+- Bind an Agent only to an already-created, non-privileged PostgreSQL login through `agentos.register_agent_principal`; migrations never create login roles or contain credentials.
+- Keep runtime grants deny-by-default. The first authorization slice exposes only `agents` and `inbox`; do not grant other Fleet tables before their read and write policies are reviewed and tested.
+- Preserve `session_user` as the authorization identity. Never replace it with a caller-controlled session setting or infer it from prompts, process metadata or Kubernetes labels.
 
 ## Migration workflow
 
@@ -32,5 +35,5 @@ This package is SQL-first. Read the architecture section in `../../README.md` an
 - Receive `DATABASE_URL` only through an approved secret source; never commit, print or copy credentials into commands that will persist in shell history.
 - Use transactions where PostgreSQL permits them.
 - Test migration, constraint, Trigger and Function behavior against the package's in-memory PGlite database instead of inspecting SQL source text for strings.
-- When grants, RLS or multi-connection concurrency are introduced, additionally test their allowed and forbidden paths against a real PostgreSQL server; PGlite does not replace that release gate.
+- Test Grants and RLS through real role changes and allowed and forbidden SQL paths in PGlite. Do not add Docker-backed database tests without a concrete behavior that PGlite cannot exercise.
 - Apply only migrations from one reviewed immutable AgentOS release and report the first unverified boundary on partial failure.

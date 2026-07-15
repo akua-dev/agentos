@@ -56,5 +56,12 @@ migration journal and security contract.
 real migration and then runs `tests/0000_initial_fleet_schema.sql` against it.
 The SQL test exercises constraints, Triggers and Functions before rolling its
 fixtures back; it never inspects migration source text. PGlite is the fast
-default for migration behavior. Grants, RLS and multi-connection concurrency
-must additionally be verified against a real PostgreSQL server when introduced.
+test boundary for migration behavior, including roles, Grants and RLS.
+
+`0001_agent_authorization.sql` binds an existing PostgreSQL `session_user` to
+an Agent without creating or storing credentials. Registered non-privileged
+login roles receive direct access only to the Agent directory and Inbox. RLS
+lets First Mate manage the Fleet, Second Mates manage their subtrees, and
+Crewmates mutate themselves; Inbox content remains visible only to participants
+and their managing Mates. Other Fleet tables remain owner-only until a later
+reviewed policy slice grants them.
