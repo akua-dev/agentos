@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS Bootstrap"
+  short_description: "Establish a persistent Kubernetes First Mate"
+  default_prompt: "Use $agentos-bootstrap to inspect my environment and establish or reconcile a persistent AgentOS First Mate."

@@ -1,0 +1,8 @@
+min_version = { hard = "2026.4.25" }
+
+[tools]
+"github:oven-sh/bun" = "canary"
+node = "24"
+
+[settings]
+lockfile = true

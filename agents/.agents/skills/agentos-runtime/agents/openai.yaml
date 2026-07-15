@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS Runtime"
+  short_description: "Operate Herdr and Kubernetes agent runtimes"
+  default_prompt: "Use $agentos-runtime to inspect and operate my AgentOS runtime safely."

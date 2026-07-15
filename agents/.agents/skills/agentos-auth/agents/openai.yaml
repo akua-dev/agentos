@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS Authentication"
+  short_description: "Manage AgentOS model authentication safely"
+  default_prompt: "Use $agentos-auth to inspect and guide the required AgentOS model authentication flow."

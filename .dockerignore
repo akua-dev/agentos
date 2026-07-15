@@ -1,0 +1,11 @@
+.git
+.gitignore
+.DS_Store
+.env
+.env.*
+coverage
+node_modules
+tmp
+*.credentials
+*.log
+*.secret

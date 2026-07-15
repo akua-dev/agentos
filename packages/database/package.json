@@ -1,0 +1,20 @@
+{
+  "name": "@agentos/database",
+  "version": "0.0.0",
+  "description": "SQL-first PostgreSQL migrations and Drizzle Kit tooling for AgentOS",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "migration:new": "drizzle-kit generate --custom --dialect=postgresql --schema=./drizzle.tooling.ts --out=./migrations",
+    "migration:check": "drizzle-kit check --config=drizzle.config.ts",
+    "migrate": "drizzle-kit migrate --config=drizzle.config.ts"
+  },
+  "dependencies": {
+    "drizzle-kit": "0.31.10",
+    "drizzle-orm": "0.45.2",
+    "pg": "8.22.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.4"
+  }
+}

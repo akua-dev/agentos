@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS Database"
+  short_description: "Operate AgentOS PostgreSQL assets safely"
+  default_prompt: "Use $agentos-database to inspect and operate the AgentOS PostgreSQL database from versioned assets."

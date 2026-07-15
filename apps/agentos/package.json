@@ -1,0 +1,19 @@
+{
+  "name": "@agentos/app-agentos",
+  "version": "0.0.0",
+  "description": "Executable AgentOS command-line application",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agentos": "./src/main.ts"
+  },
+  "scripts": {
+    "test": "bun test tests"
+  },
+  "dependencies": {
+    "@agentos/cli": "workspace:*"
+  },
+  "devDependencies": {
+    "@toon-format/toon": "2.3.0"
+  }
+}
