@@ -6,8 +6,9 @@ Mate inside one Herdr server, backed by one retained Kubernetes home volume.
 ## Selected design
 
 - Keep the Mate image small: a glibc Linux base, Mise, OS transport
-  dependencies, and the reviewed AgentOS release files. Pi, Herdr, Bun, Node and
-  Fleet CLIs are not copied in as a second baked toolchain.
+  dependencies, the official PostgreSQL client, and the reviewed AgentOS release
+  files. Pi, Herdr, Bun, Node and Fleet CLIs are not copied in as a second baked
+  toolchain; the image contains no PostgreSQL server.
 - Run one non-root `StatefulSet` replica with a `volumeClaimTemplate`. The PVC
   stores the complete Agent home, including Pi sessions and authentication,
   Herdr session state, Mise-installed tools, agent-owned Mise additions and
@@ -21,9 +22,11 @@ Mate inside one Herdr server, backed by one retained Kubernetes home volume.
   init containers and the running Mate use the same image and PVC, so there is
   no second image or duplicate layer download. A
   cold bootstrap may download them once; later pod replacements reuse the PVC.
-  The remaining released Fleet tools, including PostgreSQL, stay available for
-  explicit locked installation by the running Mate. Reconciliation never
-  removes agent-owned tools or additions under `conf.d/`.
+  The remaining released Fleet tools stay available for explicit locked
+  installation by the running Mate. `psql` comes from the exact PGDG
+  `postgresql-client-18` package in the reviewed image instead of Mise's
+  source-building PostgreSQL backend. Reconciliation never removes agent-owned
+  tools or additions under `conf.d/`.
 - Mise shims are available on `PATH`; released tools, agent-added tools and
   repository-local overrides are invoked by their normal command names.
 - Home preparation and health commands use Bun Shell's `$` API. Herdr

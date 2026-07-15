@@ -21,7 +21,7 @@ Read the architecture section in `../../README.md` before changing architecture 
 
 ## Toolchain
 
-The root and `../mise.toml` form the reviewed Fleet toolchain. Invoke tools by their ordinary command names through the activated Mise environment; do not replace pinned tools with global npm, Homebrew or ad hoc installer state. A target project's nearer Mise configuration may override versions for work in that project while the AgentOS system baseline keeps missing Fleet tools available.
+The root and `../mise.toml` form the reviewed Fleet toolchain. Invoke tools by their ordinary command names through the activated Mise environment; do not replace pinned tools with global npm, Homebrew or ad hoc installer state. Pinned operating-system utilities shipped by the reviewed Mate image, including `psql`, are part of that release boundary and must not be reinstalled ad hoc. A target project's nearer Mise configuration may override versions for work in that project while the AgentOS system baseline keeps missing Fleet tools available.
 
 ## Skill routing
 

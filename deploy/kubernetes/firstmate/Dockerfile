@@ -3,6 +3,8 @@ FROM debian:13-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59
 ARG TARGETARCH
 ARG MISE_VERSION=2026.4.25
 ARG AGENTOS_VERSION=dev
+ARG POSTGRESQL_CLIENT_VERSION=18.4-1.pgdg13+1
+ARG PGDG_SIGNING_CHECKSUM=0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76
 
 LABEL org.opencontainers.image.source="https://github.com/akua-dev/agentos" \
       org.opencontainers.image.description="Persistent engineering agents for Kubernetes" \
@@ -21,6 +23,28 @@ RUN apt-get update \
     unzip \
     xz-utils \
     zstd \
+  && install -d -m 0755 /usr/share/postgresql-common/pgdg \
+  && curl --fail --location --retry 3 \
+    https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+  && echo "${PGDG_SIGNING_CHECKSUM}  /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc" \
+    | sha256sum --check --strict \
+  && printf '%s\n' \
+    'Types: deb' \
+    'URIs: https://apt.postgresql.org/pub/repos/apt' \
+    'Suites: trixie-pgdg' \
+    'Components: main' \
+    'Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc' \
+    > /etc/apt/sources.list.d/pgdg.sources \
+  && apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+    "postgresql-client-18=${POSTGRESQL_CLIENT_VERSION}" \
+  && test "$(psql --version)" = \
+    "psql (PostgreSQL) 18.4 (Debian ${POSTGRESQL_CLIENT_VERSION})" \
+  && ! command -v postgres \
+  && rm -f \
+    /etc/apt/sources.list.d/pgdg.sources \
+    /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
   && rm -rf /var/lib/apt/lists/*
 
 RUN case "$TARGETARCH" in \

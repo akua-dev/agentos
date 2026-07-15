@@ -124,7 +124,7 @@ This is a user-facing view, not a central controller or a new source of truth.
 ### Toolchains and worktrees
 
 Mise supplies tools to every AgentOS agent, including First Mates, Second Mates and Crewmates.
-The release-owned root `mise.toml`/`mise.lock` own Bun and Node; `agents/mise.toml`/`agents/mise.lock` add pinned Fleet tools for Pi, Herdr, Kubernetes, PostgreSQL, GitHub, validation, AXI helpers and command-line inspection.
+The release-owned root `mise.toml`/`mise.lock` own Bun and Node; `agents/mise.toml`/`agents/mise.lock` add pinned Fleet tools for Pi, Herdr, Kubernetes, GitHub, validation, AXI helpers and command-line inspection.
 Until Bun 1.4 has a stable release, the root pair resolves the official Bun Canary through Mise's GitHub backend and requires the runtime to report `1.4.0`. Refreshing that moving release is an explicit reviewed update.
 
 Agent Pods install the root pair as `/etc/mise/config.toml` and `/etc/mise/mise.lock`.
@@ -135,13 +135,16 @@ Mise to run the typed home-reconciliation program. Both init containers and the
 Mate use one image and one PVC; identical image layers are pulled only once per
 node. Remaining released Fleet tools stay
 locked and discoverable but are installed explicitly when the running Mate's
-task needs them; PostgreSQL therefore does not force a compiler toolchain into
-the baseline image.
+task needs them. The Mate image carries only PostgreSQL's official pinned
+`postgresql-client-18` package, so agents can invoke `psql` immediately without
+compiling or embedding a PostgreSQL server.
 
 Mise itself remains part of the running First Mate, not merely its bootstrap.
 Its shims come first on `PATH` for interactive and non-interactive processes, so released tools win over unmanaged global installations.
 Agents invoke tools by their ordinary names without a `mise exec` prefix.
 Resolution follows the current working directory, including after a Crewmate enters an isolated worktree.
+Pinned operating-system transport and database-client utilities in the reviewed
+Mate image remain ordinary commands but are not duplicated into the PVC by Mise.
 
 Mise configuration is deliberately layered:
 

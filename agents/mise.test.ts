@@ -108,7 +108,6 @@ const fleetTools = {
   "npm:gh-axi": "0.1.27",
   "npm:lavish-axi": "0.1.42",
   "npm:quota-axi": "0.1.5",
-  postgres: "18.4",
   ripgrep: "15.1.0",
 };
 
