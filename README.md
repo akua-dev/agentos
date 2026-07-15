@@ -116,7 +116,10 @@ Client detach leaves processes running. After a pod replacement, Herdr restores 
 
 Herdr is not a fleet database.
 Its CLI and socket API are used locally for attach, read, send, wait, layout and debugging.
-`agentos attach <agent>` will resolve the agent's pod locator and open the real Herdr terminal through an explicit Kubernetes context and namespace.
+`agentos attach <agent> --context <context>` resolves exactly one Ready Pod from
+its released AgentOS metadata and opens the real Herdr terminal. The Kubernetes
+context is always explicit; the namespace defaults to `agentos` and may be
+overridden with `--namespace`.
 
 A First Mate may arrange central fleet workspaces whose panes attach to Herdr sessions in other pods through Kubernetes exec.
 This is a user-facing view, not a central controller or a new source of truth.

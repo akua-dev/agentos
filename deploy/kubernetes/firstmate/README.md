@@ -46,9 +46,10 @@ Mate inside one Herdr server, backed by one retained Kubernetes home volume.
 - Keep the ServiceAccount namespaced in the base. A separate, explicit
   dedicated-cluster overlay binds it to `cluster-admin`; bootstrap must obtain
   approval before applying that overlay.
-- Expose no public Service or Ingress. Humans attach through explicit-context
-  Kubernetes exec; the later authentication step may temporarily port-forward
-  Pi's localhost OAuth callback after approval.
+- Expose no public Service or Ingress. The Pod publishes its Agent, container
+  and Herdr-session metadata so humans attach with
+  `agentos attach firstmate --context <context>`; the later authentication step
+  may temporarily port-forward Pi's localhost OAuth callback after approval.
 
 First and Second Mates share this small Mate baseline by default and keep
 different homes. A Mate that genuinely needs incompatible operating-system

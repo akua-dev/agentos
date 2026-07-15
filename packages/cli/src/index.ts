@@ -1,5 +1,6 @@
 import { AxiError, runAxiCli } from "axi-sdk-js";
 import packageMetadata from "../package.json" with { type: "json" };
+import { attachAgent, attachHelp } from "./attach";
 
 const description = "Inspect and operate deterministic AgentOS fleet primitives";
 
@@ -7,10 +8,12 @@ const topLevelHelp = `AgentOS fleet primitives
 
 Usage:
   agentos
+  agentos attach <agent> --context <context>
   agentos update --check
   agentos --help
 
 Commands:
+  attach <agent>  Open the agent's live Herdr terminal
   update --check  Report the immutable release that owns this installation
 `;
 
@@ -53,10 +56,14 @@ export async function run(args: string[]): Promise<number> {
 
   await runAxiCli({
     argv: args,
-    commands: { update: releaseUpdate },
+    commands: { attach: attachAgent, update: releaseUpdate },
     description,
     getCommandHelp: (command) =>
-      command === "update" ? updateHelp : undefined,
+      command === "attach"
+        ? attachHelp
+        : command === "update"
+          ? updateHelp
+          : undefined,
     home: () => ({
       release: packageMetadata.version,
       implementation: "skeleton",

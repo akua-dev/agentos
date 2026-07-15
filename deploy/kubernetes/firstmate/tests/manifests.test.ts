@@ -4,7 +4,12 @@ import { join } from "node:path";
 type Resource = {
   apiVersion: string;
   kind: string;
-  metadata: { name: string; namespace?: string };
+  metadata: {
+    name: string;
+    namespace?: string;
+    annotations?: Record<string, string>;
+    labels?: Record<string, string>;
+  };
   spec?: Record<string, any>;
   roleRef?: Record<string, any>;
   subjects?: Array<Record<string, any>>;
@@ -80,6 +85,17 @@ describe("First Mate Kubernetes resources", () => {
     ]);
 
     const pod = spec.template.spec;
+    expect(spec.template.metadata).toEqual({
+      annotations: {
+        "agentos.akua.dev/container": "firstmate",
+        "agentos.akua.dev/herdr-session": "agentos-firstmate",
+      },
+      labels: {
+        "agentos.akua.dev/agent": "firstmate",
+        "app.kubernetes.io/name": "agentos-firstmate",
+        "app.kubernetes.io/part-of": "agentos",
+      },
+    });
     expect(pod.securityContext).toEqual({
       fsGroup: 1000,
       fsGroupChangePolicy: "OnRootMismatch",

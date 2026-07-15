@@ -16,7 +16,7 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 
 ## Attach and debug
 
-- Prefer an implemented `agentos attach <agent>` command when CLI help advertises it. Until then, attach to First Mate with `kubectl --context <context> --namespace agentos exec -it pod/agentos-firstmate-0 --container firstmate -- herdr --session agentos-firstmate`.
+- Prefer `agentos attach <agent> --context <context> [--namespace <namespace>]` when CLI help advertises it. It must resolve exactly one Ready Pod from released AgentOS metadata and never fall back to the global current context. For an older release without that command, attach to First Mate with `kubectl --context <context> --namespace agentos exec -it pod/agentos-firstmate-0 --container firstmate -- herdr --session agentos-firstmate`.
 - Attach to the real agent terminal for interactive diagnosis.
 - Use Herdr read, status, send and wait primitives for bounded inspection; do not scrape or persist terminal output automatically.
 - Treat a live terminal send as an immediate hint only. Keep durable inter-agent communication in PostgreSQL.

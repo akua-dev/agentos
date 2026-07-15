@@ -23,7 +23,7 @@ Handle provider credentials inside the owning agent's persistent runtime wheneve
 5. Never expose the callback through a public Service or Ingress. Stop the port-forward after callback completion. If it cannot complete, use Pi's manual redirect-URL input; offer device code only as an explicit recovery choice.
 6. Let Pi own and refresh `~/.pi/agent/auth.json` on the Agent PVC. Verify mode `0600` and ownership without printing or copying its contents.
 7. AgentOS seeds Pi's `defaultProvider`, `defaultModel`, and `defaultThinkingLevel` settings without replacing unrelated or user-owned settings. Its Pi extension adopts those persisted defaults once authentication becomes available, then stops reconciling so later user changes remain possible. Do not simulate model-selection key presses.
-8. Verify the effective non-secret settings and Pi status, then request a short fixed response with no tools. Record only provider, model, thinking level and success. Detach from Herdr without stopping the agent with `Ctrl+B`, then `Q`.
+8. Verify the effective non-secret settings and Pi status, then request a short fixed response with no tools. Record only provider, model, thinking level and success. Detach from Herdr without stopping the agent with `Ctrl+B`, then lowercase `q`.
 
 ## Secret-based fallback
 

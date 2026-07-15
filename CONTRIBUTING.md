@@ -42,6 +42,7 @@ kubectl --context orbstack apply --kustomize deploy/kubernetes/firstmate/base
 kubectl --context orbstack --namespace agentos rollout status statefulset/agentos-firstmate --timeout=10m
 kubectl --context orbstack --namespace agentos get pods
 kubectl --context orbstack --namespace agentos logs agentos-firstmate-0 --all-containers
+bun run agentos attach firstmate --context orbstack
 ```
 
 The development manifests use `agentos-firstmate:dev` with
