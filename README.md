@@ -27,6 +27,11 @@ Inspect my environment read-only first and guide me interactively through establ
 
 The agent inspects what already exists, explains the viable path and asks before credentials, login, cost, cluster creation, RBAC or installation. It can use an existing Kubernetes cluster or offer Akua Zero-to-Cluster as an optional path.
 
+For an existing cluster, the temporary local agent needs a working `kubectl`
+context and a browser for interactive provider login. It does not need a local
+AgentOS clone, Mise, Bun, Node, Docker, Helm, or PostgreSQL. Mise is part of the
+persistent First-Mate image and manages that agent's tools on its PVC.
+
 ## The crew
 
 - **Captain** — the developer. Owns intent, approvals, credentials, cost and infrastructure decisions.
@@ -58,6 +63,8 @@ bun run agentos --help
 ```
 
 Bun reports the release-selected `1.4.0` baseline. Package-specific instructions live with the package they govern.
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the local Kubernetes workflow and
+repository conventions.
 
 ---
 
@@ -118,13 +125,17 @@ Until Bun 1.4 has a stable release, the root pair resolves the official Bun Cana
 
 Agent Pods install the root pair as `/etc/mise/config.toml` and `/etc/mise/mise.lock`.
 They seed the Fleet pair as `~/.config/mise/config.toml` and `~/.config/mise/mise.lock` on the agent PVC; agent-owned additions live separately under `~/.config/mise/conf.d/`.
-Before starting a Mate, home reconciliation installs the small startup-critical
-set: Node, Bun, jq, kubectl, Herdr and Pi. Remaining released Fleet tools stay
+Before starting a Mate, a direct Mise init step installs the small
+startup-critical set: Node, Bun, kubectl, Herdr and Pi. A second init step uses
+Mise to run the typed home-reconciliation program. Both init containers and the
+Mate use one image and one PVC; identical image layers are pulled only once per
+node. Remaining released Fleet tools stay
 locked and discoverable but are installed explicitly when the running Mate's
 task needs them; PostgreSQL therefore does not force a compiler toolchain into
 the baseline image.
 
-Mise shims come first on `PATH` for interactive and non-interactive processes, so released tools win over unmanaged global installations.
+Mise itself remains part of the running First Mate, not merely its bootstrap.
+Its shims come first on `PATH` for interactive and non-interactive processes, so released tools win over unmanaged global installations.
 Agents invoke tools by their ordinary names without a `mise exec` prefix.
 Resolution follows the current working directory, including after a Crewmate enters an isolated worktree.
 
@@ -300,6 +311,7 @@ Workspace packages depend on each other through `workspace:*`, and the repositor
 ### Repository source-of-truth rules
 
 - `README.md` contains product orientation, the copyable onboarding prompt and the canonical architecture.
+- `CONTRIBUTING.md` contains repository setup, development conventions and disposable-cluster smoke testing.
 - `BOOTSTRAP.md` points to the canonical First-Mate bootstrap skill without duplicating its procedure.
 - The Architecture section in this README contains architectural decisions and boundaries.
 - `agents/.agents/skills/` contains workflows shared by First and Second Mate without exposing them to development sessions.

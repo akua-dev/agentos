@@ -88,26 +88,45 @@ describe("First Mate Kubernetes resources", () => {
       runAsUser: 1000,
       seccompProfile: { type: "RuntimeDefault" },
     });
-    expect(pod.initContainers).toHaveLength(1);
+    expect(pod.initContainers).toHaveLength(2);
     expect(pod.containers).toHaveLength(1);
-    const init = pod.initContainers[0];
+    const install = pod.initContainers[0];
+    const prepare = pod.initContainers[1];
     const firstmate = pod.containers[0];
-    expect(init.image).toBe("agentos-firstmate:dev");
-    expect(firstmate.image).toBe(init.image);
-    expect(init.volumeMounts).toEqual([{ mountPath: "/home/agent", name: "home" }]);
-    expect(firstmate.volumeMounts).toEqual(init.volumeMounts);
-    expect(init.command).toEqual([
-      "/opt/agentos/deploy/kubernetes/firstmate/bin/prepare-home.sh",
+    expect(install.image).toBe("agentos-firstmate:dev");
+    expect(prepare.image).toBe(install.image);
+    expect(firstmate.image).toBe(install.image);
+    expect(install.volumeMounts).toEqual([{ mountPath: "/home/agent", name: "home" }]);
+    expect(prepare.volumeMounts).toEqual(install.volumeMounts);
+    expect(firstmate.volumeMounts).toEqual(install.volumeMounts);
+    expect(install.command).toEqual(["mise"]);
+    expect(install.args).toEqual([
+      "install",
+      "--locked",
+      "node",
+      "github:oven-sh/bun",
+      "kubectl",
+      "github:ogulcancelik/herdr",
+      "npm:@earendil-works/pi-coding-agent",
     ]);
-    expect(firstmate.command).toEqual([
-      "/opt/agentos/deploy/kubernetes/firstmate/bin/run-firstmate.sh",
-    ]);
+    expect(prepare.command).toEqual(["mise"]);
+    expect(prepare.args).toEqual(["run", "--skip-tools", "firstmate:prepare"]);
+    expect(firstmate.command).toEqual(["mise"]);
+    expect(firstmate.args).toEqual(["run", "--skip-tools", "firstmate:run"]);
     expect(firstmate.livenessProbe.exec.command).toEqual([
-      "/opt/agentos/deploy/kubernetes/firstmate/bin/health.sh",
+      "mise",
+      "run",
+      "--skip-tools",
+      "firstmate:health",
+      "--",
       "live",
     ]);
     expect(firstmate.readinessProbe.exec.command).toEqual([
-      "/opt/agentos/deploy/kubernetes/firstmate/bin/health.sh",
+      "mise",
+      "run",
+      "--skip-tools",
+      "firstmate:health",
+      "--",
       "ready",
     ]);
     expect(firstmate.securityContext).toEqual({

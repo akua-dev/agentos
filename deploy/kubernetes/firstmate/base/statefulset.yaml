@@ -31,11 +31,19 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       initContainers:
-        - name: prepare-home
+        - name: install-tools
           image: agentos-firstmate:dev
           imagePullPolicy: Never
           command:
-            - /opt/agentos/deploy/kubernetes/firstmate/bin/prepare-home.sh
+            - mise
+          args:
+            - install
+            - --locked
+            - node
+            - github:oven-sh/bun
+            - kubectl
+            - github:ogulcancelik/herdr
+            - npm:@earendil-works/pi-coding-agent
           env: &runtime-environment
             - name: HOME
               value: /home/agent
@@ -65,19 +73,39 @@ spec:
           volumeMounts: &home-volume
             - name: home
               mountPath: /home/agent
+        - name: prepare-home
+          image: agentos-firstmate:dev
+          imagePullPolicy: Never
+          command:
+            - mise
+          args:
+            - run
+            - --skip-tools
+            - firstmate:prepare
+          env: *runtime-environment
+          securityContext: *container-security
+          volumeMounts: *home-volume
       containers:
         - name: firstmate
           image: agentos-firstmate:dev
           imagePullPolicy: Never
           command:
-            - /opt/agentos/deploy/kubernetes/firstmate/bin/run-firstmate.sh
+            - mise
+          args:
+            - run
+            - --skip-tools
+            - firstmate:run
           env: *runtime-environment
           securityContext: *container-security
           volumeMounts: *home-volume
           livenessProbe:
             exec:
               command:
-                - /opt/agentos/deploy/kubernetes/firstmate/bin/health.sh
+                - mise
+                - run
+                - --skip-tools
+                - firstmate:health
+                - --
                 - live
             initialDelaySeconds: 5
             periodSeconds: 10
@@ -86,7 +114,11 @@ spec:
           readinessProbe:
             exec:
               command:
-                - /opt/agentos/deploy/kubernetes/firstmate/bin/health.sh
+                - mise
+                - run
+                - --skip-tools
+                - firstmate:health
+                - --
                 - ready
             initialDelaySeconds: 2
             periodSeconds: 5

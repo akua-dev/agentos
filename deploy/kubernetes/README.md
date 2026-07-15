@@ -6,9 +6,12 @@ Every behavior change requires a render or lifecycle test; ambiguous ownership m
 
 Runtime images copy the release root `mise.toml` to `/etc/mise/config.toml` and
 `mise.lock` to `/etc/mise/mise.lock`, but keep the tool installations in the
-agent's persistent home. The init boundary installs only the startup-critical
-locked tools. Mise shims remain on `PATH` for every process so repository-local
-configuration resolves from each agent's current worktree.
+agent's persistent home. The first init boundary invokes Mise directly to
+install only the startup-critical locked tools. The second invokes a
+Bun/TypeScript home-preparation task through Mise. Init and main containers use
+the same image and PVC. Mise remains the running Mate's tool manager, and its
+shims stay on `PATH` for every process so repository-local configuration
+resolves from each agent's current worktree.
 
 The first executable runtime is in [`firstmate/`](firstmate/). Its base grants
 the First Mate namespace-wide administration. The `cluster-admin` overlay is

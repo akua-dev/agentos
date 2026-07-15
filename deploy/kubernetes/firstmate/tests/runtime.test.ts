@@ -10,8 +10,8 @@ const repository = new URL("../../../..", import.meta.url).pathname.replace(
   "",
 );
 const runtime = new URL("..", import.meta.url).pathname;
-const runFirstMate = join(runtime, "bin", "run-firstmate.sh");
-const health = join(runtime, "bin", "health.sh");
+const runFirstMate = join(runtime, "runtime", "run-firstmate.ts");
+const health = join(runtime, "runtime", "health.ts");
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -104,7 +104,7 @@ async function readCalls(state: string): Promise<string[][]> {
 }
 
 async function runHealth(env: Record<string, string | undefined>, mode: "live" | "ready") {
-  const child = Bun.spawn(["/bin/sh", health, mode], {
+  const child = Bun.spawn([process.execPath, health, mode], {
     env,
     stderr: "pipe",
     stdout: "pipe",
@@ -120,7 +120,7 @@ async function runHealth(env: Record<string, string | undefined>, mode: "live" |
 describe("First Mate runtime", () => {
   test("starts one named Pi agent on an empty Herdr session", async () => {
     const { env, state } = await createHarness([]);
-    const child = Bun.spawn(["/bin/sh", runFirstMate], {
+    const child = Bun.spawn([process.execPath, runFirstMate], {
       env,
       stderr: "pipe",
       stdout: "pipe",
@@ -157,7 +157,7 @@ describe("First Mate runtime", () => {
 
   test("triggers native restore instead of creating a second First Mate", async () => {
     const { env, state } = await createHarness([{ name: "firstmate" }]);
-    const child = Bun.spawn(["/bin/sh", runFirstMate], {
+    const child = Bun.spawn([process.execPath, runFirstMate], {
       env,
       stderr: "pipe",
       stdout: "pipe",
@@ -195,7 +195,7 @@ describe("First Mate runtime", () => {
       { name: "firstmate" },
       { name: "firstmate" },
     ]);
-    const child = Bun.spawn(["/bin/sh", runFirstMate], {
+    const child = Bun.spawn([process.execPath, runFirstMate], {
       env,
       stderr: "pipe",
       stdout: "pipe",

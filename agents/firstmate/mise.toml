@@ -1,0 +1,11 @@
+[tasks."firstmate:prepare"]
+description = "Reconcile the persistent First Mate home"
+file = "../../deploy/kubernetes/firstmate/runtime/prepare-home.ts"
+
+[tasks."firstmate:run"]
+description = "Run the persistent First Mate through Herdr and Pi"
+file = "../../deploy/kubernetes/firstmate/runtime/run-firstmate.ts"
+
+[tasks."firstmate:health"]
+description = "Check First Mate liveness or readiness"
+file = "../../deploy/kubernetes/firstmate/runtime/health.ts"

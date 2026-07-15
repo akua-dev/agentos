@@ -15,7 +15,7 @@ const repository = new URL("../../../..", import.meta.url).pathname.replace(
   "",
 );
 const runtime = new URL("..", import.meta.url).pathname;
-const prepareHome = join(runtime, "bin", "prepare-home.sh");
+const prepareHome = join(runtime, "runtime", "prepare-home.ts");
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -32,7 +32,7 @@ async function makeExecutable(path: string, contents: string) {
 }
 
 async function run(script: string, env: Record<string, string>) {
-  const child = Bun.spawn(["/bin/sh", script], {
+  const child = Bun.spawn([process.execPath, script], {
     env: { ...process.env, ...env },
     stderr: "pipe",
     stdout: "pipe",
@@ -72,16 +72,30 @@ describe("First Mate home preparation", () => {
       ),
       makeExecutable(
         join(fakeBin, "mise"),
-        '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$FAKE_LOG_DIRECTORY/mise.log"\n',
+        `#!/usr/bin/env bun
+import { appendFile } from "node:fs/promises";
+import { join } from "node:path";
+await appendFile(
+  join(process.env.FAKE_LOG_DIRECTORY!, "mise.log"),
+  process.argv.slice(2).join(" ") + "\\n",
+);
+`,
       ),
       makeExecutable(
         join(fakeBin, "herdr"),
-        `#!/bin/sh
-printf '%s\\n' "$*" >> "$FAKE_LOG_DIRECTORY/herdr.log"
-if [ "$1 $2 $3" = "integration install pi" ]; then
-  [ -d "$HOME/.pi/agent/extensions" ] || exit 3
-  printf 'installed\\n' > "$HOME/.pi/agent/extensions/herdr-agent-state.ts"
-fi
+        `#!/usr/bin/env bun
+import { appendFile, stat, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+const args = process.argv.slice(2);
+await appendFile(
+  join(process.env.FAKE_LOG_DIRECTORY!, "herdr.log"),
+  args.join(" ") + "\\n",
+);
+if (args.join(" ") === "integration install pi") {
+  const extensions = join(process.env.HOME!, ".pi", "agent", "extensions");
+  await stat(extensions);
+  await writeFile(join(extensions, "herdr-agent-state.ts"), "installed\\n");
+}
 `,
       ),
     ]);
@@ -130,7 +144,6 @@ fi
     expect((await readFile(join(logDirectory, "mise.log"), "utf8")).trim().split("\n")).toEqual([
       `trust ${join(repository, "mise.toml")}`,
       `trust ${join(home, ".config", "mise", "config.toml")}`,
-      "install --locked node github:oven-sh/bun jq kubectl github:ogulcancelik/herdr npm:@earendil-works/pi-coding-agent",
     ]);
     expect((await readFile(join(logDirectory, "herdr.log"), "utf8")).trim().split("\n")).toEqual([
       "integration install pi",

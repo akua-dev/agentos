@@ -38,7 +38,7 @@ RUN case "$TARGETARCH" in \
     chmod 0755 /usr/local/bin/mise
 
 RUN groupadd --gid 1000 agent \
-  && useradd --uid 1000 --gid 1000 --home-dir /home/agent --create-home --shell /bin/bash agent \
+  && useradd --uid 1000 --gid 1000 --home-dir /home/agent --create-home --shell /bin/sh agent \
   && install -d -o agent -g agent -m 0700 /home/agent \
   && install -d -o root -g root -m 0755 /etc/mise /opt/agentos
 
@@ -53,10 +53,11 @@ RUN chmod 0644 \
     /opt/agentos/mise.lock \
     /opt/agentos/agents/mise.toml \
     /opt/agentos/agents/mise.lock \
+    /opt/agentos/agents/firstmate/mise.toml \
   && chmod 0755 \
-    /opt/agentos/deploy/kubernetes/firstmate/bin/prepare-home.sh \
-    /opt/agentos/deploy/kubernetes/firstmate/bin/run-firstmate.sh \
-    /opt/agentos/deploy/kubernetes/firstmate/bin/health.sh
+    /opt/agentos/deploy/kubernetes/firstmate/runtime/prepare-home.ts \
+    /opt/agentos/deploy/kubernetes/firstmate/runtime/run-firstmate.ts \
+    /opt/agentos/deploy/kubernetes/firstmate/runtime/health.ts
 
 ENV HOME=/home/agent \
     AGENTOS_RELEASE_ROOT=/opt/agentos \
@@ -74,4 +75,4 @@ ENV HOME=/home/agent \
 USER 1000:1000
 WORKDIR /opt/agentos/agents/firstmate
 
-CMD ["/opt/agentos/deploy/kubernetes/firstmate/bin/run-firstmate.sh"]
+CMD ["mise", "run", "--skip-tools", "firstmate:run"]

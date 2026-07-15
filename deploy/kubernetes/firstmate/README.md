@@ -5,22 +5,32 @@ Mate inside one Herdr server, backed by one retained Kubernetes home volume.
 
 ## Selected design
 
-- Keep the Mate image small: a glibc Linux base, Mise, basic shell and transport
+- Keep the Mate image small: a glibc Linux base, Mise, OS transport
   dependencies, and the reviewed AgentOS release files. Pi, Herdr, Bun, Node and
   Fleet CLIs are not copied in as a second baked toolchain.
 - Run one non-root `StatefulSet` replica with a `volumeClaimTemplate`. The PVC
   stores the complete Agent home, including Pi sessions and authentication,
   Herdr session state, Mise-installed tools, agent-owned Mise additions and
   working repositories.
-- The released root Mise pair remains the image's system configuration. An init
-  container seeds the released Fleet pair into the mounted home and installs
-  only the startup-critical Node, Bun, jq, kubectl, Herdr and Pi tools there. A
+- The released root Mise pair remains the image's system configuration. A first
+  init container invokes Mise directly to install the startup-critical Node,
+  Bun, kubectl, Herdr and Pi tools. A second init container runs the typed
+  `firstmate:prepare` task with Mise's task-level automatic tool installation
+  disabled, so the broader Fleet configuration does not become an eager image
+  bootstrap. The same boundary applies to run and health tasks. Both
+  init containers and the running Mate use the same image and PVC, so there is
+  no second image or duplicate layer download. A
   cold bootstrap may download them once; later pod replacements reuse the PVC.
   The remaining released Fleet tools, including PostgreSQL, stay available for
   explicit locked installation by the running Mate. Reconciliation never
   removes agent-owned tools or additions under `conf.d/`.
 - Mise shims are available on `PATH`; released tools, agent-added tools and
   repository-local overrides are invoked by their normal command names.
+- Home preparation and health commands use Bun Shell's `$` API. Herdr
+  supervision uses `Bun.spawn` only where a long-lived signal-controlled
+  process handle is required. All three are TypeScript executables registered
+  as Mise file tasks; AgentOS runtime behavior is not implemented in
+  repository-owned shell scripts or shell-backed task strings.
 - Locked checksums remain mandatory. Runtime verification disables only the
   GitHub backend's online artifact-attestation and SLSA lookups so anonymous
   GitHub API rate limits are not a bootstrap dependency; other backend
@@ -95,3 +105,6 @@ The checked-in `:dev` image reference is deliberately local-only. A released
 bootstrap must replace it with its reviewed registry image pinned by digest.
 Render `overlays/cluster-admin` only after the developer approves fleet-wide
 control for a dedicated cluster.
+
+The complete macOS OrbStack and portable kind workflows live in the repository
+[`CONTRIBUTING.md`](../../../CONTRIBUTING.md).
