@@ -17,13 +17,13 @@ Handle provider credentials inside the owning agent's persistent runtime wheneve
 ## Pi with a Codex subscription
 
 1. Verify that the persistent Pod binds Pi's fixed `http://localhost:1455/auth/callback` listener with `PI_OAUTH_CALLBACK_HOST=0.0.0.0`.
-2. Read the expected `FIRSTMATE_MODEL` and `FIRSTMATE_THINKING` values from the Pod spec. After approval, start `kubectl --context <context> --namespace agentos port-forward pod/agentos-firstmate-0 1455:1455` on the seed machine.
+2. Read the seeded `FIRSTMATE_MODEL` and `FIRSTMATE_THINKING` values from the Pod spec and the effective non-secret defaults from `~/.pi/agent/settings.json`. Existing Pi settings are agent-owned and take precedence over release seeds. After approval, start `kubectl --context <context> --namespace agentos port-forward pod/agentos-firstmate-0 1455:1455` on the seed machine.
 3. Attach with `kubectl --context <context> --namespace agentos exec -it pod/agentos-firstmate-0 --container firstmate -- herdr --session agentos-firstmate`.
 4. In Pi, run `/login` with no trailing provider text. Choose `Sign in with an account`, `ChatGPT Plus/Pro (Codex Subscription)`, then `Browser login`, and complete the developer's browser flow. Pi treats text after `/login` as a provider filter, so do not use `/login openai-codex`.
 5. Never expose the callback through a public Service or Ingress. Stop the port-forward after callback completion. If it cannot complete, use Pi's manual redirect-URL input; offer device code only as an explicit recovery choice.
 6. Let Pi own and refresh `~/.pi/agent/auth.json` on the Agent PVC. Verify mode `0600` and ownership without printing or copying its contents.
-7. Authentication may preserve or select a different model in the native Pi session. Use `Ctrl+L` to select the expected model and `Shift+Tab` to cycle to the expected thinking level. Prefer these keybindings over `/model`, which can collide with extension commands. Verify both values in Pi's status before continuing.
-8. In that same pane, request a short fixed response with no tools. Verify the selected `openai-codex` provider and expected model, recording only non-secret status. Detach from Herdr without stopping the agent with `Ctrl+B`, then `Q`.
+7. AgentOS seeds Pi's `defaultProvider`, `defaultModel`, and `defaultThinkingLevel` settings without replacing unrelated or user-owned settings. Its Pi extension adopts those persisted defaults once authentication becomes available, then stops reconciling so later user changes remain possible. Do not simulate model-selection key presses.
+8. Verify the effective non-secret settings and Pi status, then request a short fixed response with no tools. Record only provider, model, thinking level and success. Detach from Herdr without stopping the agent with `Ctrl+B`, then `Q`.
 
 ## Secret-based fallback
 

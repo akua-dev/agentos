@@ -25,6 +25,10 @@ const herdrConfig =
   join(home, ".config", "herdr", "config.toml");
 const piAgentDirectory =
   process.env.PI_CODING_AGENT_DIR ?? join(home, ".pi", "agent");
+const piExtensionDirectory = join(piAgentDirectory, "extensions");
+const firstmateModel =
+  process.env.FIRSTMATE_MODEL ?? "openai-codex/gpt-5.6-terra";
+const firstmateThinking = process.env.FIRSTMATE_THINKING ?? "high";
 
 await Promise.all(
   [
@@ -34,7 +38,7 @@ await Promise.all(
     join(home, ".local", "state", "agentos"),
     join(home, "projects"),
     dirname(herdrConfig),
-    join(piAgentDirectory, "extensions"),
+    piExtensionDirectory,
   ].map((directory) => mkdir(directory, { recursive: true, mode: 0o700 })),
 );
 
@@ -47,7 +51,24 @@ await Promise.all([
     join(releaseRoot, "agents", "mise.lock"),
     join(fleetConfigDirectory, "mise.lock"),
   ),
+  copyPrivateFile(
+    join(
+      releaseRoot,
+      "deploy",
+      "kubernetes",
+      "firstmate",
+      "runtime",
+      "pi-defaults.ts",
+    ),
+    join(piExtensionDirectory, "agentos-pi-defaults.ts"),
+  ),
 ]);
+
+await seedPiSettings(
+  join(piAgentDirectory, "settings.json"),
+  firstmateModel,
+  firstmateThinking,
+);
 
 if (!(await exists(herdrConfig))) {
   await writeFile(
@@ -108,4 +129,44 @@ async function exists(path: string): Promise<boolean> {
 async function copyPrivateFile(source: string, destination: string) {
   await copyFile(source, destination);
   await chmod(destination, 0o600);
+}
+
+async function seedPiSettings(
+  path: string,
+  qualifiedModel: string,
+  thinkingLevel: string,
+) {
+  const separator = qualifiedModel.indexOf("/");
+  if (separator < 1 || separator === qualifiedModel.length - 1) {
+    throw new Error(
+      `FIRSTMATE_MODEL must use provider/model syntax, received ${qualifiedModel}`,
+    );
+  }
+
+  const settings = (await exists(path))
+    ? (JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>)
+    : {};
+  const defaults = {
+    defaultProvider: qualifiedModel.slice(0, separator),
+    defaultModel: qualifiedModel.slice(separator + 1),
+    defaultThinkingLevel: thinkingLevel,
+  };
+  let changed = !(await exists(path));
+
+  for (const [name, value] of Object.entries(defaults)) {
+    if (typeof settings[name] !== "string") {
+      settings[name] = value;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    const next = `${path}.agentos-next`;
+    await writeFile(next, `${JSON.stringify(settings, null, 2)}\n`, {
+      mode: 0o600,
+    });
+    await chmod(next, 0o600);
+    await rename(next, path);
+  }
+  await chmod(path, 0o600);
 }

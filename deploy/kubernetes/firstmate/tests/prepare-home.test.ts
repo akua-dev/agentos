@@ -55,6 +55,7 @@ describe("First Mate home preparation", () => {
     const customFragment = join(home, ".config", "mise", "conf.d", "custom.toml");
     const customTool = join(home, ".local", "share", "mise", "installs", "custom", "marker");
     const herdrConfig = join(home, ".config", "herdr", "config.toml");
+    const piSettings = join(home, ".pi", "agent", "settings.json");
     await Promise.all([
       mkdir(fakeBin, { recursive: true }),
       mkdir(logDirectory, { recursive: true }),
@@ -65,6 +66,11 @@ describe("First Mate home preparation", () => {
     await Promise.all([
       writeFile(customFragment, '[tools]\npython = "3.13"\n', "utf8"),
       writeFile(customTool, "agent-owned\n", "utf8"),
+      writeFile(
+        piSettings,
+        `${JSON.stringify({ theme: "agent-owned" }, null, 2)}\n`,
+        "utf8",
+      ),
       writeFile(
         join(home, ".pi", "agent", "trust.json"),
         `${JSON.stringify({ "/workspace": false }, null, 2)}\n`,
@@ -105,6 +111,8 @@ if (args.join(" ") === "integration install pi") {
       FAKE_LOG_DIRECTORY: logDirectory,
       HERDR_CONFIG_PATH: herdrConfig,
       HOME: home,
+      FIRSTMATE_MODEL: "openai-codex/gpt-5.6-terra",
+      FIRSTMATE_THINKING: "high",
       MISE_SYSTEM_CONFIG_FILE: join(repository, "mise.toml"),
       PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
     };
@@ -128,6 +136,12 @@ if (args.join(" ") === "integration install pi") {
       "/workspace": false,
       [repository]: true,
     });
+    expect(JSON.parse(await readFile(piSettings, "utf8"))).toEqual({
+      defaultModel: "gpt-5.6-terra",
+      defaultProvider: "openai-codex",
+      defaultThinkingLevel: "high",
+      theme: "agent-owned",
+    });
     expect(Bun.TOML.parse(await readFile(herdrConfig, "utf8"))).toEqual({
       onboarding: false,
       version_check: false,
@@ -141,6 +155,14 @@ if (args.join(" ") === "integration install pi") {
         "utf8",
       ),
     ).toBe("installed\n");
+    expect(
+      await readFile(
+        join(home, ".pi", "agent", "extensions", "agentos-pi-defaults.ts"),
+        "utf8",
+      ),
+    ).toBe(
+      await readFile(join(runtime, "runtime", "pi-defaults.ts"), "utf8"),
+    );
     expect((await readFile(join(logDirectory, "mise.log"), "utf8")).trim().split("\n")).toEqual([
       `trust ${join(repository, "mise.toml")}`,
       `trust ${join(home, ".config", "mise", "config.toml")}`,
@@ -151,6 +173,20 @@ if (args.join(" ") === "integration install pi") {
 
     const customHerdrConfig = '[theme]\nname = "agent-owned"\n';
     await writeFile(herdrConfig, customHerdrConfig, "utf8");
+    await writeFile(
+      piSettings,
+      `${JSON.stringify(
+        {
+          defaultModel: "gpt-5.4",
+          defaultProvider: "openai-codex",
+          defaultThinkingLevel: "low",
+          theme: "agent-owned",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
     const warm = await run(prepareHome, environment);
 
     expect(warm).toEqual({ exitCode: 0, stderr: "", stdout: "" });
@@ -159,5 +195,11 @@ if (args.join(" ") === "integration install pi") {
       '[tools]\npython = "3.13"\n',
     );
     expect(await readFile(customTool, "utf8")).toBe("agent-owned\n");
+    expect(JSON.parse(await readFile(piSettings, "utf8"))).toEqual({
+      defaultModel: "gpt-5.4",
+      defaultProvider: "openai-codex",
+      defaultThinkingLevel: "low",
+      theme: "agent-owned",
+    });
   });
 });

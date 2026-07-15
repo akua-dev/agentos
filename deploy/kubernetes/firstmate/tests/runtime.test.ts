@@ -136,10 +136,6 @@ describe("First Mate runtime", () => {
       "agentos-firstmate-test",
       "--",
       "pi",
-      "--model",
-      "openai-codex/gpt-5.6-terra",
-      "--thinking",
-      "high",
     ];
 
     await waitFor(async () =>

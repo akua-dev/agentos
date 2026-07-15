@@ -11,9 +11,6 @@ const releaseRoot = withoutTrailingSlash(
 const session = process.env.HERDR_SESSION ?? "agentos-firstmate";
 const firstmateCwd =
   process.env.FIRSTMATE_CWD ?? joinPath(releaseRoot, "agents", "firstmate");
-const firstmateModel =
-  process.env.FIRSTMATE_MODEL ?? "openai-codex/gpt-5.6-terra";
-const firstmateThinking = process.env.FIRSTMATE_THINKING ?? "high";
 
 let server: Bun.Subprocess | undefined;
 let observer: Bun.Subprocess | undefined;
@@ -34,7 +31,7 @@ try {
   const firstmateCount = agents.filter(({ name }) => name === "firstmate").length;
 
   if (firstmateCount === 0) {
-    await $`herdr agent start firstmate --cwd ${firstmateCwd} --no-focus --session ${session} -- pi --model ${firstmateModel} --thinking ${firstmateThinking}`;
+    await $`herdr agent start firstmate --cwd ${firstmateCwd} --no-focus --session ${session} -- pi`;
   } else if (firstmateCount === 1) {
     await restoreFirstMate();
   } else {
