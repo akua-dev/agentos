@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage AgentOS Second Mates"
+  short_description: "Charter and manage persistent Second Mates"
+  default_prompt: "Use $agentos-secondmates to manage this Second Mate lifecycle safely."

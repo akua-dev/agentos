@@ -1,0 +1,4 @@
+interface:
+  display_name: "Delegate AgentOS Work"
+  short_description: "Route and deliver bounded agent work"
+  default_prompt: "Use $agentos-delegation to route this project request safely."

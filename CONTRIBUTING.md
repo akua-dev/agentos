@@ -93,6 +93,6 @@ mise run release:render -- \
   --output ../../dist/release
 ```
 
-Publish `release.json` and all generated manifests on a draft GitHub release,
-then publish it with release immutability enabled. Never hand-edit a generated
-manifest or reuse a release tag or image digest for different contents.
+Publish all generated manifests on a draft GitHub release, then publish it with
+release immutability enabled. Never hand-edit a generated manifest or reuse a
+release tag or image digest for different contents.

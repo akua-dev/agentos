@@ -1,0 +1,4 @@
+interface:
+  display_name: "Supervise AgentOS Work"
+  short_description: "Recover and supervise direct agent reports"
+  default_prompt: "Use $agentos-supervision to reconcile and supervise my active direct reports."

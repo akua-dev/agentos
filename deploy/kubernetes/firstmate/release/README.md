@@ -24,6 +24,5 @@ mise run release:render -- \
   --output ../../dist/release
 ```
 
-The renderer also writes `release.json` with the immutable AgentOS image and
-asset names. Publish all four files on an immutable GitHub release. Never hand-edit a
+Publish all three files on an immutable GitHub release. Never hand-edit a
 generated manifest or reuse a release tag.

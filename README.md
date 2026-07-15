@@ -124,6 +124,30 @@ overridden with `--namespace`.
 A First Mate may arrange central fleet workspaces whose panes attach to Herdr sessions in other pods through Kubernetes exec.
 This is a user-facing view, not a central controller or a new source of truth.
 
+### Delegation and supervision
+
+The Captain has one regular fleet interface: First Mate.
+First Mate does not perform project-specific coding, investigation, planning, bug reproduction or audits itself.
+It may inspect projects read-only to understand and route work, and it may mutate reviewed Fleet operational state, but it delegates project work to a charter-matched Second Mate or a bounded Crewmate.
+The running AgentOS checkout is First Mate's narrow self-maintenance exception: it may change shared AgentOS source directly only with Captain approval, no active direct report and the normal reviewed delivery path.
+If any direct report is active, First Mate delegates AgentOS source changes too because hands-on work competes with supervision.
+
+A Second Mate uses the same architecture inside one persistent charter.
+It delegates project work to its own Crewmates, manages only its direct subtree and returns Captain-relevant outcomes to First Mate.
+An empty Second-Mate queue is a healthy idle state, not permission to invent work.
+Second Mates never create further Second Mates.
+
+Every accepted work item has one durable Task and at least one explicit Assignment before an asynchronous worker begins.
+A ship Crewmate works in an isolated worktree until its changes are durably landed or handed off.
+A scout's durable output is its report; its scratch worktree may then be discarded.
+No Mate merges without the Captain's explicit approval or a previously recorded standing authorization, and no agent or worktree with active or unlanded work is retired by implication.
+
+Delegated agents report through PostgreSQL Inbox, Task and Assignment state rather than opening competing Captain-facing threads.
+Direct Captain intervention in any attached terminal remains authoritative and is reconciled into Fleet state.
+Each Mate supervises only its direct reports and keeps status changes sparse: decisions, blockers, material phase changes, completion and failure.
+While a direct report is active, its Mate keeps exactly one verified harness-appropriate supervision wait and resumes it after handling actionable work.
+If the selected release lacks that wake capability, the Mate reports the unsupported boundary instead of claiming unattended supervision.
+
 ### Toolchains and worktrees
 
 Mise supplies tools to every AgentOS agent, including First Mates, Second Mates and Crewmates.
@@ -305,10 +329,12 @@ The initial model path uses Pi with the developer's Codex subscription through p
 Login happens inside the persistent Pi runtime, not by copying a local token directory.
 Exact package versions and authentication commands belong to release assets and the auth skill.
 
-The seed resolves `release.json` through the latest published GitHub release,
-verifies that release is immutable, and applies only its versioned AgentOS
-manifest URLs. External database dependencies are discovered and verified by
-First Mate when the developer selects self-hosting. The default manifest grants First Mate administration within `agentos`;
+The seed resolves the latest published GitHub release, verifies that release is
+immutable, and applies only its fixed-name assets under that versioned release
+URL. It verifies the immutable AgentOS image digest embedded in the selected
+manifest instead of trusting a separate metadata index.
+External database dependencies are discovered and verified by First Mate when the developer selects self-hosting.
+The default manifest grants First Mate administration within `agentos`;
 the separately named dedicated-cluster manifest adds cluster-administrator
 access only after explicit approval.
 
@@ -320,8 +346,8 @@ Akua Zero-to-Cluster is an optional path selected by the developer, never an imp
 Codex and Pi discover `.agents/skills/` directories from their working directory upward to the Git root.
 AgentOS uses that hierarchy to keep operational roles out of development sessions:
 
-- `agents/.agents/skills/` contains workflows shared by First and Second Mate, initially runtime, authentication and database operations;
-- `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, initially bootstrap and cluster handoff;
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication and database operations;
+- `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
 - a subtree under `apps/` or `packages/` may add its own `.agents/skills/` when development there needs a reusable workflow.
 
@@ -377,7 +403,7 @@ Workspace packages depend on each other through `workspace:*`, and the repositor
 - `deploy/kubernetes/database/` is authoritative for the optional self-hosted
   CloudNativePG topology; it does not own SQL schema.
 - `deploy/kubernetes/firstmate/release/` is authoritative for the renderer;
-  generated manifests and `release.json` belong only to immutable GitHub releases.
+  generated manifests belong only to immutable GitHub releases.
 - `packages/database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `packages/database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
 - `apps/agentos/`, `packages/cli/`, CLI output and their tests define implemented AXI behavior.
 - Release assets pin exact versions, digests and checksums.

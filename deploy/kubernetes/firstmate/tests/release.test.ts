@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderRelease } from "../release/render.ts";
@@ -55,6 +55,12 @@ describe("First Mate release artifacts", () => {
     const database = parseResources(
       await readFile(join(outputDirectory, release.manifests.database), "utf8"),
     );
+
+    expect((await readdir(outputDirectory)).sort()).toEqual([
+      "agentos-firstmate-cluster-admin.yaml",
+      "agentos-firstmate.yaml",
+      "agentos-postgres.yaml",
+    ]);
 
     expect(scoped.some(({ kind }) => kind === "ClusterRoleBinding")).toBe(false);
     expect(clusterAdmin.some(({ kind }) => kind === "ClusterRoleBinding")).toBe(true);

@@ -94,12 +94,6 @@ export async function renderRelease({
       );
     }),
   );
-  await writeFile(
-    join(outputDirectory, "release.json"),
-    `${JSON.stringify({ schemaVersion: 1, ...release }, null, 2)}\n`,
-    "utf8",
-  );
-
   return release;
 }
 
