@@ -63,10 +63,13 @@ For direct `psql`, copy only the Secret's `pgpass` value into `~/.pgpass` on the
 
 For an external endpoint, prefer an approved Kubernetes Secret or mode-`0600` file owned by the persistent agent. Keep the connection URI out of prompts, command arguments, shell history and normal logs.
 
-Create each Agent's PostgreSQL login through the selected database platform's
-approved role-management path, outside AgentOS migrations. Require a login role
-with no superuser, database-creation, role-creation, RLS-bypass or inherited
-owner capability. After creating the Agent row, bind the exact role name with
+Create Agent PostgreSQL logins through the selected database platform's approved
+role-management path, outside AgentOS migrations. Bind First Mate to the login
+that owns the Fleet's released AgentOS tables. This makes First Mate the Fleet
+database/schema administrator, but does not require PostgreSQL cluster
+`SUPERUSER`, `CREATEDB`, `CREATEROLE` or `BYPASSRLS`. Require every other Agent
+login to have none of those privileges and no inherited owner capability. After
+creating the Agent row, bind the exact role name with
 `agentos.register_agent_principal(agent_id, database_role)`. Keep the credential
 in that Agent's approved Secret or mode-`0600` file; never store it in Fleet rows.
 An active registered Agent receives the complete released Fleet read view; RLS

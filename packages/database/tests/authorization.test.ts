@@ -18,7 +18,6 @@ beforeAll(async () => {
   await database.exec(initialMigration);
   await database.exec(authorizationMigration);
   await database.exec(`
-    CREATE ROLE test_first_mate LOGIN;
     CREATE ROLE test_second_mate LOGIN;
     CREATE ROLE test_crewmate LOGIN;
     CREATE ROLE test_outsider LOGIN;
@@ -30,7 +29,7 @@ beforeAll(async () => {
       ('${ids.secondMate}', 'second', 'second_mate', '${ids.firstMate}', 'pi', 'active', 'Second Mate ready'),
       ('${ids.crewmate}', 'crew', 'crewmate', '${ids.secondMate}', 'codex', 'active', 'Crewmate ready');
 
-    SELECT agentos.register_agent_principal('${ids.firstMate}', 'test_first_mate');
+    SELECT agentos.register_agent_principal('${ids.firstMate}', 'postgres');
     SELECT agentos.register_agent_principal('${ids.secondMate}', 'test_second_mate');
     SELECT agentos.register_agent_principal('${ids.crewmate}', 'test_crewmate');
   `);
@@ -163,7 +162,7 @@ describe.serial("agent database authorization", () => {
     const firstToSecond = "10000000-0000-4000-8000-000000000002";
     const crewToFirst = "10000000-0000-4000-8000-000000000003";
 
-    await asRole("test_first_mate", async () => {
+    await asRole("postgres", async () => {
       await database.exec(`
         INSERT INTO agentos.inbox (
           id, sender_agent_id, sender_label, recipient_agent_id, kind,
@@ -231,7 +230,7 @@ describe.serial("agent database authorization", () => {
       `);
     });
 
-    await asRole("test_first_mate", async () => {
+    await asRole("postgres", async () => {
       await expect(
         database.exec(`
           UPDATE agentos.inbox
@@ -276,6 +275,27 @@ describe.serial("agent database authorization", () => {
         )
       `),
     ).rejects.toThrow("too privileged");
+  });
+
+  test("requires First Mate to use the Fleet owner role", async () => {
+    const unownedFirstMate = "00000000-0000-4000-8000-000000000005";
+    await database.exec(`
+      CREATE ROLE test_unowned_first_mate LOGIN;
+      INSERT INTO agentos.agents (
+        id, handle, role, harness, lifecycle_status, status_text
+      ) VALUES (
+        '${unownedFirstMate}', 'unowned-first', 'first_mate', 'pi', 'active',
+        'Awaiting the Fleet owner principal'
+      )
+    `);
+
+    await expect(
+      database.exec(`
+        SELECT agentos.register_agent_principal(
+          '${unownedFirstMate}', 'test_unowned_first_mate'
+        )
+      `),
+    ).rejects.toThrow("Fleet owner role");
   });
 
   test("removes a retired Agent from the runtime authorization boundary", async () => {

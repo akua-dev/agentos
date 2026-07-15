@@ -136,6 +136,10 @@ BEGIN
     RAISE EXCEPTION 'database role % must already exist and allow login', p_database_role;
   END IF;
 
+  IF v_agent_role = 'first_mate' AND p_database_role <> v_owner THEN
+    RAISE EXCEPTION 'First Mate must use the Fleet owner role %', v_owner;
+  END IF;
+
   IF p_database_role = v_owner THEN
     IF session_user::name <> v_owner OR v_agent_role <> 'first_mate' THEN
       RAISE EXCEPTION 'only the Fleet owner may bind its role to First Mate';

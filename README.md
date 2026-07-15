@@ -184,14 +184,18 @@ PostgreSQL is the durable fleet authority for at least:
 
 Every agent receives a PostgreSQL identity.
 Agents use SQL or `psql` directly; AgentOS does not add a database wrapper service.
-The first authorization migration binds an existing, non-privileged PostgreSQL
-`session_user` to one Agent and applies grants plus Row-Level Security to the
-Fleet tables. Every active registered Agent receives the same complete read
-view with no hidden rows. Writes remain narrower: First Mate manages the Fleet,
-Second Mates their subtrees, and Crewmates themselves; Inbox content follows
-sender, recipient and immutability rules. Fleet tables without a reviewed write
-policy remain owner-only for mutation. Recording hierarchy alone is not
-authorization, and migrations never create login credentials.
+First Mate uses the Fleet owner role and is therefore the administrator of the
+Fleet database and released AgentOS schema. This does not require PostgreSQL
+cluster `SUPERUSER`, `CREATEDB`, `CREATEROLE` or `BYPASSRLS` privileges.
+The first authorization migration binds each remaining Agent to an existing,
+non-privileged PostgreSQL `session_user` and applies grants plus Row-Level
+Security to the Fleet tables. Every active registered Agent receives the same
+complete read view with no hidden rows. Writes remain narrower: First Mate can
+administer the Fleet, Second Mates their subtrees, and Crewmates themselves;
+Inbox content follows sender, recipient and immutability rules. Fleet tables
+without a reviewed runtime write policy remain mutable only by First Mate as
+owner. Recording hierarchy alone is not authorization, and migrations never
+create login credentials.
 
 Messages may be edited by their sender until first read and become immutable afterward; corrections are follow-up messages.
 `LISTEN/NOTIFY` may wake an already-running listener but never starts a pod and never replaces the durable inbox row.
