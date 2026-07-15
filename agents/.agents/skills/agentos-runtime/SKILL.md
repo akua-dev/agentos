@@ -27,6 +27,14 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 - Run one pinned Herdr server per runtime pod.
 - Keep First and Second Mates on Pi. Permit released worker harnesses such as Pi or Codex.
 - Keep one durable home per agent. Explain the shared security boundary and ask before co-locating trusted agents in one pod.
+- Render a persistent Second Mate only with the released `mate:render` task.
+  Require an immutable AgentOS image digest, explicit namespace and existing
+  approved pgpass Secret. The renderer owns a dedicated ServiceAccount,
+  headless Service and retained StatefulSet PVC, but deliberately creates no
+  RBAC grant, Secret, database role or public endpoint.
+- Use `AGENTOS_AGENT_NAME`, `AGENTOS_AGENT_CWD`, `HERDR_SESSION` and the
+  role-scoped Mise tasks to run the common Mate runtime. Preserve one exact
+  named Herdr Agent and fail closed on duplicates.
 - Allow ordinary processes beside agents in Herdr panes.
 - Arrange optional fleet workspaces with Kubernetes-exec panes into remote pod-local Herdr sessions when requested; never treat that view as a controller.
 

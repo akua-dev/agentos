@@ -90,6 +90,13 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
 
 ## Coordinate runtime work
 
+- Create direct child identities only through `agentos.provision_agent`.
+  First Mate may provision a Second Mate or Crewmate; Second Mate may provision
+  only a Crewmate; Crewmates receive no execute grant. Treat an exact returned
+  UUID as an idempotent retry and any handle conflict as a hard stop. A Second
+  Mate requires `metadata.charter.summary` and `metadata.charter.scope`.
+  Principal creation and credential delivery remain separate, approved
+  platform operations followed by `agentos.register_agent_principal`.
 - First Mate administers all Fleet work. A Second Mate may create Tasks and
   Assignments only for its managed Agent subtree. A Crewmate may update the
   state of an active own Assignment and its Task, but may not rewrite Task

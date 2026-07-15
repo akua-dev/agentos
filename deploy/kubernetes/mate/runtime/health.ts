@@ -5,7 +5,8 @@ import { $ } from "bun";
 type Agent = { name?: unknown };
 type AgentList = { result?: { agents?: Agent[] } };
 
-const session = process.env.HERDR_SESSION ?? "agentos-firstmate";
+const agentName = requiredEnvironment("AGENTOS_AGENT_NAME");
+const session = process.env.HERDR_SESSION ?? `agentos-${agentName}`;
 const mode = process.argv[2];
 
 if (mode === "live") {
@@ -32,13 +33,13 @@ async function readiness(): Promise<number> {
   const agents = result?.result?.agents;
   if (
     !Array.isArray(agents) ||
-    agents.filter(({ name }) => name === "firstmate").length !== 1
+    agents.filter(({ name }) => name === agentName).length !== 1
   ) {
     return 1;
   }
 
   return (
-    await $`herdr agent get firstmate --session ${session}`.quiet().nothrow()
+    await $`herdr agent get ${agentName} --session ${session}`.quiet().nothrow()
   ).exitCode;
 }
 
@@ -52,4 +53,10 @@ async function agentList(): Promise<AgentList | undefined> {
   } catch {
     return undefined;
   }
+}
+
+function requiredEnvironment(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be configured for the Mate runtime`);
+  return value;
 }

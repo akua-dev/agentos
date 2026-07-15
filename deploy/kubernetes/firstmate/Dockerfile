@@ -84,13 +84,18 @@ RUN chmod 0644 \
     /opt/agentos/agents/mise.toml \
     /opt/agentos/agents/mise.lock \
     /opt/agentos/agents/firstmate/mise.toml \
+    /opt/agentos/agents/secondmate/mise.toml \
   && chmod 0755 \
-    /opt/agentos/deploy/kubernetes/firstmate/runtime/prepare-home.ts \
-    /opt/agentos/deploy/kubernetes/firstmate/runtime/run-firstmate.ts \
-    /opt/agentos/deploy/kubernetes/firstmate/runtime/health.ts
+    /opt/agentos/deploy/kubernetes/mate/runtime/prepare-home.ts \
+    /opt/agentos/deploy/kubernetes/mate/runtime/run-mate.ts \
+    /opt/agentos/deploy/kubernetes/mate/runtime/health.ts \
+    /opt/agentos/deploy/kubernetes/mate/render-secondmate.ts
 
 ENV HOME=/home/agent \
     AGENTOS_RELEASE_ROOT=/opt/agentos \
+    AGENTOS_AGENT_CWD=/opt/agentos/agents/firstmate \
+    AGENTOS_AGENT_NAME=firstmate \
+    AGENTOS_AGENT_ROLE=first_mate \
     HERDR_CONFIG_PATH=/home/agent/.config/herdr/config.toml \
     HERDR_SESSION=agentos-firstmate \
     MISE_DATA_DIR=/home/agent/.local/share/mise \

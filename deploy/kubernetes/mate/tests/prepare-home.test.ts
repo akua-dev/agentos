@@ -5,6 +5,7 @@ import {
   mkdtemp,
   readFile,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,8 +15,8 @@ const repository = new URL("../../../..", import.meta.url).pathname.replace(
   /\/$/,
   "",
 );
-const runtime = new URL("..", import.meta.url).pathname;
-const prepareHome = join(runtime, "runtime", "prepare-home.ts");
+const mateRuntime = join(repository, "deploy", "kubernetes", "mate", "runtime");
+const prepareHome = join(mateRuntime, "prepare-home.ts");
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -45,7 +46,7 @@ async function run(script: string, env: Record<string, string>) {
   return { exitCode, stderr, stdout };
 }
 
-describe("First Mate home preparation", () => {
+describe("Mate home preparation", () => {
   test("reconciles released tools while preserving the agent-owned home", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "agentos-firstmate-home-"));
     temporaryDirectories.push(sandbox);
@@ -56,12 +57,14 @@ describe("First Mate home preparation", () => {
     const customTool = join(home, ".local", "share", "mise", "installs", "custom", "marker");
     const herdrConfig = join(home, ".config", "herdr", "config.toml");
     const piSettings = join(home, ".pi", "agent", "settings.json");
+    const pgpassSource = join(sandbox, "secrets", "pgpass");
     await Promise.all([
       mkdir(fakeBin, { recursive: true }),
       mkdir(logDirectory, { recursive: true }),
       mkdir(dirname(customFragment), { recursive: true }),
       mkdir(dirname(customTool), { recursive: true }),
       mkdir(join(home, ".pi", "agent"), { recursive: true }),
+      mkdir(dirname(pgpassSource), { recursive: true }),
     ]);
     await Promise.all([
       writeFile(customFragment, '[tools]\npython = "3.13"\n', "utf8"),
@@ -74,6 +77,11 @@ describe("First Mate home preparation", () => {
       writeFile(
         join(home, ".pi", "agent", "trust.json"),
         `${JSON.stringify({ "/workspace": false }, null, 2)}\n`,
+        "utf8",
+      ),
+      writeFile(
+        pgpassSource,
+        "postgres.example.internal:5432:agentos:runtime_second:secret\n",
         "utf8",
       ),
       makeExecutable(
@@ -111,8 +119,9 @@ if (args.join(" ") === "integration install pi") {
       FAKE_LOG_DIRECTORY: logDirectory,
       HERDR_CONFIG_PATH: herdrConfig,
       HOME: home,
-      FIRSTMATE_MODEL: "openai-codex/gpt-5.6-terra",
-      FIRSTMATE_THINKING: "high",
+      AGENTOS_MODEL: "openai-codex/gpt-5.6-terra",
+      AGENTOS_PGPASS_SOURCE: pgpassSource,
+      AGENTOS_THINKING: "high",
       MISE_SYSTEM_CONFIG_FILE: join(repository, "mise.toml"),
       PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
     };
@@ -142,6 +151,10 @@ if (args.join(" ") === "integration install pi") {
       defaultThinkingLevel: "high",
       theme: "agent-owned",
     });
+    expect(await readFile(join(home, ".pgpass"), "utf8")).toBe(
+      "postgres.example.internal:5432:agentos:runtime_second:secret\n",
+    );
+    expect((await stat(join(home, ".pgpass"))).mode & 0o777).toBe(0o600);
     expect(Bun.TOML.parse(await readFile(herdrConfig, "utf8"))).toEqual({
       onboarding: false,
       version_check: false,
@@ -161,7 +174,7 @@ if (args.join(" ") === "integration install pi") {
         "utf8",
       ),
     ).toBe(
-      await readFile(join(runtime, "runtime", "pi-defaults.ts"), "utf8"),
+      await readFile(join(mateRuntime, "pi-defaults.ts"), "utf8"),
     );
     expect((await readFile(join(logDirectory, "mise.log"), "utf8")).trim().split("\n")).toEqual([
       `trust ${join(repository, "mise.toml")}`,

@@ -47,16 +47,30 @@ Do not improvise a second registry in Markdown, terminal state or an unreviewed 
 
 ## Provision and hand off
 
-1. Create exactly one active `second_mate` Agent as a direct child of First Mate through the released provisioning path.
+1. Create exactly one `second_mate` identity as a direct child of First Mate with the released `agentos.provision_agent` Function.
+   Pass handle, role `second_mate`, harness `pi`, useful provisioning status text, display name and an object at `metadata.charter` with non-empty `summary` and `scope` strings.
+   The Function returns the existing UUID on an exact retry, rejects a conflicting handle and leaves new identities in `provisioning` state.
 2. Keep Second Mate on Pi with its own persistent home and PostgreSQL login.
    Co-locate only after explaining the shared pod security boundary and receiving approval.
-3. Bind the non-privileged database principal with `agentos.register_agent_principal`; never give it Fleet-owner or PostgreSQL cluster-admin privileges.
-4. Apply only the managed-subtree grants and RLS policies from the selected release.
-5. Verify the Agent identity, parent, charter, PVC, pod, Herdr locator, Pi session and harmless authenticated model request.
-6. Move accepted in-scope Tasks through reviewed Task and Assignment mutations.
+3. Through the selected database platform's approved role-management path, create one login without `SUPERUSER`, `CREATEDB`, `CREATEROLE`, `BYPASSRLS` or inherited owner authority.
+   Bind it with `agentos.register_agent_principal`; never embed its password in Fleet rows or the database URL.
+4. Create or select one approved Kubernetes Secret in the target namespace with a `pgpass` key for that login.
+   Do not print the value or invent a second secret format.
+5. From `agents/firstmate/`, run the released `mise run mate:render --` task with the returned Agent UUID, Kubernetes-safe handle, immutable AgentOS image digest, release version, namespace, password-free PostgreSQL URL, Secret name and output file.
+   Inspect the structured output before applying it.
+   The renderer creates only a dedicated ServiceAccount, headless Service and one-replica StatefulSet with a retained PVC; it does not create the Secret, database role, RBAC binding or public endpoint.
+6. Apply the rendered file to the explicit context and namespace.
+   Stop on an existing resource with conflicting identity rather than adopting it by name.
+7. Attach to the Second Mate Pod and load `$agentos-auth` for Pi's browser login.
+   Login happens in the persistent Pi home; never copy First Mate's or the local bootstrap agent's token directory.
+8. Verify the PostgreSQL session resolves the expected Agent identity, parent and charter through the password-free URL and persisted mode-`0600` pgpass file.
+   Verify the PVC is Bound, exactly one named Herdr Agent is Ready, the selected model can answer a harmless request, and a Pod replacement restores the same PVC and native Pi session.
+9. In one short database transaction, record the verified Kubernetes and Herdr locators, set useful status text and change lifecycle state from `provisioning` to `active`.
+   On partial failure, preserve the row and runtime evidence in `provisioning` state for reconciliation; do not create a replacement identity or destructively roll back the PVC.
+10. Move accepted in-scope Tasks through reviewed Task and Assignment mutations.
    Preserve history and dependencies; do not clone backlog rows or silently duplicate ownership.
-7. Deliver one concise Inbox handoff naming the chartered outcome or queue.
-8. Confirm the Second Mate reconciles only its own work and then establishes its own supervision wait.
+11. Deliver one concise Inbox handoff naming the chartered outcome or queue.
+12. Confirm the Second Mate reconciles only its own work and then establishes its own supervision wait.
 
 First Mate supervises the Second Mate as one direct report.
 The Second Mate supervises its Crewmates; First Mate does not reconstruct the descendant subtree during routine operation.

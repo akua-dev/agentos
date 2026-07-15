@@ -135,8 +135,13 @@ describe("First Mate Kubernetes resources", () => {
     expect(prepare.args).toEqual(["run", "--skip-tools", "firstmate:prepare"]);
     expect(firstmate.command).toEqual(["mise"]);
     expect(firstmate.args).toEqual(["run", "--skip-tools", "firstmate:run"]);
-    expect(environment.FIRSTMATE_MODEL).toBe("openai-codex/gpt-5.6-terra");
-    expect(environment.FIRSTMATE_THINKING).toBe("high");
+    expect(environment.AGENTOS_AGENT_CWD).toBe(
+      "/opt/agentos/agents/firstmate",
+    );
+    expect(environment.AGENTOS_AGENT_NAME).toBe("firstmate");
+    expect(environment.AGENTOS_AGENT_ROLE).toBe("first_mate");
+    expect(environment.AGENTOS_MODEL).toBe("openai-codex/gpt-5.6-terra");
+    expect(environment.AGENTOS_THINKING).toBe("high");
     expect(environment.PI_OAUTH_CALLBACK_HOST).toBe("0.0.0.0");
     expect(firstmate.livenessProbe.exec.command).toEqual([
       "mise",

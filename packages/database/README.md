@@ -105,3 +105,12 @@ a root already bound to another role, and its partial unique index preserves one
 active Fleet root afterward. It creates neither roles nor credentials.
 `tests/fleet-initialization.test.ts` verifies each initialization and recovery
 path against isolated PGlite databases.
+
+`0004_provision_agents.sql` adds the idempotent
+`agentos.provision_agent` boundary. First Mate can create direct Second-Mate or
+Crewmate identities; Second Mate can create only direct Crewmates; Crewmates
+receive no execute grant. New rows remain in `provisioning` until their
+separately approved principal, credential and runtime have been verified. An
+exact retry returns the same UUID, a conflicting handle fails closed, and every
+Second Mate requires a non-empty charter summary and scope in metadata. The
+Function creates neither PostgreSQL roles nor Kubernetes resources.

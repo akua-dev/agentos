@@ -9,9 +9,9 @@ const repository = new URL("../../../..", import.meta.url).pathname.replace(
   /\/$/,
   "",
 );
-const runtime = new URL("..", import.meta.url).pathname;
-const runFirstMate = join(runtime, "runtime", "run-firstmate.ts");
-const health = join(runtime, "runtime", "health.ts");
+const mateRuntime = join(repository, "deploy", "kubernetes", "mate", "runtime");
+const runMate = join(mateRuntime, "run-mate.ts");
+const health = join(mateRuntime, "health.ts");
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -31,7 +31,10 @@ async function waitFor(predicate: () => Promise<boolean>, timeout = 3_000) {
   throw new Error("Timed out waiting for fake Herdr activity");
 }
 
-async function createHarness(agents: Agent[]) {
+async function createHarness(
+  agents: Agent[],
+  overrides: Record<string, string> = {},
+) {
   const sandbox = await mkdtemp(join(tmpdir(), "agentos-firstmate-runtime-"));
   temporaryDirectories.push(sandbox);
   const fakeBin = join(sandbox, "bin");
@@ -83,9 +86,12 @@ if (args[0] === "server") {
   const env = {
     ...process.env,
     AGENTOS_RELEASE_ROOT: repository,
+    AGENTOS_AGENT_CWD: join(repository, "agents", "firstmate"),
+    AGENTOS_AGENT_NAME: "firstmate",
     FAKE_HERDR_STATE: state,
     HERDR_SESSION: "agentos-firstmate-test",
     PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+    ...overrides,
   };
 
   return { env, state };
@@ -117,10 +123,10 @@ async function runHealth(env: Record<string, string | undefined>, mode: "live" |
   return { exitCode, stderr, stdout };
 }
 
-describe("First Mate runtime", () => {
+describe("Mate runtime", () => {
   test("starts one named Pi agent on an empty Herdr session", async () => {
     const { env, state } = await createHarness([]);
-    const child = Bun.spawn([process.execPath, runFirstMate], {
+    const child = Bun.spawn([process.execPath, runMate], {
       env,
       stderr: "pipe",
       stdout: "pipe",
@@ -153,7 +159,7 @@ describe("First Mate runtime", () => {
 
   test("triggers native restore instead of creating a second First Mate", async () => {
     const { env, state } = await createHarness([{ name: "firstmate" }]);
-    const child = Bun.spawn([process.execPath, runFirstMate], {
+    const child = Bun.spawn([process.execPath, runMate], {
       env,
       stderr: "pipe",
       stdout: "pipe",
@@ -191,7 +197,7 @@ describe("First Mate runtime", () => {
       { name: "firstmate" },
       { name: "firstmate" },
     ]);
-    const child = Bun.spawn([process.execPath, runFirstMate], {
+    const child = Bun.spawn([process.execPath, runMate], {
       env,
       stderr: "pipe",
       stdout: "pipe",
@@ -218,5 +224,41 @@ describe("First Mate runtime", () => {
 
     await writeFile(join(state, "agents.json"), JSON.stringify([{ name: "firstmate" }]), "utf8");
     expect((await runHealth(env, "ready")).exitCode).toBe(0);
+  });
+
+  test("runs and checks the configured Second Mate identity", async () => {
+    const secondMateCwd = join(repository, "agents", "secondmate");
+    const { env, state } = await createHarness([], {
+      AGENTOS_AGENT_CWD: secondMateCwd,
+      AGENTOS_AGENT_NAME: "delivery-second",
+      HERDR_SESSION: "agentos-delivery-second",
+    });
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const expectedStart = [
+      "agent",
+      "start",
+      "delivery-second",
+      "--cwd",
+      secondMateCwd,
+      "--no-focus",
+      "--session",
+      "agentos-delivery-second",
+      "--",
+      "pi",
+    ];
+
+    await waitFor(async () =>
+      (await readCalls(state)).some((call) =>
+        call.length === expectedStart.length &&
+        call.every((argument, index) => argument === expectedStart[index]),
+      ),
+    );
+    expect((await runHealth(env, "ready")).exitCode).toBe(0);
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
   });
 });

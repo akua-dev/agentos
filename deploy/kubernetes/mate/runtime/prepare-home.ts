@@ -26,9 +26,8 @@ const herdrConfig =
 const piAgentDirectory =
   process.env.PI_CODING_AGENT_DIR ?? join(home, ".pi", "agent");
 const piExtensionDirectory = join(piAgentDirectory, "extensions");
-const firstmateModel =
-  process.env.FIRSTMATE_MODEL ?? "openai-codex/gpt-5.6-terra";
-const firstmateThinking = process.env.FIRSTMATE_THINKING ?? "high";
+const model = process.env.AGENTOS_MODEL ?? "openai-codex/gpt-5.6-terra";
+const thinking = process.env.AGENTOS_THINKING ?? "high";
 
 await Promise.all(
   [
@@ -56,7 +55,7 @@ await Promise.all([
       releaseRoot,
       "deploy",
       "kubernetes",
-      "firstmate",
+      "mate",
       "runtime",
       "pi-defaults.ts",
     ),
@@ -64,11 +63,12 @@ await Promise.all([
   ),
 ]);
 
-await seedPiSettings(
-  join(piAgentDirectory, "settings.json"),
-  firstmateModel,
-  firstmateThinking,
-);
+const pgpassSource = process.env.AGENTOS_PGPASS_SOURCE;
+if (pgpassSource) {
+  await copyPrivateFileAtomic(pgpassSource, join(home, ".pgpass"));
+}
+
+await seedPiSettings(join(piAgentDirectory, "settings.json"), model, thinking);
 
 if (!(await exists(herdrConfig))) {
   await writeFile(
@@ -108,7 +108,7 @@ await $`herdr integration install pi`;
 
 function requiredEnvironment(name: string): string {
   const value = process.env[name];
-  if (!value) throw new Error(`${name} must point at the mounted First Mate home`);
+  if (!value) throw new Error(`${name} must point at the mounted Mate home`);
   return value;
 }
 
@@ -131,6 +131,12 @@ async function copyPrivateFile(source: string, destination: string) {
   await chmod(destination, 0o600);
 }
 
+async function copyPrivateFileAtomic(source: string, destination: string) {
+  const next = `${destination}.agentos-next`;
+  await copyPrivateFile(source, next);
+  await rename(next, destination);
+}
+
 async function seedPiSettings(
   path: string,
   qualifiedModel: string,
@@ -139,7 +145,7 @@ async function seedPiSettings(
   const separator = qualifiedModel.indexOf("/");
   if (separator < 1 || separator === qualifiedModel.length - 1) {
     throw new Error(
-      `FIRSTMATE_MODEL must use provider/model syntax, received ${qualifiedModel}`,
+      `AGENTOS_MODEL must use provider/model syntax, received ${qualifiedModel}`,
     );
   }
 

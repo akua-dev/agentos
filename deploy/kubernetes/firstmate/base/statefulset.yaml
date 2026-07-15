@@ -53,14 +53,20 @@ spec:
               value: /home/agent
             - name: AGENTOS_RELEASE_ROOT
               value: /opt/agentos
+            - name: AGENTOS_AGENT_CWD
+              value: /opt/agentos/agents/firstmate
+            - name: AGENTOS_AGENT_NAME
+              value: firstmate
+            - name: AGENTOS_AGENT_ROLE
+              value: first_mate
+            - name: AGENTOS_MODEL
+              value: openai-codex/gpt-5.6-terra
+            - name: AGENTOS_THINKING
+              value: high
             - name: HERDR_CONFIG_PATH
               value: /home/agent/.config/herdr/config.toml
             - name: HERDR_SESSION
               value: agentos-firstmate
-            - name: FIRSTMATE_MODEL
-              value: openai-codex/gpt-5.6-terra
-            - name: FIRSTMATE_THINKING
-              value: high
             - name: MISE_SYSTEM_CONFIG_FILE
               value: /etc/mise/config.toml
             - name: MISE_GITHUB_GITHUB_ATTESTATIONS

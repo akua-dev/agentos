@@ -1,8 +1,7 @@
-# First Mate runtime test contract
+# First Mate Kubernetes test contract
 
-Test observable runtime behavior and rendered Kubernetes resources.
+Test rendered First-Mate Kubernetes and release resources.
 
-- Execute lifecycle programs against temporary homes and fake process boundaries.
 - Render Kustomize and compare structured resources.
 - Build or inspect the resulting container when validating image behavior.
 - Never assert that runtime programs, Dockerfiles, or YAML source merely

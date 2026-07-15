@@ -22,6 +22,11 @@ This package is SQL-first. Read the architecture section in `../../README.md` an
 - Preserve completed Assignment history. Retirement must reject active Assignments and active child Agents; never cascade or invent a handoff.
 - Bind external reconciliation to the authenticated `session_user`. Only First and Second Mates receive the claim Functions, and direct runtime updates to external-event coordination columns stay forbidden.
 - Preserve First Mate's owner-level administration of the Fleet. Do not grant `SUPERUSER`, `CREATEDB`, `CREATEROLE` or `BYPASSRLS` merely to administer AgentOS.
+- Keep child identity creation behind `agentos.provision_agent`: First Mate may
+  create direct Second Mates or Crewmates, Second Mate only direct Crewmates,
+  and exact retries must return the same UUID while conflicting handles fail
+  closed. Principal creation, credentials and runtime provisioning stay
+  separate approved operations.
 - Preserve `session_user` as the authorization identity. Never replace it with a caller-controlled session setting or infer it from prompts, process metadata or Kubernetes labels.
 
 ## Migration workflow

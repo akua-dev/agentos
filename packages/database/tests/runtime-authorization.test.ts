@@ -9,6 +9,9 @@ import authorizationMigration from "../migrations/0001_agent_authorization.sql" 
 import runtimeAuthorizationMigration from "../migrations/0002_runtime_mutation_authorization.sql" with {
   type: "text",
 };
+import provisionAgentsMigration from "../migrations/0004_provision_agents.sql" with {
+  type: "text",
+};
 
 const database = await PGlite.create();
 const ids = {
@@ -60,6 +63,8 @@ beforeAll(async () => {
     SELECT agentos.register_agent_principal('${ids.secondB}', 'runtime_second_b');
     SELECT agentos.register_agent_principal('${ids.crewB}', 'runtime_crew_b');
   `);
+
+  await database.exec(provisionAgentsMigration);
 });
 
 afterAll(async () => {
@@ -67,6 +72,126 @@ afterAll(async () => {
 });
 
 describe.serial("Agent runtime mutation authorization", () => {
+  test("provisions direct reports idempotently within the Mate hierarchy", async () => {
+    const secondMate = await asRole("postgres", () =>
+      database.query<{ id: string }>(`
+        SELECT agentos.provision_agent(
+          'delivery-second',
+          'second_mate',
+          'pi',
+          'Waiting for its persistent runtime',
+          'Delivery Second Mate',
+          '{"charter":{"summary":"Own delivery","scope":"AgentOS delivery work"}}'::jsonb
+        )::text AS id
+      `),
+    );
+    const secondMateId = secondMate.rows[0]?.id;
+    expect(secondMateId).toBeDefined();
+
+    const repeated = await asRole("postgres", () =>
+      database.query<{ id: string }>(`
+        SELECT agentos.provision_agent(
+          'delivery-second',
+          'second_mate',
+          'pi',
+          'This retry does not rewrite runtime state',
+          'Delivery Second Mate',
+          '{"charter":{"summary":"Own delivery","scope":"AgentOS delivery work"}}'::jsonb
+        )::text AS id
+      `),
+    );
+    expect(repeated.rows[0]?.id).toBe(secondMateId);
+
+    await asRole("runtime_second_a", async () => {
+      const provisioned = await database.query<{ id: string }>(`
+        SELECT agentos.provision_agent(
+          'runtime-scout',
+          'crewmate',
+          'codex',
+          'Ready for a task-specific runtime'
+        )::text AS id
+      `);
+      const crewmate = await database.query<{ parent_agent_id: string }>(`
+        SELECT parent_agent_id::text
+          FROM agentos.agents
+         WHERE id = '${provisioned.rows[0]?.id}'
+      `);
+      expect(crewmate.rows[0]?.parent_agent_id).toBe(ids.secondA);
+
+      await expect(
+        database.query(`
+          SELECT agentos.provision_agent(
+            'nested-second',
+            'second_mate',
+            'pi',
+            'Second Mates cannot create another Second Mate',
+            'Nested Second',
+            '{"charter":{"summary":"Invalid","scope":"Invalid"}}'::jsonb
+          )
+        `),
+      ).rejects.toThrow("Second Mate may provision only Crewmates");
+    });
+
+    await asRole("runtime_crew_b", async () => {
+      await expect(
+        database.query(`
+          SELECT agentos.provision_agent(
+            'crew-created-agent',
+            'crewmate',
+            'codex',
+            'Crewmates cannot provision Agents'
+          )
+        `),
+      ).rejects.toThrow();
+    });
+
+    await asRole("postgres", async () => {
+      await expect(
+        database.query(`
+          SELECT agentos.provision_agent(
+            'delivery-second',
+            'second_mate',
+            'other-harness',
+            'Conflicting retry',
+            'Delivery Second Mate',
+            '{"charter":{"summary":"Own delivery","scope":"AgentOS delivery work"}}'::jsonb
+          )
+        `),
+      ).rejects.toThrow("conflicts with the existing Agent identity");
+
+      await expect(
+        database.query(`
+          SELECT agentos.provision_agent(
+            'missing-charter',
+            'second_mate',
+            'pi',
+            'Invalid Second Mate',
+            'Missing Charter'
+          )
+        `),
+      ).rejects.toThrow("charter requires non-empty summary and scope");
+    });
+
+    const provisioned = await database.query<{
+      count: number;
+      lifecycle_status: string;
+      parent_agent_id: string;
+    }>(`
+      SELECT count(*)::int AS count,
+             min(lifecycle_status) AS lifecycle_status,
+             min(parent_agent_id::text) AS parent_agent_id
+        FROM agentos.agents
+       WHERE handle = 'delivery-second'
+    `);
+    expect(provisioned.rows).toEqual([
+      {
+        count: 1,
+        lifecycle_status: "provisioning",
+        parent_agent_id: ids.firstMate,
+      },
+    ]);
+  });
+
   test("lets Mates create and assign work only inside their hierarchy", async () => {
     await asRole("runtime_second_a", async () => {
       await database.exec(`

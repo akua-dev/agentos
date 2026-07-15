@@ -19,7 +19,7 @@ afterEach(async () => {
   );
 });
 
-describe("First Mate Pi defaults", () => {
+describe("Mate Pi defaults", () => {
   test("adopts persisted defaults once subscription authentication exists", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "agentos-pi-defaults-"));
     temporaryDirectories.push(sandbox);

@@ -5,12 +5,9 @@ import { $ } from "bun";
 type Agent = { name?: unknown };
 type AgentList = { result?: { agents?: Agent[] } };
 
-const releaseRoot = withoutTrailingSlash(
-  process.env.AGENTOS_RELEASE_ROOT ?? "/opt/agentos",
-);
-const session = process.env.HERDR_SESSION ?? "agentos-firstmate";
-const firstmateCwd =
-  process.env.FIRSTMATE_CWD ?? joinPath(releaseRoot, "agents", "firstmate");
+const agentName = requiredEnvironment("AGENTOS_AGENT_NAME");
+const agentCwd = requiredEnvironment("AGENTOS_AGENT_CWD");
+const session = process.env.HERDR_SESSION ?? `agentos-${agentName}`;
 
 let server: Bun.Subprocess | undefined;
 let observer: Bun.Subprocess | undefined;
@@ -28,15 +25,15 @@ try {
 
   await waitUntilServerReady(server);
   const agents = await listAgents();
-  const firstmateCount = agents.filter(({ name }) => name === "firstmate").length;
+  const agentCount = agents.filter(({ name }) => name === agentName).length;
 
-  if (firstmateCount === 0) {
-    await $`herdr agent start firstmate --cwd ${firstmateCwd} --no-focus --session ${session} -- pi`;
-  } else if (firstmateCount === 1) {
-    await restoreFirstMate();
+  if (agentCount === 0) {
+    await $`herdr agent start ${agentName} --cwd ${agentCwd} --no-focus --session ${session} -- pi`;
+  } else if (agentCount === 1) {
+    await restoreMate();
   } else {
     throw new Error(
-      `Refusing to start: expected at most one Herdr agent named firstmate, found ${firstmateCount}.`,
+      `Refusing to start: expected at most one Herdr agent named ${agentName}, found ${agentCount}.`,
     );
   }
 
@@ -57,11 +54,7 @@ async function waitUntilServerReady(serverProcess: Bun.Subprocess) {
     if (serverProcess.exitCode !== null) {
       throw new Error(`Herdr server exited with status ${serverProcess.exitCode}`);
     }
-    if (
-      (await herdrStatus()) === 0
-    ) {
-      return;
-    }
+    if ((await herdrStatus()) === 0) return;
     await Bun.sleep(500);
   }
   throw new Error(`Herdr session ${session} did not become ready within 30 seconds.`);
@@ -75,14 +68,14 @@ async function listAgents(): Promise<Agent[]> {
   return result.result.agents;
 }
 
-async function restoreFirstMate() {
+async function restoreMate() {
   observer = Bun.spawn(
     [
       "herdr",
       "terminal",
       "session",
       "observe",
-      "firstmate",
+      agentName,
       "--cols",
       "120",
       "--rows",
@@ -94,9 +87,7 @@ async function restoreFirstMate() {
   );
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    if (
-      (await firstmateStatus()) === 0
-    ) {
+    if ((await mateStatus()) === 0) {
       await Bun.sleep(200);
       break;
     }
@@ -113,9 +104,9 @@ async function herdrStatus(): Promise<number> {
   ).exitCode;
 }
 
-async function firstmateStatus(): Promise<number> {
+async function mateStatus(): Promise<number> {
   return (
-    await $`herdr agent get firstmate --session ${session}`.quiet().nothrow()
+    await $`herdr agent get ${agentName} --session ${session}`.quiet().nothrow()
   ).exitCode;
 }
 
@@ -135,10 +126,8 @@ async function stop(exitCode: number) {
   process.exit(exitCode);
 }
 
-function withoutTrailingSlash(path: string): string {
-  return path.length > 1 ? path.replace(/\/+$/, "") : path;
-}
-
-function joinPath(...parts: string[]): string {
-  return parts.join("/").replace(/\/+/g, "/");
+function requiredEnvironment(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be configured for the Mate runtime`);
+  return value;
 }

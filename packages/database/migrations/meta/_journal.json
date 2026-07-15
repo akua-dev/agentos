@@ -29,6 +29,13 @@
       "when": 1784139850586,
       "tag": "0003_initialize_fleet_owner",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784147553125,
+      "tag": "0004_provision_agents",
+      "breakpoints": true
     }
   ]
 }

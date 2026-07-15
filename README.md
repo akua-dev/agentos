@@ -384,7 +384,9 @@ The Bun monorepo separates executable entrypoints, importable code and agent rol
 - subtree-local `.agents/skills/` directories contain scoped, progressively disclosed workflows.
 
 The initial executable is `apps/agentos/`, a deliberately thin CLI entrypoint that imports command behavior from `packages/cli/`.
-There is no generic runtime package before shared runtime code actually exists; reusable implementation receives a concrete package when it has a real consumer.
+The shared executable Mate lifecycle lives with its Kubernetes deployment
+assets under `deploy/kubernetes/mate/`; it is not a generic importable runtime
+package.
 Future executable services receive their own directory under `apps/`; reusable implementation belongs in `packages/` instead of being duplicated between apps or roles.
 
 The root `package.json` declares `apps/*` and `packages/*` as Bun workspaces.
@@ -402,8 +404,11 @@ Workspace packages depend on each other through `workspace:*`, and the repositor
 - `deploy/kubernetes/` is authoritative for rendered Kubernetes resources.
 - `deploy/kubernetes/database/` is authoritative for the optional self-hosted
   CloudNativePG topology; it does not own SQL schema.
-- `deploy/kubernetes/firstmate/release/` is authoritative for the renderer;
-  generated manifests belong only to immutable GitHub releases.
+- `deploy/kubernetes/firstmate/release/` is authoritative for immutable
+  First-Mate and database release rendering; generated release manifests
+  belong only to immutable GitHub releases.
+- `deploy/kubernetes/mate/` owns the common persistent-Mate runtime and the
+  deterministic renderer for provisioned Second Mates.
 - `packages/database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `packages/database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
 - `apps/agentos/`, `packages/cli/`, CLI output and their tests define implemented AXI behavior.
 - Release assets pin exact versions, digests and checksums.
