@@ -24,6 +24,21 @@ workspace="$(mise run database:prepare)"
 DATABASE_URL="<approved process-only value>" bun run --cwd "$workspace" migrate
 ```
 
+For the released in-cluster CloudNativePG shape, keep the generated password in
+the mode-`0600` `~/.pgpass` file and use a non-secret process-only URL:
+
+```sh
+workspace="$(mise run database:prepare)"
+PGPASSFILE="$HOME/.pgpass" \
+  DATABASE_URL="postgresql://agentos@agentos-postgres-rw:5432/agentos?uselibpqcompat=true&sslmode=require" \
+  bun run --cwd "$workspace" migrate
+```
+
+The pinned `pg` 8 driver needs `uselibpqcompat=true` to give
+`sslmode=require` its libpq meaning. Without it, the driver attempts full
+certificate verification against CNPG's private cluster CA. Revalidate this
+connection option when upgrading to `pg` 9 or later.
+
 `database:prepare` copies only the reviewed package manifests, lockfile,
 migration configuration and SQL into a content-addressed directory under the
 agent's persistent home. It installs only this package's production

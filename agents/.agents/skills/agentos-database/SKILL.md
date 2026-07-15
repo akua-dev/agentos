@@ -61,6 +61,14 @@ Use the CNPG-generated `agentos-postgres-app` identity for self-hosted PostgreSQ
 
 For direct `psql`, copy only the Secret's `pgpass` value into `~/.pgpass` on the owning agent PVC without exposing stdout, then set mode `0600`. From an Agent Pod in `agentos`, connect directly through the `agentos-postgres-rw` Service with explicit database and user names; do not create a port-forward inside the cluster. Refresh that file after credential rotation.
 
+For Drizzle migrations against that in-cluster CNPG Service, keep the password
+in `~/.pgpass` and inject this non-secret URL into only the migration process:
+`postgresql://agentos@agentos-postgres-rw:5432/agentos?uselibpqcompat=true&sslmode=require`.
+The release-pinned `pg` 8 driver otherwise treats `sslmode=require` as
+certificate verification and rejects CNPG's private cluster CA. The explicit
+libpq compatibility flag keeps TLS required without copying a password into the
+URL. Revalidate this option when the release upgrades to `pg` 9 or later.
+
 For an external endpoint, prefer an approved Kubernetes Secret or mode-`0600` file owned by the persistent agent. Keep the connection URI out of prompts, command arguments, shell history and normal logs.
 
 Apply the migration chain with the login that owns the Fleet's released AgentOS
@@ -105,7 +113,7 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
 1. Ask before provisioning PostgreSQL, creating a database or role, changing grants, or applying migrations.
 2. Apply the topology selected by the developer. Do not rank external PostgreSQL ahead of self-hosted CloudNativePG, or vice versa.
 3. Before the first migration on an agent, explain that the pinned Drizzle and PostgreSQL driver dependencies will occupy about 90 MB on its PVC and ask for tooling-installation approval. From the selected release's `packages/database/` directory, run `mise run database:prepare`. It installs only `@agentos/database` production dependencies from the release `bun.lock` into a content-addressed persistent workspace and reuses a completed workspace on later runs. Trust its printed package path; do not run a second ad hoc `bun install` in that workspace.
-4. Apply pending migrations as the selected Fleet-owner login from the path printed by `database:prepare` with `bun run --cwd <prepared-path> migrate`, injecting `DATABASE_URL` into only that process from the approved secret source. Drizzle Kit owns ordering and the applied-migration journal. Stop on a separate migration identity instead of weakening the automatic root binding.
+4. Apply pending migrations as the selected Fleet-owner login from the path printed by `database:prepare` with `bun run --cwd <prepared-path> migrate`, injecting `DATABASE_URL` and, when used, `PGPASSFILE` into only that process from the approved secret source. For the released in-cluster CNPG shape, use the non-secret URL and `~/.pgpass` handoff defined above. Drizzle Kit owns ordering and the applied-migration journal. Stop on a separate migration identity instead of weakening the automatic root binding.
 5. Use released Functions and Triggers for shared invariants instead of rewriting equivalent ad hoc SQL in every agent session.
 6. Use released RLS policies and role grants; never bypass them to make a failing workflow pass.
 
