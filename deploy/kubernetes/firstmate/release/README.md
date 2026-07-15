@@ -1,15 +1,19 @@
 # First Mate release artifacts
 
-Each AgentOS release publishes two single-file Kubernetes manifests generated
+Each AgentOS release publishes three single-file Kubernetes manifests generated
 from the reviewed Kustomize resources:
 
 - `agentos-firstmate.yaml` grants the First Mate administration only in the
   `agentos` namespace.
 - `agentos-firstmate-cluster-admin.yaml` adds cluster-wide administration for a
   developer-approved dedicated cluster.
+- `agentos-postgres.yaml` creates the optional minimal self-hosted CloudNativePG
+  database after its controller has been approved and verified.
 
-Every container reference is replaced with the same immutable OCI digest and
-uses `IfNotPresent`. Generate the assets from `deploy/kubernetes/`:
+All three First-Mate container references are replaced with the same immutable
+AgentOS OCI digest and use `IfNotPresent`. The database manifest carries its
+separate pinned PostgreSQL operand digest. Generate the assets from
+`deploy/kubernetes/`:
 
 ```console
 mise install
@@ -19,6 +23,7 @@ mise run release:render -- \
   --output ../../dist/release
 ```
 
-The renderer also writes `release.json`, the agent-readable selection surface.
-Publish all three files on an immutable GitHub release. Never hand-edit a
+The renderer also writes `release.json`, including pinned CloudNativePG
+controller provenance and PostgreSQL image metadata. Publish all four files on
+an immutable GitHub release. Never hand-edit a
 generated manifest or reuse a release tag.

@@ -17,3 +17,7 @@ The first executable runtime is in [`firstmate/`](firstmate/). Its base grants
 the First Mate namespace-wide administration. The `cluster-admin` overlay is
 only for a developer-approved dedicated cluster and must never be applied as an
 implicit bootstrap default.
+
+The optional self-hosted PostgreSQL topology is in [`database/`](database/).
+It uses a pinned CloudNativePG controller and operand image; an external or
+managed PostgreSQL endpoint remains a complete path without CNPG.

@@ -1,0 +1,3 @@
+[tasks."database:prepare"]
+description = "Prepare pinned database migration tooling on the agent PVC"
+file = "runtime/prepare.ts"

@@ -20,6 +20,7 @@ This package is SQL-first. Read the architecture section in `../../README.md` an
 
 ## Migration workflow
 
+- Prepare the pinned migration tooling outside the immutable image with `mise run database:prepare`. The task installs only `@agentos/database` production dependencies from the reviewed `bun.lock` into a content-addressed directory on the agent PVC and prints that package path.
 - Create new entries with `bun run migration:new -- --name <name>`, then edit the generated SQL migration.
 - Let Drizzle Kit maintain migration filenames, ordering metadata and the applied-migration journal.
 - Never use `drizzle-kit push`, `pull`, or non-custom `generate` in this package.

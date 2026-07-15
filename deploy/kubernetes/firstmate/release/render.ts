@@ -14,9 +14,20 @@ type Resource = {
 };
 
 export type Release = {
+  database: {
+    cloudNativePG: {
+      controllerImage: string;
+      manifestSha256: string;
+      manifestUrl: string;
+      supportedKubernetesMinorVersions: readonly string[];
+      version: string;
+    };
+    postgresImage: string;
+  };
   image: string;
   manifests: {
     clusterAdmin: string;
+    database: string;
     scoped: string;
   };
   version: string;
@@ -32,6 +43,22 @@ const firstmateDirectory = new URL("..", import.meta.url).pathname.replace(
   /\/$/,
   "",
 );
+const databaseDirectory = new URL(
+  "../../database",
+  import.meta.url,
+).pathname.replace(/\/$/, "");
+const postgresImage =
+  "ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie@sha256:b2c03bf5c6f8bc16495aacc0bb0765c77fe3e8ce6bc94ade26958f62ab9b4a14";
+const cloudNativePG = {
+  controllerImage:
+    "ghcr.io/cloudnative-pg/cloudnative-pg@sha256:a2701eb97cdd2a34b1fdb2cb51987f544b706e40bec72ae7146cd8580efefebb",
+  manifestSha256:
+    "f8bede43fe4ee0d478c2355b204a36876b2ae4faac60f2a9452280b293da3b88",
+  manifestUrl:
+    "https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.30.0/cnpg-1.30.0.yaml",
+  supportedKubernetesMinorVersions: ["1.34", "1.35", "1.36"],
+  version: "1.30.0",
+} as const;
 
 export async function renderRelease({
   image,
@@ -42,19 +69,28 @@ export async function renderRelease({
   assertVersion(version);
 
   const release: Release = {
+    database: {
+      cloudNativePG: { ...cloudNativePG },
+      postgresImage,
+    },
     image,
     manifests: {
       clusterAdmin: "agentos-firstmate-cluster-admin.yaml",
+      database: "agentos-postgres.yaml",
       scoped: "agentos-firstmate.yaml",
     },
     version,
   };
   const variants = [
     {
+      configure: (resources: Resource[]) =>
+        configureFirstMate(resources, image, version),
       directory: join(firstmateDirectory, "base"),
       filename: release.manifests.scoped,
     },
     {
+      configure: (resources: Resource[]) =>
+        configureFirstMate(resources, image, version),
       directory: join(
         firstmateDirectory,
         "overlays",
@@ -62,14 +98,21 @@ export async function renderRelease({
       ),
       filename: release.manifests.clusterAdmin,
     },
+    {
+      configure: (resources: Resource[]) =>
+        configureDatabase(resources, postgresImage, version),
+      directory: join(databaseDirectory, "base"),
+      filename: release.manifests.database,
+    },
   ];
 
   await mkdir(outputDirectory, { recursive: true });
   await Promise.all(
-    variants.map(async ({ directory, filename }) => {
+    variants.map(async ({ configure, directory, filename }) => {
       const rendered = await $`kubectl kustomize ${directory}`.text();
-      const resources = Bun.YAML.parse(rendered) as Resource[];
-      configureRelease(resources, image, version);
+      const parsed = Bun.YAML.parse(rendered) as Resource | Resource[];
+      const resources = Array.isArray(parsed) ? parsed : [parsed];
+      configure(resources);
       await writeFile(
         join(outputDirectory, filename),
         serializeResources(resources),
@@ -98,7 +141,7 @@ function assertVersion(version: string) {
   }
 }
 
-function configureRelease(resources: Resource[], image: string, version: string) {
+function configureFirstMate(resources: Resource[], image: string, version: string) {
   const statefulSet = resources.find(
     ({ kind, metadata }) =>
       kind === "StatefulSet" && metadata.name === "agentos-firstmate",
@@ -124,6 +167,27 @@ function configureRelease(resources: Resource[], image: string, version: string)
     container.image = image;
     container.imagePullPolicy = "IfNotPresent";
   }
+}
+
+function configureDatabase(
+  resources: Resource[],
+  image: string,
+  version: string,
+) {
+  const cluster = resources.find(
+    ({ kind, metadata }) =>
+      kind === "Cluster" && metadata.name === "agentos-postgres",
+  );
+  if (!cluster?.spec) {
+    throw new Error("Rendered release is missing Cluster/agentos-postgres.");
+  }
+  if (cluster.spec.imageName !== image) {
+    throw new Error("Rendered database image differs from release metadata.");
+  }
+  cluster.metadata.labels = {
+    ...cluster.metadata.labels,
+    "app.kubernetes.io/version": version,
+  };
 }
 
 function serializeResources(resources: Resource[]): string {

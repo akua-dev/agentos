@@ -224,8 +224,22 @@ The exact tables, indexes, Functions, Triggers, grants, RLS policies and raw-ses
 The `packages/database/` workspace uses Drizzle Kit only to create and apply journaled custom SQL migrations; it has no Drizzle ORM schema or runtime database client.
 This README does not duplicate them.
 
-PostgreSQL may run in the AgentOS cluster or at a developer-selected external or managed endpoint.
-Topology does not change schema or security semantics.
+PostgreSQL may run at a developer-selected external or managed endpoint; that
+is used directly and remains the shortest path when it already exists. If the
+developer chooses self-hosting, AgentOS uses
+[CloudNativePG](https://cloudnative-pg.io/) rather than maintaining a raw
+PostgreSQL StatefulSet. A compatible existing controller is reused; installing
+or upgrading the cluster-scoped controller requires explicit approval.
+
+The initial released CNPG manifest creates one PostgreSQL 18.4 instance with a
+20 GiB PVC, data checksums, the unprivileged `agentos` application owner and no
+network-enabled superuser. This is the fastest persistent bootstrap path, not
+HA and not yet a reviewed backup topology. CNPG generates the application
+Secret; First Mate uses its `pgpass` entry with `psql` and injects its URI only
+into the Drizzle migration process. Pinned migration dependencies are installed
+from `bun.lock` into a content-addressed workspace on the agent PVC when first
+needed, keeping them out of the runtime image. Topology does not change schema
+or security semantics.
 
 ### Kubernetes and authorization
 
@@ -236,7 +250,9 @@ After explicit RBAC approval, the default dedicated-cluster path grants First Ma
 Shared or sensitive clusters must offer a scoped mode and explain which recovery operations become unavailable.
 Workers do not inherit First Mate authority automatically.
 
-Kubernetes resources are ordinary versioned manifests; AgentOS does not require CRDs or an autonomous operator.
+Agent runtimes remain ordinary versioned Kubernetes resources; AgentOS does not
+introduce its own CRDs or autonomous operator. Only the optional self-hosted
+database path uses the external CloudNativePG CRDs and controller.
 
 ### Agent-facing CLI
 
@@ -265,7 +281,7 @@ Exact package versions and authentication commands belong to release assets and 
 
 The seed resolves `release.json` through the latest published GitHub release,
 verifies that release is immutable, and applies only its versioned manifest
-URL. The default manifest grants First Mate administration within `agentos`;
+URLs and pinned database dependencies. The default manifest grants First Mate administration within `agentos`;
 the separately named dedicated-cluster manifest adds cluster-administrator
 access only after explicit approval.
 
@@ -331,6 +347,8 @@ Workspace packages depend on each other through `workspace:*`, and the repositor
 - `agents/firstmate/` and `agents/secondmate/` contain the two role instruction surfaces, their Pi configuration and role-scoped skills.
 - `apps/` contains executable entrypoints; `packages/` contains their importable implementation.
 - `deploy/kubernetes/` is authoritative for rendered Kubernetes resources.
+- `deploy/kubernetes/database/` is authoritative for the optional self-hosted
+  CloudNativePG topology; it does not own SQL schema.
 - `deploy/kubernetes/firstmate/release/` is authoritative for the renderer;
   generated manifests and `release.json` belong only to immutable GitHub releases.
 - `packages/database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `packages/database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
@@ -349,7 +367,10 @@ Patching, linking, embedding Herdr source, or otherwise tightening that boundary
 
 ### Deliberate exclusions
 
-AgentOS does not introduce autonomous schedulers, heartbeat infrastructure, Kubernetes CRDs, a PostgreSQL wrapper API, task-specific PVCs, mandatory semantic indexing, or compatibility with the failed predecessor implementation.
+AgentOS does not introduce autonomous schedulers, heartbeat infrastructure,
+AgentOS-specific Kubernetes CRDs or operators, a PostgreSQL wrapper API,
+task-specific PVCs, mandatory semantic indexing, or compatibility with the
+failed predecessor implementation.
 
 ## License
 
