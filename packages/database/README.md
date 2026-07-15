@@ -67,3 +67,17 @@ every Fleet table. RLS lets Second Mates manage their subtrees and Crewmates
 mutate themselves; Inbox writes preserve authentic senders and immutable read
 content. Tables without a reviewed runtime write policy remain mutable only by
 First Mate as owner.
+
+`0002_runtime_mutation_authorization.sql` opens the reviewed Task and Assignment
+mutation paths. Mates create and assign work only inside their managed Agent
+hierarchy; an actively assigned Crewmate can update work state but not rewrite
+scope. Completed Assignments are immutable. `agentos.retire_agent` rejects
+active Assignments and active child Agents instead of cascading a hidden
+handoff. External claim, refresh, assertion, completion and release Functions
+are executable only by First or Second Mate and require their supplied Agent ID
+to match the authenticated `session_user`. Direct runtime updates to external
+event coordination rows remain forbidden.
+
+`tests/runtime-authorization.test.ts` applies all migrations around both
+already-registered and later-registered roles, then exercises those allowed and
+forbidden paths against PGlite.

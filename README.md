@@ -194,8 +194,12 @@ complete read view with no hidden rows. Writes remain narrower: First Mate can
 administer the Fleet, Second Mates their subtrees, and Crewmates themselves;
 Inbox content follows sender, recipient and immutability rules. Fleet tables
 without a reviewed runtime write policy remain mutable only by First Mate as
-owner. Recording hierarchy alone is not authorization, and migrations never
-create login credentials.
+owner. The runtime mutation migration lets Mates create and assign Tasks inside
+their managed hierarchy and lets assigned Crewmates update only work state.
+Completed Assignments are immutable. Retiring an Agent is an explicit function
+that refuses active Assignments or active child Agents, so handoff is never an
+automatic cascade. Recording hierarchy alone is not authorization, and
+migrations never create login credentials.
 
 Messages may be edited by their sender until first read and become immutable afterward; corrections are follow-up messages.
 `LISTEN/NOTIFY` may wake an already-running listener but never starts a pod and never replaces the durable inbox row.
@@ -208,7 +212,7 @@ The initial durable model stays deliberately small:
 - `agents` stores hierarchy, role and runtime locators, but not Kubernetes or Herdr health;
 - `projects` stores non-exclusive work scopes without assigning one permanent owner;
 - `tasks` stores accepted durable work, dependencies and its small array of external tracker links;
-- `task_assignments` protects active Agent-to-Task relationships and preserves assignment history;
+- `task_assignments` protects active Agent-to-Task relationships and makes completed assignment history immutable;
 - `inbox` stores delivery to an Agent: conversation, questions, replies, approvals and notifications. A request is not accepted work until a Task exists;
 - `learnings` stores curated, evidence-backed Fleet knowledge;
 - `external_events` stores external deliveries and their reconciliation state.
@@ -223,7 +227,7 @@ Every accepted delivery is appended to `external_events` with the complete provi
 
 Ingress persists first and never invokes a model directly. Deliveries for the same provider resource share a coalescing key. A short quiet window combines a burst of related actions, while a hard maximum window makes the batch eligible after 30 seconds even if events continue arriving. Exact provider delivery identifiers are idempotent.
 
-Batch coordination also stays in `external_events`; there is no second reconciliation table. A short SQL transaction claims all currently pending rows for one coalescing key with an Agent identity, expiry and opaque fencing token, then commits immediately. No database lock remains open while a model reasons. Only First and Second Mates may own reconciliation; a cheaper delegated Agent may help inspect a claimed set but cannot complete it.
+Batch coordination also stays in `external_events`; there is no second reconciliation table. A short SQL transaction claims all currently pending rows for one coalescing key with the authenticated Mate's `session_user`, expiry and opaque fencing token, then commits immediately. A caller-supplied Agent ID can never impersonate another Mate. No database lock remains open while a model reasons. Only First and Second Mates may own reconciliation; a cheaper delegated Agent may help inspect a claimed set but cannot complete it.
 
 New events for a claimed key remain durable and pending. Before an external effect or final commit, the owner checks for them and absorbs them into the claim, then re-evaluates from the last successfully reconciled state instead of chasing an obsolete batch. If the owner disappears, the claim expires and another eligible Mate can reclaim every unresolved event with a new token. The former owner is fenced: its old token cannot complete anything. This recovery does not depend on the First Mate remaining alive.
 

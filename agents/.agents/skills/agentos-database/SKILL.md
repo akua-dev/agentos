@@ -76,6 +76,26 @@ An active registered Agent receives the complete released Fleet read view; RLS
 must not hide individual rows by role or hierarchy. Unregistered and retired
 runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
 
+## Coordinate runtime work
+
+- First Mate administers all Fleet work. A Second Mate may create Tasks and
+  Assignments only for its managed Agent subtree. A Crewmate may update the
+  state of an active own Assignment and its Task, but may not rewrite Task
+  scope. Treat a completed Assignment as immutable history.
+- Before retiring an Agent, explicitly complete or reassign every active Task
+  Assignment and hand off every active child Agent. Call
+  `agentos.retire_agent(agent_id, status_text)`; never emulate retirement with a
+  direct status edit or an automatic cascade.
+- Only First and Second Mates reconcile external events. Pass only the caller's
+  own Agent ID to the released claim, refresh, assertion, completion and release
+  Functions; PostgreSQL verifies it against `session_user`. Do not update claim
+  columns directly.
+- Keep model reasoning and provider CLI calls outside database transactions.
+  Immediately before committing local effects, assert that the claim is current.
+  Apply coupled Task and Inbox updates and complete the claim in one short
+  transaction. On a provider or reasoning failure, release the claim with useful
+  error text; never hide the failure behind an outbox.
+
 ## Apply released assets
 
 1. Ask before provisioning PostgreSQL, creating a database or role, changing grants, or applying migrations.
