@@ -186,10 +186,11 @@ Every agent receives a PostgreSQL identity.
 Agents use SQL or `psql` directly; AgentOS does not add a database wrapper service.
 The first authorization migration binds an existing, non-privileged PostgreSQL
 `session_user` to one Agent and applies grants plus Row-Level Security to the
-Agent directory and Inbox: First Mate manages the Fleet, Second Mates their
-subtrees, and Crewmates themselves; Inbox visibility follows participants and
-their managing Mates. Other Fleet tables remain owner-only until their own
-reviewed policy slices grant runtime access. Recording hierarchy alone is not
+Fleet tables. Every active registered Agent receives the same complete read
+view with no hidden rows. Writes remain narrower: First Mate manages the Fleet,
+Second Mates their subtrees, and Crewmates themselves; Inbox content follows
+sender, recipient and immutability rules. Fleet tables without a reviewed write
+policy remain owner-only for mutation. Recording hierarchy alone is not
 authorization, and migrations never create login credentials.
 
 Messages may be edited by their sender until first read and become immutable afterward; corrections are follow-up messages.

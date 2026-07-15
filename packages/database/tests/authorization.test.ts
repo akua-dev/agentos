@@ -49,6 +49,63 @@ describe.serial("agent database authorization", () => {
     ).rejects.toThrow();
   });
 
+  test("gives every active Agent an unfiltered Fleet read view", async () => {
+    await database.exec(`
+      INSERT INTO agentos.projects (
+        name, scope_text, status, status_text
+      ) VALUES (
+        'authorization', 'Exercise Fleet-wide reads', 'active', 'Project is readable'
+      );
+      INSERT INTO agentos.captain (
+        topic, content, recorded_by_agent_id
+      ) VALUES (
+        'visibility', 'All active Agents may read Fleet state', '${ids.firstMate}'
+      );
+      INSERT INTO agentos.tasks (
+        created_by_agent_id, title, status, status_text
+      ) VALUES (
+        '${ids.firstMate}', 'Verify Fleet reads', 'active', 'Authorization is under test'
+      );
+      INSERT INTO agentos.task_assignments (
+        task_id, agent_id, assigned_by_agent_id, assignment_role, status, status_text
+      )
+      SELECT
+        t.id, '${ids.crewmate}', '${ids.secondMate}', 'worker', 'active',
+        'Crewmate owns the verification assignment'
+      FROM agentos.tasks AS t
+      WHERE t.title = 'Verify Fleet reads';
+      INSERT INTO agentos.learnings (
+        recorded_by_agent_id, scope, topic, content
+      ) VALUES (
+        '${ids.crewmate}', 'fleet', 'authorization', 'Read access is Fleet-wide'
+      );
+      SELECT agentos.ingest_external_event(
+        'github', 'authorization-delivery', 'issues.edited',
+        'repo:akua/agentos:issue:1', '{"action":"edited"}'::jsonb
+      );
+    `);
+
+    await asRole("test_crewmate", async () => {
+      const expectedCounts: Record<string, number> = {
+        agents: 3,
+        captain: 1,
+        external_events: 1,
+        inbox: 0,
+        learnings: 1,
+        projects: 1,
+        task_assignments: 1,
+        tasks: 1,
+      };
+
+      for (const [table, expectedCount] of Object.entries(expectedCounts)) {
+        const result = await database.query<{ count: number }>(
+          `SELECT count(*)::int AS count FROM agentos.${table}`,
+        );
+        expect(result.rows[0]?.count).toBe(expectedCount);
+      }
+    });
+  });
+
   test("limits Agent updates to their managed hierarchy", async () => {
     await asRole("test_crewmate", async () => {
       const visible = await database.query<{ count: number }>(
@@ -101,7 +158,7 @@ describe.serial("agent database authorization", () => {
     ]);
   });
 
-  test("keeps Inbox content private and sender-authentic", async () => {
+  test("keeps Inbox fully readable and sender-authentic", async () => {
     const firstToCrew = "10000000-0000-4000-8000-000000000001";
     const firstToSecond = "10000000-0000-4000-8000-000000000002";
     const crewToFirst = "10000000-0000-4000-8000-000000000003";
@@ -125,7 +182,10 @@ describe.serial("agent database authorization", () => {
           FROM agentos.inbox
          ORDER BY decision_key
       `);
-      expect(visible.rows).toEqual([{ decision_key: "first-to-crew" }]);
+      expect(visible.rows).toEqual([
+        { decision_key: "first-to-crew" },
+        { decision_key: "first-to-second" },
+      ]);
 
       await expect(
         database.exec(`
@@ -182,15 +242,15 @@ describe.serial("agent database authorization", () => {
     });
 
     await asRole("test_second_mate", async () => {
-      const visible = await database.query<{ decision_key: string }>(`
+      const visible = await database.query<{ decision_key: string | null }>(`
         SELECT decision_key
           FROM agentos.inbox
-         WHERE decision_key IS NOT NULL
-         ORDER BY decision_key
+         ORDER BY decision_key NULLS LAST
       `);
       expect(visible.rows).toEqual([
         { decision_key: "first-to-crew" },
         { decision_key: "first-to-second" },
+        { decision_key: null },
       ]);
     });
   });
@@ -228,14 +288,21 @@ describe.serial("agent database authorization", () => {
     `);
 
     await asRole("test_crewmate", async () => {
-      const agents = await database.query<{ count: number }>(
-        "SELECT count(*)::int AS count FROM agentos.agents",
-      );
-      const inbox = await database.query<{ count: number }>(
-        "SELECT count(*)::int AS count FROM agentos.inbox",
-      );
-      expect(agents.rows[0]?.count).toBe(0);
-      expect(inbox.rows[0]?.count).toBe(0);
+      for (const table of [
+        "agents",
+        "captain",
+        "external_events",
+        "inbox",
+        "learnings",
+        "projects",
+        "task_assignments",
+        "tasks",
+      ]) {
+        const result = await database.query<{ count: number }>(
+          `SELECT count(*)::int AS count FROM agentos.${table}`,
+        );
+        expect(result.rows[0]?.count).toBe(0);
+      }
     });
   });
 });

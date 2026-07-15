@@ -60,8 +60,7 @@ test boundary for migration behavior, including roles, Grants and RLS.
 
 `0001_agent_authorization.sql` binds an existing PostgreSQL `session_user` to
 an Agent without creating or storing credentials. Registered non-privileged
-login roles receive direct access only to the Agent directory and Inbox. RLS
-lets First Mate manage the Fleet, Second Mates manage their subtrees, and
-Crewmates mutate themselves; Inbox content remains visible only to participants
-and their managing Mates. Other Fleet tables remain owner-only until a later
-reviewed policy slice grants them.
+login roles receive an unfiltered read view of every Fleet table. RLS lets First
+Mate manage the Fleet, Second Mates manage their subtrees, and Crewmates mutate
+themselves; Inbox writes preserve authentic senders and immutable read content.
+Tables without a reviewed runtime write policy remain owner-only for mutation.

@@ -69,6 +69,9 @@ with no superuser, database-creation, role-creation, RLS-bypass or inherited
 owner capability. After creating the Agent row, bind the exact role name with
 `agentos.register_agent_principal(agent_id, database_role)`. Keep the credential
 in that Agent's approved Secret or mode-`0600` file; never store it in Fleet rows.
+An active registered Agent receives the complete released Fleet read view; RLS
+must not hide individual rows by role or hierarchy. Unregistered and retired
+runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
 
 ## Apply released assets
 

@@ -169,7 +169,10 @@ BEGIN
    WHERE id = p_agent_id;
 
   EXECUTE format('GRANT USAGE ON SCHEMA agentos TO %I', p_database_role);
-  EXECUTE format('GRANT SELECT ON agentos.agents, agentos.inbox TO %I', p_database_role);
+  EXECUTE format(
+    'GRANT SELECT ON agentos.agents, agentos.captain, agentos.external_events, agentos.inbox, agentos.learnings, agentos.projects, agentos.task_assignments, agentos.tasks TO %I',
+    p_database_role
+  );
   EXECUTE format(
     'GRANT UPDATE (display_name, harness, lifecycle_status, status_text, kubernetes_context, kubernetes_namespace, kubernetes_pod, persistent_volume_claim, herdr_locator, metadata) ON agentos.agents TO %I',
     p_database_role
@@ -210,17 +213,10 @@ CREATE POLICY agents_managed_update
 
 ALTER TABLE agentos.inbox ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY inbox_managed_read
+CREATE POLICY inbox_registered_read
   ON agentos.inbox
   FOR SELECT
-  USING (
-    agentos.current_agent_id() IS NOT NULL AND (
-      sender_agent_id = agentos.current_agent_id() OR
-      recipient_agent_id = agentos.current_agent_id() OR
-      agentos.can_manage_agent(sender_agent_id) OR
-      agentos.can_manage_agent(recipient_agent_id)
-    )
-  );
+  USING (agentos.current_agent_id() IS NOT NULL);
 
 CREATE POLICY inbox_authentic_insert
   ON agentos.inbox
@@ -245,6 +241,48 @@ CREATE POLICY inbox_managed_update
     agentos.can_manage_agent(sender_agent_id) OR
     agentos.can_manage_agent(recipient_agent_id)
   );
+
+ALTER TABLE agentos.captain ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY captain_registered_read
+  ON agentos.captain
+  FOR SELECT
+  USING (agentos.current_agent_id() IS NOT NULL);
+
+ALTER TABLE agentos.external_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY external_events_registered_read
+  ON agentos.external_events
+  FOR SELECT
+  USING (agentos.current_agent_id() IS NOT NULL);
+
+ALTER TABLE agentos.learnings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY learnings_registered_read
+  ON agentos.learnings
+  FOR SELECT
+  USING (agentos.current_agent_id() IS NOT NULL);
+
+ALTER TABLE agentos.projects ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY projects_registered_read
+  ON agentos.projects
+  FOR SELECT
+  USING (agentos.current_agent_id() IS NOT NULL);
+
+ALTER TABLE agentos.task_assignments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY task_assignments_registered_read
+  ON agentos.task_assignments
+  FOR SELECT
+  USING (agentos.current_agent_id() IS NOT NULL);
+
+ALTER TABLE agentos.tasks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tasks_registered_read
+  ON agentos.tasks
+  FOR SELECT
+  USING (agentos.current_agent_id() IS NOT NULL);
 
 CREATE OR REPLACE FUNCTION agentos.protect_read_inbox_message()
 RETURNS trigger

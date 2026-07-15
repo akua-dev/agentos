@@ -18,7 +18,7 @@ This package is SQL-first. Read the architecture section in `../../README.md` an
 - Agents invoke provider CLIs directly and synchronously. PostgreSQL coordinates durable local state but does not hide provider failures behind a service.
 - Never hold a transaction open while a model reasons or a provider command runs. In the final short transaction, mutate coupled Tasks and Inbox rows and call the released claim-completion Function so stale work rolls back atomically.
 - Bind an Agent only to an already-created, non-privileged PostgreSQL login through `agentos.register_agent_principal`; migrations never create login roles or contain credentials.
-- Keep runtime grants deny-by-default. The first authorization slice exposes only `agents` and `inbox`; do not grant other Fleet tables before their read and write policies are reviewed and tested.
+- Give every active registered Agent the same unfiltered `SELECT` view across released Fleet tables; never hide rows by role or hierarchy. Keep mutations deny-by-default: the first authorization slice grants writes only on `agents` and `inbox`, and other tables need reviewed write policies first.
 - Preserve `session_user` as the authorization identity. Never replace it with a caller-controlled session setting or infer it from prompts, process metadata or Kubernetes labels.
 
 ## Migration workflow
