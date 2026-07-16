@@ -84,12 +84,14 @@ RUN chmod 0644 \
     /opt/agentos/agents/mise.toml \
     /opt/agentos/agents/mise.lock \
     /opt/agentos/agents/firstmate/mise.toml \
+    /opt/agentos/agents/crewmate/AGENTS.md \
     /opt/agentos/agents/secondmate/mise.toml \
   && chmod 0755 \
     /opt/agentos/deploy/kubernetes/mate/runtime/prepare-home.ts \
     /opt/agentos/deploy/kubernetes/mate/runtime/run-mate.ts \
     /opt/agentos/deploy/kubernetes/mate/runtime/health.ts \
-    /opt/agentos/deploy/kubernetes/mate/render-secondmate.ts
+    /opt/agentos/deploy/kubernetes/mate/render-secondmate.ts \
+    /opt/agentos/deploy/kubernetes/crewmate/spawn.ts
 
 ENV HOME=/home/agent \
     AGENTOS_RELEASE_ROOT=/opt/agentos \

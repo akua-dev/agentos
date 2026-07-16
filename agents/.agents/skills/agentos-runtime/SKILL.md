@@ -32,6 +32,18 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
   approved pgpass Secret. The renderer owns a dedicated ServiceAccount,
   headless Service and retained StatefulSet PVC, but deliberately creates no
   RBAC grant, Secret, database role or public endpoint.
+- Start a co-located Crewmate only with the released `crewmate:spawn` task and
+  an explicit `--allow-shared-home true` approval. Require the Agent identity,
+  Task, active Assignment, database access and complete brief first. This mode
+  shares the Mate home, credentials, ServiceAccount and PVC; never present it as
+  isolated or use it for untrusted work. It supports only the reviewed Codex
+  adapter, acquires a durable Treehouse lease, requires the Crewmate's own
+  password-free database URL and private pgpass file, and launches Codex through
+  the released Mise process sandbox. Treat that sandbox as defense in depth,
+  never as a replacement for a dedicated pod.
+- Treat a selected Crewmate `image` as a request for a dedicated Agent pod. The
+  co-located primitive cannot honor an image selection and must not silently
+  substitute the Mate image.
 - Use `AGENTOS_AGENT_NAME`, `AGENTOS_AGENT_CWD`, `HERDR_SESSION` and the
   role-scoped Mise tasks to run the common Mate runtime. Preserve one exact
   named Herdr Agent and fail closed on duplicates.

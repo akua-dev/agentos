@@ -9,3 +9,7 @@ file = "../../deploy/kubernetes/mate/runtime/run-mate.ts"
 [tasks."secondmate:health"]
 description = "Check Second Mate liveness or readiness"
 file = "../../deploy/kubernetes/mate/runtime/health.ts"
+
+[tasks."crewmate:spawn"]
+description = "Start an approved co-located Crewmate in an isolated worktree"
+file = "../../deploy/kubernetes/crewmate/spawn.ts"

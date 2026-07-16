@@ -70,8 +70,12 @@ profile with an optional `image` property alongside `harness`, `model` and
 The model still matches natural-language rules. Deterministic launch mechanics
 receive only the selected concrete harness, model, effort and image. An omitted
 image uses the released lightweight Crewmate default; a configured remote image
-must be from an approved registry and pinned by digest. This slice establishes
-that boundary but does not yet implement Crewmate spawning.
+must be from an approved registry and pinned by digest.
+
+The first implemented worker path is the explicit co-located mode documented in
+[`deploy/kubernetes/crewmate`](../crewmate/README.md). It supports trusted Codex
+workers without an image override. A selected image requires the forthcoming
+dedicated-pod primitive and is never ignored or replaced silently.
 
 ## Failure behavior
 
@@ -93,8 +97,8 @@ foreign worktree survive replacement.
 ## Not in this slice
 
 This slice does not perform provider login, create PostgreSQL, apply the Fleet
-schema, publish an image, install a GitHub App, or create Crewmates. Those begin
-only after the persistent First Mate runtime is reachable.
+schema, publish an image, install a GitHub App, or render dedicated Crewmate
+pods. Those begin only after the persistent First Mate runtime is reachable.
 
 ## Development render
 

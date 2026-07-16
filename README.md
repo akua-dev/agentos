@@ -101,7 +101,12 @@ Working agents may use Pi, Codex, or another harness verified by the selected Ag
 
 Each agent has its own identity and persistent home PVC.
 The default is one agent per runtime pod.
-Trusted agents may be co-located deliberately; the pod then mounts a separate home for each agent, while sharing a wider security boundary.
+Trusted agents may be co-located deliberately. The first lightweight Crewmate
+path follows the predecessor's Treehouse-plus-terminal workflow inside the
+owning Mate pod and requires explicit approval of the shared home, credentials,
+ServiceAccount and wider process boundary. Mise filesystem and environment
+sandboxing narrows ordinary worker access but does not turn co-location into
+pod isolation.
 
 First and Second Mates use a small common baseline image and keep ordinary tool
 additions in their Mise-managed homes. Crewmates instead receive a task-suited
@@ -151,7 +156,7 @@ If the selected release lacks that wake capability, the Mate reports the unsuppo
 ### Toolchains and worktrees
 
 Mise supplies tools to every AgentOS agent, including First Mates, Second Mates and Crewmates.
-The release-owned root `mise.toml`/`mise.lock` own Bun and Node; `agents/mise.toml`/`agents/mise.lock` add pinned Fleet tools for Pi, Herdr, Kubernetes, GitHub, validation, AXI helpers and command-line inspection.
+The release-owned root `mise.toml`/`mise.lock` own Bun and Node; `agents/mise.toml`/`agents/mise.lock` add pinned Fleet tools for Pi, Codex, Herdr, Treehouse, Kubernetes, GitHub, validation, AXI helpers and command-line inspection.
 The root pair resolves the latest reviewed stable Bun release through Mise's
 GitHub backend. Moving Canary tags are forbidden because a fresh Agent PVC must
 be able to reproduce the locked checksum. Upgrade to Bun 1.4 only after its
@@ -188,7 +193,14 @@ A repository-owned configuration remains project authority; AgentOS does not cop
 Untrusted repository configuration is inspected before trust because Mise configuration may carry executable behavior.
 Agents do not install parallel global toolchains through ad hoc npm-global, Homebrew, apt or `curl | sh` paths.
 
-The Fleet baseline deliberately excludes `tasks-axi` because PostgreSQL is the task authority, excludes tmux and treehouse because Herdr is the initial runtime, and excludes Helm and additional harnesses until implemented behavior requires them.
+Treehouse owns reusable detached worktrees for the released co-located
+Crewmate path. AgentOS acquires a durable UUID-labelled lease and lets the
+reviewed Treehouse return workflow own later cleanup instead of reimplementing
+worktree pooling.
+
+The Fleet baseline deliberately excludes `tasks-axi` because PostgreSQL is the
+task authority, excludes tmux because Herdr is the initial runtime, and excludes
+Helm and additional harnesses until implemented behavior requires them.
 
 ### Health and recovery
 

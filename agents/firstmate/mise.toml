@@ -13,3 +13,7 @@ file = "../../deploy/kubernetes/mate/runtime/health.ts"
 [tasks."mate:render"]
 description = "Render one persistent Second Mate from explicit reviewed inputs"
 file = "../../deploy/kubernetes/mate/render-secondmate.ts"
+
+[tasks."crewmate:spawn"]
+description = "Start an approved co-located Crewmate in an isolated worktree"
+file = "../../deploy/kubernetes/crewmate/spawn.ts"

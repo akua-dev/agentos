@@ -5,6 +5,10 @@ Second Mates. The role directories supply their own `AGENTS.md` and Mise task
 names; the runtime supplies common home preparation, Pi defaults, Herdr launch,
 health behavior and deterministic Second-Mate manifests.
 
+Trusted, explicitly approved workers may use the separate
+[`crewmate:spawn`](../crewmate/README.md) primitive inside a Mate pod. It shares
+the Mate's security boundary and is not the default per-Agent-pod topology.
+
 `render-secondmate.ts` requires an immutable AgentOS image digest, one
 provisioned Agent UUID, a Kubernetes-safe handle, an explicit namespace, a
 password-free PostgreSQL URL and the name of an already approved Secret whose

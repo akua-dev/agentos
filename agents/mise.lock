@@ -106,6 +106,45 @@ checksum = "sha256:c921a30ca97e0ae8fff45e5c6b6f2057b37cade3ec8c75a400c6b44e100ee
 url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.37.0/no-mistakes-v1.37.0-windows-amd64.zip"
 url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/475010842"
 
+[[tools."github:kunchenguid/treehouse"]]
+version = "2.0.0"
+backend = "github:kunchenguid/treehouse"
+
+[tools."github:kunchenguid/treehouse"."platforms.linux-arm64"]
+checksum = "sha256:91bca451bab84df685ee17975c8a9d8cf671b3e95c96b7fc6ff0121ea0aae991"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456806163"
+
+[tools."github:kunchenguid/treehouse"."platforms.linux-arm64-musl"]
+checksum = "sha256:91bca451bab84df685ee17975c8a9d8cf671b3e95c96b7fc6ff0121ea0aae991"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456806163"
+
+[tools."github:kunchenguid/treehouse"."platforms.linux-x64"]
+checksum = "sha256:b7926c19633ee94582b7f1b58369f22b304ae7228a47253c2148e3a8176f03b0"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456805913"
+
+[tools."github:kunchenguid/treehouse"."platforms.linux-x64-musl"]
+checksum = "sha256:b7926c19633ee94582b7f1b58369f22b304ae7228a47253c2148e3a8176f03b0"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456805913"
+
+[tools."github:kunchenguid/treehouse"."platforms.macos-arm64"]
+checksum = "sha256:66022f36eb0c79d6f242025f266b782ac947b3a2817005f13425cbd18874f1f9"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456806162"
+
+[tools."github:kunchenguid/treehouse"."platforms.macos-x64"]
+checksum = "sha256:f4e25b52240c8b302ac2c857d1795751843d2b80aa25e011303d355a49c400b1"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-darwin-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456806093"
+
+[tools."github:kunchenguid/treehouse"."platforms.windows-x64"]
+checksum = "sha256:bab1d8951c458c3a2710042a6ca92bfe042db96ba0caeb07920034c060fdf69f"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-windows-amd64.zip"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456806157"
+
 [[tools."github:ogulcancelik/herdr"]]
 version = "0.7.3"
 backend = "github:ogulcancelik/herdr"
@@ -198,6 +237,10 @@ url = "https://dl.k8s.io/v1.36.2/bin/darwin/arm64/kubectl"
 [[tools."npm:@earendil-works/pi-coding-agent"]]
 version = "0.80.7"
 backend = "npm:@earendil-works/pi-coding-agent"
+
+[[tools."npm:@openai/codex"]]
+version = "0.144.5"
+backend = "npm:@openai/codex"
 
 [[tools."npm:chrome-devtools-axi"]]
 version = "0.1.26"

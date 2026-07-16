@@ -47,6 +47,9 @@ Use released PostgreSQL schema for durable coordination and released runtime pri
 5. Give the worker a brief containing the outcome, acceptance criteria, constraints, authority, project path, isolation requirement, delivery mode and reporting contract.
    Put long context in a durable file or Task body rather than a terminal message.
 6. For project work, require an isolated worktree based on a clean reviewed base and prove it is not the Mate's primary checkout before any mutation.
+   The released co-located path must acquire it through Treehouse's durable
+   UUID-labelled lease workflow; do not replace the pool with direct
+   `git worktree add` mechanics.
 7. Start the worker only through a runtime primitive implemented by the selected AgentOS release.
    Confirm its Agent identity, Task Assignment, PVC, pod and Herdr session without treating terminal text as durable state.
 8. Load `$agentos-supervision` immediately after dispatch.
@@ -91,6 +94,8 @@ Use released PostgreSQL schema for durable coordination and released runtime pri
 4. Keep Agent retirement separate from task completion.
    Complete or reassign every active Assignment and hand off every active child before calling `agentos.retire_agent`.
 5. Remove a worktree or home only after its work is landed or explicitly discarded by the Captain.
+   Return a co-located Crewmate lease through the pinned Treehouse lifecycle;
+   never manually delete its directory or Git metadata.
 
 Load `$agentos-database` for exact grants, RLS, transaction and retirement behavior.
 Load `$agentos-runtime` for exact worktree, pod, Herdr and recovery primitives.

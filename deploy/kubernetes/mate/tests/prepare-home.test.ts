@@ -135,6 +135,24 @@ if (args.join(" ") === "integration install pi") {
     expect(
       await readFile(join(home, ".config", "mise", "mise.lock"), "utf8"),
     ).toBe(await readFile(join(repository, "agents", "mise.lock"), "utf8"));
+    expect(
+      await readFile(
+        join(home, ".agents", "skills", "agentos-delegation", "SKILL.md"),
+        "utf8",
+      ),
+    ).toBe(
+      await readFile(
+        join(
+          repository,
+          "agents",
+          ".agents",
+          "skills",
+          "agentos-delegation",
+          "SKILL.md",
+        ),
+        "utf8",
+      ),
+    );
     expect(await readFile(customFragment, "utf8")).toBe(
       '[tools]\npython = "3.13"\n',
     );

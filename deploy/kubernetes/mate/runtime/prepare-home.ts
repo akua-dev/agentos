@@ -4,6 +4,7 @@ import { $ } from "bun";
 import {
   chmod,
   copyFile,
+  cp,
   mkdir,
   readFile,
   rename,
@@ -35,6 +36,7 @@ await Promise.all(
     join(home, ".local", "bin"),
     join(home, ".local", "share", "mise"),
     join(home, ".local", "state", "agentos"),
+    join(home, ".agents", "skills"),
     join(home, "projects"),
     dirname(herdrConfig),
     piExtensionDirectory,
@@ -42,6 +44,11 @@ await Promise.all(
 );
 
 await Promise.all([
+  cp(
+    join(releaseRoot, "agents", ".agents", "skills"),
+    join(home, ".agents", "skills"),
+    { force: true, recursive: true },
+  ),
   copyPrivateFile(
     join(releaseRoot, "agents", "mise.toml"),
     join(fleetConfigDirectory, "config.toml"),
