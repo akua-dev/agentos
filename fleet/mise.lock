@@ -179,6 +179,45 @@ checksum = "sha256:9b5f35d283b0877eeda0cf66ba1ef1d95ae40f32e858a04da0041f3a20df0
 url = "https://github.com/ogulcancelik/herdr/releases/download/v0.7.3/herdr-macos-x86_64"
 url_api = "https://api.github.com/repos/ogulcancelik/herdr/releases/assets/469642057"
 
+[[tools."github:oven-sh/bun"]]
+version = "canary"
+backend = "github:oven-sh/bun"
+
+[tools."github:oven-sh/bun"."platforms.linux-arm64"]
+checksum = "sha256:3ebbf78f6cf82637daf3a3756a4c34c926fc12db5868df6c03e6d03453625742"
+url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-aarch64.zip"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478907984"
+
+[tools."github:oven-sh/bun"."platforms.linux-arm64-musl"]
+checksum = "sha256:477a261f60a00e9c62f93d5793da1f12d7f8a88d11b3352b503a5b2ee4cbe25c"
+url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-aarch64-musl.zip"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478837634"
+
+[tools."github:oven-sh/bun"."platforms.linux-x64"]
+checksum = "sha256:83144e2542c33aaae541cf16b42f8cf1c55c3b94c5395fc776417fa27e95bcbf"
+url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64.zip"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478908125"
+
+[tools."github:oven-sh/bun"."platforms.linux-x64-musl"]
+checksum = "sha256:b986b1c52b360dded9110e016f80dbb0460d8c090b768bcbdba1fdb41a829f51"
+url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64-musl.zip"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478837743"
+
+[tools."github:oven-sh/bun"."platforms.macos-arm64"]
+checksum = "sha256:4d4bdb8e3ca1b41dede0ce423871b3804424bd785c6435e43c625a60a49f2f02"
+url = "https://github.com/oven-sh/bun/releases/download/canary/bun-darwin-aarch64.zip"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478907578"
+
+[tools."github:oven-sh/bun"."platforms.macos-x64"]
+checksum = "sha256:c699ccbd63de0e6ef77fd232fcdea8b2d1fce431e2b5dcd5344d4d60b98f59fc"
+url = "https://github.com/oven-sh/bun/releases/download/canary/bun-darwin-x64.zip"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478907745"
+
+[tools."github:oven-sh/bun"."platforms.windows-x64"]
+checksum = "sha256:6dda76146c1b2aa27bc2a212e48f56f9d704d33105f73f53ac19a9952fbc1b6c"
+url = "https://github.com/oven-sh/bun/releases/download/canary/bun-windows-x64.zip"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478838726"
+
 [[tools.jq]]
 version = "1.8.2"
 backend = "aqua:jqlang/jq"
@@ -226,13 +265,61 @@ backend = "aqua:kubernetes/kubernetes/kubectl"
 checksum = "sha256:c957eb8c4bea27a3bb35b269edd9082e27f027f7b76b20b5bf4afebc726c6d3e"
 url = "https://dl.k8s.io/v1.36.2/bin/linux/arm64/kubectl"
 
+[tools.kubectl."platforms.linux-arm64-musl"]
+checksum = "sha256:c957eb8c4bea27a3bb35b269edd9082e27f027f7b76b20b5bf4afebc726c6d3e"
+url = "https://dl.k8s.io/v1.36.2/bin/linux/arm64/kubectl"
+
 [tools.kubectl."platforms.linux-x64"]
+checksum = "sha256:1e9045ec32bea85da43de85f0065358529ea7c7a152eca78154fba5b58c27d82"
+url = "https://dl.k8s.io/v1.36.2/bin/linux/amd64/kubectl"
+
+[tools.kubectl."platforms.linux-x64-musl"]
 checksum = "sha256:1e9045ec32bea85da43de85f0065358529ea7c7a152eca78154fba5b58c27d82"
 url = "https://dl.k8s.io/v1.36.2/bin/linux/amd64/kubectl"
 
 [tools.kubectl."platforms.macos-arm64"]
 checksum = "sha256:4408c85c83fd3a31adaa555bdf3c7a6c81f74b19449a9060ba31ab91926f023d"
 url = "https://dl.k8s.io/v1.36.2/bin/darwin/arm64/kubectl"
+
+[tools.kubectl."platforms.macos-x64"]
+checksum = "sha256:ce6c5e55cd17559e87e4fb5e73ebbbc2511bcf2b695d7a40c1b1461a9817d4b3"
+url = "https://dl.k8s.io/v1.36.2/bin/darwin/amd64/kubectl"
+
+[tools.kubectl."platforms.windows-x64"]
+checksum = "sha256:df04d82234b28ffbdcd36e79d596b85da6e9c736e1a7a55ff6910c648ff47af2"
+url = "https://dl.k8s.io/v1.36.2/bin/windows/amd64/kubectl.exe"
+
+[[tools.node]]
+version = "24.16.0"
+backend = "core:node"
+
+[tools.node."platforms.linux-arm64"]
+checksum = "sha256:589f5b6dd4fcfee4dfda73013903c966abaa8abd93dbc9d436544e472b4f0e74"
+url = "https://nodejs.org/dist/v24.16.0/node-v24.16.0-linux-arm64.tar.gz"
+
+[tools.node."platforms.linux-arm64-musl"]
+checksum = "sha256:85dde27aa73503b03dadfa0410a800067b4e3f702fb7fcaa3beaf284dfcc69e9"
+url = "https://unofficial-builds.nodejs.org/download/release/v24.16.0/node-v24.16.0-linux-arm64-musl.tar.gz"
+
+[tools.node."platforms.linux-x64"]
+checksum = "sha256:2faf6a387e9b62b888e21c54f01249fb27537ffecf1842f29f4c919d0a59a0ff"
+url = "https://nodejs.org/dist/v24.16.0/node-v24.16.0-linux-x64.tar.gz"
+
+[tools.node."platforms.linux-x64-musl"]
+checksum = "sha256:50df5d8d474892d4f7b906167df36f77f5b93908f63dc532dc568219cab65841"
+url = "https://unofficial-builds.nodejs.org/download/release/v24.16.0/node-v24.16.0-linux-x64-musl.tar.gz"
+
+[tools.node."platforms.macos-arm64"]
+checksum = "sha256:39189dab4eeb15706c424af0ac08a3044c9e48f7db12a7d77f6b7aafc7dd5df6"
+url = "https://nodejs.org/dist/v24.16.0/node-v24.16.0-darwin-arm64.tar.gz"
+
+[tools.node."platforms.macos-x64"]
+checksum = "sha256:298b4c7b3cb80765c8703e42b90324a4ece3b6634947b89e769c3c980ab55185"
+url = "https://nodejs.org/dist/v24.16.0/node-v24.16.0-darwin-x64.tar.gz"
+
+[tools.node."platforms.windows-x64"]
+checksum = "sha256:edaca9bd58ec8e92037dac4e877d52f6b8f430b81c18b57e264b4e2fb111cd56"
+url = "https://nodejs.org/dist/v24.16.0/node-v24.16.0-win-x64.zip"
 
 [[tools."npm:@earendil-works/pi-coding-agent"]]
 version = "0.80.7"

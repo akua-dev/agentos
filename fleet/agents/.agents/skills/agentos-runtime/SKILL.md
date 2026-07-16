@@ -16,7 +16,7 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 
 ## Attach and debug
 
-- From outside the cluster, a human or seed agent may use `agentos attach <agent> --context <context> [--namespace <namespace>]`; this external CLI always requires an explicit context. A running Mate uses native kubectl against its in-cluster credentials, for example `kubectl --namespace <namespace> exec -it pod/<pod> --container <container> -- herdr --session <session>`.
+- From outside the cluster, a human or seed agent uses native `kubectl` with an explicit context to enter the target pod and invoke Herdr. A running Mate uses the same native interface against its in-cluster credentials, for example `kubectl --namespace <namespace> exec -it pod/<pod> --container <container> -- herdr --session <session>`.
 - Attach to the real agent terminal for interactive diagnosis.
 - Use Herdr read, status, send and wait primitives for bounded inspection; do not scrape or persist terminal output automatically.
 - Treat a live terminal send as an immediate hint only. Keep durable inter-agent communication in PostgreSQL.
@@ -106,14 +106,13 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 ## Resolve tools with Mise
 
 1. Inspect effective configuration with `mise config ls`, requested versions with `mise ls --current`, and executable ownership with `mise which <tool>` before changing tools.
-2. At image build time, install the released
-   `agentos/mise.toml`/`agentos/mise.lock` as
-   `/etc/mise/config.toml`/`mise.lock`. Seed the released
-   `fleet/mise.toml`/`fleet/mise.lock` as the agent's global
-   `~/.config/mise/config.toml`/`mise.lock` on its PVC. Install the
-   startup-critical tools from both isolated layers before adding agent-owned
-   entries under `~/.config/mise/conf.d/`; install remaining released tools
-   explicitly when the task needs them.
+2. At image build time, install the released `fleet/mise.toml` and
+   `fleet/mise.lock` as `/etc/mise/config.toml` and `/etc/mise/mise.lock`, and
+   bake their pinned Bun into the image. Seed the same reviewed Fleet pair as
+   the agent's global `~/.config/mise/config.toml` and `mise.lock` on its PVC.
+   Install the remaining startup-critical tools before adding agent-owned
+   entries under `~/.config/mise/conf.d/`; install other released tools only
+   when the task needs them.
 3. Prepend Mise shims to `PATH` for interactive and non-interactive processes so released tools win over unmanaged globals. Verify ordinary tool names work without a `mise exec` prefix.
 4. Let configuration in the current repository or worktree add tools and override conflicting baseline versions. Do not copy AgentOS's project config into another repository.
 5. Inspect repository-owned Mise configuration before trust. Ask before trusting executable hooks or environment behavior that is not already approved with the project.

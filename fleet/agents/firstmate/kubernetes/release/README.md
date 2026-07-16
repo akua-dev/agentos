@@ -14,11 +14,11 @@ All three First-Mate container references are replaced with the same immutable
 AgentOS OCI digest and use `IfNotPresent`. The database manifest is deliberately
 version-neutral; First Mate discovers and injects current compatible official
 CNPG and PostgreSQL versions only if the developer selects self-hosting.
-Generate the assets from the contributor directory, `agentos/`:
+Generate the assets from the Fleet workspace, `fleet/`:
 
 ```console
 mise install
-bun run ../fleet/agents/firstmate/kubernetes/release/render.ts \
+bun run agents/firstmate/kubernetes/release/render.ts \
   --image ghcr.io/akua-dev/agentos@sha256:<digest> \
   --version <semver> \
   --output ../dist/release

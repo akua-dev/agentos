@@ -16,7 +16,7 @@ operand at installation time. It verifies their provenance, asks for approval,
 and injects the operand's `tag@sha256` into an ephemeral copy of this manifest.
 Third-party versions are deliberately not pinned to an AgentOS release.
 Database objects remain authoritative only in
-[`agentos/packages/database/migrations/`](../../../../../agentos/packages/database/migrations/).
+[`fleet/database/migrations/`](../../../../database/migrations/).
 First Mate applies them with the generated application/owner login; that same
 identity becomes the automatically registered Fleet root. No separate database
 migrator is part of the initial topology.

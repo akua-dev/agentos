@@ -11,9 +11,3 @@ AgentOS invokes Herdr through its public command-line and socket interfaces; it 
 
 Such a release must include Herdr's license and the corresponding source offer recorded in [THIRD_PARTY_SOURCES.md](THIRD_PARTY_SOURCES.md).
 Any patching, linking, embedding, or version change requires a new distribution and license review before publication.
-
-## Agent-facing CLI libraries
-
-The AgentOS source distribution uses `axi-sdk-js` 0.1.8 and its `@toon-format/toon` 2.3.0 dependency under their MIT licenses.
-The exact npm artifact versions and integrity hashes are recorded in
-`agentos/bun.lock`.

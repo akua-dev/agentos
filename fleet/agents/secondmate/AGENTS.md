@@ -66,7 +66,7 @@ Never invent manifests, SQL, lifecycle commands or recovery procedures from pros
 
 ## Toolchain
 
-`../../../agentos/mise.toml` and `../../mise.toml` form the reviewed Fleet toolchain.
+`../../mise.toml` and `../../mise.lock` define the reviewed Fleet toolchain.
 Invoke tools by ordinary command names through the activated Mise environment.
 Do not replace pinned tools with global npm, Homebrew or ad hoc installer state.
 A target project's nearer Mise configuration may add or override tools inside its own worktree without replacing the AgentOS baseline.

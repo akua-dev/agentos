@@ -18,7 +18,7 @@ type PrepareOptions = {
   releaseRoot?: string;
 };
 
-const defaultReleaseRoot = new URL("../../..", import.meta.url).pathname.replace(
+const defaultReleaseRoot = new URL("../..", import.meta.url).pathname.replace(
   /\/$/,
   "",
 );
@@ -42,7 +42,7 @@ export async function prepareMigrationWorkspace({
 
   const releaseKey = hash.digest("hex");
   const targetRoot = join(dataDirectory, releaseKey);
-  const targetPackage = join(targetRoot, "packages", "database");
+  const targetPackage = join(targetRoot, "database");
   const readyFile = join(targetRoot, ".ready");
   if (await exists(readyFile)) return targetPackage;
 
@@ -86,18 +86,18 @@ async function releaseFiles(releaseRoot: string): Promise<string[]> {
   }
 
   for (const path of [
-    "packages/database/AGENTS.md",
-    "packages/database/README.md",
-    "packages/database/package.json",
-    "packages/database/drizzle.config.ts",
-    "packages/database/drizzle.tooling.ts",
-    "packages/database/runtime/prepare.ts",
-    "packages/database/sql.d.ts",
+    "database/AGENTS.md",
+    "database/README.md",
+    "database/package.json",
+    "database/drizzle.config.ts",
+    "database/drizzle.tooling.ts",
+    "database/runtime/prepare.ts",
+    "database/sql.d.ts",
   ]) {
     files.add(path);
   }
 
-  const databaseFiles = new Bun.Glob("packages/database/migrations/**/*");
+  const databaseFiles = new Bun.Glob("database/migrations/**/*");
   for await (const path of databaseFiles.scan({ cwd: releaseRoot, onlyFiles: true })) {
     files.add(path);
   }

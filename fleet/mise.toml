@@ -1,4 +1,6 @@
 [tools]
+"github:oven-sh/bun" = "canary"
+node = "24"
 gh = "2.96.0"
 jq = "1.8.2"
 kubectl = "1.36.2"

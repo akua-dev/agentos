@@ -1,6 +1,6 @@
 # AgentOS database package contract
 
-This package is SQL-first. Read the architecture section in `../../../README.md` and preserve the database boundary defined there.
+This package is SQL-first. Read the architecture section in `../../README.md` and preserve the database boundary defined there.
 
 ## Source of truth
 

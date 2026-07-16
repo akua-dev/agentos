@@ -135,7 +135,6 @@ describe("First Mate Kubernetes resources", () => {
       "install",
       "--locked",
       "node",
-      "github:oven-sh/bun",
       "kubectl",
       "github:ogulcancelik/herdr",
       "npm:@earendil-works/pi-coding-agent",

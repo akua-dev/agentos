@@ -76,11 +76,11 @@ async function installFleetBaseline(systemConfigDirectory: string) {
 
   await Promise.all([
     copyFile(
-      join(root, "agentos", "mise.toml"),
+      join(root, "fleet", "mise.toml"),
       join(systemConfigDirectory, "config.toml"),
     ),
     copyFile(
-      join(root, "agentos", "mise.lock"),
+      join(root, "fleet", "mise.lock"),
       join(systemConfigDirectory, "mise.lock"),
     ),
     copyFile(
@@ -100,7 +100,7 @@ const fleetTools = {
   "github:kunchenguid/no-mistakes": "1.37.0",
   "github:kunchenguid/treehouse": "2.0.0",
   "github:ogulcancelik/herdr": "0.7.3",
-  "github:oven-sh/bun": "bun-v1.3.14",
+  "github:oven-sh/bun": "canary",
   jq: "1.8.2",
   kubectl: "1.36.2",
   node: "24",

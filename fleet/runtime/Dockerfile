@@ -72,15 +72,25 @@ RUN groupadd --gid 1000 agent \
   && install -d -o agent -g agent -m 0700 /home/agent \
   && install -d -o root -g root -m 0755 /etc/mise /opt/agentos
 
-COPY agentos/mise.toml /etc/mise/config.toml
-COPY agentos/mise.lock /etc/mise/mise.lock
+COPY fleet/mise.toml /etc/mise/config.toml
+COPY fleet/mise.lock /etc/mise/mise.lock
+
+RUN MISE_DATA_DIR=/opt/mise \
+    MISE_GITHUB_GITHUB_ATTESTATIONS=false \
+    MISE_GITHUB_SLSA=false \
+    MISE_LOCKED=1 \
+    MISE_SYSTEM_CONFIG_FILE=/etc/mise/config.toml \
+    mise install github:oven-sh/bun \
+  && ln -s \
+    "$(MISE_DATA_DIR=/opt/mise MISE_SYSTEM_CONFIG_FILE=/etc/mise/config.toml mise where github:oven-sh/bun)/bun" \
+    /usr/local/bin/bun \
+  && test "$(bun --version)" = "1.4.0"
+
 COPY . /opt/agentos
 
 RUN chmod 0644 \
     /etc/mise/config.toml \
     /etc/mise/mise.lock \
-    /opt/agentos/agentos/mise.toml \
-    /opt/agentos/agentos/mise.lock \
     /opt/agentos/fleet/mise.toml \
     /opt/agentos/fleet/mise.lock \
     /opt/agentos/fleet/agents/firstmate/mise.toml \

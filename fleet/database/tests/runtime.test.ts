@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { prepareMigrationWorkspace } from "../runtime/prepare.ts";
 
 const temporaryDirectories: string[] = [];
-const releaseRoot = new URL("../../..", import.meta.url).pathname.replace(/\/$/, "");
+const releaseRoot = new URL("../..", import.meta.url).pathname.replace(/\/$/, "");
 
 afterEach(async () => {
   await Promise.all(
@@ -25,7 +25,7 @@ test("prepares a reusable migration workspace outside the release image", async 
 
   expect(second).toBe(first);
   expect(await readFile(join(first, "AGENTS.md"), "utf8")).toBe(
-    await readFile(join(releaseRoot, "packages", "database", "AGENTS.md"), "utf8"),
+    await readFile(join(releaseRoot, "database", "AGENTS.md"), "utf8"),
   );
   const result = await $`bun run migration:check`.cwd(first).quiet();
   expect(result.exitCode).toBe(0);
@@ -40,7 +40,7 @@ test("keeps database tooling rooted in the implementation directory", async () =
   try {
     const prepared = await prepareMigrationWorkspace({ dataDirectory });
     expect(await readFile(join(prepared, "package.json"), "utf8")).toBe(
-      await readFile(join(releaseRoot, "packages", "database", "package.json"), "utf8"),
+      await readFile(join(releaseRoot, "database", "package.json"), "utf8"),
     );
   } finally {
     if (previousReleaseRoot === undefined) {

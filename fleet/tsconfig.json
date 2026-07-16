@@ -15,9 +15,5 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true
   },
-  "include": [
-    "../fleet/**/*.ts",
-    "apps/**/*.ts",
-    "packages/**/*.ts"
-  ]
+  "include": ["**/*.ts"]
 }

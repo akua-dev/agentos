@@ -54,20 +54,19 @@ First and Second Mates use Pi where AgentOS needs deep lifecycle customization. 
 - **Human-controlled.** Sensitive or costly actions remain explicit approval boundaries.
 
 > [!NOTE]
-> AgentOS is under active development. This repository now includes the first persistent First-Mate runtime slice alongside the architecture, bootstrap workflow, fleet database, toolchain and initial AXI CLI; it is not yet a finished production distribution.
+> AgentOS is under active development. This repository now includes the first persistent First-Mate runtime slice alongside the architecture, bootstrap workflow, Fleet database and toolchain; it is not yet a finished production distribution.
 
 ## Develop
 
 The implementation is a Bun monorepo whose toolchain is pinned through Mise:
 
 ```sh
-cd agentos
+cd agentos/fleet
 mise install
 bun run check
-bun run agentos --help
 ```
 
-Bun reports the release-selected `1.3.14` baseline. Package-specific instructions live with the package they govern.
+Bun reports the release-selected `1.4.0` canary baseline. Package-specific instructions live with the package they govern.
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the local Kubernetes workflow and
 repository conventions.
 
@@ -109,8 +108,8 @@ native `kubectl` commands.
 First and Second Mates use the same small `agentos` image and the same shared
 StatefulSet base. Their Kustomize overlays explicitly select the role working
 directory, environment, lifecycle tasks and credentials. The image contains
-Mise and the locked AgentOS tool definitions; an init container installs Bun,
-Node and the startup-critical Fleet tools onto the Mate's persistent home.
+Mise, pinned Bun and the locked AgentOS tool definitions; an init container
+installs Node and the remaining startup-critical Fleet tools onto the Mate's persistent home.
 Ordinary tool additions remain in that Mise-managed home. Crewmates instead
 receive a task-suited image selected by the responsible Mate. The judgment-based
 dispatch profile
@@ -124,10 +123,10 @@ Client detach leaves processes running. After a pod replacement, Herdr restores 
 
 Herdr is not a fleet database.
 Its CLI and socket API are used locally for attach, read, send, wait, layout and debugging.
-`agentos attach <agent> --context <context>` resolves exactly one Ready Pod from
-its released AgentOS metadata and opens the real Herdr terminal. The Kubernetes
-context is always explicit; the namespace defaults to `agentos` and may be
-overridden with `--namespace`.
+Outside the cluster, a human or seed agent resolves the target Pod with native
+`kubectl` using an explicit Kubernetes context, enters that Pod, and invokes
+its real Herdr terminal. Running Mates use the same native tools with their
+in-cluster credentials.
 
 A First Mate may arrange central fleet workspaces whose panes attach to Herdr sessions in other pods through Kubernetes exec.
 This is only a user-facing view; the remote pod-local sessions remain authoritative.
@@ -159,19 +158,21 @@ If the selected release lacks that wake capability, the Mate reports the unsuppo
 ### Toolchains and worktrees
 
 Mise supplies tools to every AgentOS agent, including First Mates, Second Mates and Crewmates.
-The release-owned `agentos/mise.toml`/`agentos/mise.lock` own Bun and Node;
-`fleet/mise.toml`/`fleet/mise.lock` add pinned Fleet tools for Pi, Codex,
-Herdr, Treehouse, Kubernetes, GitHub, validation, AXI helpers and command-line
-inspection. The implementation pair resolves the latest reviewed stable Bun release through Mise's
-GitHub backend. Moving Canary tags are forbidden because a fresh Agent PVC must
-be able to reproduce the locked checksum. Upgrade to Bun 1.4 only after its
-official immutable release tag exists and a cold locked install succeeds on
-every released platform.
+The release-owned `fleet/mise.toml` and `fleet/mise.lock` define Bun, Node and
+the pinned Fleet tools for Pi, Codex, Herdr, Treehouse, Kubernetes, GitHub,
+validation, AXI helpers and command-line inspection. The pair resolves the
+reviewed Bun 1.4.0 canary through Mise's GitHub backend. The moving upstream
+`canary` name is resolved through the reviewed Fleet lockfile; an AgentOS
+release updates that lock deliberately and verifies a cold locked install on
+every released platform before publication.
 
-Agent Pods install the implementation pair as `/etc/mise/config.toml` and `/etc/mise/mise.lock`.
-They seed the Fleet pair as `~/.config/mise/config.toml` and `~/.config/mise/mise.lock` on the agent PVC; agent-owned additions live separately under `~/.config/mise/conf.d/`.
-Before starting a Mate, a direct Mise init step installs the small
-startup-critical set: Node, Bun, kubectl, Herdr and Pi. A second init step uses
+AgentOS images install that pair as `/etc/mise/config.toml` and
+`/etc/mise/mise.lock`, and bake its pinned Bun so typed bootstrap programs do
+not require a first-start download. Pods seed the same reviewed pair as
+`~/.config/mise/config.toml` and `~/.config/mise/mise.lock` on the agent PVC;
+agent-owned additions live separately under `~/.config/mise/conf.d/`.
+Before starting a Mate, a direct Mise init step installs the remaining small
+startup-critical set: Node, kubectl, Herdr and Pi. A second init step uses
 Mise to run the typed home-reconciliation program. Both init containers and the
 Mate use one image and one PVC; identical image layers are pulled only once per
 node. Remaining released Fleet tools stay
@@ -189,8 +190,8 @@ Mate image remain ordinary commands but are not duplicated into the PVC by Mise.
 
 Mise configuration is deliberately layered:
 
-1. `/etc/mise/config.toml` provides the lowest-precedence AgentOS release baseline.
-2. `~/.config/mise/config.toml` provides released Fleet tools; its `conf.d/` may add approved persistent tools for that agent.
+1. `/etc/mise/config.toml` provides the lowest-precedence immutable Fleet baseline.
+2. `~/.config/mise/config.toml` carries the same released tool selection on the PVC; its `conf.d/` may add approved persistent tools for that agent.
 3. A repository or nested-worktree `mise.toml`, `.tool-versions`, or supported idiomatic version file adds tools and overrides conflicting versions for that project.
 
 A repository with no Mise configuration receives the AgentOS baseline unchanged.
@@ -288,7 +289,7 @@ The final local mutation is one short PostgreSQL transaction. It updates all cou
 Agents invoke provider tools such as `gh-axi` directly and synchronously instead of writing an AgentOS outbox. They observe the actual exit status and remain responsible for failure and recovery in their persistent harness session. Cross-system atomicity is impossible: after a successful provider command and before the local transaction, a crash can still occur. State-setting provider operations should be idempotent; non-idempotent operations such as comments use a deterministic action identifier when supported. Recovery checks the already persisted webhook payloads first and queries the provider only when local evidence is inconclusive, avoiding routine duplicate API and model work.
 
 The exact tables, indexes, Functions, Triggers, grants, RLS policies and raw-session retention policy are defined only by versioned SQL and SQL tests after schema review.
-The `agentos/packages/database/` workspace uses Drizzle Kit only to create and
+The `fleet/database/` workspace uses Drizzle Kit only to create and
 apply journaled custom SQL migrations; it has no Drizzle ORM schema or runtime
 database client.
 This README does not duplicate them.
@@ -311,7 +312,7 @@ checksums, the unprivileged `agentos` application owner and no network-enabled
 superuser. This minimal topology is not HA and has no reviewed backup policy yet.
 CNPG generates the application Secret; First Mate uses its `pgpass` entry with
 `psql` and injects its URI only into the Drizzle migration process. Pinned
-migration dependencies are installed from `agentos/bun.lock` into a content-addressed
+migration dependencies are installed from `fleet/bun.lock` into a content-addressed
 workspace on the agent PVC when first needed, keeping them out of the runtime
 image. Topology does not change schema or security semantics.
 
@@ -327,20 +328,6 @@ Workers do not inherit First Mate authority automatically.
 Agent runtimes remain ordinary versioned Kubernetes resources; AgentOS does not
 introduce its own CRDs or autonomous operator. Only the optional self-hosted
 database path uses the external CloudNativePG CRDs and controller.
-
-### External CLI
-
-The `agentos` command is an Agent Experience Interface (AXI) for humans and
-seed or operations agents outside the cluster, not an in-cluster orchestration
-layer.
-It exposes deterministic fleet primitives with token-efficient structured output, explicit empty states, bounded content, structured failures, idempotent mutations and contextual next-command hints.
-Running it without arguments returns a compact live home view; each command also provides concise help.
-
-The initial TypeScript implementation uses the pinned `axi-sdk-js` library for shared dispatch, TOON serialization and error behavior.
-AgentOS owns its `update` command so upgrades remain bound to reviewed immutable AgentOS releases rather than a package-manager global self-update.
-First Mates, Second Mates and Crewmates instead use `kubectl`, `psql`, Herdr,
-Treehouse, provider CLIs and their selected harness directly. AgentOS does not
-wrap those native tools merely to rename their commands.
 
 ### Bootstrap
 
@@ -379,7 +366,7 @@ AgentOS uses that hierarchy to keep operational roles out of development session
 - `fleet/agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication and database operations;
 - `fleet/agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `fleet/agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
-- a subtree under `agentos/apps/` or `agentos/packages/` may add its own `.agents/skills/` when development there needs a reusable workflow.
+- a future subtree under `fleet/apps/` or `fleet/packages/` may add its own `.agents/skills/` when development there needs a reusable workflow.
 
 Bootstrap explicitly loads the other skills when it reaches their boundary.
 First and Second Mates can load those skills independently during normal operation, so runtime knowledge is not hidden behind bootstrap.
@@ -389,14 +376,15 @@ This is a regular Markdown pointer rather than a symlink because raw GitHub cont
 There is initially no root `.agents/skills/` directory.
 Only a workflow that genuinely applies to agent operation and repository development belongs there later.
 Sibling skill trees are not linked: a process started under `fleet/agents/firstmate/`
-sees the shared Fleet skills and its First-Mate skills, while a contributor
-process under `agentos/` does not see either role tree. Released shared skills
+sees the shared Fleet skills and its First-Mate skills, while contributor
+processes under `fleet/database/` or `fleet/runtime/` do not see either role tree. Released shared skills
 are reconciled into each Agent's persistent home for use from foreign project
 worktrees.
 
-The repository deliberately has no root `AGENTS.md`. Contributor instructions
-live under `agentos/`; Agent-shared instructions live under `fleet/agents/`; and
-persistent role instructions live in two real agent working directories:
+The repository deliberately has no root or `fleet/AGENTS.md`. Contributor
+instructions live at the database, runtime and test boundaries they govern;
+Agent-shared instructions live under `fleet/agents/`; and persistent role
+instructions live in two real agent working directories:
 
 - `fleet/agents/firstmate/AGENTS.md` is the complete First-Mate job description;
 - `fleet/agents/secondmate/AGENTS.md` is the complete Second-Mate job description.
@@ -412,26 +400,25 @@ instructions without becoming the Fleet role contract.
 
 ### Repository layout
 
-The repository separates contributor implementation from running Fleet roles:
+The repository root is the AgentOS product and public onboarding surface.
+`fleet/` is the executable distribution and Bun workspace:
 
-- `agentos/` is the contributor working directory and Bun monorepo;
-- `agentos/apps/` contains everything launched directly as a process or binary;
-- `agentos/packages/` contains importable TypeScript packages without process entrypoints;
 - `fleet/agents/` contains role working directories, role instructions and operational skills;
-- `fleet/runtime/` contains role-neutral runtime mechanics and shared Kubernetes resources;
-- `agentos/packages/database/` is the SQL-first Drizzle Kit migration workspace;
+- `fleet/database/` is the SQL-first Drizzle Kit migration workspace shared by the whole Fleet;
+- `fleet/runtime/` contains role-neutral image lifecycle mechanics and shared Kubernetes resources;
 - subtree-local `.agents/skills/` directories contain scoped, progressively disclosed workflows.
 
-The initial executable is `agentos/apps/agentos/`, a deliberately thin CLI entrypoint that imports command behavior from `agentos/packages/cli/`.
 The shared executable Mate lifecycle and common First/Second-Mate StatefulSet
 live under `fleet/runtime/`; this is not an agent role, external CLI or generic
 importable runtime package. Each role owns its Kubernetes patch and surrounding
 ServiceAccount, Service, credentials and authority under
-`fleet/agents/<role>/kubernetes/`.
-Future executable services receive their own directory under `agentos/apps/`; reusable implementation belongs in `agentos/packages/` instead of being duplicated between apps or roles.
+`fleet/agents/<role>/kubernetes/`. First Mate owns database topology under its
+Kubernetes subtree, while `fleet/database/` owns schema semantics for every Mate.
 
-`agentos/package.json` declares `apps/*` and `packages/*` as Bun workspaces.
-Workspace packages depend on each other through `workspace:*`, and the implementation keeps one `agentos/bun.lock`.
+There is no speculative CLI or placeholder application. When a real executable
+service or reusable library exists, it may introduce `fleet/apps/<name>/` or
+`fleet/packages/<name>/` through a reviewed boundary. The workspace keeps one
+`fleet/bun.lock`.
 
 ### Repository source-of-truth rules
 
@@ -439,12 +426,12 @@ Workspace packages depend on each other through `workspace:*`, and the implement
 - `CONTRIBUTING.md` contains repository setup, development conventions and disposable-cluster smoke testing.
 - `BOOTSTRAP.md` points to the canonical First-Mate bootstrap skill without duplicating its procedure.
 - The Architecture section in this README contains architectural decisions and boundaries.
-- `agentos/AGENTS.md` governs contributors without influencing Fleet sessions.
 - `fleet/agents/AGENTS.md` contains identity-neutral shared Agent rules.
 - `fleet/agents/.agents/skills/` contains workflows shared by First and Second Mate without exposing them to contributor or runtime-development sessions.
 - `fleet/agents/firstmate/` and `fleet/agents/secondmate/` contain the two persistent role instruction surfaces, their Pi configuration and role-scoped skills.
 - `fleet/agents/crewmate/BRIEF.md` is the canonical bounded-worker contract rendered into each Assignment brief.
-- `agentos/apps/` contains executable entrypoints; `agentos/packages/` contains their importable implementation.
+- `fleet/database/AGENTS.md` governs SQL-first schema development without selecting an Agent role.
+- `fleet/runtime/AGENTS.md` governs shared container lifecycle mechanics without selecting an Agent role.
 - `fleet/runtime/kubernetes/base/` owns the shared First/Second-Mate StatefulSet.
 - `fleet/agents/firstmate/kubernetes/`, `fleet/agents/secondmate/kubernetes/` and
   `fleet/agents/crewmate/kubernetes/` are authoritative for role-owned Kubernetes
@@ -456,8 +443,7 @@ Workspace packages depend on each other through `workspace:*`, and the implement
   belong only to immutable GitHub releases.
 - `fleet/runtime/` owns only the common persistent-Mate runtime mechanics,
   StatefulSet base and role-neutral `agentos` image.
-- `agentos/packages/database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `agentos/packages/database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
-- `agentos/apps/agentos/`, `agentos/packages/cli/`, CLI output and their tests define implemented AXI behavior.
+- `fleet/database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `fleet/database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
 - Release assets pin exact versions, digests and checksums.
 - `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_SOURCES.md` are authoritative for redistributed third-party licensing and source offers.
 

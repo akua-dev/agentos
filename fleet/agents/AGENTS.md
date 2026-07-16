@@ -16,5 +16,3 @@ identity.
   role that operates them.
 - Use native tools directly and preserve PostgreSQL, Kubernetes, Herdr, PVC and
   Git as distinct sources of truth.
-
-Contributor agents working from `../../agentos/` do not load this Agent context.

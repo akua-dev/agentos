@@ -70,7 +70,7 @@ Keep Akua optional; a Captain-selected existing Kubernetes cluster is a complete
 
 ## Toolchain
 
-`../../../agentos/mise.toml` and `../../mise.toml` form the reviewed Fleet toolchain.
+`../../mise.toml` and `../../mise.lock` define the reviewed Fleet toolchain.
 Invoke tools by ordinary command names through the activated Mise environment.
 Do not replace pinned tools with global npm, Homebrew or ad hoc installer state.
 A target project's nearer Mise configuration may add or override tools inside its own worktree without replacing the AgentOS baseline.
@@ -87,6 +87,6 @@ A target project's nearer Mise configuration may add or override tools inside it
 - Load `$agentos-database` for PostgreSQL topology, migrations, roles, RLS, Functions, Triggers or Inbox rules.
 
 Keep always-applicable identity and safety rules here.
-Put conditional workflows in skills and durable mechanics beside their owning
-role in `fleet/agents/` or in the implementing `agentos/apps/` or
-`agentos/packages/` subtree.
+Put conditional workflows in skills, role-owned mechanics beside their role in
+`fleet/agents/`, shared lifecycle mechanics in `fleet/runtime/`, and released
+SQL behavior in `fleet/database/`.
