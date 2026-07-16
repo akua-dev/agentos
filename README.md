@@ -1,20 +1,26 @@
 <p align="center">
-  <img src="docs/assets/agentos-hero.png" alt="AgentOS — a persistent fleet of engineering agents" width="1200">
+  <img src="docs/assets/agentos-hero.png" alt="AgentOS — the open-source product factory for agentic organizations" width="1200">
 </p>
 
 <h1 align="center">AgentOS</h1>
 
 <p align="center">
-  <strong>Turn one trusted coding agent into a persistent engineering fleet.</strong>
+  <strong>Build autonomous companies.</strong>
 </p>
 
 <p align="center">
-  Delegated · Visible · Recoverable · Human-controlled
+  The open-source product factory for agentic organizations.
 </p>
 
-AgentOS gives your coding agent a durable crew: a persistent First Mate, optional domain-owning Second Mates, and task-scoped Crewmates working across repositories without losing their sessions, tools or context.
+AgentOS turns human intent into an always-on company operating loop. Agents organize the work, build and improve products, respond to customer and operational signals, and turn what they learn into the next reviewed change. Humans keep the mission, judgment and consequential decisions.
 
-The model remains the decision-maker. AgentOS supplies the durable state, visible terminals and deterministic infrastructure mechanics around it.
+```text
+human intent
+  → company work
+  → products and operations
+  → real-world signals
+  → the next improvement
+```
 
 ## Start with your agent
 
