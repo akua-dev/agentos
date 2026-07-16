@@ -11,7 +11,7 @@ configuration provide Bun, Node, and the remaining development tools:
 
 ```console
 git clone https://github.com/akua-dev/agentos.git
-cd agentos/fleet
+cd agentos
 mise install
 bun run check
 ```
@@ -37,7 +37,7 @@ context:
 
 ```console
 orb start k8s
-docker build --tag agentos:dev --file runtime/Dockerfile ..
+docker build --tag agentos:dev .
 kubectl --context orbstack apply --kustomize agents/firstmate/kubernetes/base
 kubectl --context orbstack --namespace agentos rollout status statefulset/agentos-firstmate --timeout=10m
 kubectl --context orbstack --namespace agentos get pods
@@ -61,7 +61,7 @@ a compatible container runtime and an explicit local image load before apply:
 
 ```console
 kind create cluster --name agentos
-docker build --tag agentos:dev --file runtime/Dockerfile ..
+docker build --tag agentos:dev .
 kind load docker-image agentos:dev --name agentos
 kubectl --context kind-agentos apply --kustomize agents/firstmate/kubernetes/base
 ```
@@ -89,7 +89,7 @@ mise install
 bun run agents/firstmate/kubernetes/release/render.ts \
   --image ghcr.io/akua-dev/agentos@sha256:<digest> \
   --version <semver> \
-  --output ../dist/release
+  --output dist/release
 ```
 
 Publish all generated manifests on a draft GitHub release, then publish it with

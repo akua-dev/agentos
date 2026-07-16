@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-secondmate
+  labels:
+    app.kubernetes.io/name: agentos-secondmate
+spec:
+  serviceName: agentos-secondmate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-secondmate
+  template:
+    metadata:
+      annotations:
+        agentos.akua.dev/herdr-session: agentos-secondmate
+      labels:
+        agentos.akua.dev/agent: secondmate
+        app.kubernetes.io/name: agentos-secondmate
+    spec:
+      serviceAccountName: agentos-secondmate
+      initContainers:
+        - name: install-tools
+          workingDir: /opt/agentos/agents/secondmate
+          env: &role-environment
+            - name: AGENTOS_AGENT_CWD
+              value: /opt/agentos/agents/secondmate
+            - name: AGENTOS_AGENT_ID
+              value: 00000000-0000-4000-8000-000000000002
+            - name: AGENTOS_AGENT_NAME
+              value: secondmate
+            - name: AGENTOS_AGENT_ROLE
+              value: second_mate
+            - name: AGENTOS_DATABASE_URL
+              value: postgresql://runtime_secondmate@agentos-postgres-rw.agentos.svc:5432/agentos?sslmode=require
+            - name: AGENTOS_PGPASS_SOURCE
+              value: /var/run/secrets/agentos/pgpass
+            - name: HERDR_SESSION
+              value: agentos-secondmate
+            - name: PGPASSFILE
+              value: /home/agent/.pgpass
+        - name: prepare-home
+          workingDir: /opt/agentos/agents/secondmate
+          args:
+            - run
+            - --skip-tools
+            - secondmate:prepare
+          env: *role-environment
+          volumeMounts:
+            - name: database-credentials
+              mountPath: /var/run/secrets/agentos
+              readOnly: true
+      containers:
+        - name: agentos
+          workingDir: /opt/agentos/agents/secondmate
+          args:
+            - run
+            - --skip-tools
+            - secondmate:run
+          env: *role-environment
+          livenessProbe:
+            exec:
+              command:
+                - mise
+                - run
+                - --skip-tools
+                - secondmate:health
+                - --
+                - live
+          readinessProbe:
+            exec:
+              command:
+                - mise
+                - run
+                - --skip-tools
+                - secondmate:health
+                - --
+                - ready
+      volumes:
+        - name: database-credentials
+          secret:
+            secretName: agentos-secondmate-postgres

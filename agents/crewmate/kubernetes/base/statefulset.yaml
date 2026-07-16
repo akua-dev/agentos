@@ -1,0 +1,168 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-crewmate
+  labels:
+    app.kubernetes.io/name: agentos-crewmate
+    app.kubernetes.io/part-of: agentos
+spec:
+  replicas: 1
+  serviceName: agentos-crewmate
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-crewmate
+  template:
+    metadata:
+      annotations:
+        agentos.akua.dev/container: crewmate
+        agentos.akua.dev/herdr-session: agentos-crewmate
+      labels:
+        agentos.akua.dev/agent: crewmate
+        app.kubernetes.io/name: agentos-crewmate
+        app.kubernetes.io/part-of: agentos
+    spec:
+      serviceAccountName: agentos-crewmate
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: install-tools
+          image: agentos:dev
+          imagePullPolicy: Never
+          workingDir: /opt/agentos/agents/crewmate
+          command:
+            - mise
+          args:
+            - install
+            - --locked
+            - node
+            - kubectl
+            - github:ogulcancelik/herdr
+            - github:kunchenguid/treehouse
+            - npm:@openai/codex
+          env: &runtime-environment
+            - name: HOME
+              value: /home/agent
+            - name: AGENTOS_RELEASE_ROOT
+              value: /opt/agentos
+            - name: AGENTOS_AGENT_CWD
+              value: /opt/agentos/agents/crewmate
+            - name: AGENTOS_AGENT_ID
+              value: 00000000-0000-4000-8000-000000000003
+            - name: AGENTOS_AGENT_NAME
+              value: crewmate
+            - name: AGENTOS_AGENT_ROLE
+              value: crewmate
+            - name: AGENTOS_ASSIGNMENT_ID
+              value: 00000000-0000-4000-8000-000000000005
+            - name: AGENTOS_BRIEF_PATH
+              value: /home/agent/brief.md
+            - name: AGENTOS_DATABASE_URL
+              value: postgresql://runtime_crewmate@agentos-postgres-rw.agentos.svc:5432/agentos?sslmode=require
+            - name: AGENTOS_PGPASS_SOURCE
+              value: /var/run/secrets/agentos/pgpass
+            - name: AGENTOS_TASK_ID
+              value: 00000000-0000-4000-8000-000000000004
+            - name: HERDR_CONFIG_PATH
+              value: /home/agent/.config/herdr/config.toml
+            - name: HERDR_SESSION
+              value: agentos-crewmate
+            - name: MISE_SYSTEM_CONFIG_FILE
+              value: /etc/mise/config.toml
+            - name: MISE_GITHUB_GITHUB_ATTESTATIONS
+              value: "false"
+            - name: MISE_GITHUB_SLSA
+              value: "false"
+            - name: MISE_TRUSTED_CONFIG_PATHS
+              value: /opt/agentos
+            - name: PGPASSFILE
+              value: /home/agent/.pgpass
+            - name: PATH
+              value: /home/agent/.local/share/mise/shims:/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - &home-volume
+              name: home
+              mountPath: /home/agent
+        - name: prepare-home
+          image: agentos:dev
+          imagePullPolicy: Never
+          workingDir: /opt/agentos/agents/crewmate
+          command:
+            - mise
+          args:
+            - run
+            - --skip-tools
+            - crewmate:prepare
+          env: *runtime-environment
+          securityContext: *container-security
+          volumeMounts:
+            - *home-volume
+            - name: database-credentials
+              mountPath: /var/run/secrets/agentos
+              readOnly: true
+      containers:
+        - name: crewmate
+          image: agentos:dev
+          imagePullPolicy: Never
+          workingDir: /opt/agentos/agents/crewmate
+          command:
+            - herdr
+          args:
+            - server
+            - --session
+            - agentos-crewmate
+          env: *runtime-environment
+          securityContext: *container-security
+          volumeMounts:
+            - *home-volume
+          livenessProbe:
+            exec:
+              command:
+                - herdr
+                - status
+                - --json
+                - --session
+                - agentos-crewmate
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - herdr
+                - status
+                - --json
+                - --session
+                - agentos-crewmate
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: database-credentials
+          secret:
+            secretName: agentos-crewmate-postgres
+  volumeClaimTemplates:
+    - metadata:
+        name: home
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi

@@ -61,7 +61,7 @@ First and Second Mates use Pi where AgentOS needs deep lifecycle customization. 
 The implementation is a Bun monorepo whose toolchain is pinned through Mise:
 
 ```sh
-cd agentos/fleet
+cd agentos
 mise install
 bun run check
 ```
@@ -158,7 +158,7 @@ If the selected release lacks that wake capability, the Mate reports the unsuppo
 ### Toolchains and worktrees
 
 Mise supplies tools to every AgentOS agent, including First Mates, Second Mates and Crewmates.
-The release-owned `fleet/mise.toml` and `fleet/mise.lock` define Bun, Node and
+The release-owned `mise.toml` and `mise.lock` define Bun, Node and
 the pinned Fleet tools for Pi, Codex, Herdr, Treehouse, Kubernetes, GitHub,
 validation, AXI helpers and command-line inspection. The pair resolves the
 reviewed Bun 1.4.0 canary through Mise's GitHub backend. The moving upstream
@@ -289,7 +289,7 @@ The final local mutation is one short PostgreSQL transaction. It updates all cou
 Agents invoke provider tools such as `gh-axi` directly and synchronously instead of writing an AgentOS outbox. They observe the actual exit status and remain responsible for failure and recovery in their persistent harness session. Cross-system atomicity is impossible: after a successful provider command and before the local transaction, a crash can still occur. State-setting provider operations should be idempotent; non-idempotent operations such as comments use a deterministic action identifier when supported. Recovery checks the already persisted webhook payloads first and queries the provider only when local evidence is inconclusive, avoiding routine duplicate API and model work.
 
 The exact tables, indexes, Functions, Triggers, grants, RLS policies and raw-session retention policy are defined only by versioned SQL and SQL tests after schema review.
-The `fleet/database/` workspace uses Drizzle Kit only to create and
+The `database/` workspace uses Drizzle Kit only to create and
 apply journaled custom SQL migrations; it has no Drizzle ORM schema or runtime
 database client.
 This README does not duplicate them.
@@ -312,7 +312,7 @@ checksums, the unprivileged `agentos` application owner and no network-enabled
 superuser. This minimal topology is not HA and has no reviewed backup policy yet.
 CNPG generates the application Secret; First Mate uses its `pgpass` entry with
 `psql` and injects its URI only into the Drizzle migration process. Pinned
-migration dependencies are installed from `fleet/bun.lock` into a content-addressed
+migration dependencies are installed from `bun.lock` into a content-addressed
 workspace on the agent PVC when first needed, keeping them out of the runtime
 image. Topology does not change schema or security semantics.
 
@@ -363,10 +363,10 @@ Akua Zero-to-Cluster is an optional path selected by the developer, never an imp
 Codex and Pi discover `.agents/skills/` directories from their working directory upward to the Git root.
 AgentOS uses that hierarchy to keep operational roles out of development sessions:
 
-- `fleet/agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication and database operations;
-- `fleet/agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
-- `fleet/agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
-- a future subtree under `fleet/apps/` or `fleet/packages/` may add its own `.agents/skills/` when development there needs a reusable workflow.
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication and database operations;
+- `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
+- `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
+- a future subtree under `apps/` or `packages/` may add its own `.agents/skills/` when development there needs a reusable workflow.
 
 Bootstrap explicitly loads the other skills when it reaches their boundary.
 First and Second Mates can load those skills independently during normal operation, so runtime knowledge is not hidden behind bootstrap.
@@ -375,50 +375,49 @@ This is a regular Markdown pointer rather than a symlink because raw GitHub cont
 
 There is initially no root `.agents/skills/` directory.
 Only a workflow that genuinely applies to agent operation and repository development belongs there later.
-Sibling skill trees are not linked: a process started under `fleet/agents/firstmate/`
+Sibling skill trees are not linked: a process started under `agents/firstmate/`
 sees the shared Fleet skills and its First-Mate skills, while contributor
-processes under `fleet/database/` or `fleet/runtime/` do not see either role tree. Released shared skills
+processes under `database/` or `runtime/` do not see either role tree. Released shared skills
 are reconciled into each Agent's persistent home for use from foreign project
 worktrees.
 
-The repository deliberately has no root or `fleet/AGENTS.md`. Contributor
+The repository deliberately has no root `AGENTS.md`. Contributor
 instructions live at the database, runtime and test boundaries they govern;
-Agent-shared instructions live under `fleet/agents/`; and persistent role
+Agent-shared instructions live under `agents/`; and persistent role
 instructions live in two real agent working directories:
 
-- `fleet/agents/firstmate/AGENTS.md` is the complete First-Mate job description;
-- `fleet/agents/secondmate/AGENTS.md` is the complete Second-Mate job description.
+- `agents/firstmate/AGENTS.md` is the complete First-Mate job description;
+- `agents/secondmate/AGENTS.md` is the complete Second-Mate job description.
 
-The First Mate process starts with `fleet/agents/firstmate/` as its working directory; the Second Mate process starts in `fleet/agents/secondmate/`.
+The First Mate process starts with `agents/firstmate/` as its working directory; the Second Mate process starts in `agents/secondmate/`.
 Codex and Pi can therefore load the selected nested instruction file without mixing both roles, while Pi still discovers the shared `.agents/skills/` directory from an ancestor up to the Git root.
-Role-specific Pi configuration may live beside each persistent role under `fleet/agents/<role>/.pi/`.
+Role-specific Pi configuration may live beside each persistent role under `agents/<role>/.pi/`.
 
 Crewmates are different: their harness working directory is the isolated
 project worktree. The owning Mate renders a durable brief from
-`fleet/agents/crewmate/BRIEF.md`; the project's own `AGENTS.md` then supplies codebase
+`agents/crewmate/BRIEF.md`; the project's own `AGENTS.md` then supplies codebase
 instructions without becoming the Fleet role contract.
 
 ### Repository layout
 
-The repository root is the AgentOS product and public onboarding surface.
-`fleet/` is the executable distribution and Bun workspace:
+The repository root is both the AgentOS product surface and its Bun workspace:
 
-- `fleet/agents/` contains role working directories, role instructions and operational skills;
-- `fleet/database/` is the SQL-first Drizzle Kit migration workspace shared by the whole Fleet;
-- `fleet/runtime/` contains role-neutral image lifecycle mechanics and shared Kubernetes resources;
+- `agents/` contains role working directories, role instructions and operational skills;
+- `database/` is the SQL-first Drizzle Kit migration workspace shared by the whole Fleet;
+- `runtime/` contains role-neutral image lifecycle mechanics and shared Kubernetes resources;
 - subtree-local `.agents/skills/` directories contain scoped, progressively disclosed workflows.
 
 The shared executable Mate lifecycle and common First/Second-Mate StatefulSet
-live under `fleet/runtime/`; this is not an agent role, external CLI or generic
+live under `runtime/`; this is not an agent role, external CLI or generic
 importable runtime package. Each role owns its Kubernetes patch and surrounding
 ServiceAccount, Service, credentials and authority under
-`fleet/agents/<role>/kubernetes/`. First Mate owns database topology under its
-Kubernetes subtree, while `fleet/database/` owns schema semantics for every Mate.
+`agents/<role>/kubernetes/`. First Mate owns database topology under its
+Kubernetes subtree, while `database/` owns schema semantics for every Mate.
 
 There is no speculative CLI or placeholder application. When a real executable
-service or reusable library exists, it may introduce `fleet/apps/<name>/` or
-`fleet/packages/<name>/` through a reviewed boundary. The workspace keeps one
-`fleet/bun.lock`.
+service or reusable library exists, it may introduce `apps/<name>/` or
+`packages/<name>/` through a reviewed boundary. The workspace keeps one
+`bun.lock`.
 
 ### Repository source-of-truth rules
 
@@ -426,24 +425,24 @@ service or reusable library exists, it may introduce `fleet/apps/<name>/` or
 - `CONTRIBUTING.md` contains repository setup, development conventions and disposable-cluster smoke testing.
 - `BOOTSTRAP.md` points to the canonical First-Mate bootstrap skill without duplicating its procedure.
 - The Architecture section in this README contains architectural decisions and boundaries.
-- `fleet/agents/AGENTS.md` contains identity-neutral shared Agent rules.
-- `fleet/agents/.agents/skills/` contains workflows shared by First and Second Mate without exposing them to contributor or runtime-development sessions.
-- `fleet/agents/firstmate/` and `fleet/agents/secondmate/` contain the two persistent role instruction surfaces, their Pi configuration and role-scoped skills.
-- `fleet/agents/crewmate/BRIEF.md` is the canonical bounded-worker contract rendered into each Assignment brief.
-- `fleet/database/AGENTS.md` governs SQL-first schema development without selecting an Agent role.
-- `fleet/runtime/AGENTS.md` governs shared container lifecycle mechanics without selecting an Agent role.
-- `fleet/runtime/kubernetes/base/` owns the shared First/Second-Mate StatefulSet.
-- `fleet/agents/firstmate/kubernetes/`, `fleet/agents/secondmate/kubernetes/` and
-  `fleet/agents/crewmate/kubernetes/` are authoritative for role-owned Kubernetes
+- `agents/AGENTS.md` contains identity-neutral shared Agent rules.
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate without exposing them to contributor or runtime-development sessions.
+- `agents/firstmate/` and `agents/secondmate/` contain the two persistent role instruction surfaces, their Pi configuration and role-scoped skills.
+- `agents/crewmate/BRIEF.md` is the canonical bounded-worker contract rendered into each Assignment brief.
+- `database/AGENTS.md` governs SQL-first schema development without selecting an Agent role.
+- `runtime/AGENTS.md` governs shared container lifecycle mechanics without selecting an Agent role.
+- `runtime/kubernetes/base/` owns the shared First/Second-Mate StatefulSet.
+- `agents/firstmate/kubernetes/`, `agents/secondmate/kubernetes/` and
+  `agents/crewmate/kubernetes/` are authoritative for role-owned Kubernetes
   patches and surrounding resources.
-- `fleet/agents/firstmate/kubernetes/database/` is authoritative for the optional
+- `agents/firstmate/kubernetes/database/` is authoritative for the optional
   self-hosted CloudNativePG topology; it does not own SQL schema.
-- `fleet/agents/firstmate/kubernetes/release/` is authoritative for immutable
+- `agents/firstmate/kubernetes/release/` is authoritative for immutable
   First-Mate and database release rendering; generated release manifests
   belong only to immutable GitHub releases.
-- `fleet/runtime/` owns only the common persistent-Mate runtime mechanics,
+- `runtime/` owns only the common persistent-Mate runtime mechanics,
   StatefulSet base and role-neutral `agentos` image.
-- `fleet/database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `fleet/database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
+- `database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
 - Release assets pin exact versions, digests and checksums.
 - `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_SOURCES.md` are authoritative for redistributed third-party licensing and source offers.
 
