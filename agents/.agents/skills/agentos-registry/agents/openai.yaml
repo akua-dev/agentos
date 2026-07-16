@@ -1,0 +1,4 @@
+interface:
+  display_name: "Operate an AgentOS Registry"
+  short_description: "Select and operate a Fleet image registry"
+  default_prompt: "Use $agentos-registry to establish the smallest approved registry path for this Fleet."

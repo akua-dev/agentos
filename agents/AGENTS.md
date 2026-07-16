@@ -14,5 +14,13 @@ identity.
 - Keep shared executable lifecycle mechanics in `../runtime/`, shared operational
   skills in `.agents/skills/`, and role-owned Kubernetes resources beside the
   role that operates them.
+- Load `$agentos-development` when changing, reviewing, testing, dogfooding or
+  delivering AgentOS itself. It preserves the active role rather than granting
+  a different identity or direct-work authority.
+- Load `$agentos-image-builds` and `$agentos-registry` only when image building,
+  distribution or node pull reachability is actually in scope.
+- Load `$agentos-artifact-fs` only when a read-heavy Scout may benefit from lazy
+  access to large or multiple repositories. It never changes the active role or
+  makes FUSE a Fleet default.
 - Use native tools directly and preserve PostgreSQL, Kubernetes, Herdr, PVC and
   Git as distinct sources of truth.

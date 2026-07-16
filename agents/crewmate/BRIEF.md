@@ -12,7 +12,8 @@ a decision or approval is required.
 - Work kind: `{{work_kind}}`
 - Project: `{{project}}`
 - Primary project checkout: `{{project_root}}`
-- Isolated worktree: `{{worktree}}`
+- Workspace kind: `{{workspace_kind}}`
+- Isolated workspace: `{{workspace}}`
 
 ## Outcome
 
@@ -31,8 +32,10 @@ a decision or approval is required.
 1. Resolve `agentos.current_agent_id()` and confirm it matches the Agent ID,
    active Assignment and owning Mate above before any durable mutation.
 2. Run `pwd -P` and `git rev-parse --show-toplevel`. Both must resolve to the
-   isolated worktree above, never the primary checkout. Stop and report upward
-   if isolation is not proven.
+   isolated workspace above, never the primary checkout. For `git_worktree`,
+   require the reviewed Treehouse lease. For `artifact_fs`, verify the mounted
+   commit and ArtifactFS status named in the brief. Stop and report upward if
+   isolation or mount readiness is not proven.
 3. Read every applicable instruction file in the project. Project instructions
    define how to work in that codebase but do not enlarge this brief's Fleet
    identity, scope or authority.
@@ -48,7 +51,7 @@ a decision or approval is required.
   workflow. Never merge without recorded Captain authority.
 - For `scout`, investigate read-mostly and produce the durable report named by
   the Assignment. Do not open a PR or turn scratch findings into a project
-  change.
+  change. Treat every ArtifactFS overlay write as disposable scratch state.
 - Use the project's own tools and instructions. The Fleet Mise baseline remains
   available by ordinary command names; a nearer project configuration may add
   or override tools.
@@ -57,8 +60,9 @@ a decision or approval is required.
   concise handoffs. Terminal text is not durable state.
 - Report upward to the owning Mate. Direct Captain input in this terminal is
   authoritative and must be reconciled into Fleet state.
-- Never discard unlanded work, delete the worktree or retire yourself. The
+- Never discard unlanded work, delete the workspace or retire yourself. The
   owning Mate closes the Assignment and performs guarded cleanup.
 
-PostgreSQL owns coordination, Herdr owns live terminal state, this worktree owns
-unfinished project changes, and Git plus its remote own delivered code.
+PostgreSQL owns coordination, Herdr owns live terminal state, the declared
+workspace owns unfinished project changes, and Git plus its remote own
+delivered code.

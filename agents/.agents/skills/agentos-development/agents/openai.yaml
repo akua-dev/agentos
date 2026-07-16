@@ -1,0 +1,4 @@
+interface:
+  display_name: "Develop AgentOS"
+  short_description: "Contribute safely from inside an AgentOS Fleet"
+  default_prompt: "Use $agentos-development to change AgentOS through its reviewed contribution workflow."

@@ -5,14 +5,14 @@
 <h1 align="center">AgentOS</h1>
 
 <p align="center">
-  <strong>Persistent engineering agents for Kubernetes.</strong>
+  <strong>Turn one trusted coding agent into a persistent engineering fleet.</strong>
 </p>
 
 <p align="center">
-  Agent-native · Kubernetes-native · PostgreSQL-backed · Human-controlled
+  Delegated · Visible · Recoverable · Human-controlled
 </p>
 
-AgentOS turns one trusted coding agent into a durable engineering fleet: a persistent First Mate, optional domain-owning Second Mates, and task-scoped Crewmates working across repositories without losing their sessions, tools or context.
+AgentOS gives your coding agent a durable crew: a persistent First Mate, optional domain-owning Second Mates, and task-scoped Crewmates working across repositories without losing their sessions, tools or context.
 
 The model remains the decision-maker. AgentOS supplies the durable state, visible terminals and deterministic infrastructure mechanics around it.
 
@@ -25,16 +25,18 @@ Fetch and read https://raw.githubusercontent.com/akua-dev/agentos/main/BOOTSTRAP
 Inspect my environment read-only first and guide me interactively through establishing a persistent First Mate in Kubernetes.
 ```
 
-The agent inspects what already exists, explains the viable path and asks before credentials, login, cost, cluster creation, RBAC or installation. It can use an existing Kubernetes cluster or offer Akua Zero-to-Cluster as an optional path.
+The agent inspects what already exists, explains the viable path and asks before credentials, login, cost, cluster creation, RBAC or installation. It can use a dedicated cluster, isolate AgentOS behind a vCluster hosted by an existing cluster, install directly into an existing cluster, or offer Akua Zero-to-Cluster as an optional path.
 
-Installation uses a versioned single-file manifest from an immutable GitHub
-release. Its init and runtime containers all use the same public
+Stable installation uses a versioned single-file manifest from an immutable
+GitHub release. Its init and runtime containers all use the same public
 `ghcr.io/akua-dev/agentos` image pinned by OCI digest.
 
 For an existing cluster, the temporary local agent needs a working `kubectl`
 context and a browser for interactive provider login. It does not need a local
 AgentOS clone, Mise, Bun, Node, Docker, Helm, or PostgreSQL. Mise is part of the
 persistent First-Mate image and manages that agent's tools on its PVC.
+If the developer selects vCluster isolation, the seed adds an exact reviewed
+vCluster CLI version only after that topology is approved.
 
 ## The crew
 
@@ -107,8 +109,11 @@ native `kubectl` commands.
 
 First and Second Mates use the same small `agentos` image and the same shared
 StatefulSet base. Their Kustomize overlays explicitly select the role working
-directory, environment, lifecycle tasks and credentials. The image contains
-Mise, pinned Bun and the locked AgentOS tool definitions; an init container
+directory, environment, lifecycle tasks and credentials. The image contains a
+credential-free, shallow Git seed at its exact source revision, Mise, pinned
+Bun and the locked AgentOS
+tool definitions. First start clones that seed to the home PVC and Pi runs from
+the persistent role directory; an init container
 installs Node and the remaining startup-critical Fleet tools onto the Mate's persistent home.
 Ordinary tool additions remain in that Mise-managed home. Crewmates instead
 receive a task-suited image selected by the responsible Mate. The judgment-based
@@ -117,6 +122,10 @@ may add an optional `image` beside `harness`, `model` and `effort`; omission use
 the released lightweight default, while a remote image must come from an
 approved registry and be pinned by digest. Large language- or Codex-oriented
 images are therefore explicit task costs, not the universal fleet runtime.
+Read-heavy Scouts may opt into a separate ArtifactFS image and a reviewed
+platform-specific FUSE Pod profile for fast lazy access to large or multiple
+repositories. ArtifactFS is never installed in the common Mate image, and its
+scratch overlay is not a delivery path for ship work.
 
 One Herdr server runs per runtime pod and owns that pod's workspaces, tabs, panes, terminal processes, runtime status and native harness session references.
 Client detach leaves processes running. After a pod replacement, Herdr restores its layout and asks supported harnesses to resume from their own persistent sessions.
@@ -136,7 +145,13 @@ This is only a user-facing view; the remote pod-local sessions remain authoritat
 The Captain has one regular fleet interface: First Mate.
 First Mate does not perform project-specific coding, investigation, planning, bug reproduction or audits itself.
 It may inspect projects read-only to understand and route work, and it may mutate reviewed Fleet operational state, but it delegates project work to a charter-matched Second Mate or a bounded Crewmate.
-The running AgentOS checkout is First Mate's narrow self-maintenance exception: it may change shared AgentOS source directly only with Captain approval, no active direct report and the normal reviewed delivery path.
+A persistent writable AgentOS development checkout is First Mate's narrow self-maintenance exception: it may change shared AgentOS source directly only with Captain approval, no active direct report and the normal reviewed delivery path.
+The root-owned `/opt/agentos` tree is the immutable image Git seed, not the
+active checkout. The harness reads AgentOS instructions, Skills and Mise files
+from `$HOME/projects/agentos`; unfinished changes and its worktrees therefore
+survive Pod replacement. Reviewed Markdown and Skill updates can be loaded from
+that Git checkout at a safe Pi turn boundary, while OS, runtime and Kubernetes
+changes still reach a running Mate through a tested immutable image digest.
 If any direct report is active, First Mate delegates AgentOS source changes too because hands-on work competes with supervision.
 
 A Second Mate uses the same architecture inside one persistent charter.
@@ -146,8 +161,8 @@ Second Mates never create further Second Mates.
 
 Every accepted work item has one durable Task and at least one explicit Assignment before an asynchronous worker begins.
 A ship Crewmate works in an isolated worktree until its changes are durably landed or handed off.
-A scout's durable output is its report; its scratch worktree may then be discarded.
-No Mate merges without the Captain's explicit approval or a previously recorded standing authorization, and no agent or worktree with active or unlanded work is retired by implication.
+A scout's durable output is its report; its scratch worktree or ArtifactFS mount may then be discarded.
+No Mate merges without the Captain's explicit approval or a previously recorded standing authorization, and no agent or workspace with active or unlanded work is retired by implication.
 
 Delegated agents report through PostgreSQL Inbox, Task and Assignment state rather than opening competing Captain-facing threads.
 Direct Captain intervention in any attached terminal remains authoritative and is reconciled into Fleet state.
@@ -168,9 +183,9 @@ every released platform before publication.
 
 AgentOS images install that pair as `/etc/mise/config.toml` and
 `/etc/mise/mise.lock`, and bake its pinned Bun so typed bootstrap programs do
-not require a first-start download. Pods seed the same reviewed pair as
-`~/.config/mise/config.toml` and `~/.config/mise/mise.lock` on the agent PVC;
-agent-owned additions live separately under `~/.config/mise/conf.d/`.
+not require a first-start download. The persistent AgentOS Git checkout
+provides the current repository and role Mise configuration; agent-owned
+additions live separately under `~/.config/mise/conf.d/`.
 Before starting a Mate, a direct Mise init step installs the remaining small
 startup-critical set: Node, kubectl, Herdr and Pi. A second init step uses
 Mise to run the typed home-reconciliation program. Both init containers and the
@@ -190,8 +205,8 @@ Mate image remain ordinary commands but are not duplicated into the PVC by Mise.
 
 Mise configuration is deliberately layered:
 
-1. `/etc/mise/config.toml` provides the lowest-precedence immutable Fleet baseline.
-2. `~/.config/mise/config.toml` carries the same released tool selection on the PVC; its `conf.d/` may add approved persistent tools for that agent.
+1. `/etc/mise/config.toml` provides the lowest-precedence immutable image baseline.
+2. The persistent AgentOS checkout supplies its reviewed root and role configuration; `~/.config/mise/conf.d/` may add approved persistent tools for that agent.
 3. A repository or nested-worktree `mise.toml`, `.tool-versions`, or supported idiomatic version file adds tools and overrides conflicting versions for that project.
 
 A repository with no Mise configuration receives the AgentOS baseline unchanged.
@@ -337,7 +352,7 @@ That local agent loads `agentos-bootstrap`, inspects read-only, explains viable 
 
 Bootstrap has two handoff stages:
 
-1. Establish the smallest persistent Kubernetes runtime: Herdr, Pi First Mate, agent PVC, immutable AgentOS release, attach path and working model authentication.
+1. Establish the smallest persistent Kubernetes runtime: Herdr, Pi First Mate, agent PVC, immutable AgentOS revision, attach path and working model authentication.
 2. Hand control to that First Mate, which selects or provisions PostgreSQL with approval, applies the versioned database assets and verifies the complete fleet identity.
 
 The initial model path uses Pi with the developer's Codex subscription through
@@ -346,10 +361,11 @@ authoritative; AgentOS does not seed a release-wide model or thinking level.
 Login happens inside the persistent Pi runtime, not by copying a local token directory.
 Exact package versions and authentication commands belong to release assets and the auth skill.
 
-The seed resolves the latest published GitHub release, verifies that release is
-immutable, and applies only its fixed-name assets under that versioned release
-URL. It verifies the immutable AgentOS image digest embedded in the selected
-manifest instead of trusting a separate metadata index.
+For a stable install, the seed resolves the latest published GitHub release,
+verifies that release is immutable, and applies only its fixed-name assets
+under that versioned release URL. An explicitly chosen preview instead uses an
+exact Git commit, a locally rendered manifest and an immutable OCI digest; it
+never installs from a branch URL or mutable tag.
 External database dependencies are discovered and verified by First Mate when the developer selects self-hosting.
 The default manifest grants First Mate administration within `agentos`;
 the separately named dedicated-cluster manifest adds cluster-administrator
@@ -363,7 +379,7 @@ Akua Zero-to-Cluster is an optional path selected by the developer, never an imp
 Codex and Pi discover `.agents/skills/` directories from their working directory upward to the Git root.
 AgentOS uses that hierarchy to keep operational roles out of development sessions:
 
-- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication and database operations;
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication, database, image-build, registry and optional ArtifactFS Scout operations;
 - `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
 - a future subtree under `apps/` or `packages/` may add its own `.agents/skills/` when development there needs a reusable workflow.
@@ -377,9 +393,9 @@ There is initially no root `.agents/skills/` directory.
 Only a workflow that genuinely applies to agent operation and repository development belongs there later.
 Sibling skill trees are not linked: a process started under `agents/firstmate/`
 sees the shared Fleet skills and its First-Mate skills, while contributor
-processes under `database/` or `runtime/` do not see either role tree. Released shared skills
-are reconciled into each Agent's persistent home for use from foreign project
-worktrees.
+processes under `database/` or `runtime/` do not see either role tree. First and
+Second Mate run directly from their persistent AgentOS Git checkout, so Skill
+updates follow Git and need no copied mirror under the home directory.
 
 The repository deliberately has no root `AGENTS.md`. Contributor
 instructions live at the database, runtime and test boundaries they govern;
@@ -389,12 +405,15 @@ instructions live in two real agent working directories:
 - `agents/firstmate/AGENTS.md` is the complete First-Mate job description;
 - `agents/secondmate/AGENTS.md` is the complete Second-Mate job description.
 
-The First Mate process starts with `agents/firstmate/` as its working directory; the Second Mate process starts in `agents/secondmate/`.
+The First Mate process starts with `$HOME/projects/agentos/agents/firstmate/` as
+its working directory; the Second Mate starts in the corresponding persistent
+`agents/secondmate/` directory.
 Codex and Pi can therefore load the selected nested instruction file without mixing both roles, while Pi still discovers the shared `.agents/skills/` directory from an ancestor up to the Git root.
 Role-specific Pi configuration may live beside each persistent role under `agents/<role>/.pi/`.
 
 Crewmates are different: their harness working directory is the isolated
-project worktree. The owning Mate renders a durable brief from
+project workspace, normally a Treehouse worktree and optionally a reviewed
+ArtifactFS mount for an eligible Scout. The owning Mate renders a durable brief from
 `agents/crewmate/BRIEF.md`; the project's own `AGENTS.md` then supplies codebase
 instructions without becoming the Fleet role contract.
 
@@ -429,6 +448,8 @@ service or reusable library exists, it may introduce `apps/<name>/` or
 - `agents/.agents/skills/` contains workflows shared by First and Second Mate without exposing them to contributor or runtime-development sessions.
 - `agents/firstmate/` and `agents/secondmate/` contain the two persistent role instruction surfaces, their Pi configuration and role-scoped skills.
 - `agents/crewmate/BRIEF.md` is the canonical bounded-worker contract rendered into each Assignment brief.
+- `agents/crewmate/images/` owns optional task-specific worker images; it never
+  expands the common Mate image or grants runtime permissions by implication.
 - `database/AGENTS.md` governs SQL-first schema development without selecting an Agent role.
 - `runtime/AGENTS.md` governs shared container lifecycle mechanics without selecting an Agent role.
 - `runtime/kubernetes/base/` owns the shared First/Second-Mate StatefulSet.
@@ -437,9 +458,9 @@ service or reusable library exists, it may introduce `apps/<name>/` or
   patches and surrounding resources.
 - `agents/firstmate/kubernetes/database/` is authoritative for the optional
   self-hosted CloudNativePG topology; it does not own SQL schema.
-- `agents/firstmate/kubernetes/release/` is authoritative for immutable
-  First-Mate and database release rendering; generated release manifests
-  belong only to immutable GitHub releases.
+- `agents/firstmate/kubernetes/release/` is authoritative for human-readable
+  First-Mate and database manifest rendering; stable generated assets belong
+  to immutable GitHub releases, while previews remain exact-commit builds.
 - `runtime/` owns only the common persistent-Mate runtime mechanics,
   StatefulSet base and role-neutral `agentos` image.
 - `database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `database/drizzle.tooling.ts` is deliberately empty and non-authoritative.

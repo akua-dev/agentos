@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build AgentOS Images"
+  short_description: "Build OCI images safely inside a Fleet"
+  default_prompt: "Use $agentos-image-builds to build and publish this exact revision safely."

@@ -71,7 +71,7 @@ describe("Second Mate Kubernetes base", () => {
       ]),
     );
     expect(environment.AGENTOS_AGENT_CWD).toBe(
-      "/opt/agentos/agents/secondmate",
+      "/home/agent/projects/agentos/agents/secondmate",
     );
     expect(environment.AGENTOS_AGENT_ROLE).toBe("second_mate");
     expect(environment.AGENTOS_MODEL).toBeUndefined();

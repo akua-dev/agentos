@@ -1,7 +1,7 @@
 # First Mate release artifacts
 
-Each AgentOS release publishes three single-file Kubernetes manifests generated
-from the reviewed Kustomize resources:
+A stable AgentOS release may publish three human-readable single-file
+Kubernetes manifests generated directly from the reviewed Kustomize resources:
 
 - `agentos-firstmate.yaml` grants the First Mate administration only in the
   `agentos` namespace.
@@ -24,5 +24,6 @@ bun run agents/firstmate/kubernetes/release/render.ts \
   --output dist/release
 ```
 
-Publish all three files on an immutable GitHub release. Never hand-edit a
-generated manifest or reuse a release tag.
+Publish all three files on an immutable GitHub release. GitHub releases are not
+required for an exact-commit development build. Never hand-edit a generated
+manifest or reuse a release tag.

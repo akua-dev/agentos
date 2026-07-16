@@ -144,7 +144,7 @@ describe("First Mate Kubernetes resources", () => {
     expect(firstmate.command).toEqual(["mise"]);
     expect(firstmate.args).toEqual(["run", "--skip-tools", "firstmate:run"]);
     expect(environment.AGENTOS_AGENT_CWD).toBe(
-      "/opt/agentos/agents/firstmate",
+      "/home/agent/projects/agentos/agents/firstmate",
     );
     expect(environment.AGENTOS_AGENT_NAME).toBe("firstmate");
     expect(environment.AGENTOS_AGENT_ROLE).toBe("first_mate");

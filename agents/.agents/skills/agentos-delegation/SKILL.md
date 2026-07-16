@@ -30,6 +30,9 @@ Use released PostgreSQL schema for durable coordination and native tools against
 - Use a **ship Crewmate** when the durable output is a delivered project change.
 - Use a **scout Crewmate** when the durable output is knowledge: investigation, planning, reproduction or audit.
   A scout does not open a PR unless the Captain later promotes the result into a ship task.
+- Load `$agentos-artifact-fs` only when a read-heavy Scout must enter large or
+  multiple repositories quickly enough to justify a separate FUSE-enabled
+  image and reviewed Pod profile. Native Git remains the default.
 - Never retain project work on the Mate because it appears small, urgent or easier than delegation.
 - Only First Mate may use the narrow AgentOS self-maintenance exception in its `AGENTS.md`, and only while it has no active direct report.
   Second Mate has no equivalent exception.
@@ -47,15 +50,17 @@ Use released PostgreSQL schema for durable coordination and native tools against
    Set `created_by_agent_id` and `assigned_by_agent_id` to the authenticated Mate and include concise explanatory status text.
 5. Render the worker's durable brief from `../crewmate/BRIEF.md`. Fill every
    marker with the owning Mate, Agent, Task, Assignment, work kind, project,
-   primary checkout, isolated worktree, outcome, acceptance criteria and
+   primary checkout, workspace kind, isolated workspace, outcome, acceptance criteria and
    constraints. Reject an unresolved marker. Store the rendered brief beside
    the reviewed workload artifact and copy it to the Agent-owned
    `AGENTOS_BRIEF_PATH` before harness launch. Put longer supporting context in
    the Task body rather than a terminal message.
-6. For project work, require an isolated worktree based on a clean reviewed base and prove it is not the Mate's primary checkout before any mutation.
-   Acquire it inside the Crewmate pod through Treehouse's durable UUID-labelled
-   lease workflow; do not replace the pool with direct `git worktree add`
-   mechanics.
+6. For project work, require an isolated workspace and prove it is not the
+   Mate's primary checkout before any mutation. Use Treehouse's durable
+   UUID-labelled worktree lease for ship work and ordinary scouts. An
+   ArtifactFS Scout may instead use only the Assignment-scoped mount prepared
+   through `$agentos-artifact-fs`; its overlay is scratch state and can never be
+   promoted directly into delivered work.
 7. Create the dedicated workload from `../crewmate/kubernetes/base` through a
    reviewed per-Agent Kustomize overlay and native kubectl, then start the
    selected harness through the pod-local Herdr CLI with the complete rendered
@@ -91,7 +96,9 @@ Use released PostgreSQL schema for durable coordination and native tools against
 
 1. Require a durable report linked from the Task.
 2. Relay the findings through the owning Mate.
-3. Discard the declared scratch worktree only after the report is durable.
+3. Discard the declared scratch worktree or ArtifactFS mount only after the
+   report is durable. Stop and unmount ArtifactFS before removing its Pod or
+   scoped credentials.
 4. If the Captain wants implementation, create or promote a ship Task while preserving the useful reproduction and context.
 
 ### Final state

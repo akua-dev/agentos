@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 type Resource = {
@@ -33,10 +33,6 @@ const firstmateDirectory = new URL("..", import.meta.url).pathname.replace(
   /\/$/,
   "",
 );
-const databaseDirectory = new URL(
-  "../database",
-  import.meta.url,
-).pathname.replace(/\/$/, "");
 
 export async function renderRelease({
   image,
@@ -57,41 +53,44 @@ export async function renderRelease({
   };
   const variants = [
     {
-      configure: (resources: Resource[]) =>
-        configureFirstMate(resources, image, version),
-      directory: join(firstmateDirectory, "base"),
+      kustomization: firstMateKustomization("../base", image, version),
       filename: release.manifests.scoped,
+      validate: (resources: Resource[]) =>
+        validateFirstMate(resources, image, version),
     },
     {
-      configure: (resources: Resource[]) =>
-        configureFirstMate(resources, image, version),
-      directory: join(
-        firstmateDirectory,
-        "overlays",
-        "cluster-admin",
+      kustomization: firstMateKustomization(
+        "../overlays/cluster-admin",
+        image,
+        version,
       ),
       filename: release.manifests.clusterAdmin,
+      validate: (resources: Resource[]) =>
+        validateFirstMate(resources, image, version),
     },
     {
-      configure: (resources: Resource[]) =>
-        configureDatabase(resources, version),
-      directory: join(databaseDirectory, "base"),
+      kustomization: databaseKustomization(version),
       filename: release.manifests.database,
+      validate: (resources: Resource[]) => validateDatabase(resources, version),
     },
   ];
 
   await mkdir(outputDirectory, { recursive: true });
   await Promise.all(
-    variants.map(async ({ configure, directory, filename }) => {
-      const rendered = await $`kubectl kustomize ${directory}`.text();
-      const parsed = Bun.YAML.parse(rendered) as Resource | Resource[];
-      const resources = Array.isArray(parsed) ? parsed : [parsed];
-      configure(resources);
-      await writeFile(
-        join(outputDirectory, filename),
-        serializeResources(resources),
-        "utf8",
+    variants.map(async ({ filename, kustomization, validate }) => {
+      const overlay = await mkdtemp(
+        join(firstmateDirectory, ".agentos-release-"),
       );
+      try {
+        await writeFile(join(overlay, "kustomization.yaml"), kustomization, "utf8");
+        const rendered = await $`kubectl kustomize ${overlay}`.text();
+        const parsed = Bun.YAML.parse(rendered) as Resource | Resource[];
+        const resources = Array.isArray(parsed) ? parsed : [parsed];
+        validate(resources);
+        await writeFile(join(outputDirectory, filename), rendered, "utf8");
+      } finally {
+        await rm(overlay, { force: true, recursive: true });
+      }
     }),
   );
   return release;
@@ -109,7 +108,7 @@ function assertVersion(version: string) {
   }
 }
 
-function configureFirstMate(resources: Resource[], image: string, version: string) {
+function validateFirstMate(resources: Resource[], image: string, version: string) {
   const statefulSet = resources.find(
     ({ kind, metadata }) =>
       kind === "StatefulSet" && metadata.name === "agentos-firstmate",
@@ -118,26 +117,28 @@ function configureFirstMate(resources: Resource[], image: string, version: strin
     throw new Error("Rendered release is missing StatefulSet/agentos-firstmate.");
   }
 
-  statefulSet.metadata.labels = {
-    ...statefulSet.metadata.labels,
-    "app.kubernetes.io/version": version,
-  };
-  statefulSet.spec.template.metadata.labels = {
-    ...statefulSet.spec.template.metadata.labels,
-    "app.kubernetes.io/version": version,
-  };
+  if (statefulSet.metadata.labels?.["app.kubernetes.io/version"] !== version) {
+    throw new Error("Rendered release is missing the First Mate version label.");
+  }
+  if (
+    statefulSet.spec.template.metadata.labels?.["app.kubernetes.io/version"] !==
+    version
+  ) {
+    throw new Error("Rendered release is missing the First Mate Pod version label.");
+  }
   const pod = statefulSet.spec.template.spec;
   const containers = [...pod.initContainers, ...pod.containers];
   if (containers.length !== 3) {
     throw new Error(`Expected three First Mate containers, found ${containers.length}.`);
   }
   for (const container of containers) {
-    container.image = image;
-    container.imagePullPolicy = "IfNotPresent";
+    if (container.image !== image || container.imagePullPolicy !== "IfNotPresent") {
+      throw new Error("Rendered release did not pin every First Mate container.");
+    }
   }
 }
 
-function configureDatabase(
+function validateDatabase(
   resources: Resource[],
   version: string,
 ) {
@@ -153,16 +154,74 @@ function configureDatabase(
       "Released database manifest must leave PostgreSQL version selection to First Mate.",
     );
   }
-  cluster.metadata.labels = {
-    ...cluster.metadata.labels,
-    "app.kubernetes.io/version": version,
-  };
+  if (cluster.metadata.labels?.["app.kubernetes.io/version"] !== version) {
+    throw new Error("Rendered release is missing the database version label.");
+  }
 }
 
-function serializeResources(resources: Resource[]): string {
-  return `${resources
-    .map((resource) => Bun.YAML.stringify(resource).trimEnd())
-    .join("\n---\n")}\n`;
+function firstMateKustomization(
+  resource: string,
+  image: string,
+  version: string,
+): string {
+  const [newName, digest] = image.split("@");
+  return `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ${resource}
+images:
+  - name: agentos
+    newName: ${newName}
+    digest: ${digest}
+patches:
+  - target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: agentos-firstmate
+    patch: |-
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: agentos-firstmate
+        labels:
+          app.kubernetes.io/version: ${version}
+      spec:
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/version: ${version}
+          spec:
+            initContainers:
+              - name: install-tools
+                imagePullPolicy: IfNotPresent
+              - name: prepare-home
+                imagePullPolicy: IfNotPresent
+            containers:
+              - name: agentos
+                imagePullPolicy: IfNotPresent
+`;
+}
+
+function databaseKustomization(version: string): string {
+  return `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../database/base
+patches:
+  - target:
+      group: postgresql.cnpg.io
+      version: v1
+      kind: Cluster
+      name: agentos-postgres
+    patch: |-
+      apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      metadata:
+        name: agentos-postgres
+        labels:
+          app.kubernetes.io/version: ${version}
+`;
 }
 
 if (import.meta.main) {

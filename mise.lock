@@ -184,39 +184,39 @@ version = "canary"
 backend = "github:oven-sh/bun"
 
 [tools."github:oven-sh/bun"."platforms.linux-arm64"]
-checksum = "sha256:3ebbf78f6cf82637daf3a3756a4c34c926fc12db5868df6c03e6d03453625742"
+checksum = "sha256:9ccbf062a71313f75ecbb00539899ac3a63e5683d33e64a1c897775b0f451a2c"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-aarch64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478907984"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479072995"
 
 [tools."github:oven-sh/bun"."platforms.linux-arm64-musl"]
-checksum = "sha256:477a261f60a00e9c62f93d5793da1f12d7f8a88d11b3352b503a5b2ee4cbe25c"
+checksum = "sha256:4bf9e7627bbbf0034403ff9a748d01121b2cbe2ea8db983ca666c40fd5a19cd9"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-aarch64-musl.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478837634"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479073551"
 
 [tools."github:oven-sh/bun"."platforms.linux-x64"]
-checksum = "sha256:83144e2542c33aaae541cf16b42f8cf1c55c3b94c5395fc776417fa27e95bcbf"
+checksum = "sha256:c97a7bff03cc2934987f124d590deec00ff2d4cb366cc55aec4ab4894e5950a4"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478908125"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479073162"
 
 [tools."github:oven-sh/bun"."platforms.linux-x64-musl"]
-checksum = "sha256:b986b1c52b360dded9110e016f80dbb0460d8c090b768bcbdba1fdb41a829f51"
+checksum = "sha256:d9a4faa16ab9836d112f488114582a6727200e19766fa83fa3388270afb9c827"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64-musl.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478837743"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479073715"
 
 [tools."github:oven-sh/bun"."platforms.macos-arm64"]
-checksum = "sha256:4d4bdb8e3ca1b41dede0ce423871b3804424bd785c6435e43c625a60a49f2f02"
+checksum = "sha256:78b08fad57bd07a4067bd7db87c339d124cefa6da28b5ee7740fd8c25166b7e0"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-darwin-aarch64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478907578"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479072623"
 
 [tools."github:oven-sh/bun"."platforms.macos-x64"]
-checksum = "sha256:c699ccbd63de0e6ef77fd232fcdea8b2d1fce431e2b5dcd5344d4d60b98f59fc"
+checksum = "sha256:3fac7ed99e0a15af142e37bbbeb30835ccba09efba7776f44ff02c0cc7eab644"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-darwin-x64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478907745"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479072795"
 
 [tools."github:oven-sh/bun"."platforms.windows-x64"]
-checksum = "sha256:6dda76146c1b2aa27bc2a212e48f56f9d704d33105f73f53ac19a9952fbc1b6c"
+checksum = "sha256:13867f9d2af342b2be2d193fb41c311474ef189008f2d901b5bf9f3eb6717d09"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-windows-x64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/478838726"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479074946"
 
 [[tools.jq]]
 version = "1.8.2"
@@ -372,3 +372,23 @@ url = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15
 [tools.ripgrep."platforms.windows-x64"]
 checksum = "sha256:124510b94b6baa3380d051fdf4650eaa80a302c876d611e9dba0b2e18d87493a"
 url = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-pc-windows-msvc.zip"
+
+[[tools.vcluster]]
+version = "0.35.2"
+backend = "aqua:loft-sh/vcluster"
+
+[tools.vcluster."platforms.linux-arm64"]
+checksum = "sha256:465e7dc272fd9d411282f6649af426a3c325320f4fa8ea7f4d25ba6291822eb8"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.35.2/vcluster-linux-arm64"
+
+[tools.vcluster."platforms.linux-x64"]
+checksum = "sha256:98b1878dc67e61853d736979c43a2bcf5c77175a96d4db78169a2eeead7ba8a4"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.35.2/vcluster-linux-amd64"
+
+[tools.vcluster."platforms.macos-arm64"]
+checksum = "sha256:96074188bba1874be5a251ef07060be4ae158f46d74cfcd0a05e002d53da3170"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.35.2/vcluster-darwin-arm64"
+
+[tools.vcluster."platforms.macos-x64"]
+checksum = "sha256:9f01e0abbbfb04b26ca0d83a9ebe298ea199535ce101f3043a7bf30d391011b8"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.35.2/vcluster-darwin-amd64"

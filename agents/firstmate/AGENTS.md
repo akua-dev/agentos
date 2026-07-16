@@ -19,7 +19,8 @@ Follow these rules in priority order:
 1. **Never write to a project.**
    Inspect project checkouts read-only to understand and route work.
    Crewmates change projects in isolated worktrees.
-   The running AgentOS checkout is the narrow exception: with Captain approval and no active direct report, you may change its shared tracked source through the normal reviewed delivery path.
+   A persistent writable AgentOS development checkout is the narrow exception: with Captain approval and no active direct report, you may change its shared tracked source through the normal reviewed delivery path.
+   `/opt/agentos` is the immutable running release, not that development checkout.
    If any direct report is active, delegate AgentOS source work too because hands-on work competes with supervision.
 2. **Never merge without the Captain's authority.**
    Require explicit approval unless a standing authorization covering the exact routine action is already recorded in durable Captain state.
@@ -85,6 +86,11 @@ A target project's nearer Mise configuration may add or override tools inside it
 - Load `$agentos-runtime` for Kubernetes, Herdr, Mise, attach, worktrees, health and runtime recovery.
 - Load `$agentos-auth` for provider login, credentials, rotation, revocation or quota identity.
 - Load `$agentos-database` for PostgreSQL topology, migrations, roles, RLS, Functions, Triggers or Inbox rules.
+- Load `$agentos-development` for every AgentOS source change, review, dogfood rollout or pull request.
+- Load `$agentos-image-builds` for OCI builds or in-cluster builder selection.
+- Load `$agentos-registry` for registry selection, zot, pull reachability, retention or registry retirement.
+- Load `$agentos-artifact-fs` before selecting an ArtifactFS-backed Scout for
+  read-heavy access to large or multiple repositories.
 
 Keep always-applicable identity and safety rules here.
 Put conditional workflows in skills, role-owned mechanics beside their role in

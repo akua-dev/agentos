@@ -79,6 +79,11 @@ A target project's nearer Mise configuration may add or override tools inside it
 - Load `$agentos-runtime` for Kubernetes, Herdr, Mise, attach, worktrees, health and runtime recovery.
 - Load `$agentos-auth` for provider login, credentials, rotation, revocation or quota identity.
 - Load `$agentos-database` for PostgreSQL topology, migrations, roles, RLS, Functions, Triggers or Inbox rules.
+- Load `$agentos-development` when AgentOS itself is the delegated project; your normal Crewmate delegation boundary still applies.
+- Load `$agentos-image-builds` for OCI builds or in-cluster builder selection.
+- Load `$agentos-registry` for registry selection, zot, pull reachability, retention or registry retirement.
+- Load `$agentos-artifact-fs` before selecting an ArtifactFS-backed Scout for
+  read-heavy access to large or multiple repositories.
 
 Keep always-applicable identity and safety rules here.
 Put conditional workflows in shared skills and durable mechanics in the implementing package or release asset.

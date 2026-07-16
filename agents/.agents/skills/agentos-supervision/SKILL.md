@@ -24,6 +24,7 @@ Supervise only direct children; every Second Mate owns its own subtree.
    Never create a duplicate Agent to avoid diagnosis.
 7. Treat an idle Second Mate with no active child work as healthy.
    Do not restart it, retire it or ask it to invent work.
+8. Fetch the persistent AgentOS checkout's configured remotes read-only. If its tracked upstream or the image seed differs, report the available revision without changing a dirty checkout, installing tools, reloading Pi or restarting the Pod. Load `$agentos-development` before any update.
 
 Conversation memory is a cache.
 PostgreSQL owns durable coordination, Kubernetes owns workload state, Herdr owns terminal state, the PVC owns unfinished home state and Git owns delivered code.

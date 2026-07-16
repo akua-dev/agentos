@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { $ } from "bun";
 import {
   chmod,
   mkdir,
@@ -47,7 +48,7 @@ async function run(script: string, env: Record<string, string>) {
 }
 
 describe("Mate home preparation", () => {
-  test("reconciles released tools while preserving the agent-owned home", async () => {
+  test("seeds a persistent checkout while preserving the agent-owned home", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "agentos-firstmate-home-"));
     temporaryDirectories.push(sandbox);
     const home = join(sandbox, "home");
@@ -128,30 +129,19 @@ if (args.join(" ") === "integration install pi") {
     const cold = await run(prepareHome, environment);
 
     expect(cold).toEqual({ exitCode: 0, stderr: "", stdout: "" });
-    expect(
-      await readFile(join(home, ".config", "mise", "config.toml"), "utf8"),
-    ).toBe(await readFile(join(repository, "mise.toml"), "utf8"));
-    expect(
-      await readFile(join(home, ".config", "mise", "mise.lock"), "utf8"),
-    ).toBe(await readFile(join(repository, "mise.lock"), "utf8"));
-    expect(
-      await readFile(
-        join(home, ".agents", "skills", "agentos-delegation", "SKILL.md"),
-        "utf8",
-      ),
-    ).toBe(
-      await readFile(
-        join(
-          repository,
-          "agents",
-          ".agents",
-          "skills",
-          "agentos-delegation",
-          "SKILL.md",
-        ),
-        "utf8",
-      ),
+    await expect(
+      stat(join(home, ".config", "mise", "config.toml")),
+    ).rejects.toThrow();
+    await expect(
+      stat(join(home, ".agents", "skills", "agentos-delegation")),
+    ).rejects.toThrow();
+    const checkout = join(home, "projects", "agentos");
+    expect((await $`git -C ${checkout} rev-parse HEAD`.text()).trim()).toBe(
+      (await $`git -C ${repository} rev-parse HEAD`.text()).trim(),
     );
+    expect(
+      (await $`git -C ${checkout} remote get-url origin`.text()).trim(),
+    ).toBe((await $`git -C ${repository} remote get-url origin`.text()).trim());
     expect(await readFile(customFragment, "utf8")).toBe(
       '[tools]\npython = "3.13"\n',
     );
@@ -161,6 +151,7 @@ if (args.join(" ") === "integration install pi") {
     ).toEqual({
       "/workspace": false,
       [repository]: true,
+      [checkout]: true,
     });
     expect(JSON.parse(await readFile(piSettings, "utf8"))).toEqual({
       theme: "agent-owned",
@@ -187,7 +178,8 @@ if (args.join(" ") === "integration install pi") {
     ).rejects.toThrow();
     expect((await readFile(join(logDirectory, "mise.log"), "utf8")).trim().split("\n")).toEqual([
       `trust ${join(repository, "mise.toml")}`,
-      `trust ${join(home, ".config", "mise", "config.toml")}`,
+      `trust ${join(checkout, "mise.toml")}`,
+      `trust ${join(checkout, "agents", "firstmate", "mise.toml")}`,
     ]);
     expect((await readFile(join(logDirectory, "herdr.log"), "utf8")).trim().split("\n")).toEqual([
       "integration install pi",
@@ -223,5 +215,12 @@ if (args.join(" ") === "integration install pi") {
       defaultThinkingLevel: "low",
       theme: "agent-owned",
     });
+    const persistentMarker = join(checkout, ".fleet-marker");
+    await writeFile(persistentMarker, "unfinished work\n", "utf8");
+
+    const restarted = await run(prepareHome, environment);
+
+    expect(restarted).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+    expect(await readFile(persistentMarker, "utf8")).toBe("unfinished work\n");
   });
 });

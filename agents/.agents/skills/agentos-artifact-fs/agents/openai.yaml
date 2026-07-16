@@ -1,0 +1,4 @@
+interface:
+  display_name: "ArtifactFS Scouts"
+  short_description: "Mount large repositories for Scout research"
+  default_prompt: "Use $agentos-artifact-fs to prepare an isolated read-heavy Scout workspace."

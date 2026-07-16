@@ -23,7 +23,7 @@ spec:
           workingDir: /opt/agentos/agents/secondmate
           env: &role-environment
             - name: AGENTOS_AGENT_CWD
-              value: /opt/agentos/agents/secondmate
+              value: /home/agent/projects/agentos/agents/secondmate
             - name: AGENTOS_AGENT_ID
               value: 00000000-0000-4000-8000-000000000002
             - name: AGENTOS_AGENT_NAME

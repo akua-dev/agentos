@@ -111,6 +111,7 @@ const fleetTools = {
   "npm:lavish-axi": "0.1.42",
   "npm:quota-axi": "0.1.5",
   ripgrep: "15.1.0",
+  vcluster: "0.35.2",
 };
 
 describe("AgentOS mise baseline", () => {

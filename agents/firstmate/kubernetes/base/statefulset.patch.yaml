@@ -23,7 +23,7 @@ spec:
           workingDir: /opt/agentos/agents/firstmate
           env: &role-environment
             - name: AGENTOS_AGENT_CWD
-              value: /opt/agentos/agents/firstmate
+              value: /home/agent/projects/agentos/agents/firstmate
             - name: AGENTOS_AGENT_NAME
               value: firstmate
             - name: AGENTOS_AGENT_ROLE

@@ -4,7 +4,6 @@ import { $ } from "bun";
 import {
   chmod,
   copyFile,
-  cp,
   mkdir,
   readFile,
   rename,
@@ -26,6 +25,8 @@ const herdrConfig =
   join(home, ".config", "herdr", "config.toml");
 const agentRole = requiredEnvironment("AGENTOS_AGENT_ROLE");
 const usesPi = agentRole === "first_mate" || agentRole === "second_mate";
+const agentCheckout =
+  process.env.AGENTOS_CHECKOUT ?? join(home, "projects", "agentos");
 const piAgentDirectory =
   process.env.PI_CODING_AGENT_DIR ?? join(home, ".pi", "agent");
 const piExtensionDirectory = join(piAgentDirectory, "extensions");
@@ -43,21 +44,7 @@ await Promise.all(
   ].map((directory) => mkdir(directory, { recursive: true, mode: 0o700 })),
 );
 
-await Promise.all([
-  cp(
-    join(releaseRoot, "agents", ".agents", "skills"),
-    join(home, ".agents", "skills"),
-    { force: true, recursive: true },
-  ),
-  copyPrivateFile(
-    join(releaseRoot, "mise.toml"),
-    join(agentConfigDirectory, "config.toml"),
-  ),
-  copyPrivateFile(
-    join(releaseRoot, "mise.lock"),
-    join(agentConfigDirectory, "mise.lock"),
-  ),
-]);
+if (usesPi) await ensureAgentosCheckout();
 
 const pgpassSource = process.env.AGENTOS_PGPASS_SOURCE;
 if (pgpassSource) {
@@ -84,7 +71,10 @@ if (!(await exists(herdrConfig))) {
 }
 
 await $`mise trust ${systemConfig}`;
-await $`mise trust ${join(agentConfigDirectory, "config.toml")}`;
+if (usesPi) {
+  await $`mise trust ${join(agentCheckout, "mise.toml")}`;
+  await $`mise trust ${join(agentCheckout, "agents", roleDirectory(), "mise.toml")}`;
+}
 
 if (usesPi) {
   const trustFile = join(piAgentDirectory, "trust.json");
@@ -93,6 +83,7 @@ if (usesPi) {
     ? (JSON.parse(await readFile(trustFile, "utf8")) as Record<string, boolean>)
     : {};
   trust[releaseRoot] = true;
+  trust[agentCheckout] = true;
   await writeFile(nextTrustFile, `${JSON.stringify(trust, null, 2)}\n`, {
     mode: 0o600,
   });
@@ -131,4 +122,43 @@ async function copyPrivateFileAtomic(source: string, destination: string) {
   const next = `${destination}.agentos-next`;
   await copyPrivateFile(source, next);
   await rename(next, destination);
+}
+
+async function ensureAgentosCheckout() {
+  if (await exists(join(agentCheckout, ".git"))) return;
+  if (await exists(agentCheckout)) {
+    throw new Error(
+      `${agentCheckout} exists but is not an AgentOS Git checkout`,
+    );
+  }
+  if (!(await exists(join(releaseRoot, ".git")))) {
+    throw new Error(`${releaseRoot} must contain the image's AgentOS Git seed`);
+  }
+
+  await $`git -c safe.directory=${releaseRoot} clone --no-hardlinks ${releaseRoot} ${agentCheckout}`.quiet();
+  await copyReleaseRemotes();
+}
+
+async function copyReleaseRemotes() {
+  const source = await $`git -c safe.directory=${releaseRoot} -C ${releaseRoot} remote`.text();
+  const remotes = source.split("\n").map((value) => value.trim()).filter(Boolean);
+  const localOrigin = await $`git -C ${agentCheckout} remote`.text();
+  for (const remote of localOrigin.split("\n").map((value) => value.trim()).filter(Boolean)) {
+    await $`git -C ${agentCheckout} remote remove ${remote}`.quiet();
+  }
+  for (const remote of remotes) {
+    const output = await $`git -c safe.directory=${releaseRoot} -C ${releaseRoot} remote get-url --all ${remote}`.text();
+    const urls = output.split("\n").map((value) => value.trim()).filter(Boolean);
+    if (urls.length === 0) continue;
+    await $`git -C ${agentCheckout} remote add ${remote} ${urls[0]}`.quiet();
+    for (const url of urls.slice(1)) {
+      await $`git -C ${agentCheckout} remote set-url --add ${remote} ${url}`.quiet();
+    }
+  }
+}
+
+function roleDirectory(): string {
+  if (agentRole === "first_mate") return "firstmate";
+  if (agentRole === "second_mate") return "secondmate";
+  throw new Error(`Role ${agentRole} does not use a persistent AgentOS checkout`);
 }

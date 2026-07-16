@@ -43,18 +43,30 @@ describe("First Mate release artifacts", () => {
       version: "0.1.0",
     });
 
-    const scoped = parseResources(
-      await readFile(join(outputDirectory, release.manifests.scoped), "utf8"),
+    const scopedManifest = await readFile(
+      join(outputDirectory, release.manifests.scoped),
+      "utf8",
     );
-    const clusterAdmin = parseResources(
-      await readFile(
-        join(outputDirectory, release.manifests.clusterAdmin),
-        "utf8",
-      ),
+    const clusterAdminManifest = await readFile(
+      join(outputDirectory, release.manifests.clusterAdmin),
+      "utf8",
     );
-    const database = parseResources(
-      await readFile(join(outputDirectory, release.manifests.database), "utf8"),
+    const databaseManifest = await readFile(
+      join(outputDirectory, release.manifests.database),
+      "utf8",
     );
+    const scoped = parseResources(scopedManifest);
+    const clusterAdmin = parseResources(clusterAdminManifest);
+    const database = parseResources(databaseManifest);
+
+    for (const manifest of [
+      scopedManifest,
+      clusterAdminManifest,
+      databaseManifest,
+    ]) {
+      expect(manifest).toMatch(/^apiVersion: [^\n]+\nkind: [^\n]+\n/);
+      expect(manifest).not.toMatch(/^\{.*\}$/m);
+    }
 
     expect((await readdir(outputDirectory)).sort()).toEqual([
       "agentos-firstmate-cluster-admin.yaml",

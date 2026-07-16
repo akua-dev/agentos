@@ -1,4 +1,4 @@
-FROM debian:13-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd
+FROM debian:13-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd AS agentos-base
 
 ARG TARGETARCH
 ARG MISE_VERSION=2026.4.25
@@ -86,7 +86,22 @@ RUN MISE_DATA_DIR=/opt/mise \
     /usr/local/bin/bun \
   && test "$(bun --version)" = "1.4.0"
 
-COPY . /opt/agentos
+FROM agentos-base AS agentos-seed
+
+ARG AGENTOS_GIT_REMOTE=https://github.com/akua-dev/agentos.git
+ARG AGENTOS_GIT_UPSTREAM=https://github.com/akua-dev/agentos.git
+
+COPY . /tmp/agentos-source
+
+RUN bun /tmp/agentos-source/runtime/create-image-seed.ts \
+      --source /tmp/agentos-source \
+      --output /opt/agentos-seed \
+      --origin "$AGENTOS_GIT_REMOTE" \
+      --upstream "$AGENTOS_GIT_UPSTREAM"
+
+FROM agentos-base
+
+COPY --from=agentos-seed /opt/agentos-seed/ /opt/agentos/
 
 RUN chmod 0644 \
     /etc/mise/config.toml \
@@ -98,8 +113,11 @@ RUN chmod 0644 \
     /opt/agentos/agents/secondmate/mise.toml \
   && chmod 0755 \
     /opt/agentos/runtime/prepare-home.ts \
+    /opt/agentos/runtime/create-image-seed.ts \
     /opt/agentos/runtime/run-mate.ts \
-    /opt/agentos/runtime/health.ts
+    /opt/agentos/runtime/health.ts \
+  && git config --system --add safe.directory /opt/agentos \
+  && git config --system --add safe.directory /opt/agentos/.git
 
 ENV HOME=/home/agent \
     AGENTOS_RELEASE_ROOT=/opt/agentos \
