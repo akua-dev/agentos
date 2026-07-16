@@ -15,4 +15,5 @@ Any patching, linking, embedding, or version change requires a new distribution 
 ## Agent-facing CLI libraries
 
 The AgentOS source distribution uses `axi-sdk-js` 0.1.8 and its `@toon-format/toon` 2.3.0 dependency under their MIT licenses.
-The exact npm artifact versions and integrity hashes are recorded in `bun.lock`.
+The exact npm artifact versions and integrity hashes are recorded in
+`agentos/bun.lock`.

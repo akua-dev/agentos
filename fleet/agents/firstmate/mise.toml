@@ -1,0 +1,11 @@
+[tasks."firstmate:prepare"]
+description = "Reconcile the persistent First Mate home"
+file = "../../runtime/prepare-home.ts"
+
+[tasks."firstmate:run"]
+description = "Run the persistent First Mate through Herdr and Pi"
+file = "../../runtime/run-mate.ts"
+
+[tasks."firstmate:health"]
+description = "Check First Mate liveness or readiness"
+file = "../../runtime/health.ts"

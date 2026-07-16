@@ -1,0 +1,3 @@
+[tasks."crewmate:prepare"]
+description = "Reconcile the isolated Crewmate home"
+file = "../../runtime/prepare-home.ts"

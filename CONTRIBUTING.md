@@ -11,7 +11,7 @@ configuration provide Bun, Node, and the remaining development tools:
 
 ```console
 git clone https://github.com/akua-dev/agentos.git
-cd agentos
+cd agentos/agentos
 mise install
 bun run check
 ```
@@ -37,15 +37,15 @@ context:
 
 ```console
 orb start k8s
-docker build --tag agentos-firstmate:dev --file deploy/kubernetes/firstmate/Dockerfile .
-kubectl --context orbstack apply --kustomize deploy/kubernetes/firstmate/base
+docker build --tag agentos:dev --file ../fleet/runtime/Dockerfile ..
+kubectl --context orbstack apply --kustomize ../fleet/agents/firstmate/kubernetes/base
 kubectl --context orbstack --namespace agentos rollout status statefulset/agentos-firstmate --timeout=10m
 kubectl --context orbstack --namespace agentos get pods
 kubectl --context orbstack --namespace agentos logs agentos-firstmate-0 --all-containers
 bun run agentos attach firstmate --context orbstack
 ```
 
-The development manifests use `agentos-firstmate:dev` with
+The development manifests use `agentos:dev` with
 `imagePullPolicy: Never`. Avoid `:latest`: Kubernetes normally tries to pull
 that tag even when the image exists locally.
 
@@ -61,9 +61,9 @@ a compatible container runtime and an explicit local image load before apply:
 
 ```console
 kind create cluster --name agentos
-docker build --tag agentos-firstmate:dev --file deploy/kubernetes/firstmate/Dockerfile .
-kind load docker-image agentos-firstmate:dev --name agentos
-kubectl --context kind-agentos apply --kustomize deploy/kubernetes/firstmate/base
+docker build --tag agentos:dev --file ../fleet/runtime/Dockerfile ..
+kind load docker-image agentos:dev --name agentos
+kubectl --context kind-agentos apply --kustomize ../fleet/agents/firstmate/kubernetes/base
 ```
 
 ## Change checks
@@ -85,12 +85,11 @@ Render release assets only after the multi-platform image has been published
 and its registry digest is known:
 
 ```console
-cd deploy/kubernetes
 mise install
-mise run release:render -- \
+bun run ../fleet/agents/firstmate/kubernetes/release/render.ts \
   --image ghcr.io/akua-dev/agentos@sha256:<digest> \
   --version <semver> \
-  --output ../../dist/release
+  --output ../dist/release
 ```
 
 Publish all generated manifests on a draft GitHub release, then publish it with

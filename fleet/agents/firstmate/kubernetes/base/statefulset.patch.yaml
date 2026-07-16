@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-firstmate
+  labels:
+    app.kubernetes.io/name: agentos-firstmate
+spec:
+  serviceName: agentos-firstmate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-firstmate
+  template:
+    metadata:
+      annotations:
+        agentos.akua.dev/herdr-session: agentos-firstmate
+      labels:
+        agentos.akua.dev/agent: firstmate
+        app.kubernetes.io/name: agentos-firstmate
+    spec:
+      serviceAccountName: agentos-firstmate
+      initContainers:
+        - name: install-tools
+          workingDir: /opt/agentos/fleet/agents/firstmate
+          env: &role-environment
+            - name: AGENTOS_AGENT_CWD
+              value: /opt/agentos/fleet/agents/firstmate
+            - name: AGENTOS_AGENT_NAME
+              value: firstmate
+            - name: AGENTOS_AGENT_ROLE
+              value: first_mate
+            - name: HERDR_SESSION
+              value: agentos-firstmate
+        - name: prepare-home
+          workingDir: /opt/agentos/fleet/agents/firstmate
+          args:
+            - run
+            - --skip-tools
+            - firstmate:prepare
+          env: *role-environment
+      containers:
+        - name: agentos
+          workingDir: /opt/agentos/fleet/agents/firstmate
+          args:
+            - run
+            - --skip-tools
+            - firstmate:run
+          env: *role-environment
+          livenessProbe:
+            exec:
+              command:
+                - mise
+                - run
+                - --skip-tools
+                - firstmate:health
+                - --
+                - live
+          readinessProbe:
+            exec:
+              command:
+                - mise
+                - run
+                - --skip-tools
+                - firstmate:health
+                - --
+                - ready

@@ -1,0 +1,21 @@
+{
+  "name": "@agentos/root",
+  "version": "0.0.0",
+  "description": "Persistent agent fleet and Kubernetes onboarding workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "agentos": "bun run apps/agentos/src/main.ts",
+    "test": "bun test . ../fleet",
+    "typecheck": "tsc --project tsconfig.json",
+    "check": "bun run test && bun run typecheck"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.14",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS Harnesses"
+  short_description: "Choose and launch verified agent harnesses"
+  default_prompt: "Use $agentos-harnesses to select and launch the appropriate verified harness without overriding native defaults."

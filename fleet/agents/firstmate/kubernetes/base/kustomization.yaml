@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: agentos
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - rolebinding.yaml
+  - service.yaml
+  - ../../../../runtime/kubernetes/base
+patches:
+  - path: statefulset.patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: agentos-mate
+  - patch: |-
+      - op: replace
+        path: /metadata/name
+        value: agentos-firstmate
+    target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: agentos-mate
