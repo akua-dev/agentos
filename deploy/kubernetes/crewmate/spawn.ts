@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { $ } from "bun";
 import { mkdir, readFile, realpath, stat } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -336,17 +337,20 @@ async function run(
   environment: Record<string, string | undefined>,
   cwd?: string,
 ) {
-  const child = Bun.spawn(command, {
-    cwd,
-    env: environment,
-    stderr: "pipe",
-    stdout: "pipe",
-  });
-  const [exitCode, stdout, stderr] = await Promise.all([
-    child.exited,
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-  ]);
+  const invocation = [
+    "env",
+    "-i",
+    ...Object.entries(environment)
+      .filter((entry): entry is [string, string] => entry[1] !== undefined)
+      .map(([name, value]) => `${name}=${value}`),
+    ...command,
+  ];
+  let process = $`${invocation}`.quiet().nothrow();
+  if (cwd) process = process.cwd(cwd);
+  const result = await process;
+  const stdout = result.stdout.toString();
+  const stderr = result.stderr.toString();
+  const { exitCode } = result;
   if (exitCode !== 0) {
     throw new Error(
       `${command[0]} exited with status ${exitCode}: ${stderr.trim() || stdout.trim()}`,
