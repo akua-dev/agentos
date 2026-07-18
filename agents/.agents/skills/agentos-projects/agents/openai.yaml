@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS projects"
+  short_description: "Manage safe project lifecycle changes"
+  default_prompt: "Use $agentos-projects to resolve and safely change an AgentOS project lifecycle."

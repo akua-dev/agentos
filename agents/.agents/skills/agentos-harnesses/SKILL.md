@@ -18,14 +18,25 @@ Use this precedence:
 3. the selected harness's own persisted or built-in defaults.
 
 An omitted model or effort is meaningful. Omit its launch flag and let the
-harness decide. Never replace omission with a release-wide AgentOS default.
+harness decide for persistent Mates. Never replace omission with a release-wide
+AgentOS default.
 Reject an unavailable or unverified harness instead of translating it to a
 different one silently. Check current authentication and quota before choosing
 an expensive profile, but do not let stale quota telemetry block dispatch.
 
-Record the resolved harness and only the model or effort values actually chosen
-in Fleet state. Keep natural-language policy out of scripts and TypeScript
-unions.
+For a new Crewmate only, when neither an explicit Captain instruction nor the
+matching durable dispatch policy selects effort, choose a native level
+proportionally: low for a well-understood bounded path, xhigh for ambiguous
+investigation or design, and intermediate levels as uncertainty, complexity or
+blast radius grows. Never choose `max` from this fallback; it requires explicit
+Captain preference. If the selected harness lacks the intended level, cap it at
+its highest verified non-`max` value. This fallback is an Assignment decision,
+not a Pi setting or persistent Agent default.
+
+Read durable natural-language dispatch policy from scoped Captain state at
+every Crewmate intake. Record the resolved harness and only the model, effort or
+image values actually chosen in `task_assignments.dispatch_profile`. Keep
+natural-language policy out of scripts and TypeScript unions.
 
 ## Pi
 

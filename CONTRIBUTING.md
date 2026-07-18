@@ -1,8 +1,12 @@
 # Contributing to AgentOS
 
-AgentOS is a Bun monorepo with all repository tools selected through Mise. Keep
-changes close to the app, package, agent role, or deployment asset that owns
-them, and follow any nearer `AGENTS.md` instructions.
+AgentOS is a Bun monorepo with all repository tools selected through Mise.
+Follow the root and every nearer `AGENTS.md` for instruction placement,
+ownership and subtree boundaries. This file owns contributor setup and
+verification. Never add an Agent identity as a commit co-author.
+Read [`VISION.md`](./VISION.md) for project direction and core product bets.
+Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system boundaries and the
+annotated repository ownership map.
 
 ## Repository setup
 
@@ -45,6 +49,10 @@ Inspect Git remotes before publishing. Generally useful changes belong in a
 reviewed pull request to `akua-dev/agentos`; organization-specific or private
 changes belong in that organization's fork or mirror. Use `no-mistakes` before
 requesting review or opening either kind of pull request.
+The selected project delivery workflow owns its validation and approval rigor.
+Risk may justify proposing a different workflow, not stacking an unrequested
+parallel review gate. Record backend or incident claims with date, exact pinned
+version, commands and observed evidence rather than assumptions.
 
 A Fleet may dogfood a committed change before upstream accepts it. Markdown
 and Skill-only changes may be checked out in Git and loaded by Pi with
@@ -203,6 +211,14 @@ bun run check
 Kubernetes behavior must be verified by rendering structured resources or by a
 real lifecycle smoke test. Tests that merely search source files for arbitrary
 strings are not accepted.
+
+A harness becomes Fleet-eligible only after its pinned build has passed one
+supervised lifecycle: authentication and first-run trust, isolated workspace,
+native launch, busy/status inspection, short steer, interrupt, verified wake,
+native resume, failure visibility and safe teardown. Do not silently substitute
+an unverified harness. Provider ingress work also needs a fixture or sandbox
+path that exercises raw payload preservation, classification, linkage and local
+reconciliation without posting publicly.
 
 ## Stable release manifests
 

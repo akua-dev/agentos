@@ -44,7 +44,12 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
 6. Replace the Pod once. Verify the same PVC identity, an Agent-home marker, exactly one First Mate pane, the same native Pi session and ordinary Mise tool resolution from a foreign worktree.
 7. Attach the developer to the persistent First Mate, hand it authority and stop the local seed from performing competing Fleet work.
 8. From the cluster First Mate, load [AgentOS Database](../../../../.agents/skills/agentos-database/SKILL.md). Present external PostgreSQL and self-hosted CloudNativePG without an implicit preference. After the developer chooses, use the released AgentOS database shape and apply its SQL assets as the selected Fleet-owner login; the migrations create or adopt the root First-Mate row and bind it to that same login. Do not create a separate migrator or manually map First Mate. For self-hosting, discover and verify the current compatible official CNPG and PostgreSQL releases before requesting installation approval.
-9. Leave bootstrap mode only after runtime, authentication, schema, `current_agent_id()` resolving the single active root First Mate, and every security check implemented by the selected release pass.
+9. Until the database exists, First Mate may converse with the developer,
+   inspect read-only and finish approved provisioning, but it must not accept
+   durable Fleet work, create Assignments or delegate another Agent. Do not use
+   an issue tracker, transcript or local file as a temporary coordination
+   backend.
+10. Leave bootstrap mode only after runtime, authentication, schema, `current_agent_id()` resolving the single active root First Mate, and every security check implemented by the selected release pass.
 
 If bootstrap or later dogfooding needs a private image path, load [AgentOS Image Builds](../../../../.agents/skills/agentos-image-builds/SKILL.md) and [AgentOS Registry](../../../../.agents/skills/agentos-registry/SKILL.md). Do not install a builder or registry merely because AgentOS itself is being installed from a public immutable image.
 

@@ -10,12 +10,21 @@ Use released PostgreSQL schema for durable coordination and native tools against
 
 ## Intake
 
-1. Resolve the authenticated Mate with `agentos.current_agent_id()` and verify the role and active hierarchy before mutation.
+1. Resolve the authenticated Mate with `agentos.current_agent_id()` and verify
+   the role, active hierarchy and released schema before mutation. If Fleet
+   identity or schema verification is incomplete, stop intake and resume
+   bootstrap; never fall back to a tracker, transcript or local file for
+   accepted work.
 2. Resolve the project independently from the current request.
    Prefer an explicit project, then an unambiguous follow-up, then the registered project scopes and a read-only repository inspection.
    Ask one short question when multiple projects remain plausible.
+   Load `$agentos-projects` when the registry, checkout, remote or delivery
+   posture must change; intake itself grants no outward project authority.
 3. Distinguish conversation from accepted work.
-   An Inbox request, comment or idea does not become accepted work until a Task exists.
+   An Inbox request, provider comment or idea does not become accepted work
+   until a Task exists. Keep raw reasoning and harness transcripts out of Inbox;
+   persist only requests, decisions, replies, blockers and other coordination
+   that must survive the runtime.
 4. Query active Tasks and Assignments before creating another row.
    Reuse the existing Task for the same accepted outcome; use `parent_task_id` for a genuinely distinct child outcome.
 5. Keep dependency judgment coarse.
@@ -30,6 +39,8 @@ Use released PostgreSQL schema for durable coordination and native tools against
 - Use a **ship Crewmate** when the durable output is a delivered project change.
 - Use a **scout Crewmate** when the durable output is knowledge: investigation, planning, reproduction or audit.
   A scout does not open a PR unless the Captain later promotes the result into a ship task.
+- For a reported defect, load `$agentos-diagnostics` before writing the Scout
+  brief and again before accepting its causal explanation.
 - Load `$agentos-artifact-fs` only when a read-heavy Scout must enter large or
   multiple repositories quickly enough to justify a separate FUSE-enabled
   image and reviewed Pod profile. Native Git remains the default.
@@ -43,18 +54,24 @@ Use released PostgreSQL schema for durable coordination and native tools against
 2. Select a reviewed harness, model, effort and image that fit the task and recorded Captain policy.
    Keep First and Second Mates on Pi; permit a worker harness only when the selected release verifies it.
    Require remote images to be approved and pinned by digest.
-   Load `$agentos-harnesses`; omit model or effort flags when policy does not select them.
+   Load `$agentos-harnesses`; consult scoped natural-language dispatch policy
+   on every intake and record the concrete resolution on the Assignment.
 3. Ensure the target Agent identity is active and inside the caller's managed hierarchy.
    If the selected release lacks an authorized Agent-provisioning primitive, request the parent Mate to provision it; never bypass grants or invent SQL.
 4. Create the Task and active Assignment before starting asynchronous work.
-   Set `created_by_agent_id` and `assigned_by_agent_id` to the authenticated Mate and include concise explanatory status text.
-5. Render the worker's durable brief from `../crewmate/BRIEF.md`. Fill every
+   Set `created_by_agent_id` and `assigned_by_agent_id` to the authenticated
+   Mate, store the complete brief in `task_assignments.brief`, store harness and
+   any selected model, effort or immutable image in `dispatch_profile`, and
+   set `assignment_role` to `ship` or `scout` with concise explanatory status
+   text.
+5. Render the worker's harness view from the authoritative Assignment brief
+   using `../crewmate/BRIEF.md`. Fill every
    marker with the owning Mate, Agent, Task, Assignment, work kind, project,
    primary checkout, workspace kind, isolated workspace, outcome, acceptance criteria and
-   constraints. Reject an unresolved marker. Store the rendered brief beside
-   the reviewed workload artifact and copy it to the Agent-owned
-   `AGENTOS_BRIEF_PATH` before harness launch. Put longer supporting context in
-   the Task body rather than a terminal message.
+   constraints. Reject an unresolved marker. Copy it to the Agent-owned
+   `AGENTOS_BRIEF_PATH` before harness launch and regenerate it from PostgreSQL
+   after loss; the PVC file is not a second authority. Put longer supporting
+   context in the Task body rather than a terminal message.
 6. For project work, require an isolated workspace and prove it is not the
    Mate's primary checkout before any mutation. Use Treehouse's durable
    UUID-labelled worktree lease for ship work and ordinary scouts. An
@@ -84,7 +101,13 @@ Use released PostgreSQL schema for durable coordination and native tools against
 
 ### Ship work
 
-1. Require the worker to inspect its complete diff, run the project's proportionate verification and preserve project-intrinsic learnings in the project's own instruction surface through the same change.
+1. Require the worker to inspect its complete diff and use the project's
+   selected delivery path. That path owns proportionate verification and review
+   rigor; do not add a parallel Mate review gate merely because the change is
+   risky. Recommend changing paths when the selected rigor is insufficient.
+   Preserve durable project-intrinsic learnings in the project's own instruction
+   surface through the same change, creating that memory only when real work
+   produced a reusable fact and pruning stale guidance rather than appending.
 2. Require commits and remote delivery according to the project's reviewed workflow.
 3. Present review-ready work to the Captain with the full remote URL, outcome, evidence and material risk.
 4. Merge only after explicit Captain approval or an exact durable standing authorization.
@@ -94,17 +117,21 @@ Use released PostgreSQL schema for durable coordination and native tools against
 
 ### Scout work
 
-1. Require a durable report linked from the Task.
+1. Require the complete report in `task_assignments.report`.
+   Load `$agentos-decisions`, inventory genuine unresolved Captain choices and
+   attest the exact key set, including an explicit empty set, before completion.
 2. Relay the findings through the owning Mate.
 3. Discard the declared scratch worktree or ArtifactFS mount only after the
    report is durable. Stop and unmount ArtifactFS before removing its Pod or
    scoped credentials.
-4. If the Captain wants implementation, create or promote a ship Task while preserving the useful reproduction and context.
+4. If the Captain wants implementation, create a clean ship Task while
+   preserving useful reproduction and context but none of the Scout's scratch
+   commits or debug edits.
 
 ### Final state
 
 1. Apply coupled Task, Assignment and Inbox mutations in one short transaction when they represent one outcome.
-2. End the Assignment with explanatory status and timestamp.
+2. Store the final or handoff report, then end the Assignment with explanatory status and timestamp.
    Completed Assignments are immutable; create a new Assignment for later work.
 3. Complete or archive the Task only when the accepted outcome is actually complete.
 4. Keep Agent retirement separate from task completion.
@@ -112,6 +139,13 @@ Use released PostgreSQL schema for durable coordination and native tools against
 5. Remove a worktree or home only after its work is landed or explicitly discarded by the Captain.
    Return a Crewmate lease through the pinned Treehouse lifecycle; never
    manually delete its directory or Git metadata.
+
+For reassignment, call the released `agentos.handoff_task_assignment` Function.
+It ends the old Assignment with a report and creates one replacement for the
+same Task in one transaction. Never rewrite the assigned Agent, clone the Task
+or create a fresh worktree while existing ownership is ambiguous. Ship
+Crewmates retire after landed work plus report; scratch Scouts may retire after
+their report; First and Second Mates are never retired merely for idleness.
 
 Load `$agentos-database` for exact grants, RLS, transaction and retirement behavior.
 Load `$agentos-runtime` for exact worktree, pod, Herdr and recovery primitives.

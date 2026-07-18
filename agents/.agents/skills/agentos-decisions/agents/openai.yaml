@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS decisions"
+  short_description: "Preserve and resolve Captain choices"
+  default_prompt: "Use $agentos-decisions to hold, attest, and resolve a durable Captain choice."

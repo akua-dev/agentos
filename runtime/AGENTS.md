@@ -2,6 +2,7 @@
 
 This subtree contains executable mechanics shared by persistent First and
 Second Mates. It is not an agent role and it is not an in-cluster CLI.
+Read the runtime boundary in `../ARCHITECTURE.md` before changing its ownership.
 
 - Implement only real container lifecycle behavior: persistent-home
   reconciliation, Herdr/Pi process supervision and Kubernetes health probes.

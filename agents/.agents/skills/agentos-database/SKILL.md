@@ -1,6 +1,6 @@
 ---
 name: agentos-database
-description: Inspect, provision, migrate, verify, and recover the AgentOS PostgreSQL database using released SQL assets. Use for database topology, schema versions, roles, grants, RLS, Functions, Triggers, inbox rules, fleet data, migration failures, or PostgreSQL bootstrap and recovery.
+description: Inspect, provision, migrate, verify, and recover the AgentOS PostgreSQL database using released SQL assets. Use for database topology, schema versions, Fleet coordination, Tasks, Assignments, Inbox, Captain state, external-event reconciliation, roles, grants, RLS, Functions, Triggers, migration failures, or PostgreSQL bootstrap and recovery.
 ---
 
 # Operate the AgentOS database
@@ -62,13 +62,17 @@ Use the CNPG-generated `agentos-postgres-app` identity for self-hosted PostgreSQ
 
 For direct `psql`, copy only the Secret's `pgpass` value into `~/.pgpass` on the owning agent PVC without exposing stdout, then set mode `0600`. From an Agent Pod in `agentos`, connect directly through the `agentos-postgres-rw` Service with explicit database and user names; do not create a port-forward inside the cluster. Refresh that file after credential rotation.
 
-For Drizzle migrations against that in-cluster CNPG Service, keep the password
-in `~/.pgpass` and inject this non-secret URL into only the migration process:
-`postgresql://agentos@agentos-postgres-rw:5432/agentos?uselibpqcompat=true&sslmode=require`.
-The release-pinned `pg` 8 driver otherwise treats `sslmode=require` as
-certificate verification and rejects CNPG's private cluster CA. The explicit
-libpq compatibility flag keeps TLS required without copying a password into the
-URL. Revalidate this option when the release upgrades to `pg` 9 or later.
+For Drizzle migrations, `pg-listen`, or another release-pinned `pg`
+process against that in-cluster CNPG Service, mount only the `ca.crt` key from
+Secret `agentos-postgres-ca` read-only; never mount `ca.key`. Set
+`PGSSLROOTCERT` and `NODE_EXTRA_CA_CERTS` to that mounted certificate and use
+`PGSSLMODE=verify-full`. Keep the password in `~/.pgpass` and inject this
+non-secret URL into only the migration process:
+`postgresql://agentos@agentos-postgres-rw:5432/agentos?sslmode=verify-full`.
+The release-pinned `pg` 8 driver otherwise rejects CNPG's private cluster CA,
+while `sslmode=no-verify` or libpq-compatibility mode would weaken identity
+verification. Validate the Service hostname against the certificate and
+recheck this configuration when upgrading the PostgreSQL driver.
 
 For an external endpoint, prefer an approved Kubernetes Secret or mode-`0600` file owned by the persistent agent. Keep the connection URI out of prompts, command arguments, shell history and normal logs.
 
@@ -91,6 +95,17 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
 
 ## Coordinate runtime work
 
+- Require `agentos.current_agent_id()` and the released security checks to pass
+  before any durable work intake or delegation. A running First Mate without
+  that database is still in bootstrap; never substitute a provider tracker,
+  transcript or local file as a second coordination backend.
+- Keep raw reasoning, harness transcripts and terminal output in their runtime
+  authorities. Use Inbox only for durable requests, questions, decisions,
+  replies, blockers and concise handoffs.
+- Captain state uses one table with explicit Fleet or Mate-domain scope. All
+  active registered Agents retain the unfiltered read view; scope guides use and
+  mutation, not row secrecy. First Mate owns Fleet scope. A Second Mate may
+  write only its own domain rows.
 - Create direct child identities only through `agentos.provision_agent`.
   First Mate may provision a Second Mate or Crewmate; Second Mate may provision
   only a Crewmate; Crewmates receive no execute grant. Treat an exact returned
@@ -102,6 +117,17 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   Assignments only for its managed Agent subtree. A Crewmate may update the
   state of an active own Assignment and its Task, but may not rewrite Task
   scope. Treat a completed Assignment as immutable history.
+- Every new Assignment has a PostgreSQL-authoritative `brief` and concrete
+  `dispatch_profile`. Render the brief into the PVC for the harness; regenerate
+  it rather than reconciling two peers. Store a final or handoff `report` before
+  ending the Assignment.
+- Transfer work only with `agentos.handoff_task_assignment`. It ends the old
+  Assignment and creates one replacement for the same Task atomically and
+  idempotently; never rewrite Assignment ownership or clone the Task.
+- Load `$agentos-decisions` for the released Captain-decision Functions. Scout
+  and review completion requires an exact unresolved-key attestation, including
+  an explicit empty set. Resolution records the exact answer and releases Task
+  dependency edges in one transaction without another table.
 - Before retiring an Agent, explicitly complete or reassign every active Task
   Assignment and hand off every active child Agent. Call
   `agentos.retire_agent(agent_id, status_text)`; never emulate retirement with a
@@ -110,11 +136,17 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   own Agent ID to the released claim, refresh, assertion, completion and release
   Functions; PostgreSQL verifies it against `session_user`. Do not update claim
   columns directly.
+- Treat provider issues, comments and board mutations as human-facing external
+  intent. Link accepted work through `tasks.external_links`, reconcile it into
+  Fleet state, and keep provider writes synchronous through native tools; never
+  mirror the provider into PostgreSQL or call it an independent Fleet authority.
 - Keep model reasoning and provider CLI calls outside database transactions.
   Immediately before committing local effects, assert that the claim is current.
   Apply coupled Task and Inbox updates and complete the claim in one short
   transaction. On a provider or reasoning failure, release the claim with useful
   error text; never hide the failure behind an outbox.
+  On crash-after-send ambiguity, perform one recovery-only remote-state check
+  before deciding whether a retry would duplicate the provider effect.
 
 ## Apply released assets
 

@@ -47,11 +47,13 @@ a decision or approval is required.
 - Stay inside the accepted outcome and authority above. Ask the owning Mate
   through durable Fleet Inbox when a material decision is missing.
 - For `ship`, create the requested task branch, implement the change, run
-  proportionate verification and deliver through the project's reviewed
-  workflow. Never merge without recorded Captain authority.
+  the selected project delivery workflow. That workflow owns its verification
+  and review rigor; do not invent a parallel gate. Never merge without recorded
+  Captain authority.
 - For `scout`, investigate read-mostly and produce the durable report named by
-  the Assignment. Do not open a PR or turn scratch findings into a project
-  change. Treat every ArtifactFS overlay write as disposable scratch state.
+  the Assignment. Separate observed facts from hypotheses. Do not open a PR or
+  turn scratch findings into a project change. Treat every ArtifactFS overlay
+  write as disposable scratch state.
 - Use the project's own tools and instructions. The Fleet Mise baseline remains
   available by ordinary command names; a nearer project configuration may add
   or override tools.
@@ -60,6 +62,9 @@ a decision or approval is required.
   concise handoffs. Terminal text is not durable state.
 - Report upward to the owning Mate. Direct Captain input in this terminal is
   authoritative and must be reconciled into Fleet state.
+- Put the complete final or handoff report into the Assignment before ending.
+  Ask unresolved material questions through Inbox; the owning Mate records and
+  attests genuine Captain decisions before completing Scout or review work.
 - Never discard unlanded work, delete the workspace or retire yourself. The
   owning Mate closes the Assignment and performs guarded cleanup.
 

@@ -21,6 +21,9 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 - Use Herdr read, status, send and wait primitives for bounded inspection; do not scrape or persist terminal output automatically.
 - Treat a live terminal send as an immediate hint only. Keep durable inter-agent communication in PostgreSQL.
 - Ask before interrupting, restarting, closing, taking over, or rearranging an existing user session.
+- Attach to the existing named Mate session. Never launch a second independent
+  Pi writer for the same home. If Pod, Herdr and native session identity do not
+  agree, remain read-only until the owning Mate state is reconciled.
 
 ## Runtime topology
 
@@ -84,7 +87,8 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 
 7. Verify observed image IDs, ServiceAccount, Pod, PVC, Secret mount, Agent
    environment and Herdr status. For a Crewmate, create or recover the project
-   and Treehouse lease inside that pod. Copy the fully rendered brief with
+   and Treehouse lease inside that pod. Copy the PostgreSQL-authoritative
+   brief's rendered harness view with
    native kubectl and verify its digest inside the pod:
 
    ```console
@@ -99,7 +103,9 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
    `$agentos-harnesses` to invoke
    `herdr agent start ... -- <native-harness-argv> <brief>` through
    `kubectl exec`.
-8. Record verified Kubernetes and Herdr locators in Fleet state. On partial
+8. Record verified Kubernetes and Herdr locators in Fleet state. Treat launch
+   as successful only after the native harness is processing the complete brief
+   and any first-run trust prompt is visibly resolved. On partial
    failure, preserve the identity, PVC and rendered evidence for reconciliation;
    never create a replacement Agent to hide the error.
 
@@ -125,6 +131,9 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 - Fail readiness only for explicit, supported degradation classes on required agents; ordinary human-blocked state is not a readiness failure.
 - Preserve attach access during provider, quota and rate-limit failures.
 - Reuse the owned PVC and native harness session during pod replacement.
+- Reconcile a stopped worker against its recorded Assignment and Treehouse
+  worktree before resume. Preserve same-task work and refuse a fresh workspace
+  while ownership is ambiguous.
 - Let the supervising model decide whether to retry, attach, rotate auth, change model, restart a process, or leave the agent stopped.
 
 Use only released Kustomize assets and native tool interfaces. Fail closed on ambiguous ownership or missing runtime assets.

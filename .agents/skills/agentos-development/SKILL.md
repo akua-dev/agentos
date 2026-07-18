@@ -16,3 +16,7 @@ Preserve the active Agent role and Assignment. This skill does not grant permiss
 At session start or after a Pod restart, fetch configured remotes read-only and compare the checkout HEAD with its upstream and the image seed. Report a newer revision; never switch a dirty checkout, install changed tools, reload Pi, or roll out an image without the applicable authority. For a reviewed Markdown or Skill-only update, change Git first and invoke Pi `/reload` at a safe turn boundary. Use a new image for OS packages, immutable runtime code or Kubernetes assets.
 
 Git and its remote own delivered source. The persistent home owns unfinished work. The image digest owns the running AgentOS revision.
+
+Follow the repository's root and nearer `AGENTS.md` for knowledge placement and
+source ownership. Rewrite or prune stale guidance; a stow or memory sweep
+alone never creates a Skill.

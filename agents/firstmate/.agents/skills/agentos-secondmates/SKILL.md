@@ -45,6 +45,11 @@ Require one durable charter with:
 
 Store the charter only through the released schema or provisioning primitive that owns its exact format.
 Do not improvise a second registry in Markdown, terminal state or an unreviewed JSON shape.
+Fleet-wide Captain state remains in `captain.scope = 'fleet'`; domain-local
+Second-Mate state uses `scope = 'agent'` with that Mate's UUID. Every Agent may
+read both for context, but no file copy or inherited Pi configuration becomes a
+second authority. Learnings remain domain-local unless promoted through a
+reviewed shared AgentOS or project instruction change.
 
 ## Provision and hand off
 
@@ -72,8 +77,12 @@ Do not improvise a second registry in Markdown, terminal state or an unreviewed 
    Verify the PVC is Bound, exactly one named Herdr Agent is Ready, the selected model can answer a harmless request, and a Pod replacement restores the same PVC and native Pi session.
 9. In one short database transaction, record the verified Kubernetes and Herdr locators, set useful status text and change lifecycle state from `provisioning` to `active`.
    On partial failure, preserve the row and runtime evidence in `provisioning` state for reconciliation; do not create a replacement identity or destructively roll back the PVC.
-10. Move accepted in-scope Tasks through reviewed Task and Assignment mutations.
-   Preserve history and dependencies; do not clone backlog rows or silently duplicate ownership.
+10. Move accepted in-scope Tasks with
+    `agentos.handoff_task_assignment`. Preserve the stable Task, Assignment
+    history, dependencies, complete destination brief and concrete dispatch
+    profile; do not clone backlog rows or rewrite the previous Agent. Active
+    work requires an explicit handoff report. An exact retry returns the same
+    replacement; invalid hierarchy or destination fails closed.
 11. Deliver one concise Inbox handoff naming the chartered outcome or queue.
 12. Confirm the Second Mate reconciles only its own work and then establishes its own supervision wait.
 

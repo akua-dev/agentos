@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS diagnostics"
+  short_description: "Establish falsifiable bug causality"
+  default_prompt: "Use $agentos-diagnostics to brief and evaluate a causal bug investigation."

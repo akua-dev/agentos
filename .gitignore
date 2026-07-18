@@ -1,4 +1,5 @@
 tmp/
+docs/superpowers/
 node_modules/
 coverage/
 dist/
