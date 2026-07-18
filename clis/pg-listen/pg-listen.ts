@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 
 import { Client, escapeIdentifier } from "pg";
+import type { ClientConfig } from "pg";
+import pgPass from "pgpass";
 
 type Notification = {
   channel: string;
@@ -25,6 +27,13 @@ export interface PostgresListenerClient {
 export type PostgresNotification = {
   channel: string;
   payload: string;
+};
+
+export type PgPassConnection = {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
 };
 
 const help = `pg-listen
@@ -112,6 +121,41 @@ export async function waitForNotification(
   return notification;
 }
 
+export function resolvePgPassPassword(
+  connection: PgPassConnection,
+): Promise<string | undefined> {
+  return new Promise((resolve) => pgPass(connection, resolve));
+}
+
+export function createPostgresListenerClient(): PostgresListenerClient {
+  const connectionString = process.env.DATABASE_URL;
+  const config: ClientConfig = {
+    application_name: "pg-listen",
+    ...(connectionString ? { connectionString } : {}),
+  };
+
+  if (
+    process.env.PGPASSWORD === undefined &&
+    !connectionStringHasPassword(connectionString)
+  ) {
+    config.password = ((connection?: PgPassConnection) =>
+      connection
+        ? resolvePgPassPassword(connection)
+        : Promise.resolve(undefined)) as () => Promise<string>;
+  }
+
+  return new Client(config) as PostgresListenerClient;
+}
+
+function connectionStringHasPassword(connectionString: string | undefined) {
+  if (!connectionString) return false;
+  try {
+    return new URL(connectionString).password.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 if (import.meta.main) {
   if (process.argv.includes("--help") || process.argv.includes("-h")) {
     process.stdout.write(help);
@@ -122,12 +166,7 @@ if (import.meta.main) {
       process.stderr.write("Usage: pg-listen <channel>\n");
       process.exitCode = 2;
     } else {
-      const client = new Client({
-        application_name: "pg-listen",
-        ...(process.env.DATABASE_URL
-          ? { connectionString: process.env.DATABASE_URL }
-          : {}),
-      }) as PostgresListenerClient;
+      const client = createPostgresListenerClient();
       try {
         await waitForNotification(client, channel);
       } catch (error) {

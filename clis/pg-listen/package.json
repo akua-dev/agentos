@@ -8,7 +8,8 @@
     "pg-listen": "./pg-listen.ts"
   },
   "dependencies": {
-    "pg": "8.22.0"
+    "pg": "8.22.0",
+    "pgpass": "1.0.6"
   },
   "devDependencies": {
     "@types/pg": "8.20.0"

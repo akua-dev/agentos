@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { EventEmitter } from "node:events";
-import { resolve } from "node:path";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 
 import * as postgresListener from "../pg-listen.ts";
 
@@ -105,7 +107,62 @@ describe("pg-listen", () => {
     await expect(result).rejects.toThrow("output failed");
     expect(client.ended).toBe(true);
   });
+
+  test("resolves a matching private pgpass entry explicitly", async () => {
+    const resolvePassword = (postgresListener as Record<string, unknown>)[
+      "resolvePgPassPassword"
+    ];
+    expect(typeof resolvePassword).toBe("function");
+
+    const directory = await mkdtemp(join(tmpdir(), "pg-listen-pgpass-"));
+    const passwordFile = join(directory, "pgpass");
+    const previousPasswordFile = process.env.PGPASSFILE;
+
+    try {
+      await writeFile(
+        passwordFile,
+        "db.internal:5432:fleet:runtime_agent:test-password\n",
+        { mode: 0o600 },
+      );
+      await chmod(passwordFile, 0o600);
+      process.env.PGPASSFILE = passwordFile;
+
+      const resolvePgPassPassword = resolvePassword as (
+        connection: PgPassConnection,
+      ) => Promise<string | undefined>;
+      await expect(
+        resolvePgPassPassword({
+          host: "db.internal",
+          port: 5432,
+          database: "fleet",
+          user: "runtime_agent",
+        }),
+      ).resolves.toBe("test-password");
+      await expect(
+        resolvePgPassPassword({
+          host: "db.internal",
+          port: 5432,
+          database: "fleet",
+          user: "another_agent",
+        }),
+      ).resolves.toBeUndefined();
+    } finally {
+      if (previousPasswordFile === undefined) {
+        delete process.env.PGPASSFILE;
+      } else {
+        process.env.PGPASSFILE = previousPasswordFile;
+      }
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 });
+
+type PgPassConnection = {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+};
 
 class FakePostgresClient extends EventEmitter {
   readonly queries: string[] = [];

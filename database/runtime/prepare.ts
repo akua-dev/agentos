@@ -91,6 +91,7 @@ async function releaseFiles(releaseRoot: string): Promise<string[]> {
     "database/package.json",
     "database/drizzle.config.ts",
     "database/drizzle.tooling.ts",
+    "database/runtime/database-credentials.ts",
     "database/runtime/prepare.ts",
     "database/sql.d.ts",
   ]) {
