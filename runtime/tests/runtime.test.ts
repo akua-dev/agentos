@@ -206,16 +206,26 @@ describe("Mate runtime", () => {
   });
 
   test("moves a persisted Pi session onto the configured checkout", async () => {
-    const persistedSession = "/home/agent/.pi/agent/sessions/legacy/session.jsonl";
     const paneId = "w1:p1";
-    const { env, state } = await createHarness([
+    const { env, state } = await createHarness([]);
+    const persistedSession = join(state, "session.jsonl");
+    await writeFile(
+      persistedSession,
+      [
+        JSON.stringify({ cwd: "/opt/agentos/agents/firstmate", id: "session-1", type: "session", version: 3 }),
+        JSON.stringify({ message: "preserve me", type: "message" }),
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await writeFile(join(state, "agents.json"), JSON.stringify([
       {
         agent_session: { kind: "path", value: persistedSession },
         cwd: "/opt/agentos/agents/firstmate",
         name: "firstmate",
         pane_id: paneId,
       },
-    ]);
+    ]));
     const child = Bun.spawn([process.execPath, runMate], {
       env,
       stderr: "pipe",
@@ -251,6 +261,14 @@ describe("Mate runtime", () => {
     expect(calls.filter((call) => call[0] === "agent" && call[1] === "start")).toEqual([
       expectedStart,
     ]);
+    const sessionLines = (await readFile(persistedSession, "utf8")).trim().split("\n");
+    expect(JSON.parse(sessionLines[0]!)).toEqual({
+      cwd: env.AGENTOS_AGENT_CWD,
+      id: "session-1",
+      type: "session",
+      version: 3,
+    });
+    expect(JSON.parse(sessionLines[1]!)).toEqual({ message: "preserve me", type: "message" });
   });
 
   test("fails closed when persisted identity is ambiguous", async () => {
