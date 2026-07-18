@@ -1,6 +1,7 @@
 # AgentOS database package contract
 
-This package is SQL-first. Read the architecture section in `../README.md` and preserve the database boundary defined there.
+This package is SQL-first. Read the database boundary in `../ARCHITECTURE.md`
+and preserve it.
 
 ## Source of truth
 
@@ -11,14 +12,33 @@ This package is SQL-first. Read the architecture section in `../README.md` and p
 
 ## Initial data-model boundary
 
+- Require a verified AgentOS PostgreSQL schema before accepting durable Fleet
+  work or delegating an Agent. The bootstrap runtime may exist first, but do not
+  create a tracker-, file- or transcript-backed fallback coordination mode.
 - One PostgreSQL database is one Fleet. Do not add `fleet_id` columns to core tables.
 - Keep released objects in `agentos`. First Mate may experiment in `local`, but released migrations must not adopt those objects without review.
 - Keep external tracker links in `tasks.external_links`; do not introduce a link table until measured behavior requires one.
+- Keep raw model reasoning, harness transcripts and terminal output in their
+  runtime authorities. Store only durable coordination in Task, Assignment and
+  Inbox rows; do not market released tables as a complete forensic audit log.
+- Keep Captain decisions in Inbox with stable `decision_key` values and Task
+  dependencies in `tasks.dependencies`; do not introduce a decisions table.
+- Keep the complete Assignment brief, final or handoff report, concrete dispatch
+  profile and append-only handoff history in `task_assignments`.
 - Preserve accepted provider payloads intact in `external_events.payload`. The same event rows own their small burst, claim and reconciliation state; do not add a reconciliation table or background outbox.
+- Keep `agentos_events` notifications as small transactional wake hints only.
+  Never put row contents, credentials or durable delivery state in a payload;
+  listeners must query authorized Fleet rows after wake.
 - Agents invoke provider CLIs directly and synchronously. PostgreSQL coordinates durable local state but does not hide provider failures behind a service.
+- Treat the selected tracker as the human workflow surface. Its changes remain
+  external intent until an authorized Mate reconciles them; never make provider
+  state a second Fleet authority.
 - Never hold a transaction open while a model reasons or a provider command runs. In the final short transaction, mutate coupled Tasks and Inbox rows and call the released claim-completion Function so stale work rolls back atomically.
 - Apply migrations as the login that owns the released AgentOS tables. The migration chain creates or adopts the single active root First-Mate row and binds it to that same Fleet owner; do not introduce a separate migrator or manual First-Mate mapping. Bind every other Agent only to an already-created, non-privileged login. Migrations never create login roles or contain credentials.
 - Give every active registered Agent the same unfiltered `SELECT` view across released Fleet tables; never hide rows by role or hierarchy. Keep mutations deny-by-default. Mates may create and assign Tasks inside their managed hierarchy; assigned Crewmates may change only work-state columns. Any additional table or column needs a reviewed write policy first.
+- Scope Captain rows as Fleet-wide or Mate-domain context without hiding them
+  from the shared read view. First Mate administers Fleet scope; a Second Mate
+  may mutate only its own domain scope.
 - Preserve completed Assignment history. Retirement must reject active Assignments and active child Agents; never cascade or invent a handoff.
 - Bind external reconciliation to the authenticated `session_user`. Only First and Second Mates receive the claim Functions, and direct runtime updates to external-event coordination columns stay forbidden.
 - Preserve First Mate's owner-level administration of the Fleet. Do not grant `SUPERUSER`, `CREATEDB`, `CREATEROLE` or `BYPASSRLS` merely to administer AgentOS.

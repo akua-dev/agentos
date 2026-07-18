@@ -4,6 +4,13 @@ This package is SQL-first. Ordered files under `migrations/` are the complete
 executable database contract, including tables, roles, grants, RLS policies,
 Functions and Triggers.
 
+PostgreSQL is a required coordination dependency once AgentOS accepts durable
+work or delegates an Agent. It may be provisioned only after the First Mate
+runtime is online, but that bootstrap stage is not a database-free operating
+mode. The schema stores accepted work, accountable ownership, handoffs,
+Captain-gated decisions and durable coordination—not raw model reasoning,
+harness transcripts, terminal output or a mirror of the selected issue tracker.
+
 Create a journaled empty migration, then write the approved SQL into it:
 
 ```sh
@@ -50,7 +57,9 @@ the prepared directory.
 custom-migration command and must never become a database schema source.
 `drizzle-orm` is installed only because that command requires the package, and
 `pg` is the PostgreSQL driver used by the migration runner. No AgentOS runtime
-code imports either package.
+code imports this database package. The separate `clis/pg-listen` workspace
+owns the small generic `pg-listen <channel>` command and its runtime dependency;
+it does not import this package, expose SQL, or replace direct `psql` use.
 Do not use `drizzle-kit push`, `pull`, or non-custom `generate` in this package.
 
 Use transactions where PostgreSQL permits them and add behavioral SQL tests
@@ -114,3 +123,20 @@ separately approved principal, credential and runtime have been verified. An
 exact retry returns the same UUID, a conflicting handle fails closed, and every
 Second Mate requires a non-empty charter summary and scope in metadata. The
 Function creates neither PostgreSQL roles nor Kubernetes resources.
+
+`0005_durable_coordination_contracts.sql` makes core Mate artifacts explicit.
+Captain rows carry Fleet or Mate-domain scope while every registered Agent
+keeps the complete read view. Assignments store their authoritative brief,
+resolved dispatch profile, final or handoff report and append-only handoff
+link. `agentos.handoff_task_assignment` preserves one Task identity across an
+atomic, idempotent transfer. Captain choices remain Inbox deliveries under a
+stable unique `decision_key`; Scout and review Assignments attest the exact
+open key set before completion, and resolution stores the exact answer while
+releasing matching Task dependency edges in the same transaction. There is no
+new decisions table or service. `tests/coordination-contracts.test.ts` exercises
+these contracts against the full ordered migration chain in PGlite.
+
+`0006_fleet_notifications.sql` adds transactional wake hints for actionable
+coordination tables. Payloads contain only schema version, table and operation;
+the listener must query durable rows after wake. PGlite tests prove committed
+changes notify, rolled-back changes do not, and all intended tables are wired.
