@@ -6,6 +6,7 @@ import { join } from "node:path";
 type Agent = {
   agent_session?: { kind: string; value: string };
   cwd?: string;
+  live?: boolean;
   name: string;
   pane_id?: string;
 };
@@ -71,7 +72,13 @@ if (args[0] === "server") {
   console.log(JSON.stringify({ result: { type: "agent_list", agents } }));
 } else if (command === "agent start") {
   const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
-  agents.push({ name: args[2] });
+  const cwdIndex = args.indexOf("--cwd");
+  agents.push({
+    cwd: args[cwdIndex + 1],
+    live: true,
+    name: args[2],
+    pane_id: "w-started:p1",
+  });
   await writeFile(join(state, "agents.json"), JSON.stringify(agents));
   console.log(JSON.stringify({ result: { type: "agent_started", name: args[2] } }));
 } else if (command === "agent get") {
@@ -79,6 +86,14 @@ if (args[0] === "server") {
   const agent = agents.find((candidate: { name: string }) => candidate.name === args[2]);
   if (!agent) process.exit(1);
   console.log(JSON.stringify({ result: { type: "agent_info", agent } }));
+} else if (command === "pane process-info") {
+  const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
+  const paneIndex = args.indexOf("--pane");
+  const agent = agents.find((candidate: { live?: boolean; pane_id?: string }) =>
+    candidate.pane_id === args[paneIndex + 1] && candidate.live,
+  );
+  if (!agent) process.exit(1);
+  console.log(JSON.stringify({ result: { type: "pane_process_info" } }));
 } else if (command === "pane close") {
   const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
   await writeFile(
@@ -182,6 +197,7 @@ describe("Mate runtime", () => {
       {
         agent_session: { kind: "path", value: persistedSession },
         cwd,
+        live: true,
         name: "firstmate",
         pane_id: "w1:p1",
       },
@@ -285,6 +301,57 @@ describe("Mate runtime", () => {
     expect(JSON.parse(sessionLines[1]!)).toEqual({ message: "preserve me", type: "message" });
   });
 
+  test("restarts a persisted Pi session when Herdr restored only stale pane metadata", async () => {
+    const paneId = "w1:p1";
+    const { env, state } = await createHarness([]);
+    const persistedSession = join(state, "ghost-session.jsonl");
+    await writeFile(
+      persistedSession,
+      `${JSON.stringify({ cwd: env.AGENTOS_AGENT_CWD, id: "session-ghost", type: "session", version: 3 })}\n`,
+      "utf8",
+    );
+    await writeFile(join(state, "agents.json"), JSON.stringify([
+      {
+        agent_session: { kind: "path", value: persistedSession },
+        cwd: env.AGENTOS_AGENT_CWD,
+        live: false,
+        name: "firstmate",
+        pane_id: paneId,
+      },
+    ]));
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    await waitFor(async () =>
+      (await readCalls(state)).some((call) =>
+        call[0] === "agent" &&
+        call[1] === "start" &&
+        call.includes(persistedSession),
+      ),
+    );
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
+    const calls = await readCalls(state);
+    expect(calls).toContainEqual([
+      "pane",
+      "process-info",
+      "--pane",
+      paneId,
+      "--session",
+      "agentos-firstmate-test",
+    ]);
+    expect(calls).toContainEqual([
+      "pane",
+      "close",
+      paneId,
+      "--session",
+      "agentos-firstmate-test",
+    ]);
+  });
+
   test("fails closed when persisted identity is ambiguous", async () => {
     const { env, state } = await createHarness([
       { name: "firstmate" },
@@ -315,7 +382,18 @@ describe("Mate runtime", () => {
     expect((await runHealth(env, "live")).exitCode).toBe(0);
     expect((await runHealth(env, "ready")).exitCode).toBe(1);
 
-    await writeFile(join(state, "agents.json"), JSON.stringify([{ name: "firstmate" }]), "utf8");
+    await writeFile(
+      join(state, "agents.json"),
+      JSON.stringify([{ live: false, name: "firstmate", pane_id: "w1:p1" }]),
+      "utf8",
+    );
+    expect((await runHealth(env, "ready")).exitCode).toBe(1);
+
+    await writeFile(
+      join(state, "agents.json"),
+      JSON.stringify([{ live: true, name: "firstmate", pane_id: "w1:p1" }]),
+      "utf8",
+    );
     expect((await runHealth(env, "ready")).exitCode).toBe(0);
   });
 

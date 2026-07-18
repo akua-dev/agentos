@@ -39,7 +39,7 @@ try {
   } else if (agentCount === 1) {
     const mate = mates[0]!;
     if (await mateRunsFromCheckout(mate)) {
-      await restoreMate();
+      await restoreMate(mate);
     } else {
       await relocateMate(mate);
     }
@@ -157,7 +157,11 @@ async function listAgents(): Promise<Agent[]> {
   return result.result.agents;
 }
 
-async function restoreMate() {
+async function restoreMate(mate: Agent) {
+  const paneId = mate.pane_id;
+  if (typeof paneId !== "string") {
+    throw new Error(`Refusing to restore ${agentName} without a Herdr pane ID.`);
+  }
   observer = Bun.spawn(
     [
       "herdr",
@@ -176,15 +180,17 @@ async function restoreMate() {
   );
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    if ((await mateStatus()) === 0) {
-      await Bun.sleep(200);
-      break;
+    if ((await paneProcessStatus(paneId)) === 0) {
+      await terminate(observer);
+      observer = undefined;
+      return;
     }
     await Bun.sleep(100);
   }
 
   await terminate(observer);
   observer = undefined;
+  await relocateMate(mate);
 }
 
 async function herdrStatus(): Promise<number> {
@@ -196,6 +202,14 @@ async function herdrStatus(): Promise<number> {
 async function mateStatus(): Promise<number> {
   return (
     await $`herdr agent get ${agentName} --session ${session}`.quiet().nothrow()
+  ).exitCode;
+}
+
+async function paneProcessStatus(paneId: string): Promise<number> {
+  return (
+    await $`herdr pane process-info --pane ${paneId} --session ${session}`
+      .quiet()
+      .nothrow()
   ).exitCode;
 }
 

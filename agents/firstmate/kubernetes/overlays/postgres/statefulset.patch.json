@@ -1,0 +1,100 @@
+[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/initContainers/1/env/-",
+    "value": {
+      "name": "AGENTOS_PGPASS_SOURCE",
+      "value": "/var/run/agentos/postgres-credentials/pgpass"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/initContainers/1/volumeMounts/-",
+    "value": {
+      "name": "postgres-pgpass",
+      "mountPath": "/var/run/agentos/postgres-credentials",
+      "readOnly": true
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "DATABASE_URL",
+      "value": "postgresql://agentos@agentos-postgres-rw:5432/agentos?sslmode=verify-full"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "NODE_EXTRA_CA_CERTS",
+      "value": "/var/run/agentos/postgres/ca.crt"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "PGPASSFILE",
+      "value": "/home/agent/.pgpass"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "PGSSLMODE",
+      "value": "verify-full"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/env/-",
+    "value": {
+      "name": "PGSSLROOTCERT",
+      "value": "/var/run/agentos/postgres/ca.crt"
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/volumeMounts/-",
+    "value": {
+      "name": "postgres-ca",
+      "mountPath": "/var/run/agentos/postgres",
+      "readOnly": true
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/volumes",
+    "value": [
+      {
+        "name": "postgres-ca",
+        "secret": {
+          "secretName": "agentos-postgres-ca",
+          "defaultMode": 288,
+          "items": [
+            {
+              "key": "ca.crt",
+              "path": "ca.crt"
+            }
+          ]
+        }
+      },
+      {
+        "name": "postgres-pgpass",
+        "secret": {
+          "secretName": "agentos-postgres-app",
+          "defaultMode": 288,
+          "items": [
+            {
+              "key": "pgpass",
+              "path": "pgpass"
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

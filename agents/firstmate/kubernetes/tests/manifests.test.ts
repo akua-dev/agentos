@@ -195,4 +195,62 @@ describe("First Mate Kubernetes resources", () => {
       { kind: "ServiceAccount", name: "agentos-firstmate", namespace: "agentos" },
     ]);
   });
+
+  test("mounts CNPG client identity only through the PostgreSQL overlay", async () => {
+    const resources = await render(join(runtime, "overlays", "postgres"));
+    const statefulSet = resource(resources, "StatefulSet", "agentos-firstmate");
+    const pod = statefulSet.spec!.template.spec;
+    const install = pod.initContainers[0];
+    const prepare = pod.initContainers[1];
+    const firstmate = pod.containers[0];
+    expect(install.volumeMounts).not.toContainEqual(expect.objectContaining({ name: "postgres-ca" }));
+    expect(install.volumeMounts).not.toContainEqual(expect.objectContaining({ name: "postgres-pgpass" }));
+    expect(prepare.volumeMounts).toContainEqual({
+      mountPath: "/var/run/agentos/postgres-credentials",
+      name: "postgres-pgpass",
+      readOnly: true,
+    });
+    expect(firstmate.volumeMounts).toContainEqual({
+      mountPath: "/var/run/agentos/postgres",
+      name: "postgres-ca",
+      readOnly: true,
+    });
+
+    const environment = Object.fromEntries(
+      firstmate.env.map(({ name, value }: { name: string; value: string }) => [
+        name,
+        value,
+      ]),
+    );
+    expect(environment).toMatchObject({
+      DATABASE_URL:
+        "postgresql://agentos@agentos-postgres-rw:5432/agentos?sslmode=verify-full",
+      NODE_EXTRA_CA_CERTS: "/var/run/agentos/postgres/ca.crt",
+      PGPASSFILE: "/home/agent/.pgpass",
+      PGSSLMODE: "verify-full",
+      PGSSLROOTCERT: "/var/run/agentos/postgres/ca.crt",
+    });
+    expect(environment.PGPASSWORD).toBeUndefined();
+    expect(
+      Object.fromEntries(
+        prepare.env.map(({ name, value }: { name: string; value: string }) => [name, value]),
+      ).AGENTOS_PGPASS_SOURCE,
+    ).toBe("/var/run/agentos/postgres-credentials/pgpass");
+    expect(pod.volumes).toContainEqual({
+      name: "postgres-ca",
+      secret: {
+        defaultMode: 288,
+        items: [{ key: "ca.crt", path: "ca.crt" }],
+        secretName: "agentos-postgres-ca",
+      },
+    });
+    expect(pod.volumes).toContainEqual({
+      name: "postgres-pgpass",
+      secret: {
+        defaultMode: 288,
+        items: [{ key: "pgpass", path: "pgpass" }],
+        secretName: "agentos-postgres-app",
+      },
+    });
+  });
 });

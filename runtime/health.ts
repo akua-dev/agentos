@@ -2,7 +2,7 @@
 
 import { $ } from "bun";
 
-type Agent = { name?: unknown };
+type Agent = { name?: unknown; pane_id?: unknown };
 type AgentList = { result?: { agents?: Agent[] } };
 
 const agentName = requiredEnvironment("AGENTOS_AGENT_NAME");
@@ -31,15 +31,20 @@ async function readiness(): Promise<number> {
 
   const result = await agentList();
   const agents = result?.result?.agents;
+  const matches = Array.isArray(agents)
+    ? agents.filter(({ name }) => name === agentName)
+    : [];
   if (
-    !Array.isArray(agents) ||
-    agents.filter(({ name }) => name === agentName).length !== 1
+    matches.length !== 1 ||
+    typeof matches[0]?.pane_id !== "string"
   ) {
     return 1;
   }
 
   return (
-    await $`herdr agent get ${agentName} --session ${session}`.quiet().nothrow()
+    await $`herdr pane process-info --pane ${matches[0].pane_id} --session ${session}`
+      .quiet()
+      .nothrow()
   ).exitCode;
 }
 
