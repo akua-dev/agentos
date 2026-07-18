@@ -184,39 +184,39 @@ version = "canary"
 backend = "github:oven-sh/bun"
 
 [tools."github:oven-sh/bun"."platforms.linux-arm64"]
-checksum = "sha256:9ccbf062a71313f75ecbb00539899ac3a63e5683d33e64a1c897775b0f451a2c"
+checksum = "sha256:da3d52c68a3c7e4381b05c0dd6d094bfbd028d233430f3048914b4e284218cf8"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-aarch64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479072995"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481185832"
 
 [tools."github:oven-sh/bun"."platforms.linux-arm64-musl"]
-checksum = "sha256:4bf9e7627bbbf0034403ff9a748d01121b2cbe2ea8db983ca666c40fd5a19cd9"
+checksum = "sha256:f66aec5e3bb588e047f671a07197b9bbb26b79a20e6dae618ee4febf5f65615e"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-aarch64-musl.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479073551"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481186309"
 
 [tools."github:oven-sh/bun"."platforms.linux-x64"]
-checksum = "sha256:c97a7bff03cc2934987f124d590deec00ff2d4cb366cc55aec4ab4894e5950a4"
+checksum = "sha256:0d31eb7845c150d668e1d50701c623c050dd350dfaa5029aba51745b4af39e5b"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479073162"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481185995"
 
 [tools."github:oven-sh/bun"."platforms.linux-x64-musl"]
-checksum = "sha256:d9a4faa16ab9836d112f488114582a6727200e19766fa83fa3388270afb9c827"
+checksum = "sha256:0d7bd9b7a410b865cea539e280134649ae3048f858e1515f08524b5cf534da4b"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64-musl.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479073715"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481186399"
 
 [tools."github:oven-sh/bun"."platforms.macos-arm64"]
-checksum = "sha256:78b08fad57bd07a4067bd7db87c339d124cefa6da28b5ee7740fd8c25166b7e0"
+checksum = "sha256:42ecd34a5bcae6b8e45525b61bc162ddee03ffc6c3252ea8b15f15191ddd33f5"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-darwin-aarch64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479072623"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481185247"
 
 [tools."github:oven-sh/bun"."platforms.macos-x64"]
-checksum = "sha256:3fac7ed99e0a15af142e37bbbeb30835ccba09efba7776f44ff02c0cc7eab644"
+checksum = "sha256:3834e6d12b6d36145c00d2451b4ee6e06031fa28497d516b9d9076e7a86444c2"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-darwin-x64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479072795"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481185466"
 
 [tools."github:oven-sh/bun"."platforms.windows-x64"]
-checksum = "sha256:13867f9d2af342b2be2d193fb41c311474ef189008f2d901b5bf9f3eb6717d09"
+checksum = "sha256:6c61deea2434e88ccb71b168c6b781d01e1732dc0ebfd4e49938d046bab8b777"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-windows-x64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/479074946"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481187635"
 
 [[tools.jq]]
 version = "1.8.2"
@@ -258,36 +258,36 @@ url = "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-windows-amd64.
 provenance = "github-attestations"
 
 [[tools.kubectl]]
-version = "1.36.2"
+version = "1.35.6"
 backend = "aqua:kubernetes/kubernetes/kubectl"
 
 [tools.kubectl."platforms.linux-arm64"]
-checksum = "sha256:c957eb8c4bea27a3bb35b269edd9082e27f027f7b76b20b5bf4afebc726c6d3e"
-url = "https://dl.k8s.io/v1.36.2/bin/linux/arm64/kubectl"
+checksum = "sha256:c0f97f31c9ddc22d4951d543a1a7125a9af4b31e895ad4aa99899c4ba2a6ff0b"
+url = "https://dl.k8s.io/v1.35.6/bin/linux/arm64/kubectl"
 
 [tools.kubectl."platforms.linux-arm64-musl"]
-checksum = "sha256:c957eb8c4bea27a3bb35b269edd9082e27f027f7b76b20b5bf4afebc726c6d3e"
-url = "https://dl.k8s.io/v1.36.2/bin/linux/arm64/kubectl"
+checksum = "sha256:c0f97f31c9ddc22d4951d543a1a7125a9af4b31e895ad4aa99899c4ba2a6ff0b"
+url = "https://dl.k8s.io/v1.35.6/bin/linux/arm64/kubectl"
 
 [tools.kubectl."platforms.linux-x64"]
-checksum = "sha256:1e9045ec32bea85da43de85f0065358529ea7c7a152eca78154fba5b58c27d82"
-url = "https://dl.k8s.io/v1.36.2/bin/linux/amd64/kubectl"
+checksum = "sha256:5d11e2ba01ea68ffd053f56e27738e2b4330013ee67f7e46c6da6c585d3c9926"
+url = "https://dl.k8s.io/v1.35.6/bin/linux/amd64/kubectl"
 
 [tools.kubectl."platforms.linux-x64-musl"]
-checksum = "sha256:1e9045ec32bea85da43de85f0065358529ea7c7a152eca78154fba5b58c27d82"
-url = "https://dl.k8s.io/v1.36.2/bin/linux/amd64/kubectl"
+checksum = "sha256:5d11e2ba01ea68ffd053f56e27738e2b4330013ee67f7e46c6da6c585d3c9926"
+url = "https://dl.k8s.io/v1.35.6/bin/linux/amd64/kubectl"
 
 [tools.kubectl."platforms.macos-arm64"]
-checksum = "sha256:4408c85c83fd3a31adaa555bdf3c7a6c81f74b19449a9060ba31ab91926f023d"
-url = "https://dl.k8s.io/v1.36.2/bin/darwin/arm64/kubectl"
+checksum = "sha256:1827b555615791c1c1065dd64870eb49a4e00e9dfd389a82a2ef1d31bb46d200"
+url = "https://dl.k8s.io/v1.35.6/bin/darwin/arm64/kubectl"
 
 [tools.kubectl."platforms.macos-x64"]
-checksum = "sha256:ce6c5e55cd17559e87e4fb5e73ebbbc2511bcf2b695d7a40c1b1461a9817d4b3"
-url = "https://dl.k8s.io/v1.36.2/bin/darwin/amd64/kubectl"
+checksum = "sha256:fa6b472ca1e542e171d7daedd9435b8e9650bc18d42a57eb930a51f48ca58874"
+url = "https://dl.k8s.io/v1.35.6/bin/darwin/amd64/kubectl"
 
 [tools.kubectl."platforms.windows-x64"]
-checksum = "sha256:df04d82234b28ffbdcd36e79d596b85da6e9c736e1a7a55ff6910c648ff47af2"
-url = "https://dl.k8s.io/v1.36.2/bin/windows/amd64/kubectl.exe"
+checksum = "sha256:ce1c21d0e0a64fa249fad3b6372c14479e7901fedf6d5a425d92c46c2bd87442"
+url = "https://dl.k8s.io/v1.35.6/bin/windows/amd64/kubectl.exe"
 
 [[tools.node]]
 version = "24.16.0"

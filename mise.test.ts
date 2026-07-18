@@ -102,7 +102,7 @@ const fleetTools = {
   "github:ogulcancelik/herdr": "0.7.3",
   "github:oven-sh/bun": "canary",
   jq: "1.8.2",
-  kubectl: "1.36.2",
+  kubectl: "1.35.6",
   node: "24",
   "npm:@earendil-works/pi-coding-agent": "0.80.7",
   "npm:@openai/codex": "0.144.5",
