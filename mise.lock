@@ -184,39 +184,39 @@ version = "canary"
 backend = "github:oven-sh/bun"
 
 [tools."github:oven-sh/bun"."platforms.linux-arm64"]
-checksum = "sha256:da3d52c68a3c7e4381b05c0dd6d094bfbd028d233430f3048914b4e284218cf8"
+checksum = "sha256:e094277b0f23ae375de3407e307a0d116826208ff2b609f6997898a06bb906c7"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-aarch64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481185832"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481342296"
 
 [tools."github:oven-sh/bun"."platforms.linux-arm64-musl"]
-checksum = "sha256:f66aec5e3bb588e047f671a07197b9bbb26b79a20e6dae618ee4febf5f65615e"
+checksum = "sha256:7a54bf18a209f54aedd2c794ff4ce42c4bd5f468ce49a26e67c6a0f21dd18b24"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-aarch64-musl.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481186309"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481342617"
 
 [tools."github:oven-sh/bun"."platforms.linux-x64"]
-checksum = "sha256:0d31eb7845c150d668e1d50701c623c050dd350dfaa5029aba51745b4af39e5b"
+checksum = "sha256:da9a927d60d60138392f4e677e01ad32e620dfb910f06334a87de230caf297ee"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481185995"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481342387"
 
 [tools."github:oven-sh/bun"."platforms.linux-x64-musl"]
-checksum = "sha256:0d7bd9b7a410b865cea539e280134649ae3048f858e1515f08524b5cf534da4b"
+checksum = "sha256:a02a3de5f31a15ace04fdfb15a95895e2b0ec3e28566706bfbedb3002ab63f23"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64-musl.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481186399"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481342678"
 
 [tools."github:oven-sh/bun"."platforms.macos-arm64"]
-checksum = "sha256:42ecd34a5bcae6b8e45525b61bc162ddee03ffc6c3252ea8b15f15191ddd33f5"
+checksum = "sha256:441685db7367823f1c0162b81f5351cbeba17dd490502bacce484d41a83464df"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-darwin-aarch64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481185247"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481342024"
 
 [tools."github:oven-sh/bun"."platforms.macos-x64"]
-checksum = "sha256:3834e6d12b6d36145c00d2451b4ee6e06031fa28497d516b9d9076e7a86444c2"
+checksum = "sha256:3752a25a6b2eec9a7d98ba5975bfa3d28c8a9018c491577100d9fdbea951ecfe"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-darwin-x64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481185466"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481342133"
 
 [tools."github:oven-sh/bun"."platforms.windows-x64"]
-checksum = "sha256:6c61deea2434e88ccb71b168c6b781d01e1732dc0ebfd4e49938d046bab8b777"
+checksum = "sha256:1b5a718ed5eef87547502130838a738427f9a975806f70cc44d9cc79e17e815d"
 url = "https://github.com/oven-sh/bun/releases/download/canary/bun-windows-x64.zip"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481187635"
+url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/481343597"
 
 [[tools.jq]]
 version = "1.8.2"
