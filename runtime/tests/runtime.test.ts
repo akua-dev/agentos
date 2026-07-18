@@ -3,7 +3,12 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-type Agent = { name: string };
+type Agent = {
+  agent_session?: { kind: string; value: string };
+  cwd?: string;
+  name: string;
+  pane_id?: string;
+};
 
 const repository = new URL("../..", import.meta.url).pathname.replace(
   /\/$/,
@@ -74,6 +79,12 @@ if (args[0] === "server") {
   const agent = agents.find((candidate: { name: string }) => candidate.name === args[2]);
   if (!agent) process.exit(1);
   console.log(JSON.stringify({ result: { type: "agent_info", agent } }));
+} else if (command === "pane close") {
+  const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
+  await writeFile(
+    join(state, "agents.json"),
+    JSON.stringify(agents.filter((candidate: { pane_id?: string }) => candidate.pane_id !== args[2])),
+  );
 } else if (args.slice(0, 3).join(" ") === "terminal session observe") {
   process.on("SIGTERM", () => process.exit(0));
   setInterval(() => {}, 1_000);
@@ -159,7 +170,8 @@ describe("Mate runtime", () => {
   });
 
   test("triggers native restore instead of creating a second First Mate", async () => {
-    const { env, state } = await createHarness([{ name: "firstmate" }]);
+    const cwd = join(repository, "agents", "firstmate");
+    const { env, state } = await createHarness([{ cwd, name: "firstmate" }]);
     const child = Bun.spawn([process.execPath, runMate], {
       env,
       stderr: "pipe",
@@ -190,6 +202,54 @@ describe("Mate runtime", () => {
     expect(calls.filter((call) => call[0] === "agent" && call[1] === "start")).toEqual([]);
     expect(calls.filter((call) => call.slice(0, 3).join(" ") === "terminal session observe")).toEqual([
       expectedObserve,
+    ]);
+  });
+
+  test("moves a persisted Pi session onto the configured checkout", async () => {
+    const persistedSession = "/home/agent/.pi/agent/sessions/legacy/session.jsonl";
+    const paneId = "w1:p1";
+    const { env, state } = await createHarness([
+      {
+        agent_session: { kind: "path", value: persistedSession },
+        cwd: "/opt/agentos/agents/firstmate",
+        name: "firstmate",
+        pane_id: paneId,
+      },
+    ]);
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const expectedStart = [
+      "agent",
+      "start",
+      "firstmate",
+      "--cwd",
+      env.AGENTOS_AGENT_CWD!,
+      "--no-focus",
+      "--session",
+      "agentos-firstmate-test",
+      "--",
+      "pi",
+      "--session",
+      persistedSession,
+    ];
+
+    await waitFor(async () =>
+      (await readCalls(state)).some((call) =>
+        call.length === expectedStart.length &&
+        call.every((argument, index) => argument === expectedStart[index]),
+      ),
+    );
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
+    const calls = await readCalls(state);
+    expect(calls.filter((call) => call[0] === "pane" && call[1] === "close")).toEqual([
+      ["pane", "close", paneId, "--session", "agentos-firstmate-test"],
+    ]);
+    expect(calls.filter((call) => call[0] === "agent" && call[1] === "start")).toEqual([
+      expectedStart,
     ]);
   });
 

@@ -2,7 +2,12 @@
 
 import { $ } from "bun";
 
-type Agent = { name?: unknown };
+type Agent = {
+  agent_session?: { kind?: unknown; value?: unknown };
+  cwd?: unknown;
+  name?: unknown;
+  pane_id?: unknown;
+};
 type AgentList = { result?: { agents?: Agent[] } };
 
 const agentName = requiredEnvironment("AGENTOS_AGENT_NAME");
@@ -25,12 +30,18 @@ try {
 
   await waitUntilServerReady(server);
   const agents = await listAgents();
-  const agentCount = agents.filter(({ name }) => name === agentName).length;
+  const mates = agents.filter(({ name }) => name === agentName);
+  const agentCount = mates.length;
 
   if (agentCount === 0) {
-    await $`herdr agent start ${agentName} --cwd ${agentCwd} --no-focus --session ${session} -- pi`;
+    await startMate();
   } else if (agentCount === 1) {
-    await restoreMate();
+    const mate = mates[0]!;
+    if (mate.cwd === agentCwd) {
+      await restoreMate();
+    } else {
+      await relocateMate(mate);
+    }
   } else {
     throw new Error(
       `Refusing to start: expected at most one Herdr agent named ${agentName}, found ${agentCount}.`,
@@ -47,6 +58,48 @@ try {
   server = undefined;
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
+}
+
+async function startMate(persistedSession?: string) {
+  const command = [
+    "herdr",
+    "agent",
+    "start",
+    agentName,
+    "--cwd",
+    agentCwd,
+    "--no-focus",
+    "--session",
+    session,
+    "--",
+    "pi",
+    ...(persistedSession ? ["--session", persistedSession] : []),
+  ];
+  await $`${command}`;
+}
+
+async function relocateMate(mate: Agent) {
+  const paneId = mate.pane_id;
+  const persistedSession = mate.agent_session?.value;
+  if (
+    typeof paneId !== "string" ||
+    mate.agent_session?.kind !== "path" ||
+    typeof persistedSession !== "string"
+  ) {
+    throw new Error(
+      `Refusing to move ${agentName} from ${String(mate.cwd)} without a persisted Pi session path.`,
+    );
+  }
+
+  await $`herdr pane close ${paneId} --session ${session}`;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if ((await mateStatus()) !== 0) {
+      await startMate(persistedSession);
+      return;
+    }
+    await Bun.sleep(100);
+  }
+  throw new Error(`Herdr did not release ${agentName} after closing pane ${paneId}.`);
 }
 
 async function waitUntilServerReady(serverProcess: Bun.Subprocess) {
