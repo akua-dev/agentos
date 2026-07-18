@@ -21,8 +21,25 @@ and preserve it.
 - Keep raw model reasoning, harness transcripts and terminal output in their
   runtime authorities. Store only durable coordination in Task, Assignment and
   Inbox rows; do not market released tables as a complete forensic audit log.
+- Keep ordinary communication in Task and Assignment state. Inbox stores only
+  durable speech acts that state cannot express. Its closed `kind` vocabulary
+  belongs to one released migration; Skills must reference it rather than
+  defining aliases.
+- Permit Agent-authored Inbox delivery only across one direct parent-child
+  hierarchy edge. Cross-domain work must escalate to the common ancestor for
+  Task creation or routing; do not add a lateral-message exception.
+- Preserve `agentos.receive_inbox` as the idempotent recipient-owned boundary
+  that returns the delivery while setting `read_at` atomically. First Mate keeps
+  owner-level administrative repair; no ordinary sender or unrelated Agent may
+  acknowledge another recipient's row. `read_at` means loaded into model
+  context, `resolved_at` means handled, and read-but-unresolved rows remain
+  actionable after recovery.
 - Keep Captain decisions in Inbox with stable `decision_key` values and Task
   dependencies in `tasks.dependencies`; do not introduce a decisions table.
+- Treat `agentos.resolve_captain_decision` as the reference contract for any
+  future speech act with a state effect: one released idempotent Function must
+  record the response, close the delivery and apply the coupled state mutation
+  in one short transaction.
 - Keep the complete Assignment brief, final or handoff report, concrete dispatch
   profile and append-only handoff history in `task_assignments`.
 - Preserve accepted provider payloads intact in `external_events.payload`. The same event rows own their small burst, claim and reconciliation state; do not add a reconciliation table or background outbox.
@@ -61,6 +78,9 @@ and preserve it.
 
 - Inspect read-only first and ask before credentials, database creation, role or grant changes, or migration application.
 - Receive `DATABASE_URL` only through an approved secret source; never commit, print or copy credentials into commands that will persist in shell history.
+- Preserve the explicit in-memory PGPASSFILE resolution in
+  `drizzle.config.ts`; do not fall back to `pg`'s deprecated implicit pgpass
+  lookup or place a password in a command argument.
 - Use transactions where PostgreSQL permits them.
 - Test migration, constraint, Trigger and Function behavior against the package's in-memory PGlite database instead of inspecting SQL source text for strings.
 - Test Grants and RLS through real role changes and allowed and forbidden SQL paths in PGlite. Do not add Docker-backed database tests without a concrete behavior that PGlite cannot exercise.

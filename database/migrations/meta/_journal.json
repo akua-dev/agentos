@@ -50,6 +50,34 @@
       "when": 1784317041855,
       "tag": "0006_fleet_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784395533147,
+      "tag": "0007_inbox_hierarchy_edge_routing",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784395682062,
+      "tag": "0008_inbox_speech_act_vocabulary",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784407912979,
+      "tag": "0009_inbox_receipt",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784409309452,
+      "tag": "0010_preserve_runtime_privileges",
+      "breakpoints": true
     }
   ]
 }

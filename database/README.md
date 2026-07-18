@@ -45,6 +45,10 @@ The pinned `pg` 8 driver needs `uselibpqcompat=true` to give
 `sslmode=require` its libpq meaning. Without it, the driver attempts full
 certificate verification against CNPG's private cluster CA. Revalidate this
 connection option when upgrading to `pg` 9 or later.
+The migration config resolves the matching mode-`0600` pgpass entry into its
+in-memory connection URL before Drizzle constructs `pg`; it never puts the
+password in a command argument and avoids `pg`'s deprecated implicit pgpass
+fallback.
 
 `database:prepare` copies only the reviewed package manifests, lockfile,
 migration configuration and SQL into a content-addressed directory under the
@@ -88,9 +92,9 @@ owner role and is the database/schema administrator without needing PostgreSQL
 cluster-superuser privileges. All other registered Agents use non-privileged
 login roles. Every active registered Agent receives an unfiltered read view of
 every Fleet table. RLS lets Second Mates manage their subtrees and Crewmates
-mutate themselves; Inbox writes preserve authentic senders and immutable read
-content. Tables without a reviewed runtime write policy remain mutable only by
-First Mate as owner.
+mutate themselves; Inbox writes begin with authentic senders and immutable read
+content, with `0007` later adding direct hierarchy-edge routing. Tables without
+a reviewed runtime write policy remain mutable only by First Mate as owner.
 
 `0002_runtime_mutation_authorization.sql` opens the reviewed Task and Assignment
 mutation paths. Mates create and assign work only inside their managed Agent
@@ -140,3 +144,35 @@ these contracts against the full ordered migration chain in PGlite.
 coordination tables. Payloads contain only schema version, table and operation;
 the listener must query durable rows after wake. PGlite tests prove committed
 changes notify, rolled-back changes do not, and all intended tables are wired.
+
+`0007_inbox_hierarchy_edge_routing.sql` makes the communication topology an
+executable contract. Agent-authored Inbox delivery is accepted only between a
+direct parent and child in either direction, including when First Mate writes
+through the Fleet-owner login. Cross-domain requests therefore escalate to the
+common ancestor for Task creation or routing instead of becoming lateral
+messages. Released Captain-decision Functions retain their intentional
+self-addressed and Captain-authored rows. `tests/inbox-routing.test.ts` proves
+direct delivery, complete Fleet reads and forbidden self, grandparent, sibling
+and cross-domain writes with real roles and RLS.
+
+`0008_inbox_speech_act_vocabulary.sql` closes `inbox.kind` to `request`,
+`question`, `answer`, `approval_request`, `approval`, `notification`,
+`escalation`, `captain_decision` and `captain_decision_answer`. Adding the
+constraint validates every existing row and fails closed on an unknown legacy
+kind rather than guessing its meaning. `tests/inbox-vocabulary.test.ts` proves
+unknown kinds fail, every released kind succeeds and the Captain-decision
+Functions remain conformant.
+
+`0009_inbox_receipt.sql` adds `agentos.receive_inbox(uuid)`, the idempotent
+recipient-owned boundary for loading a delivery. It returns the row while
+setting `read_at` in the same transaction, leaves `resolved_at` separate, rejects
+ordinary senders and unrelated Agents, and preserves First Mate's owner-level
+administrative repair. This makes read-but-unresolved delivery recoverable and
+lets a Crewmate receive a durable row after only a concise Herdr doorbell.
+`tests/inbox-receipt.test.ts` proves the receipt, retry and authorization paths.
+
+`0010_preserve_runtime_privileges.sql` carries the complete latest runtime-grant
+configuration forward while retaining `receive_inbox` execution. In particular,
+adding the receipt primitive must not erase Second Mate's later Captain-domain,
+Assignment-artifact or durable-coordination privileges. The full authorization
+and coordination suites exercise the preserved grants with real roles.

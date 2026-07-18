@@ -102,6 +102,13 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
 - Keep raw reasoning, harness transcripts and terminal output in their runtime
   authorities. Use Inbox only for durable requests, questions, decisions,
   replies, blockers and concise handoffs.
+- A recipient loads one delivery through `agentos.receive_inbox(uuid)`. The
+  idempotent Function returns the row and sets `read_at` atomically; only that
+  recipient may use it in normal operation, while First Mate retains owner-level
+  administrative repair. `read_at` means loaded into model context and
+  `resolved_at` means handled. Recover both unread and read-but-unresolved rows.
+  The sender never marks the recipient's row read merely because it submitted a
+  Crewmate doorbell.
 - Captain state uses one table with explicit Fleet or Mate-domain scope. All
   active registered Agents retain the unfiltered read view; scope guides use and
   mutation, not row secrecy. First Mate owns Fleet scope. A Second Mate may
@@ -153,7 +160,7 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
 1. Ask before provisioning PostgreSQL, creating a database or role, changing grants, or applying migrations.
 2. Apply the topology selected by the developer. Do not rank external PostgreSQL ahead of self-hosted CloudNativePG, or vice versa.
 3. Before the first migration on an agent, explain that the pinned Drizzle and PostgreSQL driver dependencies will occupy about 90 MB on its PVC and ask for tooling-installation approval. From the selected release's `database/` directory, run `mise run database:prepare`. It installs only `@agentos/database` production dependencies from the release root `bun.lock` into a content-addressed persistent workspace and reuses a completed workspace on later runs. Trust its printed package path; do not run a second ad hoc `bun install` in that workspace.
-4. Apply pending migrations as the selected Fleet-owner login from the path printed by `database:prepare` with `bun run --cwd <prepared-path> migrate`, injecting `DATABASE_URL` and, when used, `PGPASSFILE` into only that process from the approved secret source. For the released in-cluster CNPG shape, use the non-secret URL and `~/.pgpass` handoff defined above. Drizzle Kit owns ordering and the applied-migration journal. Stop on a separate migration identity instead of weakening the automatic root binding.
+4. Apply pending migrations as the selected Fleet-owner login from the path printed by `database:prepare` with `bun run --cwd <prepared-path> migrate`, injecting `DATABASE_URL` and, when used, `PGPASSFILE` into only that process from the approved secret source. For the released in-cluster CNPG shape, use the non-secret URL and `~/.pgpass` handoff defined above. The released config resolves that entry in memory before constructing `pg`; never put the password in a command argument or restore the driver's deprecated implicit pgpass fallback. Drizzle Kit owns ordering and the applied-migration journal. Stop on a separate migration identity instead of weakening the automatic root binding.
 5. Use released Functions and Triggers for shared invariants instead of rewriting equivalent ad hoc SQL in every agent session.
 6. Use released RLS policies and role grants; never bypass them to make a failing workflow pass.
 
