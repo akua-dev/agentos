@@ -221,9 +221,11 @@ function completionMessage(tasks: TaskSnapshot[]) {
 }
 
 function formatCompletion(task: TaskSnapshot) {
-  const status = task.signal
-    ? `signal ${task.signal}`
-    : `exit code ${task.exitCode ?? "unknown"}`;
+  const status = task.error
+    ? `error: ${task.error}`
+    : task.signal
+      ? `signal ${task.signal}`
+      : `exit code ${task.exitCode ?? "unknown"}`;
   const duration = ((task.durationMs ?? 0) / 1_000).toFixed(1);
   return [
     `Background command "${task.id}" completed (${status}).`,
@@ -247,10 +249,11 @@ function formatTask(task: TaskSnapshot) {
 }
 
 function formatTaskWithOutput(task: TaskSnapshot) {
+  const error = task.error ? `\nError: ${task.error}` : "";
   const output = task.outputTail
     ? `\n\nOutput${task.outputTruncated ? " tail" : ""}:\n${task.outputTail}`
     : "";
-  return `${formatTask(task)}\nCommand: ${task.command}\nOutput file: ${task.outputPath}${output}`;
+  return `${formatTask(task)}\nCommand: ${task.command}\nOutput file: ${task.outputPath}${error}${output}`;
 }
 
 function parseRequest(params: Record<string, unknown>): BackgroundCommandRequest {

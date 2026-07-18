@@ -197,6 +197,34 @@ describe("AgentOS Pi background commands", () => {
     ).rejects.toThrow("Unknown background command: missing-task");
   });
 
+  test("surfaces a background start error in tool output", async () => {
+    const commands = controlledCommands();
+    const pi = new FakePi();
+    registerAgentosBackgroundTasks(pi.extensionApi(), {
+      startCommand: commands.start,
+      rootDirectory: await root(),
+      createId: () => "bg-error",
+      batchDelayMs: 5,
+    });
+    await execute(pi.tools.get("run_background_command"), {
+      command: "pg-listen agentos_events",
+      description: "Listen for AgentOS events",
+    });
+    commands.controls[0]!.resolve({
+      state: "failed",
+      summary: "Background command failed to start",
+      error: "Bun is not defined",
+    });
+    await Bun.sleep(20);
+
+    const inspected = await execute(pi.tools.get("get_background_command_output"), {
+      task_id: "bg-error",
+    });
+    expect((inspected.content[0] as { text: string }).text).toContain(
+      "Error: Bun is not defined",
+    );
+  });
+
   test("natural completion wakes with metadata and a pull pointer but no output", async () => {
     const directory = await root();
     const commands = controlledCommands();

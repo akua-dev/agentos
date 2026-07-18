@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 
 import { BoundedTaskOutput } from "../output.ts";
 import { spawnTaskProcess } from "../subprocess.ts";
@@ -26,7 +27,46 @@ async function sink(name: string, maxBytes = 1024 * 1024) {
 }
 
 describe("spawnTaskProcess", () => {
-  test("runs a shell command through Bun and captures stdout and stderr", async () => {
+  test("runs without a Bun global, as Pi's Node extension runtime does", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "agentos-node-extension-"));
+    temporaryDirectories.push(directory);
+    const build = await Bun.build({
+      entrypoints: [new URL("../subprocess.ts", import.meta.url).pathname],
+      format: "esm",
+      outdir: directory,
+      target: "node",
+    });
+    expect(build.success).toBe(true);
+    const moduleUrl = pathToFileURL(build.outputs[0]!.path).href;
+    const runner = join(directory, "runner.mjs");
+    await writeFile(
+      runner,
+      `import { spawnTaskProcess } from ${JSON.stringify(moduleUrl)};
+let output = "";
+const sink = {
+  async write(chunk) { output += Buffer.from(chunk).toString("utf8"); },
+  async close() {},
+};
+const handle = spawnTaskProcess("printf node-compatible", { output: sink });
+const result = await handle.completion;
+console.log(JSON.stringify({ output, result }));
+`,
+      "utf8",
+    );
+    const child = Bun.spawn(["node", runner], { stderr: "pipe", stdout: "pipe" });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
+    expect(JSON.parse(stdout)).toMatchObject({
+      output: "node-compatible",
+      result: { exitCode: 0, signal: null },
+    });
+  });
+
+  test("runs a shell command and captures stdout and stderr", async () => {
     const output = await sink("success");
     const handle = spawnTaskProcess(
       "printf stdout; printf stderr >&2",

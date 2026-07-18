@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { open, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import { startBackgroundCommand } from "./command.ts";
 import type {
@@ -100,7 +101,7 @@ export class BackgroundTaskBroker {
       record.blockingWaiters += 1;
       const completed = await Promise.race([
         record.terminal.then(() => true),
-        Bun.sleep(options.waitMs!).then(() => false),
+        sleep(options.waitMs!).then(() => false),
       ]);
       record.blockingWaiters -= 1;
       if (completed) record.snapshot.completionObserved = true;

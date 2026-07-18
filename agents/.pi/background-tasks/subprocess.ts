@@ -1,3 +1,7 @@
+import { spawn } from "node:child_process";
+import type { Readable } from "node:stream";
+import { setTimeout as sleep } from "node:timers/promises";
+
 import {
   BoundedTaskOutput,
   TaskOutputLimitError,
@@ -35,14 +39,11 @@ export function spawnTaskProcess(
       : process.env.SHELL ?? "/bin/sh";
   const shellArguments =
     process.platform === "win32" ? ["/d", "/s", "/c", command] : ["-c", command];
-  const child = Bun.spawn({
-    cmd: [shell, ...shellArguments],
+  const child = spawn(shell, shellArguments, {
     cwd: options.cwd,
     env: options.env ?? process.env,
     detached: process.platform !== "win32",
-    stdin: "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
+    stdio: ["ignore", "pipe", "pipe"],
   });
   const terminateGraceMs = options.terminateGraceMs ?? 2_000;
   let settled = false;
@@ -54,23 +55,16 @@ export function spawnTaskProcess(
     resolveCompletion = resolve;
   });
 
-  const consume = async (stream: ReadableStream<Uint8Array>) => {
-    const reader = stream.getReader();
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) return;
-        try {
-          await options.output.write(value);
-        } catch (error) {
-          if (!(error instanceof TaskOutputLimitError)) throw error;
-          outputLimitReached = true;
-          void stop();
-          return;
-        }
+  const consume = async (stream: Readable) => {
+    for await (const chunk of stream) {
+      try {
+        await options.output.write(Buffer.from(chunk));
+      } catch (error) {
+        if (!(error instanceof TaskOutputLimitError)) throw error;
+        outputLimitReached = true;
+        void stop();
+        return;
       }
-    } finally {
-      reader.releaseLock();
     }
   };
 
@@ -87,24 +81,19 @@ export function spawnTaskProcess(
     resolveCompletion({ ...result, outputLimitReached });
   };
 
-  void child.exited.then(
-    (exitCode) => {
-      const signal = child.signalCode;
-      void finalize({ exitCode: signal ? null : exitCode, signal });
-    },
-    (error: unknown) => {
-      void finalize({
-        exitCode: null,
-        signal: null,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    },
-  );
+  child.once("close", (exitCode, signal) => {
+    void finalize({ exitCode: signal ? null : exitCode, signal });
+  });
+  child.once("error", (error) => {
+    void finalize({ exitCode: null, signal: null, error: error.message });
+  });
 
   function sendSignal(signal: NodeJS.Signals) {
     if (settled) return;
     try {
-      if (process.platform !== "win32") process.kill(-child.pid, signal);
+      if (process.platform !== "win32" && child.pid !== undefined) {
+        process.kill(-child.pid, signal);
+      }
       else child.kill(signal);
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
@@ -122,7 +111,7 @@ export function spawnTaskProcess(
     stopPromise = (async () => {
       if (settled) return completion;
       sendSignal("SIGTERM");
-      await Promise.race([completion, Bun.sleep(terminateGraceMs)]);
+      await Promise.race([completion, sleep(terminateGraceMs)]);
       if (!settled) sendSignal("SIGKILL");
       return completion;
     })();
@@ -130,7 +119,7 @@ export function spawnTaskProcess(
   }
 
   return {
-    pid: child.pid,
+    pid: child.pid ?? 0,
     completion,
     stop,
   };
