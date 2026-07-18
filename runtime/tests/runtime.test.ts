@@ -171,7 +171,21 @@ describe("Mate runtime", () => {
 
   test("triggers native restore instead of creating a second First Mate", async () => {
     const cwd = join(repository, "agents", "firstmate");
-    const { env, state } = await createHarness([{ cwd, name: "firstmate" }]);
+    const { env, state } = await createHarness([]);
+    const persistedSession = join(state, "current-session.jsonl");
+    await writeFile(
+      persistedSession,
+      `${JSON.stringify({ cwd, id: "session-current", type: "session", version: 3 })}\n`,
+      "utf8",
+    );
+    await writeFile(join(state, "agents.json"), JSON.stringify([
+      {
+        agent_session: { kind: "path", value: persistedSession },
+        cwd,
+        name: "firstmate",
+        pane_id: "w1:p1",
+      },
+    ]));
     const child = Bun.spawn([process.execPath, runMate], {
       env,
       stderr: "pipe",
@@ -221,7 +235,7 @@ describe("Mate runtime", () => {
     await writeFile(join(state, "agents.json"), JSON.stringify([
       {
         agent_session: { kind: "path", value: persistedSession },
-        cwd: "/opt/agentos/agents/firstmate",
+        cwd: env.AGENTOS_AGENT_CWD,
         name: "firstmate",
         pane_id: paneId,
       },

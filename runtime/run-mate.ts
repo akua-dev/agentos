@@ -38,7 +38,7 @@ try {
     await startMate();
   } else if (agentCount === 1) {
     const mate = mates[0]!;
-    if (mate.cwd === agentCwd) {
+    if (await mateRunsFromCheckout(mate)) {
       await restoreMate();
     } else {
       await relocateMate(mate);
@@ -59,6 +59,16 @@ try {
   server = undefined;
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
+}
+
+async function mateRunsFromCheckout(mate: Agent) {
+  if (mate.cwd !== agentCwd) return false;
+  const persistedSession = mate.agent_session?.value;
+  if (mate.agent_session?.kind !== "path" || typeof persistedSession !== "string") {
+    return false;
+  }
+  const { header } = await readPiSession(persistedSession);
+  return header.cwd === agentCwd;
 }
 
 async function startMate(persistedSession?: string) {
