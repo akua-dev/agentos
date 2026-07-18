@@ -7,6 +7,9 @@ bounded output when useful, list it, or kill it.
 
 - Keep the broker domain-neutral. PostgreSQL, Herdr and Kubernetes remain
   native commands selected by Agent guidance, never adapters in this module.
+- Permit several independent background commands at once. The supervising Mate
+  chooses and deduplicates the useful authority/target/predicate set; this
+  broker must not impose a single-wait topology or encode Fleet policy.
 - A natural completion wakes Pi with task ID, command, description, exit or
   signal, and duration only. Never inject command output into the wake.
 - Treat completion as a signal, not authority. Query PostgreSQL, Herdr or

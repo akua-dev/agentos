@@ -47,8 +47,14 @@ or restarts itself without authority.
 
 Inspect Git remotes before publishing. Generally useful changes belong in a
 reviewed pull request to `akua-dev/agentos`; organization-specific or private
-changes belong in that organization's fork or mirror. Use `no-mistakes` before
-requesting review or opening either kind of pull request.
+changes belong in that organization's fork or mirror. AgentOS selects
+`no-mistakes` for either pull-request path. Commit the feature branch and follow
+the installed no-mistakes Skill and live CLI guidance instead of opening a
+parallel pull request manually. No-mistakes installs a local bare-repository Git
+proxy; after its pipeline passes, it forwards the validated branch to the
+configured GitHub origin or fork and opens the pull request. It is not a hosted
+Fleet Git server. Pull-request creation is part of the accepted ship delivery;
+merge remains separately gated by the configured authority.
 The selected project delivery workflow owns its validation and approval rigor.
 Risk may justify proposing a different workflow, not stacking an unrequested
 parallel review gate. Record backend or incident claims with date, exact pinned

@@ -120,24 +120,55 @@ report; its PVC copy is only the harness view. A handoff ends the prior
 Assignment and creates the replacement atomically instead of rewriting history
 or cloning the Task.
 A ship Crewmate works in an isolated worktree until its changes are durably landed or handed off.
+A ship is complete only when the selected project workflow has produced its
+declared durable delivery artifact: a remote-backed workflow normally commits
+and pushes the task branch and creates or updates its review artifact, while a
+local-only workflow produces a clean committed branch. Accepted ship authority
+never includes a default-branch push or merge. A contradictory brief that
+forbids every selected delivery path is rejected or reclassified before
+dispatch; an uncommitted worktree is not review-ready.
 A scout's durable output is its report; its scratch worktree or ArtifactFS mount may then be discarded.
 No Mate merges without the Captain's explicit approval or a previously recorded standing authorization, and no agent or workspace with active or unlanded work is retired by implication.
 
-Delegated agents report through PostgreSQL Inbox, Task and Assignment state rather than opening competing Captain-facing threads.
+Task and Assignment state is the primary channel for delegated work. Inbox is
+reserved for durable speech acts that state cannot express, and Agent-authored
+delivery crosses only one direct parent-child hierarchy edge. A cross-domain
+request escalates to the common ancestor, which creates or routes a Task in the
+target subtree; sibling Agents never establish a lateral coordination channel.
+Persistent First and Second Mates wake through PostgreSQL `LISTEN/NOTIFY` and
+query the durable rows. Crewmates are not required to run AgentOS supervision
+or a PostgreSQL listener: for a downward Crewmate delivery, the owning Mate
+commits the Inbox row first, then submits one concise Herdr doorbell containing
+only its kind, UUID and subject. The full body is never duplicated into the
+terminal. A visible supervisor label followed by U+2063 distinguishes this
+ephemeral routing hint from likely direct human input, but never authenticates
+it or grants authority. Direct terminal delivery to another Mate is an
+exceptional recovery path for a broken listener, not ordinary communication.
 Direct Captain intervention in any attached terminal remains authoritative and is reconciled into Fleet state.
 Fleet-wide and Mate-domain Captain preferences are scoped rows in one readable
 table rather than synchronized files. Genuine unresolved Captain choices live
 in Inbox under stable keys. Investigations attest their complete choice set,
 including none, before completion; the exact answer later releases linked Task
 dependencies atomically without a separate decisions service.
+That idempotent transaction—record the response, close the speech act and apply
+its coupled state effect—is the template for any future Inbox act that changes
+durable state.
 Each Mate supervises only its direct reports and keeps status changes sparse: decisions, blockers, material phase changes, completion and failure.
-While a direct report is active, its Mate keeps exactly one verified harness-appropriate supervision wait and resumes it after handling actionable work.
+While direct reports are active, their Mate keeps the smallest verified set of
+situation-appropriate waits: normally one durable Fleet notification wait plus
+native Kubernetes, Herdr-status or bounded terminal waits for concrete live
+risks. Waits are deduplicated by authority, target and predicate and re-armed
+only while their condition remains useful.
 If the selected release lacks that wake capability, the Mate reports the unsupported boundary instead of claiming unattended supervision.
 
 Project checkouts and provider repositories are operated through native Git and
 reviewed provider CLIs. The project's selected delivery workflow owns its
-validation and approval rigor; AgentOS does not add a wrapper CLI or a parallel
-review gate. External webhook payloads remain immutable JSON, coalesce into
+validation, task-branch push, review artifact and approval rigor; AgentOS does
+not add a wrapper CLI or a parallel review gate. Project metadata records that
+workflow, artifact and merge authority as durable prose rather than an AgentOS
+mode enum. The Task links the resulting remote review artifact and the
+Assignment report records branch, commit, URL, validation and delivery state.
+External webhook payloads remain immutable JSON, coalesce into
 short bounded bursts and are reconciled pull-first by the responsible Mate.
 Provider writes remain synchronous and visible to that Agent rather than being
 hidden behind an outbox worker.
@@ -232,7 +263,9 @@ non-privileged PostgreSQL `session_user` and applies grants plus Row-Level
 Security to the Fleet tables. Every active registered Agent receives the same
 complete read view with no hidden rows. Writes remain narrower: First Mate can
 administer the Fleet, Second Mates their subtrees, and Crewmates themselves;
-Inbox content follows sender, recipient and immutability rules. Fleet tables
+Agent-authored Inbox delivery requires an authentic sender and a direct
+parent-child recipient, then content follows sender, recipient and immutability
+rules. Fleet tables
 without a reviewed runtime write policy remain mutable only by First Mate as
 owner. The runtime mutation migration lets Mates create and assign Tasks inside
 their managed hierarchy and lets assigned Crewmates update only work state.
@@ -241,13 +274,21 @@ that refuses active Assignments or active child Agents, so handoff is never an
 automatic cascade. Recording hierarchy alone is not authorization, and
 migrations never create login credentials.
 
-Messages may be edited by their sender until first read and become immutable afterward; corrections are follow-up messages.
+Messages may be edited by their sender until first read and become immutable
+afterward; corrections are follow-up messages. The recipient calls
+`agentos.receive_inbox` to atomically load the row and set `read_at`; First Mate
+retains owner-level administrative repair. `read_at` means the delivery entered
+the recipient's model context, while `resolved_at` means its requested action or
+disposition was durably handled. A read but unresolved row therefore remains
+recoverable work after a crash.
 Transactional Fleet triggers publish small table-and-operation hints on the
 `agentos_events` channel. A running Pi Mate can arm `pg-listen agentos_events` through
 its generic background-command tool for a prompt wake, then must query its
 authorized durable rows. The wake contains no Fleet row data and
 `LISTEN/NOTIFY` never starts a pod or replaces Inbox, Task or external-event
-truth.
+truth. The same generic tool may own additional native blocking commands for
+selected Kubernetes resources, Herdr state transitions or bounded pane output;
+their completion is only a wake to re-query the named authority.
 
 One PostgreSQL database is one Fleet. Core tables therefore carry no `fleet_id`; a developer who intentionally needs an isolated second Fleet creates another database. Released objects live in the `agentos` schema. The `local` schema is an approved First-Mate playground whose objects are never treated as released AgentOS behavior until they return through a reviewed migration.
 
@@ -258,9 +299,9 @@ The initial durable model stays deliberately small:
 - `projects` stores non-exclusive work scopes without assigning one permanent owner;
 - `tasks` stores accepted durable work, dependencies and its small array of external tracker links;
 - `task_assignments` protects active Agent-to-Task relationships and makes completed assignment history immutable;
-- `inbox` stores durable delivery to an Agent: requests, questions, replies,
-  decisions, approvals and concise notifications. It is not a raw model or
-  terminal transcript. A request is not accepted work until a Task exists;
+- `inbox` stores durable delivery to an Agent under the closed speech-act
+  vocabulary defined by released SQL. It is not a raw model or terminal
+  transcript. A request is not accepted work until a Task exists;
 - `learnings` stores curated, evidence-backed Fleet knowledge;
 - `external_events` stores external deliveries and their reconciliation state.
 

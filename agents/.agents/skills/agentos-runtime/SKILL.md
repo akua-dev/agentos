@@ -11,7 +11,12 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 
 1. Resolve an explicit Kubernetes context, namespace, workload and agent identity.
 2. Inspect pod phase, readiness, ownership, PVC bindings and immutable release identity.
-3. Query the target Herdr server for its agents, panes, semantic status and native harness session reference.
+3. Query the target Herdr server with `herdr agent get <handle> --session
+   <session>` for the exact Agent, semantic status, working directory and
+   native harness session reference when available. Use `herdr pane
+   process-info` to corroborate the live process when diagnosis or recovery
+   depends on it; recover a missing native reference only from recorded state
+   or the same pane.
 4. Explain the fault boundary before changing anything.
 
 ## Attach and debug
@@ -19,11 +24,43 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 - From outside the cluster, a human or seed agent uses native `kubectl` with an explicit context to enter the target pod and invoke Herdr. A running Mate uses the same native interface against its in-cluster credentials, for example `kubectl --namespace <namespace> exec -it pod/<pod> --container <container> -- herdr --session <session>`.
 - Attach to the real agent terminal for interactive diagnosis.
 - Use Herdr read, status, send and wait primitives for bounded inspection; do not scrape or persist terminal output automatically.
-- Treat a live terminal send as an immediate hint only. Keep durable inter-agent communication in PostgreSQL.
+- After launch, steer, `/reload` or resume, verify that the exact Herdr Agent
+  enters `working`, or that the exact Agent produced fresh completion evidence
+  before the observation. Do not call a process healthy
+  merely because the Herdr server or Pod is ready.
+- Treat a live terminal send as an immediate hint only. Use
+  `$agentos-supervision`'s provenance marker for a supervisor-origin hint and
+  keep durable inter-agent communication in PostgreSQL.
 - Ask before interrupting, restarting, closing, taking over, or rearranging an existing user session.
 - Attach to the existing named Mate session. Never launch a second independent
   Pi writer for the same home. If Pod, Herdr and native session identity do not
   agree, remain read-only until the owning Mate state is reconciled.
+
+## Submit a Crewmate doorbell
+
+Use this only after the owning Mate has committed a downward Inbox row. The
+doorbell is not a second message body and is not the normal delivery path for a
+persistent Mate.
+
+1. Query the exact named Herdr Agent and record its pane, session and semantic
+   status. If it is working or the composer state is ambiguous, do not type over
+   it; wait for a safe boundary or use the reviewed recovery path.
+2. Write only the canonical supervisor marker plus
+   `Inbox <kind> <uuid> — <subject>; load it from PostgreSQL.` with native
+   `herdr agent send <handle> <text> --session <session>`. This command writes
+   literal text into the target terminal; it does not submit it.
+3. Submit that text with native
+   `herdr pane send-keys <pane_id> enter --session <session>`.
+4. Verify the exact Agent enters `working` with `herdr agent wait`, or that the
+   matching Inbox row acquired `read_at` before the observation. Pane text alone
+   is not receipt evidence.
+5. If delivery fails before receipt, preserve and retry the same Inbox UUID.
+   Never create a duplicate row or include the full body in the terminal.
+
+Run these commands through the target pod's own Herdr CLI. From outside the
+cluster, reach it with native `kubectl` and an explicit context; from a Mate,
+use its in-cluster Kubernetes credentials. Do not add an AgentOS wrapper CLI for
+this sequence.
 
 ## Runtime topology
 
@@ -105,9 +142,12 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
    `kubectl exec`.
 8. Record verified Kubernetes and Herdr locators in Fleet state. Treat launch
    as successful only after the native harness is processing the complete brief
-   and any first-run trust prompt is visibly resolved. On partial
-   failure, preserve the identity, PVC and rendered evidence for reconciliation;
-   never create a replacement Agent to hide the error.
+   without a trust or routine command-approval dialog. The owning Mate must use
+   `$agentos-harnesses` to reconcile a missing unattended launch or reviewed
+   repository-trust preflight instead of repeatedly pressing through ordinary
+   commands. On partial failure, preserve the identity, PVC and rendered
+   evidence for reconciliation; never create a replacement Agent to hide the
+   error.
 
 ## Resolve tools with Mise
 
@@ -134,6 +174,11 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 - Reconcile a stopped worker against its recorded Assignment and Treehouse
   worktree before resume. Preserve same-task work and refuse a fresh workspace
   while ownership is ambiguous.
+- Preserve the Herdr Agent's native session reference before a deliberate exit.
+  Prefer the harness's documented graceful command or quit keybinding, then
+  resume the same native session with the current reviewed flags. Use Pi
+  `/reload` only for reloadable resources, not as a substitute for process,
+  environment or authentication recovery.
 - Let the supervising model decide whether to retry, attach, rotate auth, change model, restart a process, or leave the agent stopped.
 
 Use only released Kustomize assets and native tool interfaces. Fail closed on ambiguous ownership or missing runtime assets.
