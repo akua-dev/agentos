@@ -99,9 +99,32 @@ RUN bun /tmp/agentos-source/runtime/create-image-seed.ts \
       --origin "$AGENTOS_GIT_REMOTE" \
       --upstream "$AGENTOS_GIT_UPSTREAM"
 
+FROM agentos-base AS agentos-runtime-dependencies
+
+WORKDIR /tmp/agentos-dependencies
+
+COPY package.json bun.lock ./
+COPY clis/pg-listen/package.json clis/pg-listen/package.json
+COPY database/package.json database/package.json
+COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
+
+RUN bun install \
+      --frozen-lockfile \
+      --ignore-scripts \
+      --no-progress \
+      --production \
+      --filter @agentos/pg-listen \
+  && bun clis/pg-listen/pg-listen.ts --help >/dev/null
+
 FROM agentos-base
 
 COPY --from=agentos-seed /opt/agentos-seed/ /opt/agentos/
+COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/node_modules/ \
+  /opt/agentos/node_modules/
+COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/clis/pg-listen/node_modules/ \
+  /opt/agentos/clis/pg-listen/node_modules/
 
 RUN chmod 0644 \
     /etc/mise/config.toml \
@@ -116,6 +139,11 @@ RUN chmod 0644 \
     /opt/agentos/runtime/create-image-seed.ts \
     /opt/agentos/runtime/run-mate.ts \
     /opt/agentos/runtime/health.ts \
+  && chmod 0755 \
+    /opt/agentos/clis/pg-listen/pg-listen.ts \
+  && ln -s \
+    /opt/agentos/clis/pg-listen/pg-listen.ts \
+    /usr/local/bin/pg-listen \
   && git config --system --add safe.directory /opt/agentos \
   && git config --system --add safe.directory /opt/agentos/.git
 

@@ -15,5 +15,12 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true
   },
-  "include": ["*.ts", "agents/**/*.ts", "database/**/*.ts", "runtime/**/*.ts"]
+  "include": [
+    "*.ts",
+    "agents/**/*.ts",
+    "agents/.pi/**/*.ts",
+    "clis/**/*.ts",
+    "database/**/*.ts",
+    "runtime/**/*.ts"
+  ]
 }
