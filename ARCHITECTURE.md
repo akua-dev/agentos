@@ -21,6 +21,7 @@ Each kind of state has one authority:
 | Terminal and harness runtime | Herdr inside each runtime pod |
 | Agent home and unfinished work | Agent-owned PVC |
 | Delivered code | Git and its remote |
+| Optional pooled AI credentials and routing state | Quota-router PVC and process |
 
 AgentOS does not continuously mirror one authority into another.
 PostgreSQL stores pod locators, not heartbeats; Kubernetes is inspected when live state matters.
@@ -225,6 +226,46 @@ The Fleet baseline deliberately excludes `tasks-axi` because PostgreSQL is the
 task authority, excludes tmux because Herdr is the initial runtime, and excludes
 Helm and additional harnesses until implemented behavior requires them.
 
+## Optional pooled AI capacity
+
+Direct provider authentication inside each Agent's persistent harness is a
+complete AgentOS topology and remains the default. A Captain may instead select
+the optional Fleet quota router when several approved Agents should share a
+pool of Codex subscriptions. That service is capacity infrastructure, not the
+Fleet coordination kernel: PostgreSQL still owns work and communication, the
+harness still chooses the requested provider/model, and the provider response
+still returns synchronously to the calling harness.
+
+The first implementation is a single-replica Bun service with one retained
+ReadWriteOnce PVC. Its mode-`0600` OAuth vault owns fresh server-created Codex
+refresh chains; its separate routing state owns only bounded quota observations,
+opaque session assignments, provider blocks and renewable request reservations.
+It stores no prompts, model responses or harness transcripts. An OpenAI API key
+may be mounted separately as an explicitly enabled last-resort fallback and is
+never copied into the mutable OAuth vault.
+
+Every client request is authenticated before its body is read. Selected Agent
+Pods receive only a Fleet client token and are also constrained by a
+selected-client NetworkPolicy. The router removes inbound credentials, selects
+and reserves an eligible account, normalizes the OpenAI Responses path, injects
+that account's upstream credential and streams the actual response. Existing
+sessions remain sticky while eligible. A sent request is never retried silently
+on another account; upstream `401`, `429`, timeout and provider failures remain
+visible to Pi or Codex and affect only later selection.
+
+Pi exposes the router as the explicit `fleet-codex` provider through a
+role-local extension that is inert without its two environment values. Codex
+uses native `model_providers` configuration, not an AgentOS wrapper. Neither
+path selects a model or rewrites a persistent default. `quota-axi` remains an
+observation-only tool and has no routing, login or mutation authority.
+
+The released service, tests and optional Kubernetes topology live together in
+`services/quota-router/`. First Mate may operate that topology through its
+reviewed Skill and RBAC without owning the component's source directory.
+Claude, Gemini, WebSockets,
+multi-replica authority, public ingress and general-purpose AI gateway behavior
+remain outside the first contract.
+
 ## Health and recovery
 
 Kubernetes liveness means the pod runtime is technically alive.
@@ -351,7 +392,13 @@ CNPG generates the application Secret; First Mate uses its `pgpass` entry with
 `psql` and injects its URI only into the Drizzle migration process. Pinned
 migration dependencies are installed from `bun.lock` into a content-addressed
 workspace on the agent PVC when first needed, keeping them out of the runtime
-image. Topology does not change schema or security semantics.
+image. After CNPG is Ready, one role-owned additive strategic patch wires its
+application identity and private CA into the already running First Mate. This
+explicit stage-two handoff preserves the selected image and unrelated workload
+state, requires approval for the intentional Pod restart, and is not a second
+database topology or release manifest. External PostgreSQL receives only an
+installation-specific equivalent after its endpoint, TLS and Secret shape are
+known. Topology does not change schema or security semantics.
 
 ## Kubernetes and authorization
 
@@ -365,6 +412,8 @@ Workers do not inherit First Mate authority automatically.
 Agent runtimes remain ordinary versioned Kubernetes resources; AgentOS does not
 introduce its own CRDs or autonomous operator. Only the optional self-hosted
 database path uses the external CloudNativePG CRDs and controller.
+The optional quota router is an ordinary single-replica StatefulSet and
+ClusterIP Service; it adds no Kubernetes controller or CRD.
 
 ## Bootstrap
 
@@ -389,6 +438,8 @@ provider `openai-codex`. Existing Pi settings on the persistent home remain
 authoritative; AgentOS does not seed a release-wide model or thinking level.
 Login happens inside the persistent Pi runtime, not by copying a local token directory.
 Exact package versions and authentication commands belong to release assets and the auth skill.
+The optional quota router is not required for either bootstrap stage. It may be
+selected later through its dedicated Skill after direct First-Mate auth works.
 
 For a stable install, the seed resolves the latest published GitHub release,
 verifies that release is immutable, and applies only its fixed-name assets
@@ -411,10 +462,10 @@ checkout while keeping operational roles out of contributor sessions:
 
 - `.agents/skills/` contains workflows that apply from every AgentOS checkout
   working directory; initially this is only `agentos-development`;
-- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication, database, image-build, registry and optional ArtifactFS Scout operations;
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
 - `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
-- a future subtree under `clis/` or `packages/` may add its own `.agents/skills/` when development there needs a reusable workflow.
+- a future subtree under `clis/`, `packages/` or `services/` may add its own `.agents/skills/` when development there needs a reusable workflow.
 
 Bootstrap explicitly loads the other skills when it reaches their boundary.
 First and Second Mates can load those skills independently during normal operation, so runtime knowledge is not hidden behind bootstrap.
@@ -470,11 +521,12 @@ workspace. The tree reflects ownership, not deployment order:
 │   ├── AGENTS.md                     shared rules for running Agent roles
 │   ├── .agents/skills/               operational Skills shared by both Mates
 │   ├── .pi/background-tasks/         shared Pi extension implementation
+│   ├── .pi/quota-router/             optional Fleet Codex provider extension
 │   ├── firstmate/
 │   │   ├── AGENTS.md                 complete First-Mate identity and duties
 │   │   ├── .agents/skills/           First-Mate-only workflows
 │   │   ├── .pi/extensions/           First-Mate Pi auto-load entrypoints
-│   │   └── kubernetes/               First-Mate workload, RBAC and topology
+│   │   └── kubernetes/               workload, RBAC and client patches
 │   ├── secondmate/
 │   │   ├── AGENTS.md                 complete Second-Mate identity and duties
 │   │   ├── .pi/extensions/           Second-Mate Pi auto-load entrypoints
@@ -488,14 +540,20 @@ workspace. The tree reflects ownership, not deployment order:
 │   └── pg-listen/                    one-notification PostgreSQL primitive
 ├── database/
 │   ├── AGENTS.md                     SQL-first schema-development boundary
+│   ├── kubernetes/cloudnative-pg/     optional self-hosted PostgreSQL topology
 │   ├── migrations/                   released schema and authorization truth
 │   ├── runtime/                      deterministic migration preparation
 │   └── tests/                        behavioral PGlite contract tests
 ├── runtime/
-│   ├── AGENTS.md                     shared Mate-lifecycle boundary
-│   ├── kubernetes/base/              common First/Second-Mate StatefulSet
+│   ├── AGENTS.md                     shared persistent-Agent runtime boundary
+│   ├── kubernetes/base/              retained-home Agent StatefulSet
+│   ├── kubernetes/mate/              Pi lifecycle for First/Second Mate
 │   ├── *.ts                          typed image and home lifecycle mechanics
 │   └── tests/                        observable runtime behavior tests
+├── services/
+│   ├── AGENTS.md                     admission boundary for optional services
+│   └── quota-router/                 service, tests and optional K8s topology
+├── release/kubernetes/               reviewed manifest release assembly
 ├── docs/                             supporting assets and stable pointers
 ├── Dockerfile                        common AgentOS image build
 ├── mise.toml / mise.lock             reviewed Fleet tool baseline
@@ -515,12 +573,20 @@ workspace. The tree reflects ownership, not deployment order:
 - Put reusable imported code in `packages/<name>/` only after at least one real
   consumer requires a library boundary. There is intentionally no empty
   `packages/` directory.
-- Put common First/Second-Mate process and image lifecycle mechanics in
-  `runtime/`; put role identity, credentials, RBAC and Kubernetes patches under
-  `agents/<role>/`.
+- Put a reviewed optional long-running network capability in
+  `services/<name>/` only when native tools cannot safely provide its cross-Pod
+  state and request lifecycle. Keep it authenticated, independently testable
+  and outside Fleet coordination authority.
+- Put retained-home, Pod-security and role-neutral Herdr mechanics shared by
+  persistent Agents in `runtime/kubernetes/base/`. Add the persistent Pi Mate
+  lifecycle in `runtime/kubernetes/mate/`; put role identity, credentials,
+  RBAC, harness choice and role-specific probes under `agents/<role>/`.
 - Put released database objects, authorization and transactional coordination
-  in SQL migrations under `database/`; keep topology manifests with the role
-  that owns their operation.
+  in SQL migrations under `database/`.
+- A deployable component owns its implementation, behavior tests and
+  Kubernetes shape. Skills and RBAC define who may operate it. Role-specific
+  workload manifests remain under `agents/<role>/kubernetes/`; release assembly
+  belongs under `release/`.
 - Put project orientation in `README.md`, direction and product bets in
   `VISION.md`, architectural decisions here and contributor procedure in
   `CONTRIBUTING.md`. Link across those owners instead of copying a workflow.
@@ -528,12 +594,15 @@ workspace. The tree reflects ownership, not deployment order:
   ownership. Their generator, immutable release or ignored workspace remains
   authoritative.
 
-The shared executable Mate lifecycle and common First/Second-Mate StatefulSet
-live under `runtime/`; this is not an agent role, external CLI or generic
-importable runtime package. Each role owns its Kubernetes patch and surrounding
-ServiceAccount, Service, credentials and authority under
-`agents/<role>/kubernetes/`. First Mate owns database topology under its
-Kubernetes subtree, while `database/` owns schema semantics for every Mate.
+The retained-home StatefulSet shared by persistent Agents and the executable
+First/Second-Mate lifecycle live under `runtime/`; this is not an agent role,
+external CLI or generic importable runtime package. `runtime/kubernetes/base/`
+contains only semantics common to persistent Agents, while
+`runtime/kubernetes/mate/` adds Pi and Mate health behavior. Each role owns its
+Kubernetes workload patch and surrounding ServiceAccount, Service, identity,
+credentials, harness choice and authority under `agents/<role>/kubernetes/`.
+Stateless workers do not inherit the retained-home base. Optional component
+topology stays with that component even when First Mate is its normal operator.
 
 There is no speculative CLI or placeholder application. A real missing native
 primitive may enter `clis/<name>/` through the admission boundary in
@@ -561,19 +630,34 @@ workspace keeps one `bun.lock`.
   expands the common Mate image or grants runtime permissions by implication.
 - `clis/AGENTS.md` admits only narrow executable primitives and rejects wrappers, policy and shadow state.
 - `clis/<name>/` owns each admitted command's implementation, package dependencies and behavior tests.
+- `services/AGENTS.md` admits only explicitly reviewed optional network
+  processes and rejects native-tool wrappers, prompt queues and shadow Fleet
+  state.
+- `services/quota-router/` owns the optional authenticated AI request data
+  plane, its private credential/routing files, behavior tests and Kubernetes
+  topology; it does not own harness choice or PostgreSQL state.
 - `database/AGENTS.md` governs SQL-first schema development without selecting an Agent role.
+- `database/kubernetes/cloudnative-pg/` is authoritative only for the optional
+  self-hosted CloudNativePG topology; it does not own SQL schema, controller
+  installation or third-party version selection.
 - `runtime/AGENTS.md` governs shared container lifecycle mechanics without selecting an Agent role.
-- `runtime/kubernetes/base/` owns the shared First/Second-Mate StatefulSet.
+- `runtime/kubernetes/base/` owns only the retained-home StatefulSet mechanics
+  shared by persistent Agents.
+- `runtime/kubernetes/mate/` owns the Pi and `mate:*` lifecycle shared by First
+  and Second Mate.
 - `agents/firstmate/kubernetes/`, `agents/secondmate/kubernetes/` and
   `agents/crewmate/kubernetes/` are authoritative for role-owned Kubernetes
-  patches and surrounding resources.
-- `agents/firstmate/kubernetes/database/` is authoritative for the optional
-  self-hosted CloudNativePG topology; it does not own SQL schema.
-- `agents/firstmate/kubernetes/release/` is authoritative for human-readable
+  patches and surrounding resources. A role-owned client patch wires that
+  workload to a component; it does not move the component's topology into the
+  role subtree.
+- `services/quota-router/kubernetes/` is authoritative for the optional
+  single-replica router topology; its Secret values and local overlays are not
+  repository state.
+- `release/kubernetes/` is authoritative for human-readable
   First-Mate and database manifest rendering; stable generated assets belong
   to immutable GitHub releases, while previews remain exact-commit builds.
-- `runtime/` owns only the common persistent-Mate runtime mechanics,
-  StatefulSet base and role-neutral `agentos` image.
+- `runtime/` owns only shared persistent-Agent Kubernetes mechanics, common
+  First/Second-Mate executable lifecycle and the role-neutral `agentos` image.
 - `database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
 - Release assets pin exact versions, digests and checksums.
 - `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_SOURCES.md` are authoritative for redistributed third-party licensing and source offers.
@@ -591,5 +675,5 @@ Patching, linking, embedding Herdr source, or otherwise tightening that boundary
 
 AgentOS does not introduce autonomous schedulers, heartbeat infrastructure,
 AgentOS-specific Kubernetes CRDs or operators, a PostgreSQL wrapper API,
-task-specific PVCs, mandatory semantic indexing, or compatibility with the
-failed predecessor implementation.
+prompt queues, transcript-capturing AI gateways, task-specific PVCs, mandatory
+semantic indexing, or compatibility with the failed predecessor implementation.
