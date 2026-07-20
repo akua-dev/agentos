@@ -72,6 +72,28 @@ describe("public benchmark contracts", () => {
     expect(validateContract("evidence", duplicate).valid).toBe(false);
   });
 
+  test("scopes evidence verdict identifiers to their own collections", async () => {
+    const example = await readJson("tests/fixtures/minimal-evidence-bundle.json") as {
+      outcome: { acceptance_criteria: Array<Record<string, unknown>> };
+      gates: Array<Record<string, unknown>>;
+    };
+
+    const sharedAcrossCollections = structuredClone(example);
+    sharedAcrossCollections.gates[0]!.id =
+      sharedAcrossCollections.outcome.acceptance_criteria[0]!.id;
+    expect(validateContract("evidence", sharedAcrossCollections).valid).toBe(true);
+
+    const duplicateCriterion = structuredClone(example);
+    duplicateCriterion.outcome.acceptance_criteria.push(
+      structuredClone(duplicateCriterion.outcome.acceptance_criteria[0]!),
+    );
+    expect(validateContract("evidence", duplicateCriterion).valid).toBe(false);
+
+    const duplicateGate = structuredClone(example);
+    duplicateGate.gates.push(structuredClone(duplicateGate.gates[0]!));
+    expect(validateContract("evidence", duplicateGate).valid).toBe(false);
+  });
+
   test("validates the catalog and recomputes compact-result gates and aggregates", async () => {
     const catalog = await readJson("metrics/catalog.json");
     const result = await readJson("tests/fixtures/minimal-compact-result.json");
