@@ -20,6 +20,7 @@
       },
       "dependencies": {
         "pg": "8.22.0",
+        "pg-connection-string": "2.14.0",
         "pgpass": "1.0.6",
       },
       "devDependencies": {

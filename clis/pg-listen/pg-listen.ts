@@ -2,6 +2,7 @@
 
 import { Client, escapeIdentifier } from "pg";
 import type { ClientConfig } from "pg";
+import { parse as parseConnectionString } from "pg-connection-string";
 import pgPass from "pgpass";
 
 type Notification = {
@@ -129,10 +130,17 @@ export function resolvePgPassPassword(
 
 export function createPostgresListenerClient(): PostgresListenerClient {
   const connectionString = process.env.DATABASE_URL;
-  const config: ClientConfig = {
+  const parsedConnection = connectionString
+    ? Object.fromEntries(
+        Object.entries(parseConnectionString(connectionString)).filter(
+          ([, value]) => value !== null,
+        ),
+      )
+    : {};
+  const config = {
+    ...parsedConnection,
     application_name: "pg-listen",
-    ...(connectionString ? { connectionString } : {}),
-  };
+  } as ClientConfig;
 
   if (
     process.env.PGPASSWORD === undefined &&
