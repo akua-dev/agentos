@@ -18,7 +18,7 @@ Generate the assets from the repository root:
 
 ```console
 mise install
-bun run agents/firstmate/kubernetes/release/render.ts \
+bun run release/kubernetes/render.ts \
   --image ghcr.io/akua-dev/agentos@sha256:<digest> \
   --version <semver> \
   --output dist/release

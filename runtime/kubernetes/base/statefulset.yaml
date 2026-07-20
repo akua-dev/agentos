@@ -1,30 +1,30 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: agentos-mate
+  name: agentos-agent
   labels:
-    app.kubernetes.io/name: agentos-mate
+    app.kubernetes.io/name: agentos-agent
     app.kubernetes.io/part-of: agentos
 spec:
   replicas: 1
-  serviceName: agentos-mate
+  serviceName: agentos-agent
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
   selector:
     matchLabels:
-      app.kubernetes.io/name: agentos-mate
+      app.kubernetes.io/name: agentos-agent
   template:
     metadata:
       annotations:
         agentos.akua.dev/container: agentos
-        agentos.akua.dev/herdr-session: agentos-mate
+        agentos.akua.dev/herdr-session: agentos-agent
       labels:
-        agentos.akua.dev/agent: mate
-        app.kubernetes.io/name: agentos-mate
+        agentos.akua.dev/agent: agent
+        app.kubernetes.io/name: agentos-agent
         app.kubernetes.io/part-of: agentos
     spec:
-      serviceAccountName: agentos-mate
+      serviceAccountName: agentos-agent
       terminationGracePeriodSeconds: 30
       securityContext:
         runAsNonRoot: true
@@ -47,7 +47,6 @@ spec:
             - node
             - kubectl
             - github:ogulcancelik/herdr
-            - npm:@earendil-works/pi-coding-agent
           env: &runtime-environment
             - name: HOME
               value: /home/agent
@@ -56,13 +55,13 @@ spec:
             - name: AGENTOS_AGENT_CWD
               value: /opt/agentos
             - name: AGENTOS_AGENT_NAME
-              value: mate
+              value: agent
             - name: AGENTOS_AGENT_ROLE
-              value: mate
+              value: agent
             - name: HERDR_CONFIG_PATH
               value: /home/agent/.config/herdr/config.toml
             - name: HERDR_SESSION
-              value: agentos-mate
+              value: agentos-agent
             - name: MISE_SYSTEM_CONFIG_FILE
               value: /etc/mise/config.toml
             - name: MISE_GITHUB_GITHUB_ATTESTATIONS
@@ -71,10 +70,6 @@ spec:
               value: "false"
             - name: MISE_TRUSTED_CONFIG_PATHS
               value: /opt/agentos
-            - name: PI_CODING_AGENT_DIR
-              value: /home/agent/.pi/agent
-            - name: PI_OAUTH_CALLBACK_HOST
-              value: 0.0.0.0
             - name: PATH
               value: /home/agent/.local/share/mise/shims:/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin
           securityContext: &container-security
@@ -85,42 +80,28 @@ spec:
           volumeMounts: &home-volume
             - name: home
               mountPath: /home/agent
-        - name: prepare-home
-          image: agentos:dev
-          imagePullPolicy: Never
-          workingDir: /opt/agentos
-          command:
-            - mise
-          args:
-            - run
-            - --skip-tools
-            - mate:prepare
-          env: *runtime-environment
-          securityContext: *container-security
-          volumeMounts: *home-volume
       containers:
         - name: agentos
           image: agentos:dev
           imagePullPolicy: Never
           workingDir: /opt/agentos
           command:
-            - mise
+            - herdr
           args:
-            - run
-            - --skip-tools
-            - mate:run
+            - server
+            - --session
+            - agentos-agent
           env: *runtime-environment
           securityContext: *container-security
           volumeMounts: *home-volume
           livenessProbe:
             exec:
               command:
-                - mise
-                - run
-                - --skip-tools
-                - mate:health
-                - --
-                - live
+                - herdr
+                - status
+                - --json
+                - --session
+                - agentos-agent
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3
@@ -128,12 +109,11 @@ spec:
           readinessProbe:
             exec:
               command:
-                - mise
-                - run
-                - --skip-tools
-                - mate:health
-                - --
-                - ready
+                - herdr
+                - status
+                - --json
+                - --session
+                - agentos-agent
             initialDelaySeconds: 2
             periodSeconds: 5
             timeoutSeconds: 3

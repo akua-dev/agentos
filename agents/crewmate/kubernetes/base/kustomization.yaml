@@ -4,4 +4,23 @@ namespace: agentos
 resources:
   - serviceaccount.yaml
   - service.yaml
-  - statefulset.yaml
+  - ../../../../runtime/kubernetes/base
+patches:
+  - path: statefulset.patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: agentos-agent
+  - patch: |-
+      - op: replace
+        path: /metadata/name
+        value: agentos-crewmate
+      - op: replace
+        path: /spec/template/spec/containers/0/name
+        value: crewmate
+    target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: agentos-agent

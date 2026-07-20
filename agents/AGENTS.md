@@ -12,8 +12,9 @@ repository boundary; it never selects an identity.
   `crewmate/BRIEF.md`; their harness working directory remains the project
   worktree so project instructions and tools resolve normally.
 - Keep shared executable lifecycle mechanics in `../runtime/`, shared operational
-  skills in `.agents/skills/`, and role-owned Kubernetes resources beside the
-  role that operates them.
+  skills in `.agents/skills/`, and role-specific workload resources beside the
+  role. A deployable component owns its own Kubernetes shape; Skills and RBAC
+  define which Mate may operate it.
 - Keep shared Pi extension mechanics in `.pi/`; First and Second Mate expose
   them only through their own `.pi/extensions/` auto-load entry points. A
   role-local entry point selects availability, never a different identity.

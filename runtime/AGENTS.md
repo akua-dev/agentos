@@ -1,13 +1,17 @@
-# Shared Mate runtime boundary
+# Shared persistent-Agent runtime boundary
 
-This subtree contains executable mechanics shared by persistent First and
-Second Mates. It is not an agent role and it is not an in-cluster CLI.
-Read the runtime boundary in `../ARCHITECTURE.md` before changing its ownership.
+This subtree contains Kubernetes mechanics shared by persistent Agents plus
+executable lifecycle mechanics shared only by persistent First and Second
+Mates. It is not an agent role and it is not an in-cluster CLI. Read the runtime
+boundary in `../ARCHITECTURE.md` before changing its ownership.
 
 - Implement only real container lifecycle behavior: persistent-home
   reconciliation, Herdr/Pi process supervision and Kubernetes health probes.
-- Keep the shared First/Second-Mate StatefulSet in `kubernetes/base/`; role
-  directories patch identity, working directory, tasks and credentials.
+- Keep only retained-home, Pod-security, home-mount and role-neutral Mise/Herdr
+  semantics in `kubernetes/base/`. Stateless workers do not inherit this base.
+- Keep Pi and `mate:*` defaults shared by First and Second Mate in
+  `kubernetes/mate/`. Role directories patch identity, working directory,
+  tasks, credentials, harness selection and role-specific probes.
 - Keep Captain policy, delegation judgment, model choice, thinking level and
   harness routing in role instructions and skills.
 - Treat Pi settings and authentication as agent-owned PVC state. Never seed or

@@ -1,4 +1,4 @@
-# Mate runtime test contract
+# Persistent Agent runtime test contract
 
 Test rendered resources and executable runtime behavior through their public interfaces.
 

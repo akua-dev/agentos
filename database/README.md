@@ -75,10 +75,11 @@ provider payloads remain raw JSONB in `agentos.external_events`; the same rows
 carry their small burst, claim and reconciliation state. There is no external
 link table, reconciliation table, outbox or database wrapper service.
 
-Database topology is deliberately outside this package. A developer-selected
-external endpoint and the self-hosted CloudNativePG shape in
-`agents/firstmate/kubernetes/database/` are equally supported paths. Both apply
-this same migration journal and security contract.
+An external PostgreSQL endpoint and the optional self-hosted CloudNativePG
+topology in `kubernetes/cloudnative-pg/` are equally supported paths. The
+topology lives beside the SQL contract because both form the database
+component, but it never becomes a second schema authority. Both paths apply the
+same migration journal and security contract.
 
 `tests/migration.test.ts` starts a fresh in-memory PGlite database, executes the
 real migration and then runs `tests/0000_initial_fleet_schema.sql` against it.

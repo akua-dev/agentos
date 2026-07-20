@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-agent
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: install-tools
+          args:
+            - install
+            - --locked
+            - node
+            - kubectl
+            - github:ogulcancelik/herdr
+            - npm:@earendil-works/pi-coding-agent
+          env: &mate-environment
+            - name: HOME
+              value: /home/agent
+            - name: AGENTOS_RELEASE_ROOT
+              value: /opt/agentos
+            - name: AGENTOS_AGENT_CWD
+              value: /opt/agentos
+            - name: AGENTOS_AGENT_NAME
+              value: mate
+            - name: AGENTOS_AGENT_ROLE
+              value: mate
+            - name: HERDR_CONFIG_PATH
+              value: /home/agent/.config/herdr/config.toml
+            - name: HERDR_SESSION
+              value: agentos-agent
+            - name: MISE_SYSTEM_CONFIG_FILE
+              value: /etc/mise/config.toml
+            - name: MISE_GITHUB_GITHUB_ATTESTATIONS
+              value: "false"
+            - name: MISE_GITHUB_SLSA
+              value: "false"
+            - name: MISE_TRUSTED_CONFIG_PATHS
+              value: /opt/agentos
+            - name: PI_CODING_AGENT_DIR
+              value: /home/agent/.pi/agent
+            - name: PI_OAUTH_CALLBACK_HOST
+              value: 0.0.0.0
+            - name: PATH
+              value: /home/agent/.local/share/mise/shims:/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin
+        - name: prepare-home
+          image: agentos:dev
+          imagePullPolicy: Never
+          workingDir: /opt/agentos
+          command:
+            - mise
+          args:
+            - run
+            - --skip-tools
+            - mate:prepare
+          env: *mate-environment
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: home
+              mountPath: /home/agent
+      containers:
+        - name: agentos
+          command:
+            - mise
+          args:
+            - run
+            - --skip-tools
+            - mate:run
+          env: *mate-environment
+          livenessProbe:
+            exec:
+              command:
+                - mise
+                - run
+                - --skip-tools
+                - mate:health
+                - --
+                - live
+          readinessProbe:
+            exec:
+              command:
+                - mise
+                - run
+                - --skip-tools
+                - mate:health
+                - --
+                - ready

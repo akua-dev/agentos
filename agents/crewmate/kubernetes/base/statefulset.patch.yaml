@@ -4,13 +4,8 @@ metadata:
   name: agentos-crewmate
   labels:
     app.kubernetes.io/name: agentos-crewmate
-    app.kubernetes.io/part-of: agentos
 spec:
-  replicas: 1
   serviceName: agentos-crewmate
-  persistentVolumeClaimRetentionPolicy:
-    whenDeleted: Retain
-    whenScaled: Retain
   selector:
     matchLabels:
       app.kubernetes.io/name: agentos-crewmate
@@ -22,25 +17,11 @@ spec:
       labels:
         agentos.akua.dev/agent: crewmate
         app.kubernetes.io/name: agentos-crewmate
-        app.kubernetes.io/part-of: agentos
     spec:
       serviceAccountName: agentos-crewmate
-      terminationGracePeriodSeconds: 30
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
-        fsGroupChangePolicy: OnRootMismatch
-        seccompProfile:
-          type: RuntimeDefault
       initContainers:
         - name: install-tools
-          image: agentos:dev
-          imagePullPolicy: Never
           workingDir: /opt/agentos/agents/crewmate
-          command:
-            - mise
           args:
             - install
             - --locked
@@ -49,7 +30,7 @@ spec:
             - github:ogulcancelik/herdr
             - github:kunchenguid/treehouse
             - npm:@openai/codex
-          env: &runtime-environment
+          env: &role-environment
             - name: HOME
               value: /home/agent
             - name: AGENTOS_RELEASE_ROOT
@@ -88,15 +69,6 @@ spec:
               value: /home/agent/.pgpass
             - name: PATH
               value: /home/agent/.local/share/mise/shims:/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin
-          securityContext: &container-security
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-          volumeMounts:
-            - &home-volume
-              name: home
-              mountPath: /home/agent
         - name: prepare-home
           image: agentos:dev
           imagePullPolicy: Never
@@ -107,17 +79,20 @@ spec:
             - run
             - --skip-tools
             - crewmate:prepare
-          env: *runtime-environment
-          securityContext: *container-security
+          env: *role-environment
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
-            - *home-volume
+            - name: home
+              mountPath: /home/agent
             - name: database-credentials
               mountPath: /var/run/secrets/agentos
               readOnly: true
       containers:
-        - name: crewmate
-          image: agentos:dev
-          imagePullPolicy: Never
+        - name: agentos
           workingDir: /opt/agentos/agents/crewmate
           command:
             - herdr
@@ -125,10 +100,7 @@ spec:
             - server
             - --session
             - agentos-crewmate
-          env: *runtime-environment
-          securityContext: *container-security
-          volumeMounts:
-            - *home-volume
+          env: *role-environment
           livenessProbe:
             exec:
               command:
@@ -137,10 +109,6 @@ spec:
                 - --json
                 - --session
                 - agentos-crewmate
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 3
-            failureThreshold: 3
           readinessProbe:
             exec:
               command:
@@ -149,20 +117,7 @@ spec:
                 - --json
                 - --session
                 - agentos-crewmate
-            initialDelaySeconds: 2
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 3
       volumes:
         - name: database-credentials
           secret:
             secretName: agentos-crewmate-postgres
-  volumeClaimTemplates:
-    - metadata:
-        name: home
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi

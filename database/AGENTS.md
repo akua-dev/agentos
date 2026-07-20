@@ -6,6 +6,9 @@ and preserve it.
 ## Source of truth
 
 - Files under `migrations/` are the only database schema and security authority.
+- `kubernetes/cloudnative-pg/` owns only the optional self-hosted PostgreSQL
+  topology. It must not redefine SQL semantics, credentials, controller
+  installation policy or third-party version selection.
 - Define tables, indexes, constraints, roles, grants, RLS policies, Functions and Triggers in reviewed SQL.
 - Keep `drizzle.tooling.ts` empty. It exists only because Drizzle Kit requires a schema path for custom migration creation.
 - Do not add Drizzle ORM schemas, generated TypeScript schemas, database clients or CLI database dependencies without a separate approved design.

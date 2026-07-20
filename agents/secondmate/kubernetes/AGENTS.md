@@ -3,7 +3,7 @@
 This subtree owns the reusable persistent Second Mate workload base.
 
 - First Mate creates a reviewed per-agent overlay and invokes native kubectl.
-- Patch the shared StatefulSet from `runtime/kubernetes/base`; keep only
+- Patch the shared Pi lifecycle from `runtime/kubernetes/mate`; keep only
   Second-Mate identity, working directory, tasks and credentials here.
 - Require a distinct ServiceAccount, retained home PVC, database identity and
   Herdr session for each Second Mate.

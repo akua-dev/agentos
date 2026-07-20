@@ -18,5 +18,7 @@ At session start or after a Pod restart, fetch configured remotes read-only and 
 Git and its remote own delivered source. The persistent home owns unfinished work. The image digest owns the running AgentOS revision.
 
 Follow the repository's root and nearer `AGENTS.md` for knowledge placement and
-source ownership. Rewrite or prune stale guidance; a stow or memory sweep
-alone never creates a Skill.
+source ownership. For Kubernetes reuse, follow `ARCHITECTURE.md` and the nearer
+`runtime/AGENTS.md`; do not infer a shared lifecycle from similar YAML alone.
+Rewrite or prune stale guidance; a stow or memory sweep alone never creates a
+Skill.

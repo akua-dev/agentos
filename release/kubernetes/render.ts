@@ -29,7 +29,7 @@ type RenderReleaseOptions = {
   version: string;
 };
 
-const firstmateDirectory = new URL("..", import.meta.url).pathname.replace(
+const repositoryRoot = new URL("../..", import.meta.url).pathname.replace(
   /\/$/,
   "",
 );
@@ -53,14 +53,18 @@ export async function renderRelease({
   };
   const variants = [
     {
-      kustomization: firstMateKustomization("../base", image, version),
+      kustomization: firstMateKustomization(
+        "../agents/firstmate/kubernetes/base",
+        image,
+        version,
+      ),
       filename: release.manifests.scoped,
       validate: (resources: Resource[]) =>
         validateFirstMate(resources, image, version),
     },
     {
       kustomization: firstMateKustomization(
-        "../overlays/cluster-admin",
+        "../agents/firstmate/kubernetes/overlays/cluster-admin",
         image,
         version,
       ),
@@ -79,7 +83,7 @@ export async function renderRelease({
   await Promise.all(
     variants.map(async ({ filename, kustomization, validate }) => {
       const overlay = await mkdtemp(
-        join(firstmateDirectory, ".agentos-release-"),
+        join(repositoryRoot, ".agentos-release-"),
       );
       try {
         await writeFile(join(overlay, "kustomization.yaml"), kustomization, "utf8");
@@ -207,7 +211,7 @@ function databaseKustomization(version: string): string {
   return `apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ../database/base
+  - ../database/kubernetes/cloudnative-pg
 patches:
   - target:
       group: postgresql.cnpg.io

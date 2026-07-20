@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
 
 type Resource = {
   apiVersion: string;
@@ -27,7 +26,7 @@ async function render(directory: string): Promise<Resource[]> {
 
 describe("AgentOS self-hosted PostgreSQL", () => {
   test("renders one minimal CloudNativePG fleet database", async () => {
-    const resources = await render(join(databaseDirectory, "base"));
+    const resources = await render(databaseDirectory);
 
     expect(resources).toHaveLength(1);
     const cluster = resources[0];

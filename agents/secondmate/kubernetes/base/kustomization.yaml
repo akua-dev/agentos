@@ -4,14 +4,14 @@ namespace: agentos
 resources:
   - serviceaccount.yaml
   - service.yaml
-  - ../../../../runtime/kubernetes/base
+  - ../../../../runtime/kubernetes/mate
 patches:
   - path: statefulset.patch.yaml
     target:
       group: apps
       version: v1
       kind: StatefulSet
-      name: agentos-mate
+      name: agentos-agent
   - patch: |-
       - op: replace
         path: /metadata/name
@@ -20,4 +20,4 @@ patches:
       group: apps
       version: v1
       kind: StatefulSet
-      name: agentos-mate
+      name: agentos-agent
