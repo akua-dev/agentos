@@ -19,6 +19,7 @@
     "*.ts",
     "agents/**/*.ts",
     "agents/.pi/**/*.ts",
+    "benchmarks/**/*.ts",
     "clis/**/*.ts",
     "database/**/*.ts",
     "release/**/*.ts",

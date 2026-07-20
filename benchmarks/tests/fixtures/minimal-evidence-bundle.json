@@ -1,0 +1,98 @@
+{
+  "schema_version": "0.1.0",
+  "run_id": "synthetic-contract-fixture",
+  "created_at": "2026-07-20T12:00:00Z",
+  "mode": "conformance",
+  "scenario": {
+    "id": "quickstart-to-delivery",
+    "version": "0.1.0"
+  },
+  "subject": {
+    "name": "synthetic-example",
+    "version": "0.0.0",
+    "source_revision": "0000000000000000000000000000000000000000",
+    "images": []
+  },
+  "environment": {
+    "description": "Synthetic contract fixture; not a benchmark result.",
+    "permissions": ["Create one synthetic artifact"],
+    "harnesses": [{ "name": "example-harness", "version": "0.0.0" }],
+    "models": [{ "name": "example-model", "version": "0.0.0" }],
+    "tools": [{ "name": "git", "version": "0.0.0" }]
+  },
+  "timing": {
+    "started_at": "2026-07-20T12:00:00Z",
+    "ended_at": "2026-07-20T12:01:00Z"
+  },
+  "outcome": {
+    "status": "passed",
+    "summary": "The synthetic fixture reached its declared artifact boundary.",
+    "acceptance_criteria": [
+      {
+        "id": "fixture-artifact",
+        "status": "passed",
+        "explanation": "The synthetic artifact is referenced by the final event.",
+        "evidence_event_ids": ["event-artifact"]
+      }
+    ]
+  },
+  "events": [
+    {
+      "id": "event-intent",
+      "at": "2026-07-20T12:00:00Z",
+      "actor": "principal",
+      "type": "intent-accepted",
+      "authority": "scenario",
+      "summary": "The synthetic outcome was accepted.",
+      "references": ["task:synthetic"]
+    },
+    {
+      "id": "event-artifact",
+      "at": "2026-07-20T12:01:00Z",
+      "actor": "worker",
+      "type": "artifact-verified",
+      "authority": "git",
+      "summary": "The synthetic artifact was independently verified.",
+      "references": ["artifact:synthetic"]
+    }
+  ],
+  "metrics": [
+    {
+      "id": "effectiveness.outcome_success",
+      "state": "observed",
+      "unit": "boolean",
+      "value": true,
+      "source_event_ids": ["event-artifact"]
+    },
+    {
+      "id": "efficiency.model_tokens",
+      "state": "unobserved",
+      "unit": "tokens",
+      "reason": "The synthetic provider exposes no token telemetry.",
+      "source_event_ids": []
+    }
+  ],
+  "gates": [
+    {
+      "id": "outcome-valid",
+      "status": "passed",
+      "explanation": "The declared synthetic artifact exists.",
+      "evidence_event_ids": ["event-artifact"]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "artifact:synthetic",
+      "kind": "fixture",
+      "uri": "urn:agentos:benchmark:fixture:synthetic",
+      "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "redactions": [],
+  "evaluator": {
+    "kind": "deterministic",
+    "name": "contract-test",
+    "version": "0.1.0",
+    "rubric_version": "0.1.0"
+  }
+}

@@ -13,6 +13,10 @@ Before changing AgentOS:
 - Inspect the current worktree and preserve unrelated or unfinished work.
 - Keep the change inside the smallest component that owns the behavior.
 
+When evaluating AgentOS or another Agent organization, load
+`$agentos-evaluation`. Start `$agentos-improvement-review` only after its
+evidence bundle is frozen; measurement and improvement are separate runs.
+
 Repository-wide constraints:
 
 - Keep each contract in one source of truth: identity and permanent safety in

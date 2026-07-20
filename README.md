@@ -20,6 +20,13 @@
   <a href="./CONTRIBUTING.md">Contributing</a>
 </p>
 
+AgentOS is the organizational layer for persistent agent teams. It is not
+another coding agent, a swarm or workflow builder, a replacement for your issue
+tracker, or a black box that asks for control and reports success. Bring the
+models, harnesses, repositories and human workflow you already trust; AgentOS
+turns them into a crew with continuity, ownership and a verifiable path from
+intent to delivered work.
+
 The agent was never the bottleneck. You are. One agent in one session works —
 at the price of your full attention. The moment you want two, you become the
 infrastructure: switching tabs, ferrying context between chats that can't see
@@ -56,6 +63,27 @@ You need: a coding agent, a Kubernetes context (or let it help you create a
 disposable one), and a browser for provider login. You don't need: this repo,
 a CLI, Docker, Helm, or a PostgreSQL install.
 
+## Measured, not asserted
+
+AgentOS includes a [public, portable organization benchmark](./benchmarks/README.md)
+for the question that matters: how many verified human outcomes does the
+organization deliver for the human attention it consumes? It evaluates the
+whole lifecycle — from first prompt through delivery and recovery — rather than
+grading one model response.
+
+| It measures | It refuses to hide |
+| --- | --- |
+| Outcome effectiveness and acceptance criteria | Failed and incomplete attempts |
+| Human decisions, clarifications and repair work | Missing telemetry disguised as zero |
+| Time, tools, retries, tokens and duplicated work | Speed or cost averaging away failure |
+| Crash recovery and preservation of accepted work | Lost work, duplicate effects or false progress |
+| Authority, safety and chain of custody | Unsafe behavior behind a composite score |
+
+The contracts and first two scenarios are public now; official AgentOS results
+will appear only after real run sets satisfy the reporting rules. Every result
+must name its exact revisions and preserve sanitized, independently verifiable
+evidence. Read the [benchmark specification](./benchmarks/SPEC.md).
+
 ## A hire, not a migration
 
 Adopting AgentOS replaces nothing. Your repositories stay where they are; the
@@ -87,6 +115,10 @@ that chain of custody without replacing any of its parts.
 A crew, not a swarm. Every agent knows what it owns, who it answers to, and
 which decisions are yours alone. The Captain is a role, not a headcount — hold
 it alone, or stand a team behind it.
+
+The crew language is not roleplay. It names a concrete accountability model:
+one owner for accepted work, explicit supervision edges, durable handoffs and
+human authority where consequences live.
 
 ## The company loop
 

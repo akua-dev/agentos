@@ -1,0 +1,4 @@
+interface:
+  display_name: "Evaluate AgentOS"
+  short_description: "Run reproducible AgentOS organization evaluations"
+  default_prompt: "Use $agentos-evaluation to evaluate this AgentOS run and produce a sanitized evidence bundle."

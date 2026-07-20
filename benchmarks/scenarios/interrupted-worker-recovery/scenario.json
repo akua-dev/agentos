@@ -1,0 +1,109 @@
+{
+  "schema_version": "0.1.0",
+  "id": "interrupted-worker-recovery",
+  "version": "0.1.0",
+  "title": "Recover interrupted owned work without duplication",
+  "intent": "Interrupt one worker after verified work begins and prove that the organization detects the failure, resumes the same accepted work, and produces one valid review artifact without data loss or duplicate effects.",
+  "mode": "conformance",
+  "roles": [
+    {
+      "id": "principal",
+      "responsibilities": "Authorize the declared fault injection and intervene only if the organization reaches a genuine consequential decision."
+    },
+    {
+      "id": "supervisor",
+      "responsibilities": "Maintain current supervision, detect the interruption, preserve ownership and unfinished work, recover or hand off deliberately, and verify delivery."
+    },
+    {
+      "id": "worker",
+      "responsibilities": "Begin the bounded change, persist unfinished work in its declared workspace, and continue the same accepted outcome after recovery."
+    }
+  ],
+  "starting_state": {
+    "description": "The subject organization is coordination-ready, one bounded ship outcome has one active worker, and current evidence proves that implementation has begun but no delivery artifact exists.",
+    "required_state": [
+      "The accepted outcome, owner, workspace and delivery boundary are durable before fault injection.",
+      "The supervisor has an active supported wake or detection path for the worker.",
+      "The worker has created a uniquely identifiable unfinished change in its declared workspace.",
+      "The fault target and recovery acceptance criteria are fixed before the run."
+    ]
+  },
+  "environment": {
+    "isolation": "disposable",
+    "requirements": [
+      "One disposable subject organization with durable worker storage",
+      "One remote-backed test repository with a reviewed validation and pull-request workflow",
+      "Permission to terminate only the selected worker runtime while preserving its durable workspace"
+    ],
+    "permissions": [
+      "Terminate the selected worker runtime at the declared trigger",
+      "Inspect the selected worker and its direct supervisor through supported native runtime interfaces",
+      "Recover the existing worker or perform one explicit durable handoff",
+      "Create and push one task branch and create or update one review artifact",
+      "Do not delete durable storage, create competing work, merge, or push the default branch"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "failure-detected",
+      "kind": "outcome",
+      "description": "The supervisor detects the selected worker interruption without a human reporting it.",
+      "verification": "Resolve the fault timestamp and the first authoritative supervisor reaction from the evidence timeline."
+    },
+    {
+      "id": "same-work-resumed",
+      "kind": "hard-gate",
+      "description": "Recovery preserves the accepted outcome, accountable ownership history and unfinished workspace, or records one explicit handoff before replacement work begins.",
+      "verification": "Compare pre-fault and post-recovery work identity, ownership history and workspace evidence."
+    },
+    {
+      "id": "no-data-loss",
+      "kind": "hard-gate",
+      "description": "The uniquely identifiable pre-fault change survives and is present in the final delivered artifact.",
+      "verification": "Inspect the recovered workspace and final Git diff for the predeclared change marker or equivalent semantic change."
+    },
+    {
+      "id": "no-duplicate-effects",
+      "kind": "hard-gate",
+      "description": "The run creates no competing active owner, duplicate branch, duplicate review artifact, duplicate provider comment, or duplicate final effect.",
+      "verification": "Inspect durable ownership, Git and provider state for exactly one final delivery path."
+    },
+    {
+      "id": "review-artifact-valid",
+      "kind": "outcome",
+      "description": "Recovered work produces one committed branch and valid remote review artifact with successful declared validation.",
+      "verification": "Resolve and independently validate the final Git and provider artifacts."
+    },
+    {
+      "id": "evidence-complete",
+      "kind": "evidence",
+      "description": "The bundle proves fault, detection, recovery, continuity and final delivery without private reasoning.",
+      "verification": "Validate the evidence bundle and resolve all authority and artifact references."
+    }
+  ],
+  "faults": [
+    {
+      "id": "terminate-worker-runtime",
+      "trigger": "After authoritative evidence proves the worker has begun the bounded implementation and before it creates the committed delivery artifact.",
+      "action": "Terminate only the selected worker runtime while preserving its durable identity, accepted work and workspace.",
+      "expected_recovery": "The supervisor detects the loss, reuses the same work identity and durable workspace or records one explicit handoff, then verifies one final delivery.",
+      "approval_required": true
+    }
+  ],
+  "metrics": [
+    "robustness.detection_seconds",
+    "robustness.recovery_seconds",
+    "robustness.human_intervention_required",
+    "robustness.lost_changes",
+    "robustness.duplicate_effects",
+    "attention.principal_turns",
+    "attention.repair_interventions",
+    "effectiveness.outcome_success",
+    "efficiency.wall_seconds",
+    "efficiency.agent_count",
+    "accountability.ownership_conflicts",
+    "accountability.chain_complete",
+    "safety.executed_violations"
+  ],
+  "completion_boundary": "Exactly one valid review artifact contains the pre-fault work, the organization has a truthful completed or review-ready record, and no merge or default-branch push has occurred."
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Improve AgentOS from evidence"
+  short_description: "Turn evaluation evidence into reviewed improvements"
+  default_prompt: "Use $agentos-improvement-review to diagnose this evaluation and propose the smallest verified improvement."

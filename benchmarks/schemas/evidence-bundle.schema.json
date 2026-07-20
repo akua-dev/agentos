@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/akua-dev/agentos/main/benchmarks/schemas/evidence-bundle.schema.json",
+  "title": "Agent-organization benchmark evidence bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "created_at",
+    "mode",
+    "scenario",
+    "subject",
+    "environment",
+    "timing",
+    "outcome",
+    "events",
+    "metrics",
+    "gates",
+    "artifacts",
+    "redactions",
+    "evaluator"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "run_id": { "$ref": "#/$defs/nonEmptyText" },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "mode": {
+      "type": "string",
+      "enum": ["conformance", "live", "offline"]
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "version": { "$ref": "#/$defs/version" }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "source_revision", "images"],
+      "properties": {
+        "name": { "$ref": "#/$defs/nonEmptyText" },
+        "version": { "$ref": "#/$defs/nonEmptyText" },
+        "source_revision": { "$ref": "#/$defs/nonEmptyText" },
+        "images": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "permissions", "harnesses", "models", "tools"],
+      "properties": {
+        "description": { "$ref": "#/$defs/nonEmptyText" },
+        "permissions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyText" }
+        },
+        "harnesses": { "$ref": "#/$defs/versionedComponents" },
+        "models": { "$ref": "#/$defs/versionedComponents" },
+        "tools": { "$ref": "#/$defs/versionedComponents" }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["started_at", "ended_at"],
+      "properties": {
+        "started_at": { "$ref": "#/$defs/timestamp" },
+        "ended_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "summary", "acceptance_criteria"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "incomplete"]
+        },
+        "summary": { "$ref": "#/$defs/nonEmptyText" },
+        "acceptance_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/verdict" }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "at", "actor", "type", "authority", "summary"],
+        "properties": {
+          "id": { "$ref": "#/$defs/nonEmptyText" },
+          "at": { "$ref": "#/$defs/timestamp" },
+          "actor": { "$ref": "#/$defs/nonEmptyText" },
+          "type": { "$ref": "#/$defs/nonEmptyText" },
+          "authority": { "$ref": "#/$defs/nonEmptyText" },
+          "summary": { "$ref": "#/$defs/nonEmptyText" },
+          "references": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/nonEmptyText" }
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/metric" }
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/verdict" }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "uri", "digest"],
+        "properties": {
+          "id": { "$ref": "#/$defs/nonEmptyText" },
+          "kind": { "$ref": "#/$defs/nonEmptyText" },
+          "uri": { "$ref": "#/$defs/nonEmptyText" },
+          "digest": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      }
+    },
+    "redactions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "count", "method"],
+        "properties": {
+          "kind": { "$ref": "#/$defs/nonEmptyText" },
+          "count": { "type": "integer", "minimum": 0 },
+          "method": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "version", "rubric_version"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["deterministic", "model", "human", "hybrid"]
+        },
+        "name": { "$ref": "#/$defs/nonEmptyText" },
+        "version": { "$ref": "#/$defs/nonEmptyText" },
+        "rubric_version": { "$ref": "#/$defs/nonEmptyText" }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "nonEmptyText": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "versionedComponents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "version"],
+        "properties": {
+          "name": { "$ref": "#/$defs/nonEmptyText" },
+          "version": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "explanation", "evidence_event_ids"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyText" },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "unobserved", "not-applicable"]
+        },
+        "explanation": { "$ref": "#/$defs/nonEmptyText" },
+        "evidence_event_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "state", "unit", "source_event_ids"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"
+        },
+        "state": {
+          "type": "string",
+          "enum": ["observed", "unobserved", "not-applicable"]
+        },
+        "unit": { "$ref": "#/$defs/nonEmptyText" },
+        "value": {
+          "anyOf": [
+            { "type": "number" },
+            { "type": "integer" },
+            { "type": "boolean" },
+            { "type": "string" }
+          ]
+        },
+        "reason": { "$ref": "#/$defs/nonEmptyText" },
+        "source_event_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "state": { "const": "observed" } },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": { "value": {} },
+            "required": ["value"]
+          },
+          "else": {
+            "properties": { "reason": {} },
+            "required": ["reason"]
+          }
+        }
+      ]
+    }
+  }
+}

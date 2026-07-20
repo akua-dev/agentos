@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/akua-dev/agentos/main/benchmarks/schemas/scenario.schema.json",
+  "title": "Portable agent-organization benchmark scenario",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "version",
+    "title",
+    "intent",
+    "mode",
+    "roles",
+    "starting_state",
+    "environment",
+    "acceptance_criteria",
+    "faults",
+    "metrics",
+    "completion_boundary"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "id": { "$ref": "#/$defs/identifier" },
+    "version": { "$ref": "#/$defs/version" },
+    "title": { "$ref": "#/$defs/nonEmptyText" },
+    "intent": { "$ref": "#/$defs/nonEmptyText" },
+    "mode": {
+      "type": "string",
+      "enum": ["conformance", "live", "offline"]
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "responsibilities"],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" },
+          "responsibilities": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      }
+    },
+    "starting_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "required_state"],
+      "properties": {
+        "description": { "$ref": "#/$defs/nonEmptyText" },
+        "required_state": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["isolation", "requirements", "permissions"],
+      "properties": {
+        "isolation": {
+          "type": "string",
+          "enum": ["disposable", "production-observation", "offline"]
+        },
+        "requirements": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyText" }
+        },
+        "permissions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "description", "verification"],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" },
+          "kind": {
+            "type": "string",
+            "enum": ["outcome", "hard-gate", "evidence"]
+          },
+          "description": { "$ref": "#/$defs/nonEmptyText" },
+          "verification": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      }
+    },
+    "faults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "trigger",
+          "action",
+          "expected_recovery",
+          "approval_required"
+        ],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" },
+          "trigger": { "$ref": "#/$defs/nonEmptyText" },
+          "action": { "$ref": "#/$defs/nonEmptyText" },
+          "expected_recovery": { "$ref": "#/$defs/nonEmptyText" },
+          "approval_required": { "type": "boolean" }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/metricIdentifier" }
+    },
+    "completion_boundary": { "$ref": "#/$defs/nonEmptyText" }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "metricIdentifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$"
+    },
+    "nonEmptyText": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    }
+  }
+}

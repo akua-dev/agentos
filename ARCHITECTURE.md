@@ -50,6 +50,16 @@ atomic handoff, durable Captain decisions, selected immutable history and
 transactional wake hints. Core owns guarantees; integrations own workflows and
 surfaces.
 
+### Evaluation boundary
+
+Benchmark evidence is a bounded, immutable derivative of the authorities
+above, never another Fleet authority, transcript mirror or analytics table in
+the coordination database. A scenario declares which events and stable
+references it needs; unavailable telemetry remains `unobserved`. Measurement
+does not mutate the subject, and improvement begins only after the evidence is
+frozen. The portable contracts and AgentOS evidence mapping live under
+[`benchmarks/`](./benchmarks/README.md).
+
 ## Agents and runtime pods
 
 First Mates own the fleet. Second Mates supervise delegated domains. Crewmates perform bounded work.
@@ -461,7 +471,8 @@ AgentOS uses that hierarchy to expose repository development guidance to every
 checkout while keeping operational roles out of contributor sessions:
 
 - `.agents/skills/` contains workflows that apply from every AgentOS checkout
-  working directory; initially this is only `agentos-development`;
+  working directory: repository development, organization evaluation and
+  post-evaluation improvement review;
 - `agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
 - `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
@@ -516,7 +527,14 @@ workspace. The tree reflects ownership, not deployment order:
 ├── CONTRIBUTING.md                   contributor setup and verification
 ├── AGENTS.md                         identity-neutral repository rules
 ├── .agents/skills/
-│   └── agentos-development/          workflow for changing AgentOS itself
+│   ├── agentos-development/          workflow for changing AgentOS itself
+│   ├── agentos-evaluation/           benchmark execution and evidence
+│   └── agentos-improvement-review/   reviewed learning from frozen evidence
+├── benchmarks/
+│   ├── SPEC.md                       portable metrics and reporting rules
+│   ├── schemas/                      scenario and evidence JSON contracts
+│   ├── scenarios/                    versioned portable evaluations
+│   └── profiles/agentos/             AgentOS authority and evidence mapping
 ├── agents/
 │   ├── AGENTS.md                     shared rules for running Agent roles
 │   ├── .agents/skills/               operational Skills shared by both Mates
@@ -620,6 +638,13 @@ workspace keeps one `bun.lock`.
 - `docs/architecture.md` is a compatibility pointer to this document, not a second architecture source.
 - `.agents/skills/agentos-development/` contains the repository-development
   workflow shared by contributors and every Agent role working on AgentOS.
+- `.agents/skills/agentos-evaluation/` owns benchmark execution and sanitized
+  evidence collection without changing the measured subject.
+- `.agents/skills/agentos-improvement-review/` owns causal review and the
+  smallest reviewed change after evidence is frozen.
+- `benchmarks/SPEC.md` owns portable evaluation semantics, metrics, gates and
+  reporting; its schemas, scenarios and AgentOS profile own their corresponding
+  machine-readable or product-specific contracts.
 - `agents/AGENTS.md` contains identity-neutral shared Agent rules.
 - `agents/.agents/skills/` contains operational workflows shared by First and
   Second Mate without exposing them to contributor or runtime-development
