@@ -59,10 +59,12 @@ function argumentDigest(value: unknown): string | typeof UNOBSERVED {
 }
 
 function timestampMilliseconds(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
-  if (typeof value !== "string") return undefined;
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value >= 0 && Number.isFinite(new Date(value).getTime()) ? value : undefined;
+  }
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return undefined;
   const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
+  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value ? parsed : undefined;
 }
 
 function normalizedTimestamp(messageTimestamp: unknown, entryTimestamp: unknown): string | typeof UNOBSERVED {

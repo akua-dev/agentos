@@ -108,6 +108,19 @@ describe("Pi session action adapter", () => {
     expect(() => projectPiSession(fixture, "a".repeat(257), "work")).toThrow("length limit");
   });
 
+  test("marks non-native string timestamps unobserved", () => {
+    const entries = [
+      { type: "session", version: 3 },
+      { type: "message", id: "call", parentId: null, timestamp: "2026-07-20", message: { role: "assistant", content: [{ type: "toolCall", id: "call-1", name: "read", arguments: {} }], timestamp: "0" } },
+      { type: "message", id: "result", parentId: "call", timestamp: "2026-07-21", message: { role: "toolResult", toolCallId: "call-1", toolName: "read", isError: false, timestamp: "1" } },
+    ].map((entry) => JSON.stringify(entry)).join("\n");
+
+    expect(projectPiSession(entries, "agent", "work").events[0]).toMatchObject({
+      timestamp: "unobserved",
+      duration_ms: "unobserved",
+    });
+  });
+
   test("projects only the final leaf ancestry", () => {
     const entries = [
       { type: "session", version: 3 },
