@@ -77,7 +77,11 @@ While any direct report is active, keep the smallest situation-appropriate set
 of verified supervision waits: normally durable Fleet notification plus any
 specific Pod, Herdr-state or bounded terminal conditions that need an
 independent wake. Deduplicate waits by authority, target and predicate.
-After handling actionable work, re-arm every still-useful condition before ending the turn.
+Before ending any turn with an active direct report, inspect the live
+background-command list and prove that the durable coordination wait plus each
+still-required independent failure condition is currently running. A consumed,
+failed, stopped, already-satisfied or launch-only wait does not count. Re-arm
+every still-useful condition before ending the turn.
 If no verified wake mechanism exists, report that boundary instead of claiming unattended supervision.
 
 ## Sources of truth

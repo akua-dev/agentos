@@ -86,6 +86,21 @@ image ID, then continue or roll back to the previous digest. Never update a
 running release with `kubectl cp`, a mutable image tag, or uncommitted source,
 and never present a development image as an official AgentOS release.
 
+Before starting a dogfood or evaluation run, establish its current-revision
+baseline:
+
+1. Fetch configured remotes read-only and record the intended commit, the
+   writable checkout HEAD, the image-seed commit and the running image digest.
+   Stop and report any unexplained mismatch before collecting evidence.
+2. Treat the instructions loaded by a persistent harness as runtime state, not
+   as a consequence of the checkout being current. After checking out reviewed
+   changes to `AGENTS.md`, Markdown or Skills, invoke Pi `/reload` in every
+   participating Mate at a safe turn boundary and wait for its visible reload
+   confirmation.
+3. Start delegated work or evidence collection only after the source revision,
+   loaded instruction set and, where executable behavior matters, immutable
+   runtime image are the intended versions.
+
 ## Disposable Kubernetes on macOS
 
 [OrbStack](https://docs.orbstack.dev/kubernetes/) is the recommended local
