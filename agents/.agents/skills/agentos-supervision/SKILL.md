@@ -114,10 +114,12 @@ canonical definition of work nor logic inside the Pi guard.
 7. After handling every actionable event, stop obsolete waits and re-arm each
    still-useful predicate. Before yielding, ensure one running continuity wait
    has `[agentos-supervision]` in its useful description. The Pi backstop tracks
-   tagged task starts and terminal events; do not spend a tool call on
-   `list_background_commands` merely to prove what is already known. Use the
-   list to reconcile after missing, ambiguous or contradictory lifecycle
-   evidence. While any direct report remains active, also ensure that every
+   tagged task starts and terminal events. A successful
+   `run_background_command` result and its returned task ID are sufficient
+   evidence that the wait started; do not immediately call
+   `list_background_commands` to re-prove it. Use the list only after missing,
+   ambiguous or contradictory lifecycle evidence. While any direct report
+   remains active, also ensure that every
    selected non-durable failure condition still has a running native wait. A
    one-shot wait that is completed, failed or stopped is absent even when its
    old task ID remains visible. A predicate already true, or a `working` wait
