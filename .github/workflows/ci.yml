@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the locked toolchain
+        uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
+        with:
+          cache: false
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run repository checks
+        run: bun run check
+
+      - name: Render digest-pinned release manifests
+        run: >-
+          bun run release/kubernetes/render.ts
+          --image ghcr.io/akua-dev/agentos@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          --version 0.0.0-ci
+          --output dist/release
