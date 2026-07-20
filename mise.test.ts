@@ -7,7 +7,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 // Exercise real Mise resolution; never replace this with config-text assertions.
 const root = new URL(".", import.meta.url).pathname;
@@ -42,7 +42,7 @@ async function runMise(
       ...environment,
       HOME: home,
       MISE_CACHE_DIR: join(systemConfigDirectory, "cache"),
-      MISE_CEILING_PATHS: cwd,
+      MISE_CEILING_PATHS: dirname(cwd),
       MISE_CONFIG_DIR: join(home, ".config", "mise"),
       MISE_DATA_DIR: join(systemConfigDirectory, "data"),
       MISE_SYSTEM_CONFIG_DIR: systemConfigDirectory,
