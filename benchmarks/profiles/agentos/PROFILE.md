@@ -83,6 +83,29 @@ arguments, error classes, timings and retry relationships. Session inspection
 requires the same authority as the underlying Agent home. Publish only the
 minimum normalized action metadata needed for the metric or causal review.
 
+The optional Pi-only adapter reads one explicitly selected native session with
+the caller's existing filesystem authority and writes its projection to
+standard output. It never discovers, edits or replaces sessions:
+
+```console
+bun benchmarks/profiles/agentos/pi-session-adapter.ts \
+  /authorized/agent/home/.pi/agent/sessions/<cwd>/<session>.jsonl \
+  --actor <stable-agent-reference> \
+  --accepted-work-reference <task-or-assignment-reference> \
+  > pi-action-trajectory.json
+```
+
+Its [output contract](./pi-action-trajectory.schema.json) contains only native
+tool-call and direct-bash timestamps, actor and accepted-work references, tool
+names, canonical argument digests, native result classes, durations and exact repeated-action
+retry links. Missing native fields are `unobserved`. Redaction counts describe
+omitted prompts, reasoning, summaries, extension content, assistant content,
+tool arguments and tool results. `retry_of` is the one-based position of the
+latest equivalent failed event, `null` when there is none, or `unobserved` when
+the arguments needed for comparison are unavailable.
+The projection does not contain the source session ID, path, working directory,
+message text, result text or tool-call IDs.
+
 Never publish raw reasoning, credentials, full private transcripts or unrelated
 terminal output. When session access is unavailable, mark its dependent metrics
 `unobserved`; outcome, ownership, recovery and delivery gates still apply.

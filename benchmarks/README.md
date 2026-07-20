@@ -40,7 +40,10 @@ legible without duplicating issue checklists:
 
 An original harness session remains unchanged and private in its native Agent
 home. Only an allowlisted projection may enter shared or public evidence; see
-the [session-adapter boundary](./SPEC.md#harness-session-adapters).
+the [session-adapter boundary](./SPEC.md#harness-session-adapters). AgentOS's
+optional Pi-only implementation and output contract live in the
+[AgentOS profile](./profiles/agentos/PROFILE.md#optional-session-evidence). The
+portable validator and hard gates do not invoke or require it.
 
 ## Run it
 
