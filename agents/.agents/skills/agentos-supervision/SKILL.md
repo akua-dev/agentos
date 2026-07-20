@@ -91,9 +91,16 @@ PostgreSQL owns durable coordination, Kubernetes owns workload state, Herdr owns
    query again; never hold a database transaction while waiting or reasoning.
 6. Reconcile only reports named by the actionable event, then broaden to all direct reports when evidence is missing or contradictory.
 7. After handling every actionable event, stop obsolete waits and re-arm each
-   still-useful predicate before ending the turn. Pi batches near-simultaneous
-   completions; query the authorities once instead of reacting repeatedly to
-   the same state change.
+   still-useful predicate. Before yielding while any direct report remains
+   active, call `list_background_commands` and verify from its current result
+   that one durable Fleet notification wait is running and that every selected
+   non-durable failure condition still has a running native wait. A one-shot
+   wait that is completed, failed or stopped is absent even when its old task
+   ID remains visible. A predicate already true, or a `working` wait after
+   launch has been verified, cannot wake the next completion, blocker or loss
+   and does not count. Arm the missing path before ending the turn or report the
+   unsupported boundary. Pi batches near-simultaneous completions; query the
+   authorities once instead of reacting repeatedly to the same state change.
 8. Stay silent during an ordinary wait.
    Elapsed time and empty checks are not Captain-facing progress.
 
