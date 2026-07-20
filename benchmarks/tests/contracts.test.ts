@@ -82,13 +82,26 @@ describe("public benchmark contracts", () => {
     wrongGate.attempts[0]!.mechanical_gates[0]!.status = "failed";
     expect(validateContract("result", wrongGate).valid).toBe(false);
 
-    const missingValue = structuredClone(result) as { attempts: Array<{ metrics: Array<{ value?: unknown }> }> };
-    delete missingValue.attempts[0]!.metrics[0]!.value;
+    const missingValue = structuredClone(result) as { attempts: Array<{ metrics: Array<{ id: string; value?: unknown }> }> };
+    const observedMetric = missingValue.attempts[0]!.metrics.find((metric) => metric.id === "effectiveness.outcome_success");
+    delete observedMetric!.value;
     expect(validateContract("result", missingValue).valid).toBe(false);
 
     const duplicateAttempt = structuredClone(result) as { attempts: Array<Record<string, unknown>> };
     duplicateAttempt.attempts.push(structuredClone(duplicateAttempt.attempts[0]!));
     expect(validateContract("result", duplicateAttempt).valid).toBe(false);
+
+    const omittedMetric = structuredClone(result) as { attempts: Array<{ metrics: Array<Record<string, unknown>> }> };
+    omittedMetric.attempts[0]!.metrics.pop();
+    expect(validateContract("result", omittedMetric).valid).toBe(false);
+
+    const undeclaredMetric = structuredClone(result) as { attempts: Array<{ metrics: Array<Record<string, unknown>> }> };
+    undeclaredMetric.attempts[0]!.metrics.push({ id: "efficiency.model_tokens", state: "unobserved", unit: "tokens", reason: "Synthetic telemetry is absent." });
+    expect(validateContract("result", undeclaredMetric).valid).toBe(false);
+
+    const revisionMismatch = structuredClone(result) as { attempts: Array<{ subject_revision: string }> };
+    revisionMismatch.attempts[0]!.subject_revision = "1111111111111111111111111111111111111111";
+    expect(validateContract("result", revisionMismatch).valid).toBe(false);
 
     const incompleteCatalog = structuredClone(catalog) as { metrics: Array<{ calculation?: string }> };
     delete incompleteCatalog.metrics[0]!.calculation;

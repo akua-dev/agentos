@@ -141,11 +141,19 @@ function semanticResult(value: JsonObject): SemanticError[] {
   const attempts = asObjects(value.attempts);
   errors.push(...duplicateErrors(attempts, "/attempts", "id"), ...duplicateErrors(asObjects(value.aggregates), "/aggregates", "metric_id"));
   const qualitativeIds = new Set(scenario.rubric.qualitative_criteria);
+  const scenarioMetricIds = new Set(scenario.metrics);
   for (const [attemptIndex, attempt] of attempts.entries()) {
     const metrics = asObjects(attempt.metrics);
     const metricMap = new Map(metrics.map((metric) => [metric.id, metric]));
     errors.push(...duplicateErrors(metrics, `/attempts/${attemptIndex}/metrics`, "id"));
     metrics.forEach((metric, index) => errors.push(...validateMetric(metric, `/attempts/${attemptIndex}/metrics/${index}`)));
+    if (attempt.subject_revision !== (value.subject as JsonObject).source_revision) errors.push({ instancePath: `/attempts/${attemptIndex}/subject_revision`, keyword: "semantic", message: "attempt subject revision must match result subject revision" });
+    for (const [metricIndex, metric] of metrics.entries()) {
+      if (!scenarioMetricIds.has(String(metric.id))) errors.push({ instancePath: `/attempts/${attemptIndex}/metrics/${metricIndex}/id`, keyword: "semantic", message: "metric is not selected by this scenario" });
+    }
+    for (const metricId of scenarioMetricIds) {
+      if (!metricMap.has(metricId)) errors.push({ instancePath: `/attempts/${attemptIndex}/metrics`, keyword: "semantic", message: `missing scenario metric: ${metricId}` });
+    }
     const gates = asObjects(attempt.mechanical_gates);
     errors.push(...duplicateErrors(gates, `/attempts/${attemptIndex}/mechanical_gates`, "id"));
     const rubricGateIds = new Set(scenario.rubric.mechanical_gates.map((gate) => gate.id));

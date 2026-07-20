@@ -17,7 +17,7 @@
         "required": ["id", "pillar", "unit", "value_type", "description", "calculation", "applicability", "required_evidence"],
         "properties": {
           "id": { "$ref": "#/$defs/metricIdentifier" },
-          "pillar": { "enum": ["effectiveness", "attention", "efficiency", "robustness", "safety", "accountability", "bootstrap"] },
+          "pillar": { "enum": ["effectiveness", "attention", "efficiency", "robustness", "safety", "accountability"] },
           "unit": { "$ref": "#/$defs/nonEmptyText" },
           "value_type": { "enum": ["number", "integer", "boolean", "string"] },
           "description": { "$ref": "#/$defs/nonEmptyText" },
