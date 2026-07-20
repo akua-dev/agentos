@@ -80,11 +80,11 @@ RUN MISE_DATA_DIR=/opt/mise \
     MISE_GITHUB_SLSA=false \
     MISE_LOCKED=1 \
     MISE_SYSTEM_CONFIG_FILE=/etc/mise/config.toml \
-    mise install github:oven-sh/bun \
+    mise install http:bun \
   && ln -s \
-    "$(MISE_DATA_DIR=/opt/mise MISE_SYSTEM_CONFIG_FILE=/etc/mise/config.toml mise where github:oven-sh/bun)/bun" \
+    "$(MISE_DATA_DIR=/opt/mise MISE_SYSTEM_CONFIG_FILE=/etc/mise/config.toml mise where http:bun)/bun" \
     /usr/local/bin/bun \
-  && test "$(bun --revision)" = "1.4.0-canary.1+1ff145449"
+  && test "$(bun --revision)" = "1.4.0-canary.1+3979cbe80"
 
 FROM agentos-base AS agentos-seed
 
