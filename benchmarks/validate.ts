@@ -63,16 +63,17 @@ function validateMetric(metric: JsonObject, path: string): SemanticError[] {
 function semanticEvidence(value: JsonObject): SemanticError[] {
   const events = asObjects(value.events);
   const metrics = asObjects(value.metrics);
-  const verdicts = [
-    ...asObjects((value.outcome as JsonObject | undefined)?.acceptance_criteria),
-    ...asObjects(value.gates),
-  ];
+  const acceptanceCriteria = asObjects(
+    (value.outcome as JsonObject | undefined)?.acceptance_criteria,
+  );
+  const gates = asObjects(value.gates);
   const eventIds = new Set(events.map((event) => event.id));
   const errors = [
     ...duplicateErrors(events, "/events", "id"),
     ...duplicateErrors(metrics, "/metrics", "id"),
     ...duplicateErrors(asObjects(value.artifacts), "/artifacts", "id"),
-    ...duplicateErrors(verdicts, "/verdicts", "id"),
+    ...duplicateErrors(acceptanceCriteria, "/outcome/acceptance_criteria", "id"),
+    ...duplicateErrors(gates, "/gates", "id"),
   ];
   for (const [index, metric] of metrics.entries()) {
     errors.push(...validateMetric(metric, `/metrics/${index}`));
@@ -80,9 +81,14 @@ function semanticEvidence(value: JsonObject): SemanticError[] {
       if (!eventIds.has(eventId)) errors.push({ instancePath: `/metrics/${index}/source_event_ids`, keyword: "semantic", message: `unresolved event: ${String(eventId)}` });
     }
   }
-  for (const [index, verdict] of verdicts.entries()) {
-    for (const eventId of (verdict.evidence_event_ids as unknown[] | undefined) ?? []) {
-      if (!eventIds.has(eventId)) errors.push({ instancePath: `/verdicts/${index}/evidence_event_ids`, keyword: "semantic", message: `unresolved event: ${String(eventId)}` });
+  for (const [path, verdicts] of [
+    ["/outcome/acceptance_criteria", acceptanceCriteria],
+    ["/gates", gates],
+  ] as const) {
+    for (const [index, verdict] of verdicts.entries()) {
+      for (const eventId of (verdict.evidence_event_ids as unknown[] | undefined) ?? []) {
+        if (!eventIds.has(eventId)) errors.push({ instancePath: `${path}/${index}/evidence_event_ids`, keyword: "semantic", message: `unresolved event: ${String(eventId)}` });
+      }
     }
   }
   return errors;
