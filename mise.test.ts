@@ -23,14 +23,23 @@ afterEach(async () => {
   );
 });
 
-async function runMise(cwd: string, systemConfigDirectory: string) {
+async function runMise(
+  cwd: string,
+  systemConfigDirectory: string,
+  inheritedEnvironment: Record<string, string | undefined> = process.env,
+) {
   const home = join(systemConfigDirectory, "home");
   await mkdir(home, { recursive: true });
+  const environment = Object.fromEntries(
+    Object.entries(inheritedEnvironment).filter(
+      ([name]) => !name.startsWith("MISE_") && !name.startsWith("__MISE_"),
+    ),
+  );
 
   const child = Bun.spawn(["mise", "ls", "--current", "--json"], {
     cwd,
     env: {
-      ...process.env,
+      ...environment,
       HOME: home,
       MISE_CACHE_DIR: join(systemConfigDirectory, "cache"),
       MISE_CEILING_PATHS: cwd,
@@ -193,7 +202,10 @@ describe("AgentOS mise baseline", () => {
       "utf8",
     );
 
-    const result = await runMise(foreignWorktree, systemConfigDirectory);
+    const result = await runMise(foreignWorktree, systemConfigDirectory, {
+      ...process.env,
+      MISE_NODE_VERSION: "24",
+    });
 
     expect(result.exitCode).toBe(0);
     expect(requestedTools(result.stdout)).toEqual({
