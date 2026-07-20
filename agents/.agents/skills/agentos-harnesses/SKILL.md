@@ -54,10 +54,13 @@ delivery and Captain decisions still require their normal durable approval.
 
 Repository trust is a separate credential boundary because project hooks and
 exec policies run beside the harness credential. Before launch, the owning Mate
-must inspect the effective repository-owned executable configuration. Use a
-native non-interactive trust flag only after that review; otherwise refuse the
-launch before creating a blocked work agent. Do not edit a harness-managed
-trust store or grant global trust merely to suppress a dialog.
+must inspect the effective repository-owned executable configuration. After
+that review, satisfy the harness's workspace and hook trust gates explicitly.
+Prefer a native per-launch trust flag. When an interactive harness has no such
+workspace flag, preserve its existing private configuration and register only
+the exact resolved Assignment worktree through its documented project-trust
+entry before launch. Never trust a parent directory or filesystem root, copy
+another Agent's configuration, or select a TUI trust prompt blindly.
 
 ## Pi
 
@@ -117,6 +120,22 @@ They are per-launch native arguments, never persistent global Codex defaults.
 Keep `check_for_update_on_startup=false` per launch as well: AgentOS upgrades
 the reviewed Codex version through Mise and an image or PVC reconciliation, not
 through an interactive worker prompt or harness-owned global installation.
+
+Codex's `--dangerously-bypass-hook-trust` flag bypasses hook review only. It
+does not answer the separate `Do you trust the contents of this directory?`
+gate, and a `-c projects...trust_level` launch override is not accepted early
+enough to satisfy that gate in the reviewed interactive CLI. After inspecting
+the exact worktree, merge only this entry into the Crewmate-owned mode-`0600`
+`~/.codex/config.toml`, preserving every unrelated setting:
+
+```toml
+[projects."/absolute/assignment/worktree"]
+trust_level = "trusted"
+```
+
+Do this before `herdr agent start`; a visible trust chooser means dispatch is
+still blocked. `codex exec --skip-git-repo-check` is useful for a verified
+headless probe, not a replacement for the persistent interactive Crewmate.
 
 Before a deliberate exit, read the exact Herdr Agent and retain its
 `agent_session` ID. Exit Codex with `/quit`; if the ID was not already known,

@@ -255,7 +255,11 @@ A harness becomes Fleet-eligible only after its pinned build has passed one
 supervised lifecycle: authentication and first-run trust, isolated workspace,
 native launch, busy/status inspection, short steer, interrupt, verified wake,
 native resume, failure visibility and safe teardown. Do not silently substitute
-an unverified harness. Provider ingress work also needs a fixture or sandbox
+an unverified harness. Follow the shared
+[`agentos-harnesses`](./agents/.agents/skills/agentos-harnesses/SKILL.md) Skill
+for the selected harness; a workspace-trust chooser or routine command approval
+after dispatch means the unattended launch has not succeeded. Provider ingress
+work also needs a fixture or sandbox
 path that exercises raw payload preservation, classification, linkage and local
 reconciliation without posting publicly.
 
