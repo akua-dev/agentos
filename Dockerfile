@@ -106,6 +106,7 @@ WORKDIR /tmp/agentos-dependencies
 COPY package.json bun.lock ./
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
+COPY services/quota-router/package.json services/quota-router/package.json
 COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
 
 RUN bun install \
@@ -114,6 +115,7 @@ RUN bun install \
       --no-progress \
       --production \
       --filter @agentos/pg-listen \
+      --filter @agentos/quota-router \
   && bun clis/pg-listen/pg-listen.ts --help >/dev/null
 
 FROM agentos-base
@@ -125,6 +127,9 @@ COPY --from=agentos-runtime-dependencies \
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/clis/pg-listen/node_modules/ \
   /opt/agentos/clis/pg-listen/node_modules/
+COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/services/quota-router/node_modules/ \
+  /opt/agentos/services/quota-router/node_modules/
 
 RUN chmod 0644 \
     /etc/mise/config.toml \
@@ -139,11 +144,15 @@ RUN chmod 0644 \
     /opt/agentos/runtime/create-image-seed.ts \
     /opt/agentos/runtime/run-mate.ts \
     /opt/agentos/runtime/health.ts \
+    /opt/agentos/services/quota-router/src/main.ts \
   && chmod 0755 \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
   && ln -s \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
     /usr/local/bin/pg-listen \
+  && ln -s \
+    /opt/agentos/services/quota-router/src/main.ts \
+    /usr/local/bin/quota-router \
   && git config --system --add safe.directory /opt/agentos \
   && git config --system --add safe.directory /opt/agentos/.git
 

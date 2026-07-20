@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS Quota Router"
+  short_description: "Operate optional pooled Fleet AI capacity"
+  default_prompt: "Use $agentos-quota-router to configure or operate the Fleet quota router safely."

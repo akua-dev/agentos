@@ -5,7 +5,7 @@ description: Establish, inspect, rotate, revoke, and recover model-provider auth
 
 # Manage AgentOS authentication
 
-Handle provider credentials inside the owning agent's persistent runtime whenever the provider supports it.
+Handle provider credentials inside the owning agent's persistent runtime whenever the provider supports it. This direct path is a complete AgentOS setup. If the Captain explicitly selects pooled Fleet capacity instead, load `$agentos-quota-router`; its server-owned vault and client Secret are a different credential boundary, not a shortcut for copying Agent auth.
 
 ## Guardrails
 

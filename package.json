@@ -1,10 +1,10 @@
 {
   "name": "@agentos/root",
   "version": "0.0.0",
-  "description": "AgentOS runtime, executable primitives, and database workspace",
+  "description": "AgentOS runtime, optional services, executable primitives, and database workspace",
   "private": true,
   "type": "module",
-  "workspaces": ["clis/*", "database"],
+  "workspaces": ["clis/*", "database", "services/*"],
   "scripts": {
     "test": "bun test . ./agents/.pi/background-tasks",
     "typecheck": "tsc --project tsconfig.json",

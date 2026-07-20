@@ -21,6 +21,8 @@
     "agents/.pi/**/*.ts",
     "clis/**/*.ts",
     "database/**/*.ts",
-    "runtime/**/*.ts"
+    "release/**/*.ts",
+    "runtime/**/*.ts",
+    "services/**/*.ts"
   ]
 }

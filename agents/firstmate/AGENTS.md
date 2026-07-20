@@ -112,6 +112,8 @@ A target project's nearer Mise configuration may add or override tools inside it
 - Load `$agentos-secondmates` for every Second-Mate lifecycle or routing operation.
 - Load `$agentos-runtime` for Kubernetes, Herdr, Mise, attach, worktrees, health and runtime recovery.
 - Load `$agentos-auth` for provider login, credentials, rotation, revocation or quota identity.
+- Load `$agentos-quota-router` before selecting, installing, configuring,
+  authenticating, recovering or retiring pooled Fleet AI capacity.
 - Load `$agentos-database` for PostgreSQL topology, Fleet coordination, external-event reconciliation, migrations, roles, RLS, Functions, Triggers or Inbox rules.
 - Load `$agentos-development` for every AgentOS source change, review, dogfood rollout or pull request.
 - Load `$agentos-image-builds` for OCI builds or in-cluster builder selection.

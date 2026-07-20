@@ -1,0 +1,3 @@
+[tasks."quota-router:serve"]
+description = "Run the optional Fleet quota router"
+file = "src/main.ts"

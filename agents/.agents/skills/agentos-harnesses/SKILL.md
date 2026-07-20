@@ -23,6 +23,11 @@ AgentOS default.
 Reject an unavailable or unverified harness instead of translating it to a
 different one silently. Check current authentication and quota before choosing
 an expensive profile, but do not let stale quota telemetry block dispatch.
+When pooled capacity was explicitly selected, load `$agentos-quota-router` and
+select its `fleet-codex` provider explicitly. Never turn direct provider auth
+into pooled routing or switch credential kind/model silently. Router `401`,
+`429`, timeout and provider failures remain native harness failures; do not hide
+them behind a prompt queue or wrapper.
 
 For a new Crewmate only, when neither an explicit Captain instruction nor the
 matching durable dispatch policy selects effort, choose a native level
