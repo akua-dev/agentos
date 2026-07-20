@@ -97,6 +97,12 @@ Client detach leaves processes running. After a pod replacement, Herdr restores 
 
 Herdr is not a fleet database.
 Its CLI and socket API are used locally for attach, read, send, wait, layout and debugging.
+AgentOS uses Herdr's documented CLI for one-shot supervision waits; those
+commands already resolve targets and wait through the public socket protocol,
+so AgentOS ships no parallel Herdr client. A future long-lived subscriber must
+first justify why the CLI wait surface is insufficient, negotiate the installed
+protocol/schema, bootstrap from `session.snapshot`, and take a fresh snapshot
+after every reconnect before trusting subsequent events.
 Outside the cluster, a human or seed agent resolves the target Pod with native
 `kubectl` using an explicit Kubernetes context, enters that Pod, and invokes
 its real Herdr terminal. Running Mates use the same native tools with their

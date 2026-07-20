@@ -92,6 +92,12 @@ canonical definition of work nor logic inside the Pi guard.
    - Use `herdr wait output <pane_id> --match <text> [--timeout <ms>]
      --session <session>` only for a concrete, bounded terminal condition whose
      source does not expose a semantic status.
+     These documented one-shot CLI waits are the supported AgentOS boundary;
+     they already use Herdr's public socket protocol. Do not replace them with
+     a private socket client. If a future long-lived multi-event subscriber is
+     genuinely needed, validate the installed protocol/schema, bootstrap from
+     `session.snapshot`, and take a fresh snapshot after reconnect before
+     consuming further events.
    - Use raw Kubernetes waits such as
      `kubectl --namespace <namespace> wait pod/<pod>
      --for=condition=Ready=false --timeout=<duration>` for selected active
@@ -152,7 +158,8 @@ tagged continuity wait plus only the additional waits currently needed; do not
 replay an old process from task metadata.
 
 `LISTEN/NOTIFY` may wake an already-running listener but never replaces the durable row or starts a pod.
-Herdr socket events may expose terminal changes but never replace Inbox or Task state.
+Herdr CLI waits and socket events expose terminal changes but never replace
+Inbox or Task state.
 
 ## Classify direct-report state
 
