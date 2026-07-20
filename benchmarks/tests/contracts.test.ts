@@ -89,6 +89,14 @@ describe("public benchmark contracts", () => {
     const duplicateAttempt = structuredClone(result) as { attempts: Array<Record<string, unknown>> };
     duplicateAttempt.attempts.push(structuredClone(duplicateAttempt.attempts[0]!));
     expect(validateContract("result", duplicateAttempt).valid).toBe(false);
+
+    const incompleteCatalog = structuredClone(catalog) as { metrics: Array<{ calculation?: string }> };
+    delete incompleteCatalog.metrics[0]!.calculation;
+    expect(validateContract("catalog", incompleteCatalog).valid).toBe(false);
+
+    const unresolvedAggregate = structuredClone(result) as { aggregates: Array<Record<string, unknown>> };
+    unresolvedAggregate.aggregates.push({ metric_id: "efficiency.wall_seconds", observed_count: 0, unobserved_count: 0, not_applicable_count: 0 });
+    expect(validateContract("result", unresolvedAggregate).valid).toBe(false);
   });
 
   test("validates a selected public contract from the command line", async () => {
