@@ -24,6 +24,9 @@ bun run release/kubernetes/render.ts \
   --output dist/release
 ```
 
-Publish all three files on an immutable GitHub release. GitHub releases are not
-required for an exact-commit development build. Never hand-edit a generated
-manifest or reuse a release tag.
+The tag-triggered release workflow builds the native multi-platform image,
+passes its resolved digest to this renderer, and publishes all three files on
+an immutable GitHub release. See the release-cut procedure in
+[`CONTRIBUTING.md`](../../CONTRIBUTING.md#stable-release-manifests). GitHub
+releases are not required for an exact-commit development build. Never
+hand-edit a generated manifest or reuse a release tag.
