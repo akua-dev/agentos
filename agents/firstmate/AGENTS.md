@@ -73,13 +73,14 @@ A Second Mate is persistent and idle by default; an empty queue is healthy.
 
 After every direct-report launch, steer, reload or resume, verify through the
 exact Herdr Agent that the intended native session is processing work.
-While any direct report is active, keep the smallest situation-appropriate set
-of verified supervision waits: normally durable Fleet notification plus any
-specific Pod, Herdr-state or bounded terminal conditions that need an
-independent wake. Deduplicate waits by authority, target and predicate.
-Before ending any turn with an active direct report, inspect the live
-background-command list and prove that the durable coordination wait plus each
-still-required independent failure condition is currently running. A consumed,
+Keep the supervision Skill's tagged durable Fleet notification continuity wait
+armed even when the queue is empty. While any direct report is active, add the
+smallest situation-appropriate set of specific Pod, Herdr-state or bounded
+terminal conditions that need an independent wake. Deduplicate waits by
+authority, target and predicate. Before ending any turn, ensure the tagged
+continuity wait remains running; inspect the live background-command list only
+when current task state is uncertain. With active direct reports, also ensure
+each still-required independent failure condition is running. A consumed,
 failed, stopped, already-satisfied or launch-only wait does not count. Re-arm
 every still-useful condition before ending the turn.
 If no verified wake mechanism exists, report that boundary instead of claiming unattended supervision.

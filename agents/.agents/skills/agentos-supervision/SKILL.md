@@ -45,10 +45,31 @@ PostgreSQL owns durable coordination, Kubernetes owns workload state, Herdr owns
 
 ## Maintain the supervision cycle
 
-1. While at least one direct report is active, keep a verified, situation-
-   appropriate set of waits owned by the current Mate session. One
-   `pg-listen agentos_events` is the normal Fleet coordination baseline. Add
-   native waits only for concrete live risks that PostgreSQL cannot signal,
+When a quick signal for direct children with unended Assignments is useful, one
+possible starting query is:
+
+```sql
+SELECT EXISTS (
+  SELECT 1
+    FROM agentos.task_assignments AS assignment
+    JOIN agentos.agents AS child ON child.id = assignment.agent_id
+   WHERE child.parent_agent_id = agentos.current_agent_id()
+     AND child.retired_at IS NULL
+     AND assignment.ended_at IS NULL
+);
+```
+
+This answers only that narrow question. Choose, adapt or replace the raw SQL
+for the current reconciliation task using the released schema; active work may
+also require Inbox, Task, runtime or delivery evidence. The query is neither a
+canonical definition of work nor logic inside the Pi guard.
+
+1. Keep one verified Fleet-coordination continuity wait owned by the current
+   Mate session even when its queue is empty. `pg-listen agentos_events` is the
+   normal baseline. Its useful condition-specific description must contain
+   `[agentos-supervision]` so the Pi backstop can recognize that the Mate armed
+   its selected continuity path. While at least one direct report is active,
+   add native waits only for concrete live risks that PostgreSQL cannot signal,
    such as a selected Pod losing readiness, a specific Herdr Agent changing
    status or a bounded pane match needed for a known recovery condition.
 2. Let the supervising Mate choose the smallest useful wait set. Several
@@ -91,16 +112,27 @@ PostgreSQL owns durable coordination, Kubernetes owns workload state, Herdr owns
    query again; never hold a database transaction while waiting or reasoning.
 6. Reconcile only reports named by the actionable event, then broaden to all direct reports when evidence is missing or contradictory.
 7. After handling every actionable event, stop obsolete waits and re-arm each
-   still-useful predicate. Before yielding while any direct report remains
-   active, call `list_background_commands` and verify from its current result
-   that one durable Fleet notification wait is running and that every selected
-   non-durable failure condition still has a running native wait. A one-shot
-   wait that is completed, failed or stopped is absent even when its old task
-   ID remains visible. A predicate already true, or a `working` wait after
-   launch has been verified, cannot wake the next completion, blocker or loss
-   and does not count. Arm the missing path before ending the turn or report the
-   unsupported boundary. Pi batches near-simultaneous completions; query the
-   authorities once instead of reacting repeatedly to the same state change.
+   still-useful predicate. Before yielding, ensure one running continuity wait
+   has `[agentos-supervision]` in its useful description. The Pi backstop tracks
+   tagged task starts and terminal events; do not spend a tool call on
+   `list_background_commands` merely to prove what is already known. Use the
+   list to reconcile after missing, ambiguous or contradictory lifecycle
+   evidence. While any direct report remains active, also ensure that every
+   selected non-durable failure condition still has a running native wait. A
+   one-shot wait that is completed, failed or stopped is absent even when its
+   old task ID remains visible. A predicate already true, or a `working` wait
+   after launch has been verified, cannot wake the next completion, blocker or
+   loss and does not count. Arm the missing path before ending the turn or
+   report the unsupported boundary. Pi batches near-simultaneous completions;
+   query the authorities once instead of reacting repeatedly to the same state
+   change.
+   Pi's turn-end guard is only a backstop: it remembers observed running task
+   IDs whose description includes `[agentos-supervision]` and reminds the Mate
+   when none remain known. It never chooses, validates or launches a wait.
+   Satisfy the actual supervision contract above rather than optimizing for the
+   marker. At Pi session startup, the same backstop requests one recovery turn
+   because local background commands are session-bound; the Mate still performs
+   the reconciliation and chooses every wait.
 8. Stay silent during an ordinary wait.
    Elapsed time and empty checks are not Captain-facing progress.
 
@@ -113,8 +145,9 @@ and never mutates the Herdr Agent, PostgreSQL rows or Kubernetes resource it
 observes.
 
 Background commands belong to the current Pi runtime. Session shutdown stops
-them. At session start, recover from durable Fleet and runtime state, then arm
-only the waits currently needed; do not replay an old process from task metadata.
+them. At session start, recover from durable Fleet and runtime state, re-arm the
+tagged continuity wait plus only the additional waits currently needed; do not
+replay an old process from task metadata.
 
 `LISTEN/NOTIFY` may wake an already-running listener but never replaces the durable row or starts a pod.
 Herdr socket events may expose terminal changes but never replace Inbox or Task state.
