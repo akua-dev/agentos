@@ -78,8 +78,8 @@ In addition to the portable gates, fail the AgentOS profile when:
 
 ## Optional session evidence
 
-Pi and other supported native sessions may reveal tool names, sanitized
-arguments, error classes, timings and retry relationships. Session inspection
+Pi native sessions may reveal tool names, sanitized arguments, error classes,
+timings and retry relationships. Session inspection
 requires the same authority as the underlying Agent home. Publish only the
 minimum normalized action metadata needed for the metric or causal review.
 
