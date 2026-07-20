@@ -12,6 +12,8 @@ import { join } from "node:path";
 // Exercise real Mise resolution; never replace this with config-text assertions.
 const root = new URL(".", import.meta.url).pathname;
 const temporaryDirectories: string[] = [];
+const bunRevision = "1.4.0-canary.1+3979cbe80";
+const bunToolchainTag = "bun-toolchain-1.4.0-canary.1-3979cbe80-r2";
 
 afterEach(async () => {
   await Promise.all(
@@ -100,7 +102,7 @@ const fleetTools = {
   "github:kunchenguid/no-mistakes": "1.37.0",
   "github:kunchenguid/treehouse": "2.0.0",
   "github:ogulcancelik/herdr": "0.7.3",
-  "github:oven-sh/bun": "canary",
+  "http:bun": bunRevision,
   jq: "1.8.2",
   kubectl: "1.35.6",
   node: "24",
@@ -127,7 +129,7 @@ type LockedTool = {
 };
 
 describe("AgentOS mise baseline", () => {
-  test("installs Bun from immutable locked release assets", async () => {
+  test("installs the exact Bun revision from durable locked release assets", async () => {
     const configContents = await Bun.file(join(root, "mise.toml")).text();
     const config = Bun.TOML.parse(configContents) as {
       tools: Record<string, string | { format?: string; version?: string }>;
@@ -136,13 +138,12 @@ describe("AgentOS mise baseline", () => {
     const lock = Bun.TOML.parse(contents) as {
       tools: Record<string, LockedTool[]>;
     };
-    const bun = lock.tools["github:oven-sh/bun"]?.[0];
+    const bun = lock.tools["http:bun"]?.[0];
 
-    expect(config.tools["github:oven-sh/bun"]).toEqual({
-      format: "zip",
-      version: "canary",
+    expect(config.tools["http:bun"]).toMatchObject({
+      version: bunRevision,
     });
-    expect(bun?.version).toBe("canary");
+    expect(bun?.version).toBe(bunRevision);
     const platforms = Object.entries(bun ?? {}).filter(([key]) =>
       key.startsWith("platforms."),
     ) as Array<[string, LockedPlatform]>;
@@ -150,10 +151,12 @@ describe("AgentOS mise baseline", () => {
 
     for (const [, platform] of platforms) {
       expect(platform.checksum).toMatch(/^sha256:[a-f0-9]{64}$/);
-      expect(platform.url).toBe(platform.url_api);
       expect(platform.url).toMatch(
-        /^https:\/\/api\.github\.com\/repos\/oven-sh\/bun\/releases\/assets\/\d+$/,
+        new RegExp(
+          `^https://github\\.com/akua-dev/agentos/releases/download/${bunToolchainTag}/bun-`,
+        ),
       );
+      expect(platform.url_api).toBeUndefined();
     }
   });
 

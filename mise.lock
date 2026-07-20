@@ -179,44 +179,37 @@ checksum = "sha256:9b5f35d283b0877eeda0cf66ba1ef1d95ae40f32e858a04da0041f3a20df0
 url = "https://github.com/ogulcancelik/herdr/releases/download/v0.7.3/herdr-macos-x86_64"
 url_api = "https://api.github.com/repos/ogulcancelik/herdr/releases/assets/469642057"
 
-[[tools."github:oven-sh/bun"]]
-version = "canary"
-backend = "github:oven-sh/bun"
+[[tools."http:bun"]]
+version = "1.4.0-canary.1+3979cbe80"
+backend = "http:bun"
 
-[tools."github:oven-sh/bun"."platforms.linux-arm64"]
-checksum = "sha256:aebb0582c444852ca74787abdf004862123a1cabd9fa56c14314779733dc215a"
-url = "https://api.github.com/repos/oven-sh/bun/releases/assets/483373426"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/483373426"
+[tools."http:bun"."platforms.linux-arm64"]
+checksum = "sha256:0f88fd65a714adff0a4bd2e50d6222c572b5fba3a76d2f15ad8c48bd66410d99"
+url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-linux-aarch64.zip"
 
-[tools."github:oven-sh/bun"."platforms.linux-arm64-musl"]
-checksum = "sha256:d5bb5973fa57edc8ae9e37f2ceafdd088e6e5674230170db617ac3a496407d65"
-url = "https://api.github.com/repos/oven-sh/bun/releases/assets/483373829"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/483373829"
+[tools."http:bun"."platforms.linux-arm64-musl"]
+checksum = "sha256:6f1bf57bee81b59bc6f46adb7f2b03780d75ef889ca9b1646af68aee394a235f"
+url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-linux-aarch64-musl.zip"
 
-[tools."github:oven-sh/bun"."platforms.linux-x64"]
-checksum = "sha256:632f7a35502f3ed031fa75fd0cbc89f6f8513e78accd0ba7af97a4d07fc0c1e5"
-url = "https://api.github.com/repos/oven-sh/bun/releases/assets/483373548"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/483373548"
+[tools."http:bun"."platforms.linux-x64"]
+checksum = "sha256:ed9bc2978aeaa60287f3a873369d0714a14da187ad282cbca6517c876db231d9"
+url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-linux-x64.zip"
 
-[tools."github:oven-sh/bun"."platforms.linux-x64-musl"]
-checksum = "sha256:25f8f55d448e17c762df3f0f7a09b71a30f947970b09bf179a6e9a28a5c60c13"
-url = "https://api.github.com/repos/oven-sh/bun/releases/assets/483373977"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/483373977"
+[tools."http:bun"."platforms.linux-x64-musl"]
+checksum = "sha256:953f4542e30b4acbee23f1d4527962713b00094b467ac715bc4ead4f9499ccbd"
+url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-linux-x64-musl.zip"
 
-[tools."github:oven-sh/bun"."platforms.macos-arm64"]
-checksum = "sha256:67a8dff252012b56fa5204108dfc51e0eeb420bdacaad8586d20a496f550ea1e"
-url = "https://api.github.com/repos/oven-sh/bun/releases/assets/483372925"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/483372925"
+[tools."http:bun"."platforms.macos-arm64"]
+checksum = "sha256:16490dd21c5e72f11d6eb5e550d44c386f18ac60f6761cd9362ccccc46322727"
+url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-darwin-aarch64.zip"
 
-[tools."github:oven-sh/bun"."platforms.macos-x64"]
-checksum = "sha256:d15d9c182b4c352c306d1d5a77348b98a35e77660dbf63df728049d8c09fb7a0"
-url = "https://api.github.com/repos/oven-sh/bun/releases/assets/483373163"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/483373163"
+[tools."http:bun"."platforms.macos-x64"]
+checksum = "sha256:2ada1688e3a2c0a9d1c4983843af4d0e299bfd9873b98c9a3a3912d7db03601d"
+url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-darwin-x64.zip"
 
-[tools."github:oven-sh/bun"."platforms.windows-x64"]
-checksum = "sha256:231bf9a2762cdb1529c974cbaccd3861342b84d4959a2a278ed70e9f6b829e6b"
-url = "https://api.github.com/repos/oven-sh/bun/releases/assets/483374846"
-url_api = "https://api.github.com/repos/oven-sh/bun/releases/assets/483374846"
+[tools."http:bun"."platforms.windows-x64"]
+checksum = "sha256:04d5a5bfc646369fa2582748df29b2189cc16d96bfa80b215a1f715295d19e94"
+url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-windows-x64.zip"
 
 [[tools.jq]]
 version = "1.8.2"

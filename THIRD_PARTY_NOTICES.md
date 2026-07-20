@@ -4,6 +4,20 @@ AgentOS itself is licensed under the MIT License.
 Release artifacts may redistribute separate third-party programs under their own licenses.
 The release build and its bill of materials determine which notices apply to a particular artifact.
 
+## Bun
+
+AgentOS images include Bun, and the temporary
+[`bun-toolchain-1.4.0-canary.1-3979cbe80-r2`](https://github.com/akua-dev/agentos/releases/tag/bun-toolchain-1.4.0-canary.1-3979cbe80-r2)
+prerelease mirrors the seven unmodified normal platform archives for Bun
+revision `1.4.0-canary.1+3979cbe80`. Bun itself is MIT licensed and statically
+links separately licensed components, including LGPL-2.0 JavaScriptCore and
+WebKit.
+
+The toolchain prerelease attaches the exact upstream Bun license and
+linked-library notice, the applicable LGPL-2.0 text, and the exact Bun/WebKit
+source and relinking record. A Bun version, source revision, patch or packaging
+change requires a fresh distribution and license review before publication.
+
 ## pi-quota-router
 
 `services/quota-router/` derives its private atomic storage, Codex account

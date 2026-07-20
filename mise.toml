@@ -1,5 +1,4 @@
 [tools]
-"github:oven-sh/bun" = { version = "canary", format = "zip" }
 node = "24"
 gh = "2.96.0"
 jq = "1.8.2"
@@ -16,3 +15,15 @@ fd = "10.4.2"
 "npm:chrome-devtools-axi" = "0.1.26"
 "npm:lavish-axi" = "0.1.42"
 "npm:quota-axi" = "0.1.5"
+
+[tools."http:bun"]
+version = "1.4.0-canary.1+3979cbe80"
+
+[tools."http:bun".platforms]
+linux-arm64 = { url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-linux-aarch64.zip", checksum = "sha256:0f88fd65a714adff0a4bd2e50d6222c572b5fba3a76d2f15ad8c48bd66410d99" }
+linux-arm64-musl = { url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-linux-aarch64-musl.zip", checksum = "sha256:6f1bf57bee81b59bc6f46adb7f2b03780d75ef889ca9b1646af68aee394a235f" }
+linux-x64 = { url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-linux-x64.zip", checksum = "sha256:ed9bc2978aeaa60287f3a873369d0714a14da187ad282cbca6517c876db231d9" }
+linux-x64-musl = { url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-linux-x64-musl.zip", checksum = "sha256:953f4542e30b4acbee23f1d4527962713b00094b467ac715bc4ead4f9499ccbd" }
+macos-arm64 = { url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-darwin-aarch64.zip", checksum = "sha256:16490dd21c5e72f11d6eb5e550d44c386f18ac60f6761cd9362ccccc46322727" }
+macos-x64 = { url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-darwin-x64.zip", checksum = "sha256:2ada1688e3a2c0a9d1c4983843af4d0e299bfd9873b98c9a3a3912d7db03601d" }
+windows-x64 = { url = "https://github.com/akua-dev/agentos/releases/download/bun-toolchain-1.4.0-canary.1-3979cbe80-r2/bun-windows-x64.zip", checksum = "sha256:04d5a5bfc646369fa2582748df29b2189cc16d96bfa80b215a1f715295d19e94" }
