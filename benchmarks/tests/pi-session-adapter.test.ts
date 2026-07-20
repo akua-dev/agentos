@@ -15,9 +15,11 @@ const fixture = [
   { type: "message", id: "entry-4", parentId: "entry-3", timestamp: "2026-07-20T10:00:02.500Z", message: { role: "bashExecution", command: "printf 'direct private command'", output: "direct private output", exitCode: 0, cancelled: false, truncated: false, timestamp: 1784541602500 } },
   { type: "message", id: "entry-5", parentId: "entry-4", timestamp: "2026-07-20T10:00:03.000Z", message: { role: "assistant", content: [{ type: "toolCall", id: "call-2", name: "bash", arguments: { command: "curl proprietary.example", headers: { Authorization: "secret", "X-Proprietary": "value" } } }], timestamp: 1784541603000 } },
   { type: "message", id: "entry-6", parentId: "entry-5", timestamp: "2026-07-20T10:00:03.250Z", message: { role: "toolResult", toolCallId: "call-2", toolName: "bash", content: [{ type: "text", text: "ok but still private" }], isError: false, timestamp: 1784541603250 } },
-  { type: "compaction", id: "entry-7", parentId: "entry-6", timestamp: "2026-07-20T10:00:04.000Z", summary: "private compacted transcript", firstKeptEntryId: "entry-5", tokensBefore: 100 },
-  { type: "custom_message", id: "entry-8", parentId: "entry-7", timestamp: "2026-07-20T10:00:05.000Z", customType: "private-extension", content: "private extension content", display: false },
-  { type: "message", id: "entry-9", parentId: "entry-8", timestamp: "not-a-timestamp", message: { role: "assistant", content: [{ type: "toolCall", id: "call-3", name: "read", arguments: null }] } },
+  { type: "message", id: "entry-7", parentId: "entry-6", timestamp: "2026-07-20T10:00:03.500Z", message: { role: "assistant", content: [{ type: "toolCall", id: "call-3", name: "bash", arguments: { command: "curl proprietary.example", headers: { Authorization: "secret", "X-Proprietary": "value" } } }], timestamp: 1784541603500 } },
+  { type: "message", id: "entry-8", parentId: "entry-7", timestamp: "2026-07-20T10:00:03.625Z", message: { role: "toolResult", toolCallId: "call-3", toolName: "bash", content: [{ type: "text", text: "second success remains private" }], isError: false, timestamp: 1784541603625 } },
+  { type: "compaction", id: "entry-9", parentId: "entry-8", timestamp: "2026-07-20T10:00:04.000Z", summary: "private compacted transcript", firstKeptEntryId: "entry-5", tokensBefore: 100 },
+  { type: "custom_message", id: "entry-10", parentId: "entry-9", timestamp: "2026-07-20T10:00:05.000Z", customType: "private-extension", content: "private extension content", display: false },
+  { type: "message", id: "entry-11", parentId: "entry-10", timestamp: "not-a-timestamp", message: { role: "assistant", content: [{ type: "toolCall", id: "call-4", name: "read", arguments: null }] } },
 ].map((entry) => JSON.stringify(entry)).join("\n") + "\n";
 
 describe("Pi session action adapter", () => {
@@ -28,7 +30,7 @@ describe("Pi session action adapter", () => {
 
     expect(validate(trajectory)).toBe(true);
     expect(validate.errors).toBeNull();
-    expect(trajectory.events).toHaveLength(4);
+    expect(trajectory.events).toHaveLength(5);
     expect(trajectory.events[0]).toEqual({
       timestamp: "2026-07-20T10:00:02.000Z",
       actor: "agent-123",
@@ -48,7 +50,8 @@ describe("Pi session action adapter", () => {
       retry_of: null,
     });
     expect(trajectory.events[2]!.retry_of).toBe(1);
-    expect(trajectory.events[3]).toMatchObject({
+    expect(trajectory.events[3]!.retry_of).toBe(1);
+    expect(trajectory.events[4]).toMatchObject({
       timestamp: "unobserved",
       arguments_digest: "unobserved",
       result_class: "unobserved",
@@ -57,7 +60,7 @@ describe("Pi session action adapter", () => {
     });
 
     const serialized = JSON.stringify(trajectory);
-    for (const excluded of ["full private prompt", "private reasoning", "unrelated output", "Authorization", "X-Proprietary", "value", "secret", "proprietary.example", "credential", "ok but still private", "direct private command", "direct private output", "private compacted transcript", "private extension content", "private-extension", "call-1", "/private/project"]) {
+    for (const excluded of ["full private prompt", "private reasoning", "unrelated output", "Authorization", "X-Proprietary", "value", "secret", "proprietary.example", "credential", "ok but still private", "second success remains private", "direct private command", "direct private output", "private compacted transcript", "private extension content", "private-extension", "call-1", "/private/project"]) {
       expect(serialized).not.toContain(excluded);
     }
     expect(trajectory.redactions).toEqual([
@@ -66,8 +69,8 @@ describe("Pi session action adapter", () => {
       { kind: "full_prompts", count: 1, method: "omitted" },
       { kind: "raw_reasoning", count: 1, method: "omitted" },
       { kind: "session_summaries", count: 1, method: "omitted" },
-      { kind: "tool_arguments", count: 3, method: "replaced with canonical JSON SHA-256 digest" },
-      { kind: "tool_results", count: 3, method: "classified from native Pi result state, then omitted" },
+      { kind: "tool_arguments", count: 4, method: "replaced with canonical JSON SHA-256 digest" },
+      { kind: "tool_results", count: 4, method: "classified from native Pi result state, then omitted" },
       { kind: "unavailable_arguments", count: 1, method: "marked unobserved" },
     ]);
   });
@@ -89,7 +92,7 @@ describe("Pi session action adapter", () => {
     ], { stdout: "pipe", stderr: "pipe" });
     expect(await child.exited).toBe(0);
     const output = await new Response(child.stdout).text();
-    expect(JSON.parse(output).events).toHaveLength(4);
+    expect(JSON.parse(output).events).toHaveLength(5);
 
     const after = await stat(sessionPath);
     expect(await readFile(sessionPath, "utf8")).toBe(fixture);

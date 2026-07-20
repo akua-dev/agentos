@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 
 const SCHEMA_VERSION = "0.1.0";
 const SUPPORTED_PI_SESSION_VERSION = 3;
@@ -258,7 +258,7 @@ export function projectPiSession(
     }
   }
 
-  const previousBySignature = new Map<string, { index: number; result: PiActionEvent["result_class"] }>();
+  const previousBySignature = new Map<string, { latestFailure?: number; hasUnobserved: boolean }>();
   for (const [index, action] of actions.entries()) {
     const digest = action.event.arguments_digest;
     if (digest === UNOBSERVED) {
@@ -267,9 +267,12 @@ export function projectPiSession(
     }
     const signature = `${action.event.tool_name}\u0000${digest}`;
     const previous = previousBySignature.get(signature);
-    if (previous?.result === "error") action.event.retry_of = previous.index;
-    else if (previous?.result === UNOBSERVED) action.event.retry_of = UNOBSERVED;
-    previousBySignature.set(signature, { index: index + 1, result: action.event.result_class });
+    if (previous?.latestFailure !== undefined) action.event.retry_of = previous.latestFailure;
+    else if (previous?.hasUnobserved === true) action.event.retry_of = UNOBSERVED;
+    previousBySignature.set(signature, {
+      latestFailure: action.event.result_class === "error" ? index + 1 : previous?.latestFailure,
+      hasUnobserved: action.event.result_class === UNOBSERVED || previous?.hasUnobserved === true,
+    });
   }
 
   const redactionMethods: Record<string, string> = {
@@ -309,6 +312,9 @@ if (import.meta.main) {
     const actor = optionValue(args, "--actor");
     const acceptedWorkReference = optionValue(args, "--accepted-work-reference");
     if (sessionPath === undefined || actor === undefined || acceptedWorkReference === undefined) usage();
+    if ((await stat(sessionPath)).size > MAX_SESSION_CHARACTERS) {
+      throw new Error("Pi session exceeds the supported size limit");
+    }
     const content = await readFile(sessionPath, "utf8");
     console.log(JSON.stringify(projectPiSession(content, actor, acceptedWorkReference), null, 2));
   } catch (error) {
