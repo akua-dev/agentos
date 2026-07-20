@@ -189,11 +189,14 @@ hidden behind an outbox worker.
 Mise supplies tools to every AgentOS agent, including First Mates, Second Mates and Crewmates.
 The release-owned `mise.toml` and `mise.lock` define Bun, Node and
 the pinned Fleet tools for Pi, Codex, Herdr, Treehouse, Kubernetes, GitHub,
-validation, AXI helpers and command-line inspection. The pair resolves the
-reviewed Bun 1.4.0 canary through Mise's GitHub backend. The moving upstream
-`canary` name is resolved through the reviewed Fleet lockfile; an AgentOS
-release updates that lock deliberately and verifies a cold locked install on
-every released platform before publication.
+validation, AXI helpers and command-line inspection. The pair resolves exact
+Bun revision `1.4.0-canary.1+1ff145449` through Mise's GitHub backend. Because
+upstream publishes that build under a moving `canary` release, every Bun
+platform entry in the reviewed lock uses its immutable GitHub release-asset
+API ID for download and checksum verification. An AgentOS release updates
+those IDs deliberately and verifies a cold locked install on every released
+platform before publication. A stable Bun 1.4 release supersedes this canary
+pin once available.
 
 AgentOS images install that pair as `/etc/mise/config.toml` and
 `/etc/mise/mise.lock`, and bake its pinned Bun so typed bootstrap programs do

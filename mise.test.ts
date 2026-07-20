@@ -114,7 +114,49 @@ const fleetTools = {
   vcluster: "0.35.2",
 };
 
+type LockedPlatform = {
+  checksum?: string;
+  url?: string;
+  url_api?: string;
+};
+
+type LockedTool = {
+  [key: `platforms.${string}`]: LockedPlatform;
+  backend: string;
+  version: string;
+};
+
 describe("AgentOS mise baseline", () => {
+  test("installs Bun from immutable locked release assets", async () => {
+    const configContents = await Bun.file(join(root, "mise.toml")).text();
+    const config = Bun.TOML.parse(configContents) as {
+      tools: Record<string, string | { format?: string; version?: string }>;
+    };
+    const contents = await Bun.file(join(root, "mise.lock")).text();
+    const lock = Bun.TOML.parse(contents) as {
+      tools: Record<string, LockedTool[]>;
+    };
+    const bun = lock.tools["github:oven-sh/bun"]?.[0];
+
+    expect(config.tools["github:oven-sh/bun"]).toEqual({
+      format: "zip",
+      version: "canary",
+    });
+    expect(bun?.version).toBe("canary");
+    const platforms = Object.entries(bun ?? {}).filter(([key]) =>
+      key.startsWith("platforms."),
+    ) as Array<[string, LockedPlatform]>;
+    expect(platforms).toHaveLength(7);
+
+    for (const [, platform] of platforms) {
+      expect(platform.checksum).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(platform.url).toBe(platform.url_api);
+      expect(platform.url).toMatch(
+        /^https:\/\/api\.github\.com\/repos\/oven-sh\/bun\/releases\/assets\/\d+$/,
+      );
+    }
+  });
+
   test("provides baseline tools outside the AgentOS repository", async () => {
     const temporaryDirectory = await mkdtemp(
       join(tmpdir(), "agentos-mise-baseline-"),

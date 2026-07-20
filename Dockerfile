@@ -84,7 +84,7 @@ RUN MISE_DATA_DIR=/opt/mise \
   && ln -s \
     "$(MISE_DATA_DIR=/opt/mise MISE_SYSTEM_CONFIG_FILE=/etc/mise/config.toml mise where github:oven-sh/bun)/bun" \
     /usr/local/bin/bun \
-  && test "$(bun --version)" = "1.4.0"
+  && test "$(bun --revision)" = "1.4.0-canary.1+1ff145449"
 
 FROM agentos-base AS agentos-seed
 
