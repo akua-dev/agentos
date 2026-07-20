@@ -19,7 +19,11 @@ const fixture = [
   { type: "message", id: "entry-8", parentId: "entry-7", timestamp: "2026-07-20T10:00:03.625Z", message: { role: "toolResult", toolCallId: "call-3", toolName: "bash", content: [{ type: "text", text: "second success remains private" }], isError: false, timestamp: 1784541603625 } },
   { type: "compaction", id: "entry-9", parentId: "entry-8", timestamp: "2026-07-20T10:00:04.000Z", summary: "private compacted transcript", firstKeptEntryId: "entry-5", tokensBefore: 100 },
   { type: "custom_message", id: "entry-10", parentId: "entry-9", timestamp: "2026-07-20T10:00:05.000Z", customType: "private-extension", content: "private extension content", display: false },
-  { type: "message", id: "entry-11", parentId: "entry-10", timestamp: "not-a-timestamp", message: { role: "assistant", content: [{ type: "toolCall", id: "call-4", name: "read", arguments: null }] } },
+  { type: "model_change", id: "entry-11", parentId: "entry-10", timestamp: "2026-07-20T10:00:06.000Z", provider: "private-provider", modelId: "private-model" },
+  { type: "thinking_level_change", id: "entry-12", parentId: "entry-11", timestamp: "2026-07-20T10:00:07.000Z", thinkingLevel: "private-level" },
+  { type: "label", id: "entry-13", parentId: "entry-12", timestamp: "2026-07-20T10:00:08.000Z", targetId: "entry-1", label: "private-label" },
+  { type: "session_info", id: "entry-14", parentId: "entry-13", timestamp: "2026-07-20T10:00:09.000Z", name: "private-session-name" },
+  { type: "message", id: "entry-15", parentId: "entry-14", timestamp: "not-a-timestamp", message: { role: "assistant", content: [{ type: "toolCall", id: "call-4", name: "read", arguments: null }] } },
 ].map((entry) => JSON.stringify(entry)).join("\n") + "\n";
 
 describe("Pi session action adapter", () => {
@@ -60,15 +64,20 @@ describe("Pi session action adapter", () => {
     });
 
     const serialized = JSON.stringify(trajectory);
-    for (const excluded of ["full private prompt", "private reasoning", "unrelated output", "Authorization", "X-Proprietary", "value", "secret", "proprietary.example", "credential", "ok but still private", "second success remains private", "direct private command", "direct private output", "private compacted transcript", "private extension content", "private-extension", "call-1", "/private/project"]) {
+    for (const excluded of ["full private prompt", "private reasoning", "unrelated output", "Authorization", "X-Proprietary", "value", "secret", "proprietary.example", "credential", "ok but still private", "second success remains private", "direct private command", "direct private output", "private compacted transcript", "private extension content", "private-extension", "private-provider", "private-model", "private-level", "private-label", "private-session-name", "call-1", "/private/project"]) {
       expect(serialized).not.toContain(excluded);
     }
     expect(trajectory.redactions).toEqual([
       { kind: "assistant_content", count: 1, method: "omitted" },
       { kind: "extension_content", count: 1, method: "omitted" },
       { kind: "full_prompts", count: 1, method: "omitted" },
+      { kind: "labels", count: 1, method: "omitted" },
+      { kind: "model_changes", count: 1, method: "omitted" },
       { kind: "raw_reasoning", count: 1, method: "omitted" },
+      { kind: "session_info", count: 1, method: "omitted" },
+      { kind: "session_metadata", count: 1, method: "omitted except supported format version" },
       { kind: "session_summaries", count: 1, method: "omitted" },
+      { kind: "thinking_level_changes", count: 1, method: "omitted" },
       { kind: "tool_arguments", count: 4, method: "replaced with canonical JSON SHA-256 digest" },
       { kind: "tool_results", count: 4, method: "classified from native Pi result state, then omitted" },
       { kind: "unavailable_arguments", count: 1, method: "marked unobserved" },
@@ -119,6 +128,17 @@ describe("Pi session action adapter", () => {
       timestamp: "unobserved",
       duration_ms: "unobserved",
     });
+  });
+
+  test("does not link retries across event types", () => {
+    const entries = [
+      { type: "session", version: 3 },
+      { type: "message", id: "call", parentId: null, message: { role: "assistant", content: [{ type: "toolCall", id: "call-1", name: "bash", arguments: { command: "false" } }] } },
+      { type: "message", id: "result", parentId: "call", message: { role: "toolResult", toolCallId: "call-1", toolName: "bash", isError: true } },
+      { type: "message", id: "bash", parentId: "result", message: { role: "bashExecution", command: "false", exitCode: 1 } },
+    ].map((entry) => JSON.stringify(entry)).join("\n");
+
+    expect(projectPiSession(entries, "agent", "work").events.map((event) => event.retry_of)).toEqual([null, null]);
   });
 
   test("projects only the final leaf ancestry", () => {

@@ -136,6 +136,14 @@ function countRedactedEntry(entry: JsonObject, counts: Map<string, number>): voi
     counts.set("session_summaries", (counts.get("session_summaries") ?? 0) + 1);
   } else if (entry.type === "custom" || entry.type === "custom_message") {
     counts.set("extension_content", (counts.get("extension_content") ?? 0) + 1);
+  } else if (entry.type === "model_change") {
+    counts.set("model_changes", (counts.get("model_changes") ?? 0) + 1);
+  } else if (entry.type === "thinking_level_change") {
+    counts.set("thinking_level_changes", (counts.get("thinking_level_changes") ?? 0) + 1);
+  } else if (entry.type === "label") {
+    counts.set("labels", (counts.get("labels") ?? 0) + 1);
+  } else if (entry.type === "session_info") {
+    counts.set("session_info", (counts.get("session_info") ?? 0) + 1);
   }
 }
 
@@ -162,7 +170,7 @@ export function projectPiSession(
 
   const actions: PendingAction[] = [];
   const actionsByToolCallId = new Map<string, PendingAction>();
-  const redactionCounts = new Map<string, number>();
+  const redactionCounts = new Map<string, number>([["session_metadata", 1]]);
 
   for (const entry of activeBranch(entries.slice(1))) {
     if (entry.type !== "message") {
@@ -267,7 +275,7 @@ export function projectPiSession(
       action.event.retry_of = UNOBSERVED;
       continue;
     }
-    const signature = `${action.event.tool_name}\u0000${digest}`;
+    const signature = `${action.event.event_type}\u0000${action.event.tool_name}\u0000${digest}`;
     const previous = previousBySignature.get(signature);
     if (previous?.latestFailure !== undefined) action.event.retry_of = previous.latestFailure;
     else if (previous?.hasUnobserved === true) action.event.retry_of = UNOBSERVED;
@@ -282,7 +290,12 @@ export function projectPiSession(
     raw_reasoning: "omitted",
     assistant_content: "omitted",
     extension_content: "omitted",
+    labels: "omitted",
+    model_changes: "omitted",
+    session_info: "omitted",
+    session_metadata: "omitted except supported format version",
     session_summaries: "omitted",
+    thinking_level_changes: "omitted",
     tool_arguments: "replaced with canonical JSON SHA-256 digest",
     unavailable_arguments: "marked unobserved",
     tool_results: "classified from native Pi result state, then omitted",
