@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/akua-dev/agentos/main/benchmarks/schemas/compact-result.schema.json",
+  "title": "Compact public benchmark result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "result_id", "benchmark_version", "metric_catalog_version", "scenario", "subject", "attempts", "aggregates"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "result_id": { "$ref": "#/$defs/nonEmptyText" },
+    "benchmark_version": { "$ref": "#/$defs/version" },
+    "metric_catalog_version": { "$ref": "#/$defs/version" },
+    "scenario": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "rubric_version"],
+      "properties": { "id": { "$ref": "#/$defs/identifier" }, "version": { "$ref": "#/$defs/version" }, "rubric_version": { "$ref": "#/$defs/version" } }
+    },
+    "subject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "version", "source_revision"],
+      "properties": { "name": { "$ref": "#/$defs/nonEmptyText" }, "version": { "$ref": "#/$defs/nonEmptyText" }, "source_revision": { "$ref": "#/$defs/nonEmptyText" } }
+    },
+    "attempts": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "evidence_uri", "raw_bundle_sha256", "subject_revision", "metrics", "mechanical_gates", "qualitative_verdicts"],
+        "properties": {
+          "id": { "$ref": "#/$defs/nonEmptyText" },
+          "evidence_uri": { "$ref": "#/$defs/nonEmptyText" },
+          "raw_bundle_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "subject_revision": { "$ref": "#/$defs/nonEmptyText" },
+          "metrics": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/metric" } },
+          "mechanical_gates": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/mechanicalVerdict" } },
+          "qualitative_verdicts": { "type": "array", "items": { "$ref": "#/$defs/qualitativeVerdict" } }
+        }
+      }
+    },
+    "aggregates": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["metric_id", "observed_count", "unobserved_count", "not_applicable_count"],
+        "properties": {
+          "metric_id": { "$ref": "#/$defs/metricIdentifier" },
+          "observed_count": { "type": "integer", "minimum": 0 },
+          "unobserved_count": { "type": "integer", "minimum": 0 },
+          "not_applicable_count": { "type": "integer", "minimum": 0 },
+          "statistics": {
+            "type": "object", "additionalProperties": false,
+            "required": ["minimum", "median", "maximum"],
+            "properties": { "minimum": { "type": "number" }, "median": { "type": "number" }, "maximum": { "type": "number" } }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "metricIdentifier": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$" },
+    "version": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$" },
+    "nonEmptyText": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "metric": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "state", "unit"],
+      "properties": {
+        "id": { "$ref": "#/$defs/metricIdentifier" }, "state": { "enum": ["observed", "unobserved", "not-applicable"] }, "unit": { "$ref": "#/$defs/nonEmptyText" },
+        "value": { "anyOf": [{ "type": "number" }, { "type": "boolean" }, { "type": "string" }] }, "reason": { "$ref": "#/$defs/nonEmptyText" }
+      },
+      "allOf": [{ "if": { "properties": { "state": { "const": "observed" } }, "required": ["state"] }, "then": { "properties": { "value": {} }, "required": ["value"] }, "else": { "properties": { "reason": {} }, "required": ["reason"], "not": { "required": ["value"] } } }]
+    },
+    "mechanicalVerdict": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": { "id": { "$ref": "#/$defs/identifier" }, "status": { "enum": ["passed", "failed", "unobserved"] } }
+    },
+    "qualitativeVerdict": {
+      "type": "object", "additionalProperties": false,
+      "required": ["criterion_id", "status", "explanation", "evidence_event_ids", "evaluator", "rubric_version"],
+      "properties": {
+        "criterion_id": { "$ref": "#/$defs/identifier" }, "status": { "enum": ["passed", "failed", "unobserved", "not-applicable"] }, "explanation": { "$ref": "#/$defs/nonEmptyText" },
+        "evidence_event_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmptyText" } },
+        "evaluator": { "type": "object", "additionalProperties": false, "required": ["kind", "name", "version"], "properties": { "kind": { "enum": ["model", "human", "hybrid"] }, "name": { "$ref": "#/$defs/nonEmptyText" }, "version": { "$ref": "#/$defs/nonEmptyText" } } },
+        "rubric_version": { "$ref": "#/$defs/version" }
+      }
+    }
+  }
+}

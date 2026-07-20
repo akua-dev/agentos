@@ -257,7 +257,8 @@
           },
           "else": {
             "properties": { "reason": {} },
-            "required": ["reason"]
+            "required": ["reason"],
+            "not": { "required": ["value"] }
           }
         }
       ]
