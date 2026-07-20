@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import Ajv2020 from "ajv/dist/2020";
 import type { AnySchema } from "ajv";
+import { validateContract } from "../validate";
 
 const benchmarkRoot = join(import.meta.dir, "..");
 
@@ -38,6 +39,7 @@ describe("public benchmark contracts", () => {
 
       expect(validate(scenario)).toBe(true);
       expect(validate.errors).toBeNull();
+      expect(validateContract("scenario", scenario).valid).toBe(true);
     }
   });
 
@@ -60,6 +62,54 @@ describe("public benchmark contracts", () => {
     delete invalid.metrics[0]?.state;
 
     expect(validate(invalid)).toBe(false);
+
+    const unresolved = structuredClone(example) as { metrics: Array<{ source_event_ids: string[] }> };
+    unresolved.metrics[0]!.source_event_ids = ["missing-event"];
+    expect(validateContract("evidence", unresolved).valid).toBe(false);
+
+    const duplicate = structuredClone(example) as { events: Array<Record<string, unknown>> };
+    duplicate.events.push(structuredClone(duplicate.events[0]!));
+    expect(validateContract("evidence", duplicate).valid).toBe(false);
+  });
+
+  test("validates the catalog and recomputes compact-result gates and aggregates", async () => {
+    const catalog = await readJson("metrics/catalog.json");
+    const result = await readJson("tests/fixtures/minimal-compact-result.json");
+    expect(validateContract("catalog", catalog).valid).toBe(true);
+    expect(validateContract("result", result).valid).toBe(true);
+
+    const wrongGate = structuredClone(result) as { attempts: Array<{ mechanical_gates: Array<{ status: string }> }> };
+    wrongGate.attempts[0]!.mechanical_gates[0]!.status = "failed";
+    expect(validateContract("result", wrongGate).valid).toBe(false);
+
+    const missingValue = structuredClone(result) as { attempts: Array<{ metrics: Array<{ id: string; value?: unknown }> }> };
+    const observedMetric = missingValue.attempts[0]!.metrics.find((metric) => metric.id === "effectiveness.outcome_success");
+    delete observedMetric!.value;
+    expect(validateContract("result", missingValue).valid).toBe(false);
+
+    const duplicateAttempt = structuredClone(result) as { attempts: Array<Record<string, unknown>> };
+    duplicateAttempt.attempts.push(structuredClone(duplicateAttempt.attempts[0]!));
+    expect(validateContract("result", duplicateAttempt).valid).toBe(false);
+
+    const omittedMetric = structuredClone(result) as { attempts: Array<{ metrics: Array<Record<string, unknown>> }> };
+    omittedMetric.attempts[0]!.metrics.pop();
+    expect(validateContract("result", omittedMetric).valid).toBe(false);
+
+    const undeclaredMetric = structuredClone(result) as { attempts: Array<{ metrics: Array<Record<string, unknown>> }> };
+    undeclaredMetric.attempts[0]!.metrics.push({ id: "efficiency.model_tokens", state: "unobserved", unit: "tokens", reason: "Synthetic telemetry is absent." });
+    expect(validateContract("result", undeclaredMetric).valid).toBe(false);
+
+    const revisionMismatch = structuredClone(result) as { attempts: Array<{ subject_revision: string }> };
+    revisionMismatch.attempts[0]!.subject_revision = "1111111111111111111111111111111111111111";
+    expect(validateContract("result", revisionMismatch).valid).toBe(false);
+
+    const incompleteCatalog = structuredClone(catalog) as { metrics: Array<{ calculation?: string }> };
+    delete incompleteCatalog.metrics[0]!.calculation;
+    expect(validateContract("catalog", incompleteCatalog).valid).toBe(false);
+
+    const unresolvedAggregate = structuredClone(result) as { aggregates: Array<Record<string, unknown>> };
+    unresolvedAggregate.aggregates.push({ metric_id: "efficiency.wall_seconds", observed_count: 0, unobserved_count: 0, not_applicable_count: 0 });
+    expect(validateContract("result", unresolvedAggregate).valid).toBe(false);
   });
 
   test("validates a selected public contract from the command line", async () => {

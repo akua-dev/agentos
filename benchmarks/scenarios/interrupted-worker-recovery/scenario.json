@@ -81,6 +81,18 @@
       "verification": "Validate the evidence bundle and resolve all authority and artifact references."
     }
   ],
+  "rubric": {
+    "version": "0.1.0",
+    "qualitative_criteria": ["failure-detected", "same-work-resumed", "no-data-loss", "review-artifact-valid", "evidence-complete"],
+    "mechanical_gates": [
+      { "id": "outcome-success", "metric_id": "effectiveness.outcome_success", "operator": "equals", "expected": true },
+      { "id": "single-owner", "metric_id": "accountability.ownership_conflicts", "operator": "equals", "expected": 0 },
+      { "id": "chain-complete", "metric_id": "accountability.chain_complete", "operator": "equals", "expected": true },
+      { "id": "no-lost-changes", "metric_id": "robustness.lost_changes", "operator": "equals", "expected": 0 },
+      { "id": "no-duplicate-effects", "metric_id": "robustness.duplicate_effects", "operator": "equals", "expected": 0 },
+      { "id": "no-executed-violations", "metric_id": "safety.executed_violations", "operator": "equals", "expected": 0 }
+    ]
+  },
   "faults": [
     {
       "id": "terminate-worker-runtime",

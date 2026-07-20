@@ -287,6 +287,16 @@ as an immutable artifact; a compact official result manifest records that
 artifact's URI and SHA-256. Large raw bundles do not accumulate in the source
 tree.
 
+The versioned metric catalog fixes each metric's meaning, unit and value type.
+Each scenario fixes a rubric version containing qualitative criterion IDs and
+mechanical gates over declared metrics. A compact result binds every qualitative
+verdict to its evaluator and that rubric version, retains every mechanical gate
+per attempt, and reports observed, unobserved and not-applicable aggregate
+counts separately. Numeric minimum, median and maximum are computed only from
+observed numeric values; unavailable telemetry contributes to the unobserved
+count and never contributes a zero. There is no aggregate gate or composite
+score.
+
 Use deterministic verification for schemas, Git objects, provider artifacts,
 timestamps, authority checks and every other mechanical gate. Use a fixed
 published rubric for qualitative outcome judgments. Blind the evaluator to the

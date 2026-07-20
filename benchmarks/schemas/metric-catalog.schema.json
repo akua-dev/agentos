@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/akua-dev/agentos/main/benchmarks/schemas/metric-catalog.schema.json",
+  "title": "Portable benchmark metric catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "catalog_version", "metrics"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "catalog_version": { "$ref": "#/$defs/version" },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "pillar", "unit", "value_type", "description", "calculation", "applicability", "required_evidence"],
+        "properties": {
+          "id": { "$ref": "#/$defs/metricIdentifier" },
+          "pillar": { "enum": ["effectiveness", "attention", "efficiency", "robustness", "safety", "accountability"] },
+          "unit": { "$ref": "#/$defs/nonEmptyText" },
+          "value_type": { "enum": ["number", "integer", "boolean", "string"] },
+          "description": { "$ref": "#/$defs/nonEmptyText" },
+          "calculation": { "$ref": "#/$defs/nonEmptyText" },
+          "applicability": { "$ref": "#/$defs/nonEmptyText" },
+          "required_evidence": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/nonEmptyText" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "metricIdentifier": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$" },
+    "version": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$" },
+    "nonEmptyText": { "type": "string", "minLength": 1, "pattern": "\\S" }
+  }
+}
