@@ -52,7 +52,7 @@
     },
     "redactions": {
       "type": "array",
-      "maxItems": 8,
+      "maxItems": 13,
       "items": {
         "type": "object",
         "additionalProperties": false,
