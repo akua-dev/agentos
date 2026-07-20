@@ -155,6 +155,27 @@ describe("pg-listen", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  test("preserves the explicit pgpass resolver for a passwordless DATABASE_URL", () => {
+    const previousDatabaseUrl = process.env.DATABASE_URL;
+    const previousPassword = process.env.PGPASSWORD;
+
+    try {
+      process.env.DATABASE_URL =
+        "postgresql://runtime_agent@db.internal:5432/fleet?sslmode=verify-full";
+      delete process.env.PGPASSWORD;
+
+      const client = postgresListener.createPostgresListenerClient() as unknown as {
+        password: unknown;
+      };
+      expect(typeof client.password).toBe("function");
+    } finally {
+      if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = previousDatabaseUrl;
+      if (previousPassword === undefined) delete process.env.PGPASSWORD;
+      else process.env.PGPASSWORD = previousPassword;
+    }
+  });
 });
 
 type PgPassConnection = {
