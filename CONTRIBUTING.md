@@ -285,6 +285,14 @@ prior step succeeds. Repository release immutability then prevents replacing
 the assets or tag. Never hand-edit a generated manifest, reuse a release tag,
 or publish a local emulation build as the stable image.
 
+The workflow normally publishes with its short-lived repository
+`GITHUB_TOKEN`. A repository that must update a pre-existing GHCR package not
+yet granted Actions access may provide `AGENTOS_GHCR_TOKEN` as a repository
+secret with `write:packages`; grant the package explicit Actions access to the
+repository and remove that compatibility secret as soon as the package
+settings allow it. Never put either token in an image, command argument or
+release asset.
+
 To inspect the renderer without cutting a release, run it locally only with an
 already published immutable digest:
 
