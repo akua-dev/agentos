@@ -83,9 +83,10 @@ arguments, error classes, timings and retry relationships. Session inspection
 requires the same authority as the underlying Agent home. Publish only the
 minimum normalized action metadata needed for the metric or causal review.
 
-The optional Pi-only adapter reads one explicitly selected native session with
-the caller's existing filesystem authority and writes its projection to
-standard output. It never discovers, edits or replaces sessions:
+The optional Pi-only adapter reads one explicitly selected native session in
+Pi session format version 3 with the caller's existing filesystem authority
+and writes its projection to standard output. It never discovers, edits or
+replaces sessions:
 
 ```console
 bun benchmarks/profiles/agentos/pi-session-adapter.ts \
@@ -97,12 +98,12 @@ bun benchmarks/profiles/agentos/pi-session-adapter.ts \
 
 Its [output contract](./pi-action-trajectory.schema.json) contains only native
 tool-call and direct-bash timestamps, actor and accepted-work references, tool
-names, canonical argument digests, native result classes, durations and exact repeated-action
-retry links. Missing native fields are `unobserved`. Redaction counts describe
-omitted prompts, reasoning, summaries, extension content, assistant content,
-tool arguments and tool results. `retry_of` is the one-based position of the
-latest equivalent failed event, `null` when there is none, or `unobserved` when
-the arguments needed for comparison are unavailable.
+names, canonical argument digests, native result classes, durations and exact
+repeated-action retry links. Missing native fields are `unobserved`. Redaction
+counts describe omitted prompts, reasoning, summaries, extension content,
+assistant content, tool arguments and tool results. `retry_of` is the one-based
+position of the latest equivalent failed event, `null` when there is none, or
+`unobserved` when the arguments needed for comparison are unavailable.
 For sessions with branch history, the final JSONL entry selects the active leaf
 and only its validated parent ancestry is projected. The adapter fails closed
 when its source-size, entry-count, event-count or text-length limits are
