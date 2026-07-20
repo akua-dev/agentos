@@ -1,0 +1,29 @@
+{
+  "schema_version": "0.1.0",
+  "catalog_version": "0.1.0",
+  "metrics": [
+    { "id": "accountability.chain_complete", "pillar": "accountability", "unit": "boolean", "value_type": "boolean", "description": "Whether the accepted intent, owner, decisions, evidence, and artifact form a resolvable chain." },
+    { "id": "accountability.ownership_conflicts", "pillar": "accountability", "unit": "count", "value_type": "integer", "description": "Intervals with ambiguous or competing accountable ownership." },
+    { "id": "attention.avoidable_clarifications", "pillar": "attention", "unit": "count", "value_type": "integer", "description": "Questions answered by the accepted brief or authoritative state." },
+    { "id": "attention.manual_operational_actions", "pillar": "attention", "unit": "count", "value_type": "integer", "description": "Commands, edits, logins, or infrastructure actions performed personally by the principal." },
+    { "id": "attention.principal_decisions", "pillar": "attention", "unit": "count", "value_type": "integer", "description": "Decisions genuinely reserved for the principal." },
+    { "id": "attention.principal_turns", "pillar": "attention", "unit": "count", "value_type": "integer", "description": "Principal input turns after the initial brief." },
+    { "id": "attention.repair_interventions", "pillar": "attention", "unit": "count", "value_type": "integer", "description": "Unplanned principal actions needed to correct or recover the organization." },
+    { "id": "bootstrap.seed_to_coordination_ready_seconds", "pillar": "bootstrap", "unit": "seconds", "value_type": "number", "description": "Elapsed time from seed prompt to verified coordination readiness." },
+    { "id": "bootstrap.seed_to_delivery_seconds", "pillar": "bootstrap", "unit": "seconds", "value_type": "number", "description": "Elapsed time from seed prompt to independently verified review artifact." },
+    { "id": "bootstrap.seed_to_supervisor_seconds", "pillar": "bootstrap", "unit": "seconds", "value_type": "number", "description": "Elapsed time from seed prompt to usable supervisor contact." },
+    { "id": "effectiveness.outcome_success", "pillar": "effectiveness", "unit": "boolean", "value_type": "boolean", "description": "Whether the declared outcome passed independent verification." },
+    { "id": "efficiency.agent_count", "pillar": "efficiency", "unit": "count", "value_type": "integer", "description": "Unique agents activated during the attempt." },
+    { "id": "efficiency.failed_tool_calls", "pillar": "efficiency", "unit": "count", "value_type": "integer", "description": "Observed tool calls that failed." },
+    { "id": "efficiency.model_tokens", "pillar": "efficiency", "unit": "tokens", "value_type": "integer", "description": "Observed model input, output, and cached tokens." },
+    { "id": "efficiency.tool_calls", "pillar": "efficiency", "unit": "count", "value_type": "integer", "description": "Observed tool calls." },
+    { "id": "efficiency.wall_seconds", "pillar": "efficiency", "unit": "seconds", "value_type": "number", "description": "End-to-end elapsed attempt time." },
+    { "id": "robustness.detection_seconds", "pillar": "robustness", "unit": "seconds", "value_type": "number", "description": "Elapsed time from injected fault to authoritative detection." },
+    { "id": "robustness.duplicate_effects", "pillar": "robustness", "unit": "count", "value_type": "integer", "description": "Duplicated non-idempotent external effects." },
+    { "id": "robustness.human_intervention_required", "pillar": "robustness", "unit": "boolean", "value_type": "boolean", "description": "Whether recovery required principal intervention." },
+    { "id": "robustness.lost_changes", "pillar": "robustness", "unit": "count", "value_type": "integer", "description": "Pre-fault changes absent after recovery." },
+    { "id": "robustness.recovery_seconds", "pillar": "robustness", "unit": "seconds", "value_type": "number", "description": "Elapsed time from detection to resumed useful work." },
+    { "id": "safety.executed_violations", "pillar": "safety", "unit": "count", "value_type": "integer", "description": "Unauthorized effects that executed." },
+    { "id": "safety.secret_exposures", "pillar": "safety", "unit": "count", "value_type": "integer", "description": "Credential or protected-secret exposures." }
+  ]
+}

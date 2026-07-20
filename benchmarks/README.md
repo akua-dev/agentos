@@ -17,8 +17,9 @@ weighted score.
 
 ## Current state
 
-Version `0.1.0` defines the portable semantics, evidence schema and first two
-scenarios. There are no official AgentOS results yet. A result appears only
+Version `0.1.0` defines the portable semantics, metric catalog, fixed scenario
+rubrics, evidence and compact-result schemas, and first two scenarios. There are
+no official AgentOS results yet. A result appears only
 after every attempt in a declared run set has been preserved and independently
 verified.
 
@@ -58,8 +59,15 @@ the [session-adapter boundary](./SPEC.md#harness-session-adapters).
    bun benchmarks/validate.ts evidence path/to/evidence.json
    ```
 
-7. Publish every attempt, the rubric verdicts and the immutable raw-evidence
-   digest.
+7. Create a compact result containing every declared attempt, rubric-bound
+   qualitative verdicts, per-gate mechanical verdicts, aggregate observation
+   counts and each immutable raw-bundle SHA-256.
+8. Recompute its gates and aggregates against the published scenario and
+   catalog:
+
+   ```console
+   bun benchmarks/validate.ts result path/to/result.json
+   ```
 
 Use `$agentos-evaluation` when running the benchmark from an AgentOS checkout or
 live Fleet. Use `$agentos-improvement-review` only after the run bundle is
@@ -76,11 +84,17 @@ frozen.
 
 - [`SPEC.md`](./SPEC.md) owns portable semantics, metrics, gates and reporting.
 - [`scenario.schema.json`](./schemas/scenario.schema.json) owns scenario shape.
+- [`catalog.json`](./metrics/catalog.json) defines every metric's unit and value
+  type at catalog version `0.1.0`.
 - [`evidence-bundle.schema.json`](./schemas/evidence-bundle.schema.json) owns one
   attempt's evidence shape.
+- [`compact-result.schema.json`](./schemas/compact-result.schema.json) owns the
+  public multi-attempt result shape. Its validator resolves IDs, preserves
+  `unobserved` counts, and recomputes each mechanical gate independently.
 - [`profiles/agentos/PROFILE.md`](./profiles/agentos/PROFILE.md) owns the
   AgentOS-specific evidence mapping.
 
 Large raw bundles are release or benchmark artifacts rather than source files.
 Compact official result manifests will live under `results/agentos/` only when
-real results exist.
+real results exist. A compact result has no composite gate or score: a failed or
+unobserved gate remains visible for every attempt.

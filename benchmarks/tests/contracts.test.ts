@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import Ajv2020 from "ajv/dist/2020";
 import type { AnySchema } from "ajv";
+import { validateContract } from "../validate";
 
 const benchmarkRoot = join(import.meta.dir, "..");
 
@@ -38,6 +39,7 @@ describe("public benchmark contracts", () => {
 
       expect(validate(scenario)).toBe(true);
       expect(validate.errors).toBeNull();
+      expect(validateContract("scenario", scenario).valid).toBe(true);
     }
   });
 
@@ -60,6 +62,33 @@ describe("public benchmark contracts", () => {
     delete invalid.metrics[0]?.state;
 
     expect(validate(invalid)).toBe(false);
+
+    const unresolved = structuredClone(example) as { metrics: Array<{ source_event_ids: string[] }> };
+    unresolved.metrics[0]!.source_event_ids = ["missing-event"];
+    expect(validateContract("evidence", unresolved).valid).toBe(false);
+
+    const duplicate = structuredClone(example) as { events: Array<Record<string, unknown>> };
+    duplicate.events.push(structuredClone(duplicate.events[0]!));
+    expect(validateContract("evidence", duplicate).valid).toBe(false);
+  });
+
+  test("validates the catalog and recomputes compact-result gates and aggregates", async () => {
+    const catalog = await readJson("metrics/catalog.json");
+    const result = await readJson("tests/fixtures/minimal-compact-result.json");
+    expect(validateContract("catalog", catalog).valid).toBe(true);
+    expect(validateContract("result", result).valid).toBe(true);
+
+    const wrongGate = structuredClone(result) as { attempts: Array<{ mechanical_gates: Array<{ status: string }> }> };
+    wrongGate.attempts[0]!.mechanical_gates[0]!.status = "failed";
+    expect(validateContract("result", wrongGate).valid).toBe(false);
+
+    const missingValue = structuredClone(result) as { attempts: Array<{ metrics: Array<{ value?: unknown }> }> };
+    delete missingValue.attempts[0]!.metrics[0]!.value;
+    expect(validateContract("result", missingValue).valid).toBe(false);
+
+    const duplicateAttempt = structuredClone(result) as { attempts: Array<Record<string, unknown>> };
+    duplicateAttempt.attempts.push(structuredClone(duplicateAttempt.attempts[0]!));
+    expect(validateContract("result", duplicateAttempt).valid).toBe(false);
   });
 
   test("validates a selected public contract from the command line", async () => {
