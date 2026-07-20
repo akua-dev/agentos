@@ -266,9 +266,27 @@ reconciliation without posting publicly.
 ## Stable release manifests
 
 A GitHub release is optional for development and dogfooding: an exact Git
-commit plus immutable OCI digest is sufficient. For a stable distribution,
-render release assets only after the multi-platform image has been published
-and its registry digest is known:
+commit plus immutable OCI digest is sufficient. Stable releases are cut only
+from an exact semantic-version tag whose commit is already on `main` with a
+green required `check`. Push that tag once:
+
+```console
+git tag v<semver> <exact-commit>
+git push origin v<semver>
+```
+
+The [`Release`](./.github/workflows/release.yml) workflow builds the same clean
+tagged checkout on native GitHub-hosted amd64 and arm64 runners, publishes the
+two platform images, joins them into one OCI index, resolves its registry
+digest, and renders the ordinary human-readable block YAML directly from
+Kustomize. It uploads the fixed-name scoped, cluster-admin and database
+manifests to a draft GitHub release and publishes the release only after every
+prior step succeeds. Repository release immutability then prevents replacing
+the assets or tag. Never hand-edit a generated manifest, reuse a release tag,
+or publish a local emulation build as the stable image.
+
+To inspect the renderer without cutting a release, run it locally only with an
+already published immutable digest:
 
 ```console
 mise install
@@ -277,11 +295,6 @@ bun run release/kubernetes/render.ts \
   --version <semver> \
   --output dist/release
 ```
-
-The renderer emits ordinary human-readable block YAML directly from Kustomize.
-Publish all generated manifests on a draft GitHub release, then publish it with
-release immutability enabled. Never hand-edit a generated manifest or reuse a
-release tag or image digest for different contents.
 
 The image build accepts only a clean Git checkout. Its intermediate stage
 creates a shallow one-commit repository with credential-free `origin` and

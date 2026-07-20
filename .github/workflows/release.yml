@@ -1,0 +1,163 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    name: image (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+            suffix: amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            suffix: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - name: Check out the released revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve the release version
+        id: release
+        env:
+          TAG: ${{ github.ref_name }}
+        run: >-
+          node -e 'const tag = process.env.TAG;
+          if (!/^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(tag))
+          throw new Error(`Invalid release tag: ${tag}`);
+          require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT,
+          `version=${tag.slice(1)}\n`);'
+
+      - name: Log in to the GitHub container registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up BuildKit
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build and publish the native image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          build-args: AGENTOS_VERSION=${{ steps.release.outputs.version }}
+          context: .
+          platforms: ${{ matrix.platform }}
+          provenance: mode=max
+          push: true
+          sbom: true
+          tags: ghcr.io/akua-dev/agentos:${{ steps.release.outputs.version }}-${{ matrix.suffix }}
+
+  publish:
+    name: publish immutable release
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out the released revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve the release version
+        id: release
+        env:
+          TAG: ${{ github.ref_name }}
+        run: >-
+          node -e 'const tag = process.env.TAG;
+          if (!/^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(tag))
+          throw new Error(`Invalid release tag: ${tag}`);
+          require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT,
+          `version=${tag.slice(1)}\n`);'
+
+      - name: Log in to the GitHub container registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up BuildKit
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Publish the multi-platform image index
+        id: image
+        env:
+          IMAGE: ghcr.io/akua-dev/agentos
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          docker buildx imagetools create \
+            --tag "${IMAGE}:${VERSION}" \
+            "${IMAGE}:${VERSION}-amd64" \
+            "${IMAGE}:${VERSION}-arm64"
+          digest="$(docker buildx imagetools inspect \
+            --format '{{.Manifest.Digest}}' "${IMAGE}:${VERSION}")"
+          case "${digest}" in
+            sha256:????????????????????????????????????????????????????????????????) ;;
+            *) echo "Invalid image digest: ${digest}" >&2; exit 1 ;;
+          esac
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          docker buildx imagetools inspect "${IMAGE}@${digest}"
+
+      - name: Install the locked toolchain
+        uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
+        with:
+          cache: false
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Render the fixed-name release assets
+        env:
+          IMAGE: ghcr.io/akua-dev/agentos
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: >-
+          bun run release/kubernetes/render.ts
+          --image "${IMAGE}@${IMAGE_DIGEST}"
+          --version "${VERSION}"
+          --output dist/release
+
+      - name: Publish the immutable GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          node -e 'require("node:fs").writeFileSync(
+            "dist/release-notes.md",
+            `Immutable AgentOS image: \`ghcr.io/akua-dev/agentos@${process.env.IMAGE_DIGEST}\`\n`,
+          )'
+          gh release create "${TAG}" \
+            --draft \
+            --notes-file dist/release-notes.md \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "AgentOS ${TAG}" \
+            --verify-tag \
+            dist/release/agentos-firstmate.yaml \
+            dist/release/agentos-firstmate-cluster-admin.yaml \
+            dist/release/agentos-postgres.yaml
+          gh release edit "${TAG}" \
+            --draft=false \
+            --latest \
+            --repo "${GITHUB_REPOSITORY}"
