@@ -4,6 +4,10 @@ import { readFile } from "node:fs/promises";
 const SCHEMA_VERSION = "0.1.0";
 const SUPPORTED_PI_SESSION_VERSION = 3;
 const UNOBSERVED = "unobserved" as const;
+const MAX_SESSION_CHARACTERS = 10_000_000;
+const MAX_SESSION_ENTRIES = 10_000;
+const MAX_EVENTS = 1_000;
+const MAX_TEXT_LENGTH = 256;
 
 type JsonObject = Record<string, unknown>;
 
@@ -67,6 +71,7 @@ function normalizedTimestamp(messageTimestamp: unknown, entryTimestamp: unknown)
 }
 
 function parseJsonLines(content: string): JsonObject[] {
+  if (content.length > MAX_SESSION_CHARACTERS) throw new Error("Pi session exceeds the supported size limit");
   const entries: JsonObject[] = [];
   for (const [index, line] of content.split(/\r?\n/).entries()) {
     if (line.trim() === "") continue;
@@ -79,8 +84,36 @@ function parseJsonLines(content: string): JsonObject[] {
     const entry = asObject(value);
     if (entry === undefined) throw new Error(`Pi session line ${index + 1} is not an object`);
     entries.push(entry);
+    if (entries.length > MAX_SESSION_ENTRIES) throw new Error("Pi session exceeds the supported entry limit");
   }
   return entries;
+}
+
+function activeBranch(entries: JsonObject[]): JsonObject[] {
+  if (entries.length === 0) return [];
+  const entriesById = new Map<string, JsonObject>();
+  for (const entry of entries) {
+    if (typeof entry.id !== "string" || entry.id === "") throw new Error("Pi session entry is missing its id");
+    if (entriesById.has(entry.id)) throw new Error(`duplicate Pi session entry id: ${entry.id}`);
+    if (entry.parentId !== null && typeof entry.parentId !== "string") {
+      throw new Error(`Pi session entry ${entry.id} has an invalid parentId`);
+    }
+    entriesById.set(entry.id, entry);
+  }
+
+  const branch: JsonObject[] = [];
+  const visited = new Set<string>();
+  let current: JsonObject | undefined = entries.at(-1);
+  while (current !== undefined) {
+    const id = current.id as string;
+    if (visited.has(id)) throw new Error("Pi session branch contains a cycle");
+    visited.add(id);
+    branch.push(current);
+    if (current.parentId === null) break;
+    current = entriesById.get(current.parentId as string);
+    if (current === undefined) throw new Error(`Pi session entry ${id} references a missing parent`);
+  }
+  return branch.reverse();
 }
 
 function countRedactedContent(message: JsonObject, counts: Map<string, number>): void {
@@ -104,8 +137,9 @@ function countRedactedEntry(entry: JsonObject, counts: Map<string, number>): voi
   }
 }
 
-function requireNonEmpty(label: string, value: string): void {
+function requireBoundedText(label: string, value: string): void {
   if (value.trim() === "") throw new Error(`${label} must not be empty`);
+  if (value.length > MAX_TEXT_LENGTH) throw new Error(`${label} exceeds the supported length limit`);
 }
 
 export function projectPiSession(
@@ -113,8 +147,8 @@ export function projectPiSession(
   actor: string,
   acceptedWorkReference: string,
 ): PiActionTrajectory {
-  requireNonEmpty("actor", actor);
-  requireNonEmpty("accepted-work reference", acceptedWorkReference);
+  requireBoundedText("actor", actor);
+  requireBoundedText("accepted-work reference", acceptedWorkReference);
 
   const entries = parseJsonLines(content);
   const header = entries[0];
@@ -128,7 +162,7 @@ export function projectPiSession(
   const actionsByToolCallId = new Map<string, PendingAction>();
   const redactionCounts = new Map<string, number>();
 
-  for (const entry of entries.slice(1)) {
+  for (const entry of activeBranch(entries.slice(1))) {
     if (entry.type !== "message") {
       countRedactedEntry(entry, redactionCounts);
       continue;
@@ -166,6 +200,7 @@ export function projectPiSession(
           accepted_work_reference: acceptedWorkReference,
         },
       });
+      if (actions.length > MAX_EVENTS) throw new Error("Pi session exceeds the supported action limit");
       continue;
     }
 
@@ -176,6 +211,7 @@ export function projectPiSession(
         if (block?.type !== "toolCall") continue;
         if (typeof block.id !== "string" || block.id === "") throw new Error("Pi tool call is missing its id");
         if (typeof block.name !== "string" || block.name === "") throw new Error(`Pi tool call ${block.id} is missing its name`);
+        if (block.name.length > MAX_TEXT_LENGTH) throw new Error(`Pi tool call ${block.id} name exceeds the supported length limit`);
         if (actionsByToolCallId.has(block.id)) throw new Error(`duplicate Pi tool call id: ${block.id}`);
 
         const digest = argumentDigest(block.arguments);
@@ -201,6 +237,7 @@ export function projectPiSession(
           },
         };
         actions.push(action);
+        if (actions.length > MAX_EVENTS) throw new Error("Pi session exceeds the supported action limit");
         actionsByToolCallId.set(block.id, action);
       }
       continue;

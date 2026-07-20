@@ -102,5 +102,35 @@ describe("Pi session action adapter", () => {
     expect(() => projectPiSession("not-json\n", "agent", "work")).toThrow("not valid JSON");
     expect(() => projectPiSession(`${JSON.stringify({ type: "session", version: 99 })}\n`, "agent", "work")).toThrow("unsupported Pi session version");
     expect(() => projectPiSession(fixture, "", "work")).toThrow("actor must not be empty");
+    expect(() => projectPiSession(fixture, "a".repeat(257), "work")).toThrow("length limit");
+  });
+
+  test("projects only the final leaf ancestry", () => {
+    const entries = [
+      { type: "session", version: 3 },
+      { type: "message", id: "root", parentId: null, message: { role: "user", content: "prompt" } },
+      { type: "message", id: "abandoned", parentId: "root", message: { role: "assistant", content: [{ type: "toolCall", id: "old-call", name: "write", arguments: { path: "private" } }] } },
+      { type: "message", id: "active", parentId: "root", message: { role: "assistant", content: [{ type: "toolCall", id: "new-call", name: "read", arguments: { path: "private" } }] } },
+    ].map((entry) => JSON.stringify(entry)).join("\n");
+
+    const trajectory = projectPiSession(entries, "agent", "work");
+    expect(trajectory.events).toHaveLength(1);
+    expect(trajectory.events[0]!.tool_name).toBe("read");
+    expect(trajectory.redactions).toContainEqual({ kind: "full_prompts", count: 1, method: "omitted" });
+  });
+
+  test("fails closed when the bounded projection limits are exceeded", () => {
+    const blocks = Array.from({ length: 1001 }, (_, index) => ({
+      type: "toolCall",
+      id: `call-${index}`,
+      name: "read",
+      arguments: {},
+    }));
+    const entries = [
+      { type: "session", version: 3 },
+      { type: "message", id: "entry", parentId: null, message: { role: "assistant", content: blocks } },
+    ].map((entry) => JSON.stringify(entry)).join("\n");
+
+    expect(() => projectPiSession(entries, "agent", "work")).toThrow("action limit");
   });
 });

@@ -103,6 +103,10 @@ omitted prompts, reasoning, summaries, extension content, assistant content,
 tool arguments and tool results. `retry_of` is the one-based position of the
 latest equivalent failed event, `null` when there is none, or `unobserved` when
 the arguments needed for comparison are unavailable.
+For sessions with branch history, the final JSONL entry selects the active leaf
+and only its validated parent ancestry is projected. The adapter fails closed
+when its source-size, entry-count, event-count or text-length limits are
+exceeded.
 The projection does not contain the source session ID, path, working directory,
 message text, result text or tool-call IDs.
 
