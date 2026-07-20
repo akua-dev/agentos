@@ -47,6 +47,31 @@ When the developer selects self-hosted PostgreSQL:
 5. Obtain the exact tagged CNPG manifest from the official release, verify its official signature or published checksum, and resolve every installed controller image to a digest. Apply only after approval, then verify rollout, version and observed image IDs before creating a database Cluster.
 6. Create an ephemeral rendered copy of the selected AgentOS database manifest and inject the chosen PostgreSQL operand as `tag@sha256`; never edit the canonical release asset. Apply that rendered manifest. The initial shape creates `Cluster/agentos-postgres` in `agentos`, one instance, a 20 GiB PVC, data checksums, database and owner `agentos`, and no network-enabled superuser. Explain that this minimal path is not HA and has no reviewed backup policy yet.
 7. Wait for the CNPG `Ready` condition, one Ready instance, Bound PVC, selected operand image ID, `agentos-postgres-rw` Service and `agentos-postgres-app` Secret. Never connect directly to a PostgreSQL Pod.
+8. Connect the live First Mate only with the selected AgentOS revision's
+   `agents/firstmate/kubernetes/patches/cloudnative-pg.yaml`. This is a native
+   strategic-merge patch for CNPG's exact Service and Secret conventions, not
+   a generic PostgreSQL overlay or another release manifest. Record the
+   StatefulSet's current image references and observed Pod image IDs first.
+   Preview the mutation against the live API without persisting it:
+
+   ```console
+   kubectl --namespace agentos patch statefulset agentos-firstmate \
+     --type strategic \
+     --patch-file "$AGENTOS_AGENT_CWD/kubernetes/patches/cloudnative-pg.yaml" \
+     --dry-run=server \
+     --output yaml
+   ```
+
+   Explain that changing the Pod template intentionally restarts First Mate,
+   confirm that the current Herdr/Pi session is durably resumable, and ask for
+   approval before applying the same command without `--dry-run=server` and
+   `--output yaml`. An external operator adds the already selected explicit
+   `--context`; an in-cluster First Mate uses its ServiceAccount and explicit
+   namespace. Wait for `statefulset/agentos-firstmate` rollout completion,
+   reattach to the same native session, and verify the home PVC, image
+   references, observed image IDs, pgpass handoff, TLS hostname and direct
+   database connection before migrating. The strategic patch must not change
+   the image, pull policy, PVC, RBAC or unrelated Pod settings.
 
 Stop if official provenance cannot be verified. For an existing database Cluster,
 observe and retain its PostgreSQL version; finding a newer release never
@@ -74,7 +99,13 @@ while `sslmode=no-verify` or libpq-compatibility mode would weaken identity
 verification. Validate the Service hostname against the certificate and
 recheck this configuration when upgrading the PostgreSQL driver.
 
-For an external endpoint, prefer an approved Kubernetes Secret or mode-`0600` file owned by the persistent agent. Keep the connection URI out of prompts, command arguments, shell history and normal logs.
+For an external endpoint, prefer an approved Kubernetes Secret or mode-`0600` file owned by the persistent agent. Keep the connection URI out of prompts, command arguments, shell history and normal logs. Do not apply the CNPG patch: create and preview the smallest installation-local strategic patch only after the endpoint, TLS identity and Secret keys are known and approved.
+
+After an operation that reapplies, replaces or recreates the First Mate
+StatefulSet, inspect its live Pod template. If the selected database wiring is
+missing, preview and reapply the applicable reviewed patch with the same
+restart approval; do not assume either that a routine image rollout removed it
+or that a replacement preserved it.
 
 Apply the migration chain with the login that owns the Fleet's released AgentOS
 tables. The released initialization migration creates or adopts the root

@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 type Resource = {
@@ -37,6 +39,42 @@ function resource(resources: Resource[], kind: string, name: string) {
   );
   if (!match) throw new Error(`Missing ${kind}/${name}`);
   return match;
+}
+
+async function applyStrategicPatch(
+  target: Resource,
+  patchFile: string,
+): Promise<Resource> {
+  const directory = await mkdtemp(join(tmpdir(), "agentos-kubectl-patch-"));
+  const targetFile = join(directory, "target.yaml");
+  await writeFile(targetFile, Bun.YAML.stringify(target), "utf8");
+  try {
+    const child = Bun.spawn(
+      [
+        "kubectl",
+        "patch",
+        "--local",
+        "--filename",
+        targetFile,
+        "--type",
+        "strategic",
+        "--patch-file",
+        patchFile,
+        "--output",
+        "yaml",
+      ],
+      { stderr: "pipe", stdout: "pipe" },
+    );
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
+    return Bun.YAML.parse(stdout) as Resource;
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
 }
 
 describe("First Mate Kubernetes resources", () => {
@@ -196,13 +234,57 @@ describe("First Mate Kubernetes resources", () => {
     ]);
   });
 
-  test("mounts CNPG client identity only through the PostgreSQL overlay", async () => {
-    const resources = await render(join(runtime, "overlays", "postgres"));
-    const statefulSet = resource(resources, "StatefulSet", "agentos-firstmate");
+  test("adds CNPG client identity without replacing live First Mate state", async () => {
+    const resources = await render(join(runtime, "base"));
+    const original = resource(resources, "StatefulSet", "agentos-firstmate");
+    const live = structuredClone(original);
+    const livePod = live.spec!.template.spec;
+    const liveImage = `ghcr.io/akua-dev/agentos@sha256:${"a".repeat(64)}`;
+    for (const container of [...livePod.initContainers, ...livePod.containers]) {
+      container.image = liveImage;
+      container.imagePullPolicy = "IfNotPresent";
+    }
+    livePod.containers[0].env.push({
+      name: "EXISTING_RUNTIME_SETTING",
+      value: "preserve-me",
+    });
+    livePod.containers[0].volumeMounts.push({
+      mountPath: "/var/run/existing",
+      name: "existing-runtime",
+      readOnly: true,
+    });
+    livePod.volumes = [
+      {
+        name: "existing-runtime",
+        configMap: { name: "existing-runtime" },
+      },
+    ];
+    const statefulSet = await applyStrategicPatch(
+      live,
+      join(runtime, "patches", "cloudnative-pg.yaml"),
+    );
     const pod = statefulSet.spec!.template.spec;
     const install = pod.initContainers[0];
     const prepare = pod.initContainers[1];
     const firstmate = pod.containers[0];
+    expect(
+      [install, prepare, firstmate].map(({ image }: { image: string }) => image),
+    ).toEqual([liveImage, liveImage, liveImage]);
+    expect(
+      [install, prepare, firstmate].map(
+        ({ imagePullPolicy }: { imagePullPolicy: string }) => imagePullPolicy,
+      ),
+    ).toEqual(["IfNotPresent", "IfNotPresent", "IfNotPresent"]);
+    expect(pod.serviceAccountName).toBe("agentos-firstmate");
+    expect(firstmate.volumeMounts).toContainEqual({
+      mountPath: "/home/agent",
+      name: "home",
+    });
+    expect(firstmate.volumeMounts).toContainEqual({
+      mountPath: "/var/run/existing",
+      name: "existing-runtime",
+      readOnly: true,
+    });
     expect(install.volumeMounts).not.toContainEqual(expect.objectContaining({ name: "postgres-ca" }));
     expect(install.volumeMounts).not.toContainEqual(expect.objectContaining({ name: "postgres-pgpass" }));
     expect(prepare.volumeMounts).toContainEqual({
@@ -225,6 +307,7 @@ describe("First Mate Kubernetes resources", () => {
     expect(environment).toMatchObject({
       DATABASE_URL:
         "postgresql://agentos@agentos-postgres-rw:5432/agentos?sslmode=verify-full",
+      EXISTING_RUNTIME_SETTING: "preserve-me",
       NODE_EXTRA_CA_CERTS: "/var/run/agentos/postgres/ca.crt",
       PGPASSFILE: "/home/agent/.pgpass",
       PGSSLMODE: "verify-full",
@@ -251,6 +334,10 @@ describe("First Mate Kubernetes resources", () => {
         items: [{ key: "pgpass", path: "pgpass" }],
         secretName: "agentos-postgres-app",
       },
+    });
+    expect(pod.volumes).toContainEqual({
+      name: "existing-runtime",
+      configMap: { name: "existing-runtime" },
     });
   });
 });
