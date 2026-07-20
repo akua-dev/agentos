@@ -6,7 +6,7 @@
   "type": "module",
   "workspaces": ["clis/*", "database", "services/*"],
   "scripts": {
-    "test": "bun test . ./agents/.pi/background-tasks",
+    "test": "bun test . ./agents/.pi/background-tasks ./agents/.pi/supervision-guard",
     "typecheck": "tsc --project tsconfig.json",
     "check": "bun run test && bun run typecheck"
   },
