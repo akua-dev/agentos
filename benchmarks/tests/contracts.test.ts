@@ -100,6 +100,15 @@ describe("public benchmark contracts", () => {
     expect(validateContract("catalog", catalog).valid).toBe(true);
     expect(validateContract("result", result).valid).toBe(true);
 
+    const deterministicEvaluator = structuredClone(result) as {
+      attempts: Array<{
+        qualitative_verdicts: Array<{ evaluator: { kind: string } }>;
+      }>;
+    };
+    deterministicEvaluator.attempts[0]!.qualitative_verdicts[0]!.evaluator.kind =
+      "deterministic";
+    expect(validateContract("result", deterministicEvaluator).valid).toBe(true);
+
     const wrongGate = structuredClone(result) as { attempts: Array<{ mechanical_gates: Array<{ status: string }> }> };
     wrongGate.attempts[0]!.mechanical_gates[0]!.status = "failed";
     expect(validateContract("result", wrongGate).valid).toBe(false);
