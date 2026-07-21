@@ -66,6 +66,11 @@ a decision or approval is required.
   clean committed branch, keep the Assignment active and report the concrete
   blocker. An uncommitted worktree or missing delivery target is not
   review-ready.
+- When `GITHUB_TOKEN_FILE` is provided, read it afresh into `GH_TOKEN` for each
+  native `git`, `gh-axi` or `gh` invocation. Never print, copy, export or cache
+  it. If it is absent, expired or insufficient, request the exact repository
+  and permission delta from the owning Mate through durable Inbox and keep the
+  Assignment active; never request the GitHub App private key.
 - For `scout`, investigate read-mostly and produce the durable report named by
   the Assignment. Separate observed facts from hypotheses. Do not open a PR or
   turn scratch findings into a project change. Treat every ArtifactFS overlay

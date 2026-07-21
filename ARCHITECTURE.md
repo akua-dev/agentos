@@ -197,11 +197,17 @@ hidden behind an outbox worker.
 Provider identity stays at the same native boundary. An individual may keep
 native `gh` authentication on the owning Mate's PVC. A team may instead mount a
 dedicated GitHub App private key into First Mate only and mint short-lived
-installation tokens on demand for native `git`, `gh-axi` and `gh` calls. The
-key never enters Agent home, Fleet rows, child Agents or source control, and no
-long-lived token is cached. Repository permissions are a Captain-reviewed
-provider boundary, not Fleet authority; the accepted delivery workflow still
-controls which write or merge is allowed.
+installation tokens on demand for native `git`, `gh-axi` and `gh` calls. First
+Mate may reduce a child Agent's token to the repositories and permissions needed
+by its active Assignment, deliver it through one Agent-specific projected
+Kubernetes Secret, and replace that Secret before the provider expiry. The
+child reads the projected file for each provider command; it never receives the
+App key or a cached long-lived token. A request for broader access travels up
+the durable hierarchy and never enlarges itself. The key and token never enter
+Agent home, Fleet rows, task briefs or source control; only non-secret scope,
+expiry and Secret references may be recorded. Repository permissions are a
+Captain-reviewed provider boundary, not Fleet authority; the accepted delivery
+workflow still controls which write or merge is allowed.
 
 ## Toolchains and worktrees
 
