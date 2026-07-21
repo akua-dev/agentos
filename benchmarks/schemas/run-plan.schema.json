@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/akua-dev/agentos/main/benchmarks/schemas/run-plan.schema.json",
+  "title": "Portable benchmark run plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "mode",
+    "scenario_path",
+    "subject",
+    "environment",
+    "evaluator",
+    "execution"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "run_id": { "$ref": "#/$defs/nonEmptyText" },
+    "mode": { "enum": ["conformance", "live", "offline"] },
+    "scenario_path": { "$ref": "#/$defs/nonEmptyText" },
+    "subject": { "$ref": "#/$defs/subject" },
+    "environment": { "$ref": "#/$defs/environment" },
+    "evaluator": { "$ref": "#/$defs/evaluator" },
+    "execution": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "conformance" } }, "required": ["mode"] },
+      "then": {
+        "properties": {
+          "environment": {
+            "type": "object",
+            "required": ["approval_reference"],
+            "properties": {
+              "isolation": { "const": "disposable" },
+              "approval_reference": { "$ref": "#/$defs/nonEmptyText" }
+            }
+          },
+          "execution": { "$ref": "#/$defs/conformanceExecution" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "live" } }, "required": ["mode"] },
+      "then": {
+        "properties": {
+          "environment": {
+            "type": "object",
+            "properties": { "isolation": { "const": "production-observation" } }
+          },
+          "execution": { "$ref": "#/$defs/liveExecution" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "offline" } }, "required": ["mode"] },
+      "then": {
+        "properties": {
+          "environment": {
+            "type": "object",
+            "properties": { "isolation": { "const": "offline" } }
+          },
+          "execution": { "$ref": "#/$defs/offlineExecution" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonEmptyText": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "stringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonEmptyText" }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "$ref": "#/$defs/nonEmptyText" },
+        "version": { "$ref": "#/$defs/nonEmptyText" }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "source_revision", "images"],
+      "properties": {
+        "name": { "$ref": "#/$defs/nonEmptyText" },
+        "version": { "$ref": "#/$defs/nonEmptyText" },
+        "source_revision": { "$ref": "#/$defs/nonEmptyText" },
+        "images": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "isolation", "permissions", "harnesses", "models", "tools"],
+      "properties": {
+        "description": { "$ref": "#/$defs/nonEmptyText" },
+        "isolation": { "enum": ["disposable", "production-observation", "offline"] },
+        "approval_reference": { "$ref": "#/$defs/nonEmptyText" },
+        "permissions": { "$ref": "#/$defs/stringArray" },
+        "harnesses": { "type": "array", "items": { "$ref": "#/$defs/component" } },
+        "models": { "type": "array", "items": { "$ref": "#/$defs/component" } },
+        "tools": { "type": "array", "items": { "$ref": "#/$defs/component" } }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "version"],
+      "properties": {
+        "kind": { "enum": ["deterministic", "model", "human", "hybrid"] },
+        "name": { "$ref": "#/$defs/nonEmptyText" },
+        "version": { "$ref": "#/$defs/nonEmptyText" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interface", "command"],
+      "properties": {
+        "interface": { "$ref": "#/$defs/nonEmptyText" },
+        "command": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmptyText" }
+        }
+      }
+    },
+    "faultCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "interface", "command"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyText" },
+        "interface": { "$ref": "#/$defs/nonEmptyText" },
+        "command": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmptyText" }
+        },
+        "approval_reference": { "$ref": "#/$defs/nonEmptyText" }
+      }
+    },
+    "conformanceExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collector"],
+      "properties": {
+        "collector": { "$ref": "#/$defs/command" },
+        "trigger": { "$ref": "#/$defs/command" },
+        "fault": { "$ref": "#/$defs/faultCommand" }
+      }
+    },
+    "liveExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completed_work_reference", "collector"],
+      "properties": {
+        "completed_work_reference": { "$ref": "#/$defs/nonEmptyText" },
+        "collector": { "$ref": "#/$defs/command" }
+      }
+    },
+    "offlineExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_bundle_path", "source_bundle_sha256"],
+      "properties": {
+        "source_bundle_path": { "$ref": "#/$defs/nonEmptyText" },
+        "source_bundle_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}
