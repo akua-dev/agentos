@@ -149,12 +149,12 @@ blocked, what was learned and what needs the Captain.
 
 ## Where this is
 
-Early. Brutally early. The First Mate boots, establishes its database before it
-accepts delegated Fleet work, provisions crew, and supervises with real wake-ups
-instead of polling. The bootstrap is one prompt you paste into any coding
-agent. There's no release yet, the loop isn't fully closed, and half of what
-the docs promise is a week ahead of what the code proves. That gap closes in
-public.
+Early. The First Mate boots, establishes its database before it accepts
+delegated Fleet work, provisions crew, and supervises with real wake-ups instead
+of polling. The bootstrap is one prompt you paste into any coding agent. The
+first immutable release and public bootstrap, delivery and recovery evidence
+exist; one proven Fleet is not yet broad production maturity. The remaining gap
+closes in public.
 
 The current focus, in order: make one persistent First Mate dependable enough
 to be the daily company interface; make the first experience a conversation,
