@@ -9,19 +9,37 @@ Use Kubernetes for workload truth and the pod-local Herdr server for terminal tr
 
 ## Inspect before action
 
-1. Resolve an explicit Kubernetes context, namespace, workload and agent identity.
-2. Inspect pod phase, readiness, ownership, PVC bindings and immutable release identity.
-3. Query the target Herdr server with `herdr agent get <handle> --session
+1. Resolve the current execution boundary and the intended target before
+   choosing a transport. Use the same independent signals as bootstrap:
+   `KUBERNETES_SERVICE_HOST` plus its Service port, the standard mounted
+   ServiceAccount CA/token/namespace files without printing the token, and a
+   read-only API confirmation when identity matters. The namespace file is
+   authoritative for that mount; the hostname is only a weak Pod-name hint,
+   and Pod/container environment names exist only when the workload supplies
+   them. Distinguish the current cluster, namespace, Pod, container, Agent and
+   database identity from the target rather than assuming that a shell with
+   `kubectl` is outside Kubernetes.
+2. Resolve an explicit target Kubernetes context, namespace, workload and agent identity.
+3. Inspect pod phase, readiness, ownership, PVC bindings and immutable release identity.
+4. Query the target Herdr server with `herdr agent get <handle> --session
    <session>` for the exact Agent, semantic status, working directory and
    native harness session reference when available. Use `herdr pane
    process-info` to corroborate the live process when diagnosis or recovery
    depends on it; recover a missing native reference only from recorded state
    or the same pane.
-4. Explain the fault boundary before changing anything.
+5. Explain the fault boundary before changing anything.
+
+When the current runtime and intended target are the same Pod, container,
+identity and tool environment, invoke the native command there directly. When
+the target differs, or an explicit isolation or identity boundary requires the
+target runtime, use native `kubectl exec` with the resolved context, namespace,
+Pod and container. Neither path is a global preference: an exec into the
+current Pod can still be deliberate, but it should not be an accidental hop
+caused by forgetting where the caller already runs.
 
 ## Attach and debug
 
-- From outside the cluster, a human or seed agent uses native `kubectl` with an explicit context to enter the target pod and invoke Herdr. A running Mate uses the same native interface against its in-cluster credentials, for example `kubectl --namespace <namespace> exec -it pod/<pod> --container <container> -- herdr --session <session>`.
+- From outside the cluster, a human or seed agent uses native `kubectl` with an explicit context to enter the target Pod and invoke Herdr. A running Mate invokes its local Herdr CLI directly when that Pod is the resolved target; it uses `kubectl exec` with its in-cluster credentials when the target is another Pod or container.
 - Attach to the real agent terminal for interactive diagnosis.
 - Use Herdr read, status, send and wait primitives for bounded inspection; do not scrape or persist terminal output automatically.
 - After launch, steer, `/reload` or resume, verify that the exact Herdr Agent
@@ -57,10 +75,11 @@ persistent Mate.
 5. If delivery fails before receipt, preserve and retry the same Inbox UUID.
    Never create a duplicate row or include the full body in the terminal.
 
-Run these commands through the target pod's own Herdr CLI. From outside the
-cluster, reach it with native `kubectl` and an explicit context; from a Mate,
-use its in-cluster Kubernetes credentials. Do not add an AgentOS wrapper CLI for
-this sequence.
+Run these commands through the target Pod's own Herdr CLI. From outside the
+cluster, reach it with native `kubectl` and an explicit context. From a Mate,
+invoke Herdr locally when it owns the target Pod, or use its in-cluster
+Kubernetes credentials when the target is remote. Do not add an AgentOS
+wrapper CLI for this sequence.
 
 ## Runtime topology
 

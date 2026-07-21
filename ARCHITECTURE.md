@@ -105,8 +105,12 @@ protocol/schema, bootstrap from `session.snapshot`, and take a fresh snapshot
 after every reconnect before trusting subsequent events.
 Outside the cluster, a human or seed agent resolves the target Pod with native
 `kubectl` using an explicit Kubernetes context, enters that Pod, and invokes
-its real Herdr terminal. Running Mates use the same native tools with their
-in-cluster credentials.
+its real Herdr terminal. A running Mate first distinguishes its current
+cluster, namespace, Pod, container and identity from the intended target. It
+invokes a native command directly when it already occupies that execution
+boundary, and uses `kubectl` with its in-cluster credentials when the target is
+another Kubernetes boundary. Neither direct execution nor `kubectl exec` is a
+universal rule.
 
 A First Mate may arrange central fleet workspaces whose panes attach to Herdr sessions in other pods through Kubernetes exec.
 This is only a user-facing view; the remote pod-local sessions remain authoritative.
