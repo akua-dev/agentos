@@ -55,17 +55,32 @@ portable validator and hard gates do not invoke or require it.
    versions.
 4. Operate the subject through its own public interfaces. Do not install an
    AgentOS compatibility layer around another system.
-5. Produce one sanitized evidence JSON document for each attempt.
-6. Validate it:
+5. Write a run plan that satisfies
+   [`run-plan.schema.json`](./schemas/run-plan.schema.json). Commands are
+   direct argument arrays for the compared system's existing public
+   interfaces; the runner does not invoke a shell or provide an AgentOS
+   compatibility interface. Never put credentials in a plan or command.
+6. Run one attempt into a new directory:
 
    ```console
-   bun benchmarks/validate.ts evidence path/to/evidence.json
+   bun benchmarks/run.ts path/to/run-plan.json path/to/new-attempt-directory
    ```
 
-7. Create a compact result containing every declared attempt, rubric-bound
+   The runner writes `frozen-run.json` before it invokes an interface, then
+   writes exactly one schema-valid `evidence.json`. A collector prints one
+   evidence document to standard output. If an evaluator command fails, the
+   runner preserves the attempt as valid incomplete evidence rather than
+   dropping it.
+7. Validate the emitted evidence independently:
+
+   ```console
+   bun benchmarks/validate.ts evidence path/to/new-attempt-directory/evidence.json
+   ```
+
+8. Create a compact result containing every declared attempt, rubric-bound
    qualitative verdicts, per-gate mechanical verdicts, aggregate observation
    counts and each immutable raw-bundle SHA-256.
-8. Recompute its gates and aggregates against the published scenario and
+9. Recompute its gates and aggregates against the published scenario and
    catalog:
 
    ```console
@@ -78,15 +93,30 @@ frozen.
 
 ## Modes
 
-- **Conformance:** active, reproducible scenarios in a disposable environment;
-  approved scenarios may inject failures.
-- **Live:** observation of completed real work without fault injection.
-- **Offline:** independent evaluation of an already frozen bundle.
+- **Conformance:** requires `disposable` isolation and its approval reference.
+  A faulted scenario names one declared fault, its approval reference when
+  required, a native blocking trigger command and the native fault command.
+  The runner invokes no fault when the scenario declares none and rejects
+  undeclared faults before any command runs.
+- **Live:** requires a stable completed-work reference and exposes only one
+  collection command. Its plan has no fault-injection surface.
+- **Offline:** accepts only a path and pre-frozen SHA-256 for the evidence being
+  evaluated. Its plan has no command surface, so the runner cannot contact the
+  subject.
+
+The runner freezes the complete scenario and rubric plus the subject revision,
+environment, permission set, evaluator and exact public-interface invocation
+before measurement. Emitted evidence must match those frozen values. It never
+offers mutation, repair, reload or improvement operations; conformance fault
+injection is the only evaluator mutation and is limited to the selected
+scenario declaration.
 
 ## Contracts
 
 - [`SPEC.md`](./SPEC.md) owns portable semantics, metrics, gates and reporting.
 - [`scenario.schema.json`](./schemas/scenario.schema.json) owns scenario shape.
+- [`run-plan.schema.json`](./schemas/run-plan.schema.json) owns the portable
+  runner input and its mode-specific command surface.
 - [`catalog.json`](./metrics/catalog.json) defines every metric's unit and value
   type at catalog version `0.1.0`.
 - [`evidence-bundle.schema.json`](./schemas/evidence-bundle.schema.json) owns one
