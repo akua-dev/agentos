@@ -85,9 +85,10 @@ then verify the retained PVC and native Pi session after rollout.
 
 `github-app-token` performs only installation-token minting. It reads the
 mounted key and non-secret IDs, requests one short-lived token from GitHub and
-writes only that token to standard output. Never run it bare in a recorded
-terminal. Consume it directly through the provider's standard environment so
-the acting command and its real failure remain visible, for example:
+by default writes only that token to standard output. Never run it bare in a
+recorded terminal. Consume it directly through the provider's standard
+environment so the acting command and its real failure remain visible, for
+example:
 
 ```console
 GH_TOKEN="$(github-app-token)" gh-axi repo view akua-dev/agentos
@@ -106,3 +107,69 @@ new token rather than recovering an old one. For rotation, update the Secret,
 replace one First Mate Pod and verify the new key before revoking the old key.
 For revocation, remove the mount and Secret and revoke or uninstall the App as
 selected; report any retained provider sessions or repository access.
+
+### Delegated GitHub App access
+
+Keep the App private key in First Mate. A Second Mate or Crewmate that needs
+provider access requests the exact repository names, permission levels,
+purpose and Assignment through durable Inbox. Use `request` inside existing
+standing authority and `approval_request` when new consequential provider
+authority is required. A Second Mate relays an eligible child request upward;
+it never receives the key or mints another token itself. First Mate may approve
+scope already covered by the reviewed App installation and standing Captain
+authority. Anything broader or materially consequential returns to the
+Captain.
+
+GitHub installation tokens expire after one hour. They may contain fewer
+repositories and permissions than the installation, never more. Select the
+least scope that still permits the declared delivery workflow: cloning needs
+`contents: read`; pushing needs `contents: write`; pull-request creation or
+updates need `pull_requests: write`; changing workflow files additionally
+needs `workflows: write`. Add issue or other permissions only when the
+Assignment actually uses those provider surfaces.
+
+First Mate creates a mode-`0700` staging directory outside Git, writes a
+mode-`0600` non-secret JSON scope file, then asks the helper to materialize the
+token and its non-secret provider metadata without printing either:
+
+```console
+github-app-token \
+  --scope-file "$staging/scope.json" \
+  --token-file "$staging/token" \
+  --metadata-file "$staging/metadata.json"
+```
+
+The scope object uses GitHub's native request fields: one of `repositories` or
+`repository_ids`, plus optional `permissions`. The helper rejects unknown
+fields, ambiguous repository selectors, empty selection arrays and more than
+500 selected repositories before contacting GitHub. Its metadata contains the
+provider expiry and granted scope but never the token.
+
+Create or update one uniquely named Kubernetes Secret for the Agent and
+Assignment by streaming `kubectl create secret generic --from-file ...
+--dry-run=client -o json` into `kubectl apply -f -`; neither command receives a
+credential value in argv or prints the rendered Secret. In the reviewed
+per-Agent Kustomize overlay, mount that Secret read-only without `subPath` at
+`/var/run/secrets/agentos/github`, set `GITHUB_TOKEN_FILE` to its `token` file
+and `GITHUB_TOKEN_METADATA_FILE` to its `metadata.json` file, and expose neither
+App ID nor private key. Record only the requested and granted scope, provider
+expiry and Secret name in the relevant durable work context. Do not introduce a
+credential table, broker or controller.
+
+The child reads `GITHUB_TOKEN_FILE` afresh for every native provider or Git
+command instead of exporting it into startup state. Configure Git's native
+GitHub CLI credential helper once with the file value present, and provide a
+fresh `GH_TOKEN` to each `git`, `gh-axi` or `gh` invocation. A projected Secret
+update is eventually visible without a Pod restart; First Mate verifies the
+new projection before relying on it.
+
+After minting, First Mate arms one bounded supervision wake early enough to
+replace the Secret before `expires_at`; this is a situation-specific background
+wait, not a static daemon. Refresh repeats the same scope request and atomically
+updates the Secret. A child that observes `401`, missing scope or an expired
+file keeps its Assignment active and reports the exact failure and requested
+delta upward. It does not request, recover or retain the App key. At handoff,
+scope follows the new owner through a new Agent-specific Secret; at retirement
+or authorized revocation, remove the mount and Secret and let any issued token
+expire. Remove the staging directory after the Secret and projection are
+verified.

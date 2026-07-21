@@ -1,7 +1,7 @@
 {
   "name": "@agentos/github-app-token",
   "version": "0.0.0",
-  "description": "Mint one short-lived GitHub App installation token",
+  "description": "Mint and safely materialize a scoped GitHub App installation token",
   "private": true,
   "type": "module",
   "bin": {

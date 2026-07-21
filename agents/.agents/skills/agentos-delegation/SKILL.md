@@ -63,6 +63,10 @@ Use released PostgreSQL schema for durable coordination and native tools against
    current Git state read-only. For remote-backed ship work, verify the selected
    workflow, Git remote, required provider authentication and delivery tooling
    before dispatch; load `$agentos-projects` and `$agentos-auth` where needed.
+   With organization-owned GitHub App identity, provision only the Assignment's
+   required repositories and permissions through the auth Skill. A child that
+   lacks scope requests the exact delta upward; it never receives First Mate's
+   App key or silently falls back to another identity.
 2. Select a reviewed harness, model, effort and image that fit the task and recorded Captain policy.
    Keep First and Second Mates on Pi; permit a worker harness only when the selected release verifies it.
    Require remote images to be approved and pinned by digest.
