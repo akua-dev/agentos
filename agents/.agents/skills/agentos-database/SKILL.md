@@ -9,13 +9,20 @@ Treat versioned SQL and its tests as the database contract. Use direct PostgreSQ
 
 ## Inspect before mutation
 
-1. Identify the selected immutable AgentOS release. Require its version-neutral database manifest and ordered database migrations. CloudNativePG and PostgreSQL are external dependencies selected from current official releases during installation, not versions encoded in the AgentOS release.
-2. Enumerate that release's ordered
+1. Load `$agentos-runtime` and resolve the caller's current execution boundary
+   separately from the database and client-command target. If the authenticated
+   Mate already runs in the intended Pod/container with the selected client,
+   identity and connection environment, invoke `psql`, `pg-listen` or the
+   migration command directly. Use `kubectl exec` when an external seed or a
+   different Pod/container is the intended execution boundary. Do not assume
+   either path from the presence of `kubectl` alone.
+2. Identify the selected immutable AgentOS release. Require its version-neutral database manifest and ordered database migrations. CloudNativePG and PostgreSQL are external dependencies selected from current official releases during installation, not versions encoded in the AgentOS release.
+3. Enumerate that release's ordered
    `database/migrations/` files and Drizzle migration journal.
-3. Inspect the target endpoint, server version, database identity, schema version, installed roles and pending migrations without changing them.
-4. For an in-cluster target, inspect `Cluster` resources, CNPG CRDs, admission webhooks and controller Deployments separately. CRDs without a Ready controller are an incomplete installation, not an available database platform.
-5. Stop if required AgentOS release assets are missing. Never reconstruct production schema or Kubernetes resources from prose.
-6. Explain whether the database is existing external, existing in-cluster, or awaiting approved provisioning.
+4. Inspect the target endpoint, server version, database identity, schema version, installed roles and pending migrations without changing them.
+5. For an in-cluster target, inspect `Cluster` resources, CNPG CRDs, admission webhooks and controller Deployments separately. CRDs without a Ready controller are an incomplete installation, not an available database platform.
+6. Stop if required AgentOS release assets are missing. Never reconstruct production schema or Kubernetes resources from prose.
+7. Explain whether the database is existing external, existing in-cluster, or awaiting approved provisioning.
 
 ## Select topology
 
@@ -155,6 +162,16 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   Assignments only for its managed Agent subtree. A Crewmate may update the
   state of an active own Assignment and its Task, but may not rewrite Task
   scope. Treat a completed Assignment as immutable history.
+- First Mate's Fleet-owner authority includes deliberate repair of incorrect,
+  incomplete or stale Fleet rows within the released schema. Before repair,
+  read the authoritative row and its coupled state, decide whether the change
+  corrects prior data or records a new fact, and retain enough explanation in
+  the row's existing status, report or metadata surfaces for later
+  reconciliation when useful. Apply coupled changes in one short transaction
+  and read them back. Do not add generic key allowlists, wrapper workflows or
+  new database restrictions merely to prevent First Mate from exercising that
+  judgment; the released grants, RLS, constraints, Functions and completed-row
+  immutability remain the deterministic boundaries.
 - Every new Assignment has a PostgreSQL-authoritative `brief` and concrete
   `dispatch_profile`. Render the brief into the PVC for the harness; regenerate
   it rather than reconciling two peers. Store a final or handoff `report` before
