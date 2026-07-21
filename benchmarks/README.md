@@ -104,8 +104,10 @@ frozen.
 - **Offline:** accepts only a conformance or live scenario plus the path and
   pre-frozen SHA-256 for its evidence. Its plan has no command surface, so the
   runner cannot contact the subject. The emitted evidence preserves the source
-  run's original mode, run ID and evaluator identity; the offline plan remains
-  separately identifiable in `frozen-run.json`.
+  run's exact validated bytes, mode, run ID and evaluator identity; the offline
+  plan remains separately identifiable in `frozen-run.json`. If offline
+  verification itself fails, its newly generated incomplete evidence records
+  that evaluator failure instead.
 
 The runner freezes the complete scenario and rubric plus the subject revision,
 environment, permission set, evaluator and exact public-interface invocation

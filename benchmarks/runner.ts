@@ -54,6 +54,11 @@ interface OfflineExecution {
   source_bundle_sha256: string;
 }
 
+interface CollectedEvidence {
+  text: string;
+  exactOutput?: Uint8Array;
+}
+
 export interface RunPlan {
   schema_version: "0.1.0";
   run_id: string;
@@ -95,7 +100,7 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function sha256(value: string): string {
+function sha256(value: string | Uint8Array): string {
   return `sha256:${new Bun.CryptoHasher("sha256").update(value).digest("hex")}`;
 }
 
@@ -341,43 +346,44 @@ function incompleteEvidence(frozen: FrozenRun, startedAt: string, error: unknown
   };
 }
 
-async function collectEvidence(frozen: FrozenRun): Promise<string> {
+async function collectEvidence(frozen: FrozenRun): Promise<CollectedEvidence> {
   if (frozen.mode === "offline") {
     const execution = frozen.execution as unknown as OfflineExecution;
-    const source = await readFile(execution.source_bundle_path, "utf8");
+    const source = await readFile(execution.source_bundle_path);
     if (sha256(source) !== execution.source_bundle_sha256) {
       throw new Error("offline source bundle digest does not match its frozen digest");
     }
-    return source;
+    return { text: source.toString("utf8"), exactOutput: source };
   }
   if (frozen.mode === "live") {
     const execution = frozen.execution as unknown as LiveExecution;
-    return runCommand(execution.collector);
+    return { text: await runCommand(execution.collector) };
   }
   const execution = frozen.execution as unknown as ConformanceExecution;
   if (execution.trigger !== undefined) await runCommand(execution.trigger);
   if (execution.fault !== undefined) {
     await runCommand(execution.fault);
   }
-  return runCommand(execution.collector);
+  return { text: await runCommand(execution.collector) };
 }
 
 export async function runAttempt(plan: RunPlan, runDirectory: string): Promise<JsonObject> {
   const frozen = await freezeRun(plan, runDirectory);
   const startedAt = new Date().toISOString();
   let evidence: JsonObject;
+  let output: string | Uint8Array;
   try {
-    evidence = parseEvidence(await collectEvidence(frozen), frozen);
+    const collected = await collectEvidence(frozen);
+    evidence = parseEvidence(collected.text, frozen);
+    output = collected.exactOutput ?? `${JSON.stringify(evidence, null, 2)}\n`;
   } catch (error) {
     evidence = incompleteEvidence(frozen, startedAt, error);
     const validation = validateContract("evidence", evidence);
     if (!validation.valid) {
       throw new Error(`runner produced invalid failure evidence: ${JSON.stringify(validation.errors)}`);
     }
+    output = `${JSON.stringify(evidence, null, 2)}\n`;
   }
-  await writeFile(join(runDirectory, "evidence.json"), `${JSON.stringify(evidence, null, 2)}\n`, {
-    encoding: "utf8",
-    flag: "wx",
-  });
+  await writeFile(join(runDirectory, "evidence.json"), output, { flag: "wx" });
   return evidence;
 }

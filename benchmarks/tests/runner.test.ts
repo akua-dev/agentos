@@ -320,6 +320,29 @@ describe("portable benchmark runner", () => {
     expect(() => parseRunPlan(withCommand)).toThrow("invalid run plan");
   });
 
+  test("offline mode emits deliberately noncanonical source bytes unchanged", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "agentos-runner-"));
+    const frozenEvidence = await fixture("minimal-evidence-bundle.json");
+    const source = ` \n${JSON.stringify(frozenEvidence)}\t\n\n`;
+    const sourcePath = join(directory, "noncanonical-frozen-evidence.json");
+    await writeFile(sourcePath, source);
+    const plan: RunPlan = {
+      ...planForFrozenEvidence("offline", frozenEvidence),
+      execution: {
+        source_bundle_path: sourcePath,
+        source_bundle_sha256: `sha256:${new Bun.CryptoHasher("sha256")
+          .update(source)
+          .digest("hex")}`,
+      },
+    };
+    const runDirectory = join(directory, "attempt");
+
+    await runAttempt(parseRunPlan(plan), runDirectory);
+
+    expect(await readFile(join(runDirectory, "evidence.json"), "utf8")).toBe(source);
+    expect(await readFile(sourcePath, "utf8")).toBe(source);
+  });
+
   test("emits schema-valid incomplete evidence when collection fails", async () => {
     const directory = await mkdtemp(join(tmpdir(), "agentos-runner-"));
     const base = basePlan("conformance", quickstartScenarioPath);
