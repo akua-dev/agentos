@@ -15,6 +15,7 @@
 
 <p align="center">
   <a href="#get-started"><strong>Get started</strong></a> ·
+  <a href="./benchmarks/results/agentos/README.md">Benchmarks</a> ·
   <a href="./VISION.md">Vision</a> ·
   <a href="./ARCHITECTURE.md">Architecture</a> ·
   <a href="./CONTRIBUTING.md">Contributing</a>
@@ -63,13 +64,34 @@ You need: a coding agent, a Kubernetes context (or let it help you create a
 disposable one), and a browser for provider login. You don't need: this repo,
 a CLI, Docker, Helm, or a PostgreSQL install.
 
-## Measured, not asserted
+## Benchmarks
 
-AgentOS includes a [public, portable organization benchmark](./benchmarks/README.md)
-for the question that matters: how many verified human outcomes does the
-organization deliver for the human attention it consumes? It evaluates the
-whole lifecycle — from first prompt through delivery and recovery — rather than
-grading one model response.
+AgentOS does not ask you to trust an autonomy demo. We publish every benchmark
+attempt — including failures — then use failure as evidence for the next
+reviewed improvement.
+
+| Public proof | Observed result |
+| --- | --- |
+| Quickstart to reviewed delivery | Five declared attempts: three passed, one failed and one ended incomplete. The final two passes delivered in **16m 59s** and **16m 16s**. |
+| Human attention | The final two passes each needed **zero** Captain follow-up turns, repair interventions or manual operational actions. |
+| Interrupted-worker recovery | The same accepted work resumed after a controlled runtime loss: **30.96s** to detection, another **110.416s** to useful work, with no lost changes, duplicate effects or human repair. |
+| Portability | A native Codex-only run passed the same portable benchmark without AgentOS or an AgentOS compatibility layer. |
+
+The failure mattered too. An earlier live Fleet stalled after its useful
+supervision waits had been consumed. That run stayed frozen; the smallest cause
+was reviewed, the supervision contract changed, the original scenario passed
+twice, and the held-out recovery scenario passed afterward.
+
+Read the [human result report](./benchmarks/results/agentos/README.md), inspect
+the [machine-readable five-attempt baseline](./benchmarks/results/agentos/quickstart-to-delivery-v0.1.0.json),
+or start with the [portable benchmark](./benchmarks/README.md). Every reported
+attempt resolves to immutable sanitized evidence with its exact subject,
+environment and limitations.
+
+The benchmark asks the question that matters: how many verified human outcomes
+does the organization deliver for the human attention it consumes? It evaluates
+the whole lifecycle — from first prompt through delivery and recovery — rather
+than grading one model response.
 
 | It measures | It refuses to hide |
 | --- | --- |
@@ -79,10 +101,9 @@ grading one model response.
 | Crash recovery and preservation of accepted work | Lost work, duplicate effects or false progress |
 | Authority, safety and chain of custody | Unsafe behavior behind a composite score |
 
-The contracts and first two scenarios are public now; official AgentOS results
-will appear only after real run sets satisfy the reporting rules. Every result
-must name its exact revisions and preserve sanitized, independently verifiable
-evidence. Read the [benchmark specification](./benchmarks/SPEC.md).
+Every result names its exact revisions and preserves sanitized, independently
+verifiable evidence. Read the [benchmark specification](./benchmarks/SPEC.md)
+for the rules behind these claims.
 
 ## A hire, not a migration
 

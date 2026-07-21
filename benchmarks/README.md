@@ -15,29 +15,24 @@ An outcome counts only after effectiveness, safety and accountability pass.
 The benchmark publishes the individual metrics and hard gates instead of one
 weighted score.
 
-## Current state
+## Published proof
 
 Version `0.1.0` defines the portable semantics, metric catalog, fixed scenario
-rubrics, evidence and compact-result schemas, and first two scenarios. The
-[first AgentOS baseline](./results/agentos/quickstart-to-delivery-v0.1.0.json)
-preserves all five declared attempts: three passed, one failed, and one ended
-incomplete after its starting state was rejected. It is evidence for this exact
-subject and environment, not a claim of superiority over another system.
+rubrics, evidence and compact-result schemas, and first two scenarios. These
+published results exercise the full contract rather than describing future
+work:
 
-The [public benchmark epic](https://github.com/akua-dev/agentos/issues/14) is
-the changing work-status authority. This table keeps the repository boundary
-legible without duplicating issue checklists:
+| Result | What it demonstrates | Source |
+| --- | --- | --- |
+| First AgentOS baseline | Five declared Quickstart attempts: three passed, one failed and one incomplete; every attempt and unavailable observation is retained. | [Human report](./results/agentos/README.md) · [compact manifest](./results/agentos/quickstart-to-delivery-v0.1.0.json) |
+| Interrupted-worker recovery | One held-out attempt resumed the same accepted work with no loss, duplicate effect, human repair or authority violation. | [Immutable evidence](https://github.com/akua-dev/agentos/releases/tag/benchmark-v0.1.0-agentos-recovery-02) |
+| Reviewed improvement loop | One unchanged incomplete pilot produced a falsifiable change, two passing counterfactual reruns and a passing held-out scenario. | [Issue #20](https://github.com/akua-dev/agentos/issues/20) |
+| Non-AgentOS portability | Native Codex CLI passed the portable scenario without AgentOS or a compatibility layer. | [Immutable evidence](https://github.com/akua-dev/agentos/releases/tag/benchmark-v0.1.0-codex-cli-quickstart-01) |
 
-| Capability | State and tracking |
-| --- | --- |
-| Portable specification, structural schemas, AgentOS profile and two scenario definitions | Implemented here |
-| Live Crewmate ship-loop proof | [Issue #10](https://github.com/akua-dev/agentos/issues/10) |
-| Thin conformance, live and offline runner | [Issue #17](https://github.com/akua-dev/agentos/issues/17) |
-| Metric catalog, published rubrics, compact result contract and verdict recomputation | [Issue #19](https://github.com/akua-dev/agentos/issues/19) |
-| Optional allowlisted Pi session projection | Implemented in the AgentOS profile ([Issue #15](https://github.com/akua-dev/agentos/issues/15)) |
-| First verified AgentOS baseline | [Issue #18](https://github.com/akua-dev/agentos/issues/18) |
-| Non-AgentOS portability proof | [Issue #16](https://github.com/akua-dev/agentos/issues/16) |
-| Before-and-after improvement proof with a held-out scenario | [Issue #20](https://github.com/akua-dev/agentos/issues/20) |
+The completed [public benchmark epic](https://github.com/akua-dev/agentos/issues/14)
+preserves the implementation and review history. These results are evidence for
+their exact subjects and environments, not a claim of superiority over another
+system.
 
 An original harness session remains unchanged and private in its native Agent
 home. Only an allowlisted projection may enter shared or public evidence; see
@@ -134,6 +129,7 @@ scenario declaration.
   AgentOS-specific evidence mapping.
 
 Large raw bundles are release or benchmark artifacts rather than source files.
-Compact official result manifests will live under `results/agentos/` only when
-real results exist. A compact result has no composite gate or score: a failed or
-unobserved gate remains visible for every attempt.
+Compact official result manifests live under [`results/agentos/`](./results/agentos/)
+after real runs, independent verification and immutable publication. A compact
+result has no composite gate or score: a failed or unobserved gate remains
+visible for every attempt.
