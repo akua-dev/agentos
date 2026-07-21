@@ -33,14 +33,17 @@ legible without duplicating issue checklists:
 | Live Crewmate ship-loop proof | [Issue #10](https://github.com/akua-dev/agentos/issues/10) |
 | Thin conformance, live and offline runner | [Issue #17](https://github.com/akua-dev/agentos/issues/17) |
 | Metric catalog, published rubrics, compact result contract and verdict recomputation | [Issue #19](https://github.com/akua-dev/agentos/issues/19) |
-| Optional allowlisted Pi session projection | [Issue #15](https://github.com/akua-dev/agentos/issues/15) |
+| Optional allowlisted Pi session projection | Implemented in the AgentOS profile ([Issue #15](https://github.com/akua-dev/agentos/issues/15)) |
 | First verified AgentOS baseline | [Issue #18](https://github.com/akua-dev/agentos/issues/18) |
 | Non-AgentOS portability proof | [Issue #16](https://github.com/akua-dev/agentos/issues/16) |
 | Before-and-after improvement proof with a held-out scenario | [Issue #20](https://github.com/akua-dev/agentos/issues/20) |
 
 An original harness session remains unchanged and private in its native Agent
 home. Only an allowlisted projection may enter shared or public evidence; see
-the [session-adapter boundary](./SPEC.md#harness-session-adapters).
+the [session-adapter boundary](./SPEC.md#harness-session-adapters). AgentOS's
+optional Pi-only implementation and output contract live in the
+[AgentOS profile](./profiles/agentos/PROFILE.md#optional-session-evidence). The
+portable validator and hard gates do not invoke or require it.
 
 ## Run it
 
