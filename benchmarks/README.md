@@ -94,15 +94,18 @@ frozen.
 ## Modes
 
 - **Conformance:** requires `disposable` isolation and its approval reference.
-  A faulted scenario names one declared fault, its approval reference when
-  required, a native blocking trigger command and the native fault command.
-  The runner invokes no fault when the scenario declares none and rejects
-  undeclared faults before any command runs.
+  An optional native start or blocking trigger command runs before collection,
+  independently of fault injection. A faulted scenario additionally names one
+  declared fault, its approval reference when required, and its native fault
+  command. The runner invokes no fault when the scenario declares none and
+  rejects undeclared faults before any command runs.
 - **Live:** requires a stable completed-work reference and exposes only one
   collection command. Its plan has no fault-injection surface.
-- **Offline:** accepts only a path and pre-frozen SHA-256 for the evidence being
-  evaluated. Its plan has no command surface, so the runner cannot contact the
-  subject.
+- **Offline:** accepts only a conformance or live scenario plus the path and
+  pre-frozen SHA-256 for its evidence. Its plan has no command surface, so the
+  runner cannot contact the subject. The emitted evidence preserves the source
+  run's original mode, run ID and evaluator identity; the offline plan remains
+  separately identifiable in `frozen-run.json`.
 
 The runner freezes the complete scenario and rubric plus the subject revision,
 environment, permission set, evaluator and exact public-interface invocation

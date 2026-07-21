@@ -108,6 +108,12 @@ function sameValues(left: unknown[], right: unknown[]): boolean {
 }
 
 function assertScenarioMode(plan: RunPlan, scenario: JsonObject): void {
+  if (plan.mode === "offline") {
+    if (scenario.mode !== "conformance" && scenario.mode !== "live") {
+      throw new Error("offline mode requires the source scenario's conformance or live mode");
+    }
+    return;
+  }
   if (scenario.mode !== plan.mode) {
     throw new Error(
       `scenario mode ${String(scenario.mode)} does not match run mode ${plan.mode}`,
@@ -128,7 +134,7 @@ function assertConformance(
   }
   const declaredFaults = (scenario.faults as JsonObject[]) ?? [];
   if (declaredFaults.length === 0) {
-    if (execution.fault !== undefined || execution.trigger !== undefined) {
+    if (execution.fault !== undefined) {
       throw new Error("this scenario declares no injectable fault");
     }
     return;
@@ -215,8 +221,14 @@ function assertEvidenceBinding(frozen: FrozenRun, evidence: JsonObject): void {
   const evaluator = evidence.evaluator as JsonObject;
   const frozenScenario = frozen.scenario;
   const frozenRubric = frozenScenario.rubric as JsonObject;
-  if (evidence.run_id !== frozen.run_id) throw new Error("evidence run_id changed after freeze");
-  if (evidence.mode !== frozen.mode) throw new Error("evidence mode changed after freeze");
+  if (frozen.mode === "offline") {
+    if (evidence.mode !== frozenScenario.mode) {
+      throw new Error("offline source evidence mode does not match its frozen scenario");
+    }
+  } else {
+    if (evidence.run_id !== frozen.run_id) throw new Error("evidence run_id changed after freeze");
+    if (evidence.mode !== frozen.mode) throw new Error("evidence mode changed after freeze");
+  }
   if (scenario.id !== frozenScenario.id || scenario.version !== frozenScenario.version) {
     throw new Error("evidence scenario changed after freeze");
   }
@@ -237,11 +249,14 @@ function assertEvidenceBinding(frozen: FrozenRun, evidence: JsonObject): void {
   ) {
     throw new Error("evidence environment changed after freeze");
   }
+  if (evaluator.rubric_version !== frozenRubric.version) {
+    throw new Error("evidence evaluator or rubric changed after freeze");
+  }
   if (
-    evaluator.name !== frozen.evaluator.name ||
-    evaluator.version !== frozen.evaluator.version ||
-    evaluator.kind !== frozen.evaluator.kind ||
-    evaluator.rubric_version !== frozenRubric.version
+    frozen.mode !== "offline" &&
+    (evaluator.name !== frozen.evaluator.name ||
+      evaluator.version !== frozen.evaluator.version ||
+      evaluator.kind !== frozen.evaluator.kind)
   ) {
     throw new Error("evidence evaluator or rubric changed after freeze");
   }
@@ -340,8 +355,8 @@ async function collectEvidence(frozen: FrozenRun): Promise<string> {
     return runCommand(execution.collector);
   }
   const execution = frozen.execution as unknown as ConformanceExecution;
+  if (execution.trigger !== undefined) await runCommand(execution.trigger);
   if (execution.fault !== undefined) {
-    await runCommand(execution.trigger!);
     await runCommand(execution.fault);
   }
   return runCommand(execution.collector);

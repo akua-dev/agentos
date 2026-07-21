@@ -8,6 +8,24 @@ import { parseRunPlan, runAttempt } from "../runner";
 import { validateContract } from "../validate";
 
 const benchmarkRoot = join(import.meta.dir, "..");
+const quickstartScenarioPath = join(
+  benchmarkRoot,
+  "scenarios",
+  "quickstart-to-delivery",
+  "scenario.json",
+);
+const recoveryScenarioPath = join(
+  benchmarkRoot,
+  "scenarios",
+  "interrupted-worker-recovery",
+  "scenario.json",
+);
+const frozenConformanceEvidencePath = join(
+  benchmarkRoot,
+  "tests",
+  "fixtures",
+  "minimal-evidence-bundle.json",
+);
 
 async function readJson(path: string): Promise<Record<string, any>> {
   return JSON.parse(await readFile(path, "utf8")) as Record<string, any>;
@@ -82,6 +100,38 @@ function basePlan(mode: RunPlan["mode"], scenarioPath: string): Omit<RunPlan, "e
   };
 }
 
+function planForFrozenEvidence(
+  mode: "conformance" | "offline",
+  evidence: Record<string, any>,
+): Omit<RunPlan, "execution"> {
+  return {
+    schema_version: "0.1.0",
+    run_id: mode === "offline" ? "offline-verification-attempt" : evidence.run_id,
+    mode,
+    scenario_path: quickstartScenarioPath,
+    subject: structuredClone(evidence.subject),
+    environment: {
+      description: evidence.environment.description,
+      isolation: mode === "offline" ? "offline" : "disposable",
+      ...(mode === "conformance"
+        ? { approval_reference: "approval:synthetic-disposable" }
+        : {}),
+      permissions: structuredClone(evidence.environment.permissions),
+      harnesses: structuredClone(evidence.environment.harnesses),
+      models: structuredClone(evidence.environment.models),
+      tools: structuredClone(evidence.environment.tools),
+    },
+    evaluator:
+      mode === "offline"
+        ? { kind: "deterministic", name: "offline-verifier", version: "0.1.0" }
+        : {
+            kind: evidence.evaluator.kind,
+            name: evidence.evaluator.name,
+            version: evidence.evaluator.version,
+          },
+  };
+}
+
 async function collectorCommand(
   directory: string,
   evidence: Record<string, any>,
@@ -104,21 +154,40 @@ async function collectorCommand(
 }
 
 describe("portable benchmark runner", () => {
-  test("freezes the run before conformance collection and emits valid evidence", async () => {
+  test("runs the unmodified fault-free quickstart scenario from start to collect", async () => {
     const directory = await mkdtemp(join(tmpdir(), "agentos-runner-"));
-    const scenarioPath = await writeScenario(directory, "conformance");
-    const base = basePlan("conformance", scenarioPath);
+    const frozenEvidence = await fixture("minimal-evidence-bundle.json");
+    const base = planForFrozenEvidence("conformance", frozenEvidence);
     const runDirectory = join(directory, "attempt");
+    const logPath = join(directory, "interfaces.log");
+    const interfacePath = join(directory, "interface.ts");
+    await writeFile(
+      interfacePath,
+      [
+        'import { appendFile, readFile } from "node:fs/promises";',
+        "const [logPath, label, evidencePath, freezePath] = process.argv.slice(2);",
+        'if (freezePath) await readFile(freezePath, "utf8");',
+        'await appendFile(logPath!, `${label}\\n`);',
+        'if (evidencePath) process.stdout.write(await readFile(evidencePath, "utf8"));',
+      ].join("\n"),
+    );
     const plan: RunPlan = {
       ...base,
       execution: {
+        trigger: {
+          interface: "synthetic native start interface",
+          command: [process.execPath, interfacePath, logPath, "start"],
+        },
         collector: {
           interface: "synthetic public fixture",
-          command: await collectorCommand(
-            directory,
-            await evidenceFor(base, "conformance"),
+          command: [
+            process.execPath,
+            interfacePath,
+            logPath,
+            "collect",
+            frozenConformanceEvidencePath,
             join(runDirectory, "frozen-run.json"),
-          ),
+          ],
         },
       },
     };
@@ -128,13 +197,14 @@ describe("portable benchmark runner", () => {
     expect(frozen.scenario_sha256).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(frozen.rubric_sha256).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(frozen.subject.source_revision).toBe(plan.subject.source_revision);
+    expect(await readFile(logPath, "utf8")).toBe("start\ncollect\n");
+    expect(frozen.scenario).toEqual(await readJson(quickstartScenarioPath));
     expect(validateContract("evidence", evidence).valid).toBe(true);
   });
 
   test("rejects an undeclared conformance fault before any command runs", async () => {
     const directory = await mkdtemp(join(tmpdir(), "agentos-runner-"));
-    const scenarioPath = await writeScenario(directory, "conformance", "interrupted-worker-recovery");
-    const base = basePlan("conformance", scenarioPath);
+    const base = basePlan("conformance", recoveryScenarioPath);
     const marker = join(directory, "command-ran");
     const command = [process.execPath, "-e", `await Bun.write(${JSON.stringify(marker)}, "ran")`];
     const plan: RunPlan = {
@@ -159,8 +229,7 @@ describe("portable benchmark runner", () => {
 
   test("injects the one approved declared fault after its trigger", async () => {
     const directory = await mkdtemp(join(tmpdir(), "agentos-runner-"));
-    const scenarioPath = await writeScenario(directory, "conformance", "interrupted-worker-recovery");
-    const base = basePlan("conformance", scenarioPath);
+    const base = basePlan("conformance", recoveryScenarioPath);
     const evidencePath = join(directory, "collector-evidence.json");
     const logPath = join(directory, "interfaces.log");
     const interfacePath = join(directory, "interface.ts");
@@ -224,21 +293,26 @@ describe("portable benchmark runner", () => {
     expect(() => parseRunPlan(withFault)).toThrow("invalid run plan");
   });
 
-  test("offline mode verifies a frozen digest and has no command surface", async () => {
+  test("offline mode preserves an immutable conformance run's execution identity", async () => {
     const directory = await mkdtemp(join(tmpdir(), "agentos-runner-"));
-    const scenarioPath = await writeScenario(directory, "offline");
-    const base = basePlan("offline", scenarioPath);
-    const sourcePath = join(directory, "frozen-evidence.json");
-    const source = JSON.stringify(await evidenceFor(base, "offline"));
-    await writeFile(sourcePath, source);
+    const source = await readFile(frozenConformanceEvidencePath, "utf8");
+    const frozenEvidence = JSON.parse(source) as Record<string, any>;
+    const base = planForFrozenEvidence("offline", frozenEvidence);
     const digest = `sha256:${new Bun.CryptoHasher("sha256").update(source).digest("hex")}`;
     const plan: RunPlan = {
       ...base,
-      execution: { source_bundle_path: sourcePath, source_bundle_sha256: digest },
+      execution: {
+        source_bundle_path: frozenConformanceEvidencePath,
+        source_bundle_sha256: digest,
+      },
     };
 
     const evidence = await runAttempt(parseRunPlan(plan), join(directory, "attempt"));
-    expect(evidence.mode).toBe("offline");
+    expect(evidence.run_id).toBe(frozenEvidence.run_id);
+    expect(evidence.run_id).not.toBe(plan.run_id);
+    expect(evidence.mode).toBe("conformance");
+    expect(evidence.evaluator).toEqual(frozenEvidence.evaluator);
+    expect(await readFile(frozenConformanceEvidencePath, "utf8")).toBe(source);
     expect(validateContract("evidence", evidence).valid).toBe(true);
 
     const withCommand = structuredClone(plan) as Record<string, any>;
@@ -248,8 +322,7 @@ describe("portable benchmark runner", () => {
 
   test("emits schema-valid incomplete evidence when collection fails", async () => {
     const directory = await mkdtemp(join(tmpdir(), "agentos-runner-"));
-    const scenarioPath = await writeScenario(directory, "conformance");
-    const base = basePlan("conformance", scenarioPath);
+    const base = basePlan("conformance", quickstartScenarioPath);
     const plan: RunPlan = {
       ...base,
       execution: {
