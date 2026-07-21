@@ -49,8 +49,8 @@ One prompt. Nothing to clone, nothing to install, nothing to study first.
 **1. Copy this into the coding agent you already use:**
 
 ```text
-Fetch and read https://raw.githubusercontent.com/akua-dev/agentos/main/BOOTSTRAP.md.
-Help me bring AgentOS online. Inspect what I already have first, explain the choices in plain language, and ask before making changes.
+Read https://github.com/akua-dev/agentos/blob/main/BOOTSTRAP.md.
+Help me bring AgentOS online — check my setup first, ask before changing anything.
 ```
 
 **2. Answer its questions.** It inspects what you have, explains the real
