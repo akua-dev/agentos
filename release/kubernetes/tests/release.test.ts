@@ -11,6 +11,18 @@ type Resource = {
   spec?: Record<string, any>;
 };
 
+type Workflow = {
+  jobs: Record<
+    string,
+    {
+      steps: Array<{
+        uses?: string;
+        with?: Record<string, string>;
+      }>;
+    }
+  >;
+};
+
 const temporaryDirectories: string[] = [];
 const image = `ghcr.io/akua-dev/agentos@sha256:${"a".repeat(64)}`;
 
@@ -23,6 +35,28 @@ afterEach(async () => {
 });
 
 describe("First Mate release artifacts", () => {
+  test("logs both release jobs in to GHCR with only the repository token", async () => {
+    const workflow = Bun.YAML.parse(
+      await readFile(
+        join(import.meta.dir, "../../../.github/workflows/release.yml"),
+        "utf8",
+      ),
+    ) as Workflow;
+    const registryLogins = Object.values(workflow.jobs).flatMap(({ steps }) =>
+      steps.filter(
+        ({ uses }) =>
+          uses ===
+          "docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0",
+      ),
+    );
+
+    expect(registryLogins).toHaveLength(2);
+    expect(registryLogins.map((step) => step.with?.password)).toEqual([
+      "${{ secrets.GITHUB_TOKEN }}",
+      "${{ secrets.GITHUB_TOKEN }}",
+    ]);
+  });
+
   test("renders scoped and dedicated-cluster manifests from one immutable image", async () => {
     const outputDirectory = await mkdtemp(join(tmpdir(), "agentos-release-"));
     temporaryDirectories.push(outputDirectory);
