@@ -194,6 +194,15 @@ short bounded bursts and are reconciled pull-first by the responsible Mate.
 Provider writes remain synchronous and visible to that Agent rather than being
 hidden behind an outbox worker.
 
+Provider identity stays at the same native boundary. An individual may keep
+native `gh` authentication on the owning Mate's PVC. A team may instead mount a
+dedicated GitHub App private key into First Mate only and mint short-lived
+installation tokens on demand for native `git`, `gh-axi` and `gh` calls. The
+key never enters Agent home, Fleet rows, child Agents or source control, and no
+long-lived token is cached. Repository permissions are a Captain-reviewed
+provider boundary, not Fleet authority; the accepted delivery workflow still
+controls which write or merge is allowed.
+
 ## Toolchains and worktrees
 
 Mise supplies tools to every AgentOS agent, including First Mates, Second Mates and Crewmates.
@@ -460,6 +469,10 @@ provider `openai-codex`. Existing Pi settings on the persistent home remain
 authoritative; AgentOS does not seed a release-wide model or thinking level.
 Login happens inside the persistent Pi runtime, not by copying a local token directory.
 Exact package versions and authentication commands belong to release assets and the auth skill.
+Source-provider authentication is a separate choice. Personal native `gh`
+login remains complete; teams may select the GitHub App path defined by the
+auth Skill, with its private key mounted only into First Mate and short-lived
+installation tokens consumed directly by native provider tools.
 The optional quota router is not required for either bootstrap stage. It may be
 selected later through its dedicated Skill after direct First-Mate auth works.
 

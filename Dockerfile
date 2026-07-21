@@ -104,9 +104,11 @@ FROM agentos-base AS agentos-runtime-dependencies
 WORKDIR /tmp/agentos-dependencies
 
 COPY package.json bun.lock ./
+COPY clis/github-app-token/package.json clis/github-app-token/package.json
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
 COPY services/quota-router/package.json services/quota-router/package.json
+COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
 COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
 
 RUN bun install \
@@ -114,8 +116,10 @@ RUN bun install \
       --ignore-scripts \
       --no-progress \
       --production \
+      --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
       --filter @agentos/quota-router \
+  && bun clis/github-app-token/github-app-token.ts --help >/dev/null \
   && bun clis/pg-listen/pg-listen.ts --help >/dev/null
 
 FROM agentos-base
@@ -146,7 +150,11 @@ RUN chmod 0644 \
     /opt/agentos/runtime/health.ts \
     /opt/agentos/services/quota-router/src/main.ts \
   && chmod 0755 \
+    /opt/agentos/clis/github-app-token/github-app-token.ts \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
+  && ln -s \
+    /opt/agentos/clis/github-app-token/github-app-token.ts \
+    /usr/local/bin/github-app-token \
   && ln -s \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
     /usr/local/bin/pg-listen \

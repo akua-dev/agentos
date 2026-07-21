@@ -340,4 +340,65 @@ describe("First Mate Kubernetes resources", () => {
       configMap: { name: "existing-runtime" },
     });
   });
+
+  test("mounts GitHub App identity only into the First Mate runtime", async () => {
+    const resources = await render(join(runtime, "base"));
+    const original = resource(resources, "StatefulSet", "agentos-firstmate");
+    const live = structuredClone(original);
+    const livePod = live.spec!.template.spec;
+    livePod.volumes = [
+      { name: "existing-runtime", configMap: { name: "existing-runtime" } },
+    ];
+
+    const statefulSet = await applyStrategicPatch(
+      live,
+      join(runtime, "patches", "github-app.yaml"),
+    );
+    const pod = statefulSet.spec!.template.spec;
+    const firstmate = pod.containers[0];
+    const environment = Object.fromEntries(
+      firstmate.env.map(
+        ({ name, value, valueFrom }: Record<string, unknown>) => [
+          name,
+          value ?? valueFrom,
+        ],
+      ),
+    );
+
+    expect(pod.initContainers.every((container: Record<string, any>) =>
+      !(container.volumeMounts ?? []).some(
+        (mount: Record<string, string>) => mount.name === "github-app",
+      ),
+    )).toBe(true);
+    expect(firstmate.volumeMounts).toContainEqual({
+      mountPath: "/var/run/secrets/agentos/github",
+      name: "github-app",
+      readOnly: true,
+    });
+    expect(environment).toMatchObject({
+      GITHUB_APP_ID: {
+        secretKeyRef: { key: "app-id", name: "agentos-github-app" },
+      },
+      GITHUB_APP_INSTALLATION_ID: {
+        secretKeyRef: {
+          key: "installation-id",
+          name: "agentos-github-app",
+        },
+      },
+      GITHUB_APP_PRIVATE_KEY_FILE:
+        "/var/run/secrets/agentos/github/private-key.pem",
+    });
+    expect(pod.volumes).toContainEqual({
+      name: "github-app",
+      secret: {
+        defaultMode: 288,
+        items: [{ key: "private-key.pem", path: "private-key.pem" }],
+        secretName: "agentos-github-app",
+      },
+    });
+    expect(pod.volumes).toContainEqual({
+      name: "existing-runtime",
+      configMap: { name: "existing-runtime" },
+    });
+  });
 });
