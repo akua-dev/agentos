@@ -51,6 +51,56 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
    backend.
 10. Leave bootstrap mode only after runtime, authentication, schema, `current_agent_id()` resolving the single active root First Mate, and every security check implemented by the selected release pass.
 
+## Upgrade or remove an installation
+
+Treat both operations as a new reconciliation: inspect first, resolve the exact
+installed release, image digest, database migration journal, retained PVC,
+persistent AgentOS checkout and active work, then explain the proposed state
+change. Never overwrite a dirty or divergent checkout, strand an Assignment or
+assume that deleting a workload also retires its durable Agent identity.
+
+For an upgrade:
+
+1. Resolve one newer immutable stable release and its fixed-name manifest. Read
+   the intervening release and migration changes, verify the target image
+   digest and inspect the server-side manifest diff. Stop when the release lacks
+   an executable migration or compatibility path from the installed version.
+2. Preserve unfinished work before changing the persistent AgentOS checkout.
+   With approval, fetch and select the exact release tag in the clean checkout;
+   never copy changed release files into the PVC or edit the immutable image
+   seed.
+3. Load [AgentOS Database](../../../../.agents/skills/agentos-database/SKILL.md)
+   when migrations are pending. Establish the developer-selected backup or
+   recovery boundary first, then apply only the release's ordered forward
+   migrations in its documented compatibility order. AgentOS has no implicit
+   down-migration or database rollback path.
+4. Explain the First-Mate interruption and ask before applying the selected new
+   manifest. Preserve the existing StatefulSet identity and home claim; never
+   recreate the namespace or PVC as an upgrade shortcut.
+5. Verify the observed target digest on every init and runtime container, the
+   same PVC and native Pi session, the exact release checkout, Herdr attach,
+   provider authentication, database identity and released security checks.
+   Reapply an approved installation-specific database client patch only when
+   inspection proves the manifest update removed it.
+
+For removal, first present two explicit scopes:
+
+- **Stop AgentOS and retain state:** remove the Mate workload and unnecessary
+  AgentOS RBAC, including any cluster-admin binding, while retaining the
+  namespace, home PVC, database and unfinished Git work for recovery.
+- **Permanently remove the Fleet:** after the developer has exported or
+  deliberately discarded every required home, database and Git artifact,
+  remove the AgentOS namespace and its PVCs, then revoke AgentOS-specific
+  provider credentials and external integration access.
+
+Show the exact resources and retained data before either mutation and ask for
+the selected scope. Never delete an external PostgreSQL database, a shared
+CloudNativePG controller, shared registry, host vCluster namespace or provider
+repository as an AgentOS uninstall side effect. Verify that no AgentOS workload
+or unintended cluster-wide grant remains; report retained PVCs, database state
+and credentials rather than calling a state-retaining removal complete data
+deletion.
+
 If bootstrap or later dogfooding needs a private image path, load [AgentOS Image Builds](../../../../.agents/skills/agentos-image-builds/SKILL.md) and [AgentOS Registry](../../../../.agents/skills/agentos-registry/SKILL.md). Do not install a builder or registry merely because AgentOS itself is being installed from a public immutable image.
 
 Repeat safely from the first incomplete verified boundary after interruption.
