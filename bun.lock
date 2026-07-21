@@ -12,6 +12,13 @@
         "typescript": "7.0.2",
       },
     },
+    "clis/github-app-token": {
+      "name": "@agentos/github-app-token",
+      "version": "0.0.0",
+      "bin": {
+        "github-app-token": "./github-app-token.ts",
+      },
+    },
     "clis/pg-listen": {
       "name": "@agentos/pg-listen",
       "version": "0.0.0",
@@ -57,6 +64,8 @@
   },
   "packages": {
     "@agentos/database": ["@agentos/database@workspace:database"],
+
+    "@agentos/github-app-token": ["@agentos/github-app-token@workspace:clis/github-app-token"],
 
     "@agentos/pg-listen": ["@agentos/pg-listen@workspace:clis/pg-listen"],
 

@@ -1,6 +1,6 @@
 ---
 name: agentos-auth
-description: Establish, inspect, rotate, revoke, and recover model-provider authentication for AgentOS agents. Use for Pi Codex-subscription browser login, device-code recovery, API-key or third-party fallback, provider changes, expired credentials, quota identity changes, and authentication verification.
+description: Establish, inspect, rotate, revoke, and recover model-provider or source-provider authentication for AgentOS agents. Use for Pi Codex-subscription browser login, GitHub personal or App identity, device-code recovery, API-key or third-party fallback, provider changes, expired credentials, quota identity changes, and authentication verification.
 ---
 
 # Manage AgentOS authentication
@@ -50,3 +50,59 @@ Handle provider credentials inside the owning agent's persistent runtime wheneve
 When an approved harness requires a key, have the developer write it to a mode-`0600` file in a mode-`0700` temporary directory outside the repository. Transfer it without printing, expose it only to the owning workload, verify metadata plus a real auth probe, and remove staging only after takeover succeeds.
 
 On failure, keep the agent in bootstrap or degraded mode. Preserve the existing credential until the replacement is verified unless the developer explicitly requests urgent revocation.
+
+## GitHub identity
+
+Present two complete paths and let the Captain choose:
+
+- Personal or individual development: authenticate the owning persistent Mate
+  through native `gh auth login` and its provider-supported browser or device
+  flow. Keep the resulting `gh` state on that Mate's PVC; never copy a local
+  credential store into the Pod.
+- Organization-owned Fleet identity: use one dedicated GitHub App whose
+  repository selection and permissions the Captain has reviewed. A broad
+  installation is valid only when the Captain deliberately accepts that broad
+  provider authority; GitHub authentication still grants no AgentOS authority.
+
+The GitHub App client secret is not used for installation-token authentication
+and must not be transferred. Inventory the non-secret App ID, installation ID,
+effective repository selection and permissions. Have the Captain place the App
+private key in a mode-`0600` file outside the repository. With explicit
+credential and workload-mutation approval, stream that file into a Secret named
+`agentos-github-app` in the owning namespace with these keys:
+
+- `app-id`
+- `installation-id`
+- `private-key.pem`
+
+Do not print or persist the rendered Secret manifest. Apply the released
+`agents/firstmate/kubernetes/patches/github-app.yaml` to the effective First
+Mate StatefulSet without replacing its image, PVC, database wiring or unrelated
+configuration. The patch mounts only the private key into only the First Mate
+runtime at `/var/run/secrets/agentos/github`; init containers, Second Mates and
+Crewmates do not receive it. Ask before the required First Mate Pod replacement,
+then verify the retained PVC and native Pi session after rollout.
+
+`github-app-token` performs only installation-token minting. It reads the
+mounted key and non-secret IDs, requests one short-lived token from GitHub and
+writes only that token to standard output. Never run it bare in a recorded
+terminal. Consume it directly through the provider's standard environment so
+the acting command and its real failure remain visible, for example:
+
+```console
+GH_TOKEN="$(github-app-token)" gh-axi repo view akua-dev/agentos
+```
+
+For HTTPS Git operations, configure Git's native GitHub CLI credential helper
+once through `gh auth setup-git`, then give each `git` invocation a fresh
+`GH_TOKEN` environment value from the same command substitution. Do not export
+or cache the installation token in shell startup state, Pi settings, Fleet
+rows, task briefs or Agent home.
+
+Verify a harmless read first. A provider-visible write remains separately
+gated by the accepted delivery workflow or an explicit Captain approval; after
+one approved proof, verify GitHub attributes it to the App. On expiry, mint a
+new token rather than recovering an old one. For rotation, update the Secret,
+replace one First Mate Pod and verify the new key before revoking the old key.
+For revocation, remove the mount and Secret and revoke or uninstall the App as
+selected; report any retained provider sessions or repository access.
