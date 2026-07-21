@@ -18,10 +18,11 @@ weighted score.
 ## Current state
 
 Version `0.1.0` defines the portable semantics, metric catalog, fixed scenario
-rubrics, evidence and compact-result schemas, and first two scenarios. There are
-no official AgentOS results yet. A result appears only
-after every attempt in a declared run set has been preserved and independently
-verified.
+rubrics, evidence and compact-result schemas, and first two scenarios. The
+[first AgentOS baseline](./results/agentos/quickstart-to-delivery-v0.1.0.json)
+preserves all five declared attempts: three passed, one failed, and one ended
+incomplete after its starting state was rejected. It is evidence for this exact
+subject and environment, not a claim of superiority over another system.
 
 The [public benchmark epic](https://github.com/akua-dev/agentos/issues/14) is
 the changing work-status authority. This table keeps the repository boundary

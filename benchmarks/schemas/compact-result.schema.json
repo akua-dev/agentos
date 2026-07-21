@@ -80,7 +80,7 @@
       "properties": {
         "criterion_id": { "$ref": "#/$defs/identifier" }, "status": { "enum": ["passed", "failed", "unobserved", "not-applicable"] }, "explanation": { "$ref": "#/$defs/nonEmptyText" },
         "evidence_event_ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmptyText" } },
-        "evaluator": { "type": "object", "additionalProperties": false, "required": ["kind", "name", "version"], "properties": { "kind": { "enum": ["model", "human", "hybrid"] }, "name": { "$ref": "#/$defs/nonEmptyText" }, "version": { "$ref": "#/$defs/nonEmptyText" } } },
+        "evaluator": { "type": "object", "additionalProperties": false, "required": ["kind", "name", "version"], "properties": { "kind": { "enum": ["deterministic", "model", "human", "hybrid"] }, "name": { "$ref": "#/$defs/nonEmptyText" }, "version": { "$ref": "#/$defs/nonEmptyText" } } },
         "rubric_version": { "$ref": "#/$defs/version" }
       }
     }
