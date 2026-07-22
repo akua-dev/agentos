@@ -69,11 +69,14 @@ function inputContent(content: string | (TextContent | ImageContent)[]): Respons
   return items;
 }
 
-function toolOutput(content: (TextContent | ImageContent)[]) {
-  const output = content.map((part) =>
+function toolOutput(
+  content: (TextContent | ImageContent)[],
+): Extract<ResponseItem, { type: "function_call_output" }>["output"] {
+  const output = content.map(
+    (part): Exclude<Extract<ResponseItem, { type: "function_call_output" }>["output"], string>[number] =>
       part.type === "text"
-        ? { type: "input_text" as const, text: part.text }
-        : { type: "input_image" as const, detail: "auto", image_url: imageUrl(part) },
+        ? { type: "input_text", text: part.text }
+        : { type: "input_image", detail: "auto", image_url: imageUrl(part) },
   );
   return output.length > 0 ? output : "(no tool output)";
 }

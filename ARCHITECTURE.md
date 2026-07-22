@@ -613,6 +613,7 @@ workspace. The tree reflects ownership, not deployment order:
 │   ├── AGENTS.md                     shared rules for running Agent roles
 │   ├── .agents/skills/               operational Skills shared by both Mates
 │   ├── .pi/background-tasks/         shared Pi extension implementation
+│   ├── .pi/openai-server-compaction/ shared OpenAI compaction lifecycle
 │   ├── firstmate/
 │   │   ├── AGENTS.md                 complete First-Mate identity and duties
 │   │   ├── .agents/skills/           First-Mate-only workflows
