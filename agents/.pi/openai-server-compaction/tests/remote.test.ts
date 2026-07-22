@@ -43,7 +43,11 @@ describe("OpenAI server compaction transport", () => {
       `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
       `data: ${JSON.stringify({
         type: "response.completed",
-        response: { output: [artifact], usage: { input_tokens: 50, output_tokens: 3 } },
+        response: {
+          status: "completed",
+          output: [artifact],
+          usage: { input_tokens: 50, output_tokens: 3 },
+        },
       })}`,
       "data: [DONE]",
       "",
@@ -64,7 +68,7 @@ describe("OpenAI server compaction transport", () => {
       },
     });
 
-    expect(result).toEqual({ artifact, usage: { input_tokens: 50, output_tokens: 3 } });
+    expect(result).toEqual({ output: [artifact], usage: { input_tokens: 50, output_tokens: 3 } });
     expect(request?.url).toBe("http://ai-gateway:8787/codex/responses");
     const headers = new Headers(request?.init.headers);
     expect(headers.get("authorization")).toBe("Bearer fleet-client-token");
@@ -108,7 +112,11 @@ describe("OpenAI server compaction transport", () => {
       `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
       `data: ${JSON.stringify({
         type: "response.done",
-        response: { output: [artifact], usage: { input_tokens: 7, output_tokens: 2 } },
+        response: {
+          status: "completed",
+          output: [artifact],
+          usage: { input_tokens: 7, output_tokens: 2 },
+        },
       })}`,
       "data: [DONE]",
       "",
@@ -122,7 +130,7 @@ describe("OpenAI server compaction transport", () => {
         tools: [],
         fetchImpl: async () => new Response(sse, { status: 200 }),
       }),
-    ).resolves.toEqual({ artifact, usage: { input_tokens: 7, output_tokens: 2 } });
+    ).resolves.toEqual({ output: [artifact], usage: { input_tokens: 7, output_tokens: 2 } });
   });
 
   test("rejects Codex response.incomplete before accepting an artifact", async () => {
@@ -144,9 +152,159 @@ describe("OpenAI server compaction transport", () => {
     ).rejects.toThrow("incomplete");
   });
 
+  test("rejects every non-completed terminal status", async () => {
+    for (const status of ["queued", "in_progress", "incomplete", "failed", "cancelled", undefined]) {
+      const artifact = { type: "compaction", encrypted_content: `opaque-${status ?? "missing"}` };
+      const response = {
+        ...(status === undefined ? {} : { status }),
+        output: [artifact],
+      };
+      const sse = [
+        `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
+        `data: ${JSON.stringify({ type: "response.done", response })}`,
+        "",
+      ].join("\n\n");
+
+      await expect(
+        requestServerCompaction({
+          model: model(),
+          apiKey: "token",
+          input: [],
+          tools: [],
+          fetchImpl: async () => new Response(sse, { status: 200 }),
+        }),
+      ).rejects.toThrow();
+    }
+  });
+
+  test("rejects ambiguous multiple terminal events", async () => {
+    const artifact = { type: "compaction" as const, encrypted_content: "opaque-ambiguous" };
+    const sse = [
+      `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
+      `data: ${JSON.stringify({
+        type: "response.completed",
+        response: { status: "completed", output: [artifact] },
+      })}`,
+      `data: ${JSON.stringify({
+        type: "response.done",
+        response: { status: "completed", output: [artifact] },
+      })}`,
+      "",
+    ].join("\n\n");
+
+    await expect(
+      requestServerCompaction({
+        model: model(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: async () => new Response(sse, { status: 200 }),
+      }),
+    ).rejects.toThrow("multiple terminal");
+  });
+
+  test("rejects compaction items that share encrypted content but differ in metadata", async () => {
+    const eventArtifact = {
+      type: "compaction" as const,
+      encrypted_content: "opaque-ambiguous-artifact",
+      provider_metadata: { source: "item-done" },
+    };
+    const terminalArtifact = {
+      type: "compaction" as const,
+      encrypted_content: "opaque-ambiguous-artifact",
+      provider_metadata: { source: "terminal-output" },
+    };
+    const sse = [
+      `data: ${JSON.stringify({ type: "response.output_item.done", item: eventArtifact })}`,
+      `data: ${JSON.stringify({
+        type: "response.done",
+        response: { status: "completed", output: [terminalArtifact] },
+      })}`,
+      "",
+    ].join("\n\n");
+
+    await expect(
+      requestServerCompaction({
+        model: model(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: async () => new Response(sse, { status: 200 }),
+      }),
+    ).rejects.toThrow("ambiguous");
+  });
+
+  test("rejects malformed known output_text instead of treating it as opaque content", async () => {
+    const output = [
+      {
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: 42, annotations: [] }],
+      },
+      { type: "compaction", encrypted_content: "opaque-invalid-output-text" },
+    ];
+
+    await expect(
+      requestServerCompaction({
+        model: model({
+          provider: "openai",
+          api: "openai-responses",
+          baseUrl: "https://api.openai.com/v1",
+        }),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: async () =>
+          new Response(JSON.stringify({ output }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      }),
+    ).rejects.toThrow("invalid compacted response");
+  });
+
   test("uses the standard OpenAI compact endpoint and JSON response", async () => {
     let request: { url: string; init: RequestInit } | undefined;
-    const artifact = { type: "compaction" as const, encrypted_content: "opaque-openai" };
+    const output = [
+      {
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "retained" },
+          { type: "opaque_content", opaque: { provider_key: "preserve-me" } },
+        ],
+        provider_metadata: { trace_id: "trace-1" },
+      },
+      {
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: "retained answer", annotations: [] }],
+      },
+      {
+        type: "function_call",
+        id: "fc_1",
+        call_id: "call_1",
+        name: "ignored",
+        arguments: "{}",
+        provider_metadata: { region: "test" },
+      },
+      {
+        type: "function_call_output",
+        call_id: "call_1",
+        output: [{ type: "input_text", text: "tool result" }],
+      },
+      {
+        type: "reasoning",
+        summary: [],
+        encrypted_content: "provider-reasoning",
+        provider_metadata: { model_family: "gpt" },
+      },
+      {
+        type: "provider_metadata",
+        opaque: { trace_id: "trace-2", region: "test" },
+      },
+      { type: "compaction", encrypted_content: "opaque-openai", provider_metadata: { version: 2 } },
+    ];
     const result = await requestServerCompaction({
       model: model({
         provider: "openai",
@@ -164,7 +322,7 @@ describe("OpenAI server compaction transport", () => {
           JSON.stringify({
             id: "cmp_1",
             object: "response.compaction",
-            output: [artifact],
+            output,
             usage: { input_tokens: 40, output_tokens: 4 },
           }),
           { status: 200, headers: { "content-type": "application/json" } },
@@ -172,7 +330,7 @@ describe("OpenAI server compaction transport", () => {
       },
     });
 
-    expect(result).toEqual({ artifact, usage: { input_tokens: 40, output_tokens: 4 } });
+    expect(result).toEqual({ output, usage: { input_tokens: 40, output_tokens: 4 } });
     expect(request?.url).toBe("https://api.openai.com/v1/responses/compact");
     const headers = new Headers(request?.init.headers);
     expect(headers.get("authorization")).toBe("Bearer openai-token");

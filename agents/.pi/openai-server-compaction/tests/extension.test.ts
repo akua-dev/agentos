@@ -94,7 +94,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
     const handlers = harness({
       runLocalCompaction: async () => local,
       runServerCompaction: async () => ({
-        artifact: { type: "compaction", encrypted_content: "opaque" },
+        output: [{ type: "compaction", encrypted_content: "opaque" }],
         usage: { input_tokens: 10, output_tokens: 1, total_tokens: 11 },
       }),
     });
@@ -147,7 +147,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
         throw new Error("local failed");
       },
       runServerCompaction: async () => ({
-        artifact: { type: "compaction", encrypted_content: "must-not-persist" },
+        output: [{ type: "compaction", encrypted_content: "must-not-persist" }],
       }),
     });
     expect(await handlers.get("session_before_compact")?.(event, context())).toBeUndefined();
@@ -159,7 +159,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
       runLocalCompaction: async () => local,
       runServerCompaction: async (value) => {
         request = value;
-        return { artifact: { type: "compaction", encrypted_content: "opaque" } };
+        return { output: [{ type: "compaction", encrypted_content: "opaque" }] };
       },
     });
 
@@ -208,7 +208,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
         summary: "portable",
         firstKeptEntryId: "m1",
         tokensBefore: 100,
-        details: nativeCompactionDetails("openai-codex", "gpt-5.4", artifact),
+        details: nativeCompactionDetails("openai-codex", "gpt-5.4", [artifact]),
       },
       {
         type: "message",
@@ -220,7 +220,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
     ];
     const handlers = harness({
       runLocalCompaction: async () => local,
-      runServerCompaction: async () => ({ artifact }),
+      runServerCompaction: async () => ({ output: [artifact] }),
     });
 
     const result = handlers.get("before_provider_request")?.(

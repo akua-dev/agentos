@@ -5,8 +5,9 @@ import {
   type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import {
+  isCompactionArtifact,
+  isResponseItem,
   messagesToResponseItems,
-  type CompactionArtifact,
   type ResponseItem,
 } from "./messages.ts";
 
@@ -16,7 +17,7 @@ export type NativeCompactionState = {
   version: 1;
   provider: string;
   model: string;
-  replacementInput: [CompactionArtifact];
+  replacementInput: ResponseItem[];
   usage?: Record<string, unknown>;
 };
 
@@ -24,12 +25,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isArtifact(value: unknown): value is CompactionArtifact {
+function isReplayInput(value: unknown): value is ResponseItem[] {
   return (
-    isRecord(value) &&
-    value.type === "compaction" &&
-    typeof value.encrypted_content === "string" &&
-    value.encrypted_content.length > 0
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(isResponseItem) &&
+    value.filter(isCompactionArtifact).length === 1
   );
 }
 
@@ -40,10 +41,10 @@ function readState(entry: CompactionEntry): NativeCompactionState | undefined {
     !isRecord(state) ||
     state.version !== 1 ||
     typeof state.provider !== "string" ||
+    state.provider.length === 0 ||
     typeof state.model !== "string" ||
-    !Array.isArray(state.replacementInput) ||
-    state.replacementInput.length !== 1 ||
-    !isArtifact(state.replacementInput[0])
+    state.model.length === 0 ||
+    !isReplayInput(state.replacementInput)
   ) {
     return undefined;
   }
@@ -52,7 +53,7 @@ function readState(entry: CompactionEntry): NativeCompactionState | undefined {
     version: 1,
     provider: state.provider,
     model: state.model,
-    replacementInput: [state.replacementInput[0]],
+    replacementInput: state.replacementInput,
     ...(usage ? { usage } : {}),
   };
 }
@@ -72,7 +73,7 @@ function messagesAfter(entries: SessionEntry[], index: number) {
 export function nativeCompactionDetails(
   provider: string,
   model: string,
-  artifact: CompactionArtifact,
+  replacementInput: ResponseItem[],
   usage?: Record<string, unknown>,
 ): Record<typeof NATIVE_DETAILS_KEY, NativeCompactionState> {
   return {
@@ -80,7 +81,7 @@ export function nativeCompactionDetails(
       version: 1,
       provider,
       model,
-      replacementInput: [artifact],
+      replacementInput,
       ...(usage ? { usage } : {}),
     },
   };
@@ -116,6 +117,7 @@ export function rewriteResponsesPayload(
   model: string,
 ): Record<string, unknown> | undefined {
   if (!isRecord(payload) || !Array.isArray(payload.input)) return undefined;
+  if (payload.model !== undefined && payload.model !== model) return undefined;
   const native = matchingState(entries, provider, model);
   if (!native) return undefined;
   return {

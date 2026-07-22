@@ -211,7 +211,7 @@ async function handleCompaction(
   const native = nativeCompactionDetails(
     model.provider,
     model.id,
-    remote.value.artifact,
+    remote.value.output,
     remote.value.usage,
   );
   return {

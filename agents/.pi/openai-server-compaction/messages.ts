@@ -13,6 +13,7 @@ export type ResponseContentItem =
 export type CompactionArtifact = {
   type: "compaction";
   encrypted_content: string;
+  [key: string]: unknown;
 };
 
 export type ResponseItem =
@@ -42,12 +43,77 @@ export type ResponseItem =
         | Array<
             | { type: "input_text"; text: string }
             | { type: "input_image"; detail: "auto"; image_url: string }
-          >;
+        >;
     }
-  | CompactionArtifact;
+  | CompactionArtifact
+  | { type: string; [key: string]: unknown };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function isCompactionArtifact(value: unknown): value is CompactionArtifact {
+  return (
+    isRecord(value) &&
+    value.type === "compaction" &&
+    typeof value.encrypted_content === "string" &&
+    value.encrypted_content.length > 0
+  );
+}
+
+function isInputContentItem(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.type === "input_text") return typeof value.text === "string";
+  if (value.type === "input_image") {
+    return value.detail === "auto" && typeof value.image_url === "string";
+  }
+  if (value.type === "output_text") return false;
+  return typeof value.type === "string" && value.type.length > 0;
+}
+
+function isResponseContentItem(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (isInputContentItem(value)) return true;
+  return (
+    value.type === "output_text" &&
+    typeof value.text === "string" &&
+    Array.isArray(value.annotations)
+  );
+}
+
+export function isResponseItem(value: unknown): value is ResponseItem {
+  if (!isRecord(value) || typeof value.type !== "string" || value.type.length === 0) return false;
+  switch (value.type) {
+    case "message":
+      return (
+        (value.role === "user" || value.role === "assistant") &&
+        Array.isArray(value.content) &&
+        value.content.every(isResponseContentItem)
+      );
+    case "reasoning":
+      return (
+        Array.isArray(value.summary) &&
+        value.summary.every(isRecord) &&
+        (value.content === undefined ||
+          (Array.isArray(value.content) && value.content.every(isRecord)))
+      );
+    case "function_call":
+      return (
+        typeof value.call_id === "string" &&
+        typeof value.name === "string" &&
+        typeof value.arguments === "string"
+      );
+    case "function_call_output":
+      return (
+        typeof value.call_id === "string" &&
+        (typeof value.output === "string" ||
+          (Array.isArray(value.output) && value.output.every(isInputContentItem)))
+      );
+    case "compaction":
+      return isCompactionArtifact(value);
+    default:
+      return true;
+  }
 }
 
 function imageUrl(image: ImageContent): string {

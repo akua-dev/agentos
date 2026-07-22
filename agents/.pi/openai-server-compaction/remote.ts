@@ -1,5 +1,10 @@
 import type { Model } from "@earendil-works/pi-ai";
-import type { CompactionArtifact, ResponseItem } from "./messages.ts";
+import {
+  isCompactionArtifact,
+  isResponseItem,
+  type CompactionArtifact,
+  type ResponseItem,
+} from "./messages.ts";
 
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 const REMOTE_COMPACTION_FEATURE = "remote_compaction_v2";
@@ -9,7 +14,7 @@ const MAX_TIMEOUT_MS = 600_000;
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export type ServerCompactionResult = {
-  artifact: CompactionArtifact;
+  output: ResponseItem[];
   usage?: Record<string, unknown>;
 };
 
@@ -159,18 +164,19 @@ async function parseCompactResponse(text: string): Promise<ServerCompactionResul
   } catch {
     throw new Error("OpenAI server compaction returned invalid JSON.");
   }
-  if (!isRecord(value) || !Array.isArray(value.output)) {
+  if (!isRecord(value) || !Array.isArray(value.output) || value.output.length === 0) {
     throw new Error("OpenAI server compaction returned an invalid compacted response.");
   }
-  const artifacts = value.output.flatMap((output) => {
-    const artifact = artifactFrom(output);
-    return artifact ? [artifact] : [];
-  });
+  const output = value.output;
+  if (!output.every(isResponseItem)) {
+    throw new Error("OpenAI server compaction returned an invalid compacted response.");
+  }
+  const artifacts = output.filter(artifactFrom);
   if (artifacts.length !== 1) {
     throw new Error(`OpenAI server compaction expected one artifact, received ${artifacts.length}.`);
   }
   const usage = isRecord(value.usage) ? value.usage : undefined;
-  return { artifact: artifacts[0]!, ...(usage ? { usage } : {}) };
+  return { output, ...(usage ? { usage } : {}) };
 }
 
 function requestHeaders(params: ServerCompactionRequest, endpoint: string): Headers {
@@ -248,77 +254,88 @@ async function boundedResponseText(response: Response, signal: AbortSignal): Pro
 }
 
 function parseSse(text: string): unknown[] {
-  return text
-    .replace(/\r\n/g, "\n")
-    .split("\n\n")
-    .flatMap((block) => {
-      const data = block
-        .split("\n")
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trimStart())
-        .join("\n")
-        .trim();
-      if (!data || data === "[DONE]") return [];
-      try {
-        return [JSON.parse(data) as unknown];
-      } catch {
-        return [];
-      }
-    });
+  const events: unknown[] = [];
+  for (const block of text.replace(/\r\n/g, "\n").split("\n\n")) {
+    const data = block
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n")
+      .trim();
+    if (!data || data === "[DONE]") continue;
+    try {
+      events.push(JSON.parse(data) as unknown);
+    } catch {
+      throw new Error("OpenAI server compaction returned invalid SSE data.");
+    }
+  }
+  return events;
 }
 
 function artifactFrom(value: unknown): CompactionArtifact | undefined {
-  if (
-    !isRecord(value) ||
-    value.type !== "compaction" ||
-    typeof value.encrypted_content !== "string" ||
-    value.encrypted_content.length === 0
-  ) {
-    return undefined;
+  return isCompactionArtifact(value) ? value : undefined;
+}
+
+function recordArtifact(artifacts: Map<string, CompactionArtifact>, artifact: CompactionArtifact): void {
+  const existing = artifacts.get(artifact.encrypted_content);
+  if (existing && JSON.stringify(existing) !== JSON.stringify(artifact)) {
+    throw new Error("OpenAI server compaction returned ambiguous compaction artifacts.");
   }
-  return { type: "compaction", encrypted_content: value.encrypted_content };
+  artifacts.set(artifact.encrypted_content, existing ?? artifact);
 }
 
 function parseCompactionEvents(events: unknown[]): ServerCompactionResult {
-  let completed = false;
+  let terminalType: "response.completed" | "response.done" | undefined;
   let usage: Record<string, unknown> | undefined;
   const artifacts = new Map<string, CompactionArtifact>();
 
   for (const value of events) {
     if (!isRecord(value)) continue;
-    if (value.type === "error" || value.type === "response.failed") {
-      throw new Error("OpenAI server compaction failed.");
-    }
-    if (value.type === "response.output_item.done") {
-      const artifact = artifactFrom(value.item);
-      if (artifact) artifacts.set(artifact.encrypted_content, artifact);
-      continue;
-    }
-    if (value.type !== "response.completed" && value.type !== "response.done" && value.type !== "response.incomplete") {
-      continue;
-    }
     if (value.type === "response.incomplete") {
       throw new Error("OpenAI server compaction response was incomplete.");
     }
-    completed = true;
-    const response = value.response;
-    if (!isRecord(response)) throw new Error("OpenAI server compaction returned no terminal response.");
-    if (response.status === "incomplete") {
-      throw new Error("OpenAI server compaction response was incomplete.");
-    }
-    if (response.status === "failed" || response.status === "cancelled") {
+    if (
+      value.type === "error" ||
+      value.type === "response.error" ||
+      value.type === "response.failed" ||
+      value.type === "response.cancelled"
+    ) {
       throw new Error("OpenAI server compaction failed.");
     }
-    if (isRecord(response.usage)) usage = response.usage;
-    if (Array.isArray(response.output)) {
-      for (const output of response.output) {
-        const artifact = artifactFrom(output);
-        if (artifact) artifacts.set(artifact.encrypted_content, artifact);
+    if (value.type === "response.output_item.done") {
+      if (!isResponseItem(value.item)) {
+        throw new Error("OpenAI server compaction returned an invalid output item.");
       }
+      const artifact = artifactFrom(value.item);
+      if (artifact) recordArtifact(artifacts, artifact);
+      continue;
+    }
+    if (value.type !== "response.completed" && value.type !== "response.done") {
+      continue;
+    }
+    if (terminalType) {
+      throw new Error("OpenAI server compaction returned multiple terminal events.");
+    }
+    terminalType = value.type;
+    const response = value.response;
+    if (!isRecord(response)) throw new Error("OpenAI server compaction returned no terminal response.");
+    if (response.status !== "completed") {
+      throw new Error("OpenAI server compaction terminal response was not completed.");
+    }
+    if (isRecord(response.usage)) usage = response.usage;
+    if (response.output !== undefined && !Array.isArray(response.output)) {
+      throw new Error("OpenAI server compaction returned an invalid terminal response.");
+    }
+    if (Array.isArray(response.output) && !response.output.every(isResponseItem)) {
+      throw new Error("OpenAI server compaction returned an invalid terminal response.");
+    }
+    for (const output of response.output ?? []) {
+      const artifact = artifactFrom(output);
+      if (artifact) recordArtifact(artifacts, artifact);
     }
   }
 
-  if (!completed) {
+  if (!terminalType) {
     throw new Error("OpenAI server compaction stream ended before response.completed.");
   }
   if (artifacts.size !== 1) {
@@ -326,7 +343,7 @@ function parseCompactionEvents(events: unknown[]): ServerCompactionResult {
   }
   const artifact = artifacts.values().next().value;
   if (!artifact) throw new Error("OpenAI server compaction returned no artifact.");
-  return { artifact, ...(usage ? { usage } : {}) };
+  return { output: [artifact], ...(usage ? { usage } : {}) };
 }
 
 export async function requestServerCompaction(
