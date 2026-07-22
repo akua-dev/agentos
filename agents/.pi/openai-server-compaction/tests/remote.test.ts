@@ -8,6 +8,14 @@ import {
 } from "../remote.ts";
 import { parseResponseItems, type ResponseItem } from "../schemas.ts";
 
+const completeUsage = {
+  input_tokens: 40,
+  input_tokens_details: { cached_tokens: 10 },
+  output_tokens: 4,
+  output_tokens_details: { reasoning_tokens: 2 },
+  total_tokens: 44,
+};
+
 function responseItems(value: unknown): ResponseItem[] {
   const parsed = parseResponseItems(value);
   if (!parsed) throw new Error("Invalid response item fixture.");
@@ -436,16 +444,17 @@ describe("OpenAI server compaction transport", () => {
         return new Response(
           JSON.stringify({
             id: "cmp_1",
+            created_at: 1_784_751_200,
             object: "response.compaction",
             output,
-            usage: { input_tokens: 40, output_tokens: 4 },
+            usage: completeUsage,
           }),
           { status: 200, headers: { "content-type": "application/json" } },
         );
       },
     });
 
-    expect(result).toEqual({ output, usage: { input_tokens: 40, output_tokens: 4 } });
+    expect(result).toEqual({ output, usage: completeUsage });
     expect(request?.url).toBe("https://api.openai.com/v1/responses/compact");
     const headers = new Headers(request?.init.headers);
     expect(headers.get("authorization")).toBe("Bearer openai-token");
@@ -482,7 +491,49 @@ describe("OpenAI server compaction transport", () => {
             { status: 200 },
           ),
       }),
-    ).rejects.toThrow("invalid usage");
+    ).rejects.toThrow("invalid compacted response");
+  });
+
+  test("requires complete usage at the standard compact response boundary", async () => {
+    const output = [{ type: "compaction" as const, encrypted_content: "opaque-complete-usage" }];
+    const compactModel = model({
+      provider: "openai",
+      api: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
+    });
+
+    for (const response of [
+      { output, usage: completeUsage },
+      {
+        id: "cmp_missing_usage",
+        created_at: 1_784_751_200,
+        object: "response.compaction",
+        output,
+      },
+      {
+        id: "cmp_empty_details",
+        created_at: 1_784_751_200,
+        object: "response.compaction",
+        output,
+        usage: {
+          input_tokens: 1,
+          input_tokens_details: {},
+          output_tokens: 1,
+          output_tokens_details: {},
+          total_tokens: 2,
+        },
+      },
+    ]) {
+      await expect(
+        requestServerCompaction({
+          model: compactModel,
+          apiKey: "token",
+          input: [],
+          tools: [],
+          fetchImpl: async () => new Response(JSON.stringify(response), { status: 200 }),
+        }),
+      ).rejects.toThrow("invalid compacted response");
+    }
   });
 
   test("rejects malformed provider usage in the SSE terminal response", async () => {

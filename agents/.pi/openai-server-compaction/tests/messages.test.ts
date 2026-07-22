@@ -34,13 +34,30 @@ describe("Responses message conversion", () => {
         type: "web_search_call",
         id: "ws_1",
         status: "completed",
+        action: { type: "search", query: "AgentOS" },
       }),
     ).toBe(true);
     expect(
       isResponseItem({
         type: "web_search_call",
         id: "ws_1",
+        action: { type: "search", query: "AgentOS" },
         status: 42,
+      }),
+    ).toBe(false);
+    expect(
+      isResponseItem({
+        type: "web_search_call",
+        id: "ws_1",
+        status: "completed",
+      }),
+    ).toBe(false);
+    expect(
+      isResponseItem({
+        type: "web_search_call",
+        id: "ws_1",
+        action: { type: "search" },
+        status: "completed",
       }),
     ).toBe(false);
     expect(
@@ -62,6 +79,67 @@ describe("Responses message conversion", () => {
     ).toBe(false);
   });
 
+  test("validates item references and reasoning text as known discriminants", () => {
+    expect(isResponseItem({ type: "item_reference" })).toBe(false);
+    expect(isResponseItem({ type: "item_reference", id: "item_1" })).toBe(true);
+    expect(
+      isResponseItem({
+        type: "message",
+        role: "assistant",
+        content: [{ type: "reasoning_text" }],
+      }),
+    ).toBe(false);
+    expect(
+      isResponseItem({
+        type: "message",
+        role: "assistant",
+        content: [{ type: "reasoning_text", text: "retained reasoning" }],
+      }),
+    ).toBe(true);
+  });
+
+  test("validates tool-search and MCP items against provider output contracts", () => {
+    expect(
+      isResponseItem({
+        type: "tool_search_call",
+        id: "ts_1",
+        arguments: ["search", 1],
+        call_id: null,
+        execution: "server",
+        status: "completed",
+      }),
+    ).toBe(true);
+    expect(
+      isResponseItem({
+        type: "tool_search_call",
+        id: "ts_1",
+        arguments: {},
+        call_id: null,
+        status: "completed",
+      }),
+    ).toBe(false);
+    expect(
+      isResponseItem({
+        type: "tool_search_output",
+        id: "tso_1",
+        call_id: null,
+        execution: "server",
+        status: "completed",
+        tools: [{ type: "web_search" }],
+      }),
+    ).toBe(true);
+    expect(
+      isResponseItem({
+        type: "mcp_call",
+        id: "mcp_1",
+        arguments: "{}",
+        name: "read",
+        server_label: "server",
+        status: "surprising",
+      }),
+    ).toBe(false);
+  });
+
   test("accepts valid Responses message roles, image details, and file content", () => {
     expect(
       isResponseItem({
@@ -69,6 +147,7 @@ describe("Responses message conversion", () => {
         role: "system",
         content: [
           { type: "input_image", detail: "high", file_id: "file-image" },
+          { type: "input_image", detail: "auto", file_id: null, image_url: null },
           { type: "input_file", file_id: "file-document" },
         ],
       }),
@@ -78,6 +157,27 @@ describe("Responses message conversion", () => {
         type: "function_call_output",
         call_id: "call_1",
         output: [{ type: "input_file", file_url: "https://example.test/document.pdf" }],
+      }),
+    ).toBe(true);
+    expect(
+      isResponseItem({
+        type: "message",
+        role: "system",
+        content: [{ type: "input_file", detail: "auto", file_id: "file-document" }],
+      }),
+    ).toBe(false);
+    expect(
+      isResponseItem({
+        type: "message",
+        role: "system",
+        content: [{ type: "input_file", detail: "low", file_id: null, file_url: "https://example.test/document.pdf" }],
+      }),
+    ).toBe(true);
+    expect(
+      isResponseItem({
+        type: "function_call_output",
+        call_id: "call_2",
+        output: [{ type: "input_file", file_data: null, filename: null }],
       }),
     ).toBe(true);
   });

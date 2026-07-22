@@ -56,6 +56,7 @@ const knownContentTypes = new Set([
   "input_file",
   "output_text",
   "refusal",
+  "reasoning_text",
 ]);
 const knownResponseTypes = new Set([
   "message",
@@ -86,6 +87,7 @@ const knownResponseTypes = new Set([
   "tool_search_call",
   "tool_search_output",
   "additional_tools",
+  "item_reference",
 ]);
 
 const PromptCacheBreakpointSchema = z
@@ -102,24 +104,22 @@ const InputImageSchema = z
   .object({
     type: z.literal("input_image"),
     detail: z.enum(["low", "high", "auto", "original"]),
-    file_id: z.string().optional(),
-    image_url: z.string().optional(),
+    file_id: z.string().nullable().optional(),
+    image_url: z.string().nullable().optional(),
     prompt_cache_breakpoint: PromptCacheBreakpointSchema.optional(),
   })
-  .catchall(JsonValueSchema)
-  .refine((value) => value.file_id !== undefined || value.image_url !== undefined);
+  .catchall(JsonValueSchema);
 const InputFileSchema = z
   .object({
     type: z.literal("input_file"),
-    detail: z.enum(["auto", "low", "high"]).optional(),
-    file_data: z.string().optional(),
-    file_id: z.string().optional(),
-    file_url: z.string().optional(),
-    filename: z.string().optional(),
+    detail: z.enum(["low", "high"]).optional(),
+    file_data: z.string().nullable().optional(),
+    file_id: z.string().nullable().optional(),
+    file_url: z.string().nullable().optional(),
+    filename: z.string().nullable().optional(),
     prompt_cache_breakpoint: PromptCacheBreakpointSchema.optional(),
   })
-  .catchall(JsonValueSchema)
-  .refine((value) => value.file_data !== undefined || value.file_id !== undefined || value.file_url !== undefined);
+  .catchall(JsonValueSchema);
 const OutputTextSchema = z
   .object({
     type: z.literal("output_text"),
@@ -130,6 +130,9 @@ const OutputTextSchema = z
   .catchall(JsonValueSchema);
 const OutputRefusalSchema = z
   .object({ type: z.literal("refusal"), refusal: z.string() })
+  .catchall(JsonValueSchema);
+const ReasoningContentSchema = z
+  .object({ type: z.literal("reasoning_text"), text: z.string() })
   .catchall(JsonValueSchema);
 const OpaqueContentItemSchema = z
   .object({ type: z.string().min(1) })
@@ -143,6 +146,7 @@ export const ResponseContentItemSchema = z.union([
   InputFileSchema,
   OutputTextSchema,
   OutputRefusalSchema,
+  ReasoningContentSchema,
   OpaqueContentItemSchema,
 ]);
 
@@ -156,10 +160,6 @@ const FunctionCallOutputContentSchema = z.union([
 const ReasoningSummarySchema = z
   .object({ type: z.literal("summary_text"), text: z.string() })
   .catchall(JsonValueSchema);
-const ReasoningContentSchema = z
-  .object({ type: z.literal("reasoning_text"), text: z.string() })
-  .catchall(JsonValueSchema);
-
 const MessageItemSchema = z
   .object({
     type: z.literal("message"),
@@ -223,20 +223,22 @@ const ProviderCallerSchema = z
   .nullable()
   .optional();
 const ToolDefinitionSchema = z
-  .object({ type: z.string().min(1), name: z.string().min(1) })
+  .object({ type: z.string().min(1) })
   .catchall(JsonValueSchema);
 const WebSearchActionSchema = z.union([
   z
     .object({
       type: z.literal("search"),
       queries: z.array(z.string()).optional(),
-      query: z.string().optional(),
+      query: z.string(),
       sources: z
         .array(z.object({ type: z.literal("url"), url: z.string() }).catchall(JsonValueSchema))
         .optional(),
     })
     .catchall(JsonValueSchema),
-  z.object({ type: z.literal("open_page"), url: z.string().optional() }).catchall(JsonValueSchema),
+  z
+    .object({ type: z.literal("open_page"), url: z.string().nullable().optional() })
+    .catchall(JsonValueSchema),
   z
     .object({ type: z.literal("find_in_page"), pattern: z.string(), url: z.string() })
     .catchall(JsonValueSchema),
@@ -245,7 +247,7 @@ const WebSearchCallSchema = z
   .object({
     type: z.literal("web_search_call"),
     id: z.string(),
-    action: WebSearchActionSchema.optional(),
+    action: WebSearchActionSchema,
     status: z.enum(["in_progress", "searching", "completed", "failed"]),
   })
   .catchall(JsonValueSchema);
@@ -419,10 +421,12 @@ const McpCallSchema = z
     arguments: z.string(),
     name: z.string(),
     server_label: z.string(),
-    approval_request_id: z.string().optional(),
-    error: z.string().optional(),
-    output: z.string().optional(),
-    status: z.string().optional(),
+    approval_request_id: z.string().nullable().optional(),
+    error: z.string().nullable().optional(),
+    output: z.string().nullable().optional(),
+    status: z
+      .enum(["in_progress", "completed", "incomplete", "calling", "failed"])
+      .optional(),
   })
   .catchall(JsonValueSchema);
 const McpListToolsSchema = z
@@ -494,18 +498,19 @@ const ProgramOutputSchema = z
 const ToolSearchCallSchema = z
   .object({
     type: z.literal("tool_search_call"),
-    arguments: JsonObjectSchema,
-    id: z.string().optional(),
-    call_id: z.string().optional(),
-    execution: z.enum(["server", "client"]).optional(),
-    status: ProviderItemStatusSchema.optional(),
+    arguments: JsonValueSchema,
+    id: z.string(),
+    call_id: z.string().nullable(),
+    execution: z.enum(["server", "client"]),
+    status: ProviderItemStatusSchema,
+    created_by: z.string().optional(),
   })
   .catchall(JsonValueSchema);
 const ToolSearchOutputSchema = z
   .object({
     type: z.literal("tool_search_output"),
     id: z.string(),
-    call_id: z.string().optional(),
+    call_id: z.string().nullable(),
     execution: z.enum(["server", "client"]),
     status: ProviderItemStatusSchema,
     tools: z.array(ToolDefinitionSchema),
@@ -518,6 +523,12 @@ const AdditionalToolsSchema = z
     role: z.enum(["unknown", "user", "assistant", "system", "critic", "discriminator", "developer", "tool"]),
     tools: z.array(ToolDefinitionSchema),
     id: z.string().optional(),
+  })
+  .catchall(JsonValueSchema);
+const ItemReferenceSchema = z
+  .object({
+    type: z.literal("item_reference"),
+    id: z.string(),
   })
   .catchall(JsonValueSchema);
 
@@ -556,6 +567,7 @@ export const ResponseItemSchema = z.union([
   ToolSearchCallSchema,
   ToolSearchOutputSchema,
   AdditionalToolsSchema,
+  ItemReferenceSchema,
   OpaqueProviderItemSchema,
 ]);
 
@@ -570,6 +582,24 @@ const InputTokenDetailsSchema = z
   .catchall(JsonValueSchema);
 const OutputTokenDetailsSchema = z
   .object({ reasoning_tokens: TokenCountSchema.optional() })
+  .catchall(JsonValueSchema);
+const CompleteInputTokenDetailsSchema = z
+  .object({
+    cached_tokens: TokenCountSchema,
+    cache_write_tokens: TokenCountSchema.optional(),
+  })
+  .catchall(JsonValueSchema);
+const CompleteOutputTokenDetailsSchema = z
+  .object({ reasoning_tokens: TokenCountSchema })
+  .catchall(JsonValueSchema);
+const CompleteResponseUsageSchema = z
+  .object({
+    input_tokens: TokenCountSchema,
+    input_tokens_details: CompleteInputTokenDetailsSchema,
+    output_tokens: TokenCountSchema,
+    output_tokens_details: CompleteOutputTokenDetailsSchema,
+    total_tokens: TokenCountSchema,
+  })
   .catchall(JsonValueSchema);
 
 export const ResponseUsageSchema = z
@@ -612,8 +642,11 @@ export const ProviderRequestPayloadSchema = z
 
 export const DirectCompactResponseSchema = z
   .object({
+    id: z.string().min(1),
+    created_at: z.number().finite(),
+    object: z.literal("response.compaction"),
     output: ResponseItemsSchema.min(1),
-    usage: JsonValueSchema.optional(),
+    usage: CompleteResponseUsageSchema,
   })
   .catchall(JsonValueSchema);
 
