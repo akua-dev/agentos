@@ -12,9 +12,9 @@
     "typecheck": "tsc --project ../../tsconfig.json"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "0.80.7",
+    "@earendil-works/pi-ai": "0.81.1",
     "proper-lockfile": "4.1.2",
-    "zod": "4.3.6"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/proper-lockfile": "4.1.4"

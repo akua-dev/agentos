@@ -148,6 +148,58 @@ describe("authenticated raw Responses proxy", () => {
     expect(upstream?.headers.has("chatgpt-account-id")).toBe(false);
   });
 
+  test("forwards native compaction payloads and streams opaquely", async () => {
+    const body = JSON.stringify({
+      model: "gpt-test",
+      input: [
+        { type: "compaction", encrypted_content: "opaque-input" },
+        { type: "compaction_trigger" },
+      ],
+      stream: true,
+      store: false,
+      include: ["reasoning.encrypted_content"],
+    });
+    const providerBody =
+      'data: {"type":"response.output_item.done","item":{"type":"compaction","encrypted_content":"opaque-output"}}\n\n';
+    let forwardedBody: string | undefined;
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "codex_oauth",
+        accountId: "managed-a",
+        providerAccountId: "provider-a",
+        accessToken: "oauth-secret",
+        leaseToken: "lease-a",
+        renew: async () => true,
+        release: async () => undefined,
+      }),
+      fetchImpl: async (input, init) => {
+        forwardedBody = await new Request(
+          input instanceof Request ? input.url : input.toString(),
+          init,
+        ).text();
+        return new Response(providerBody, {
+          headers: { "content-type": "text/event-stream" },
+        });
+      },
+    });
+
+    const response = await handler(
+      new Request("http://gateway.test/codex/responses", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer fleet-token",
+          "content-type": "application/json",
+          "session-id": "session-a",
+        },
+        body,
+      }),
+    );
+
+    expect(forwardedBody).toBe(body);
+    expect(await response.text()).toBe(providerBody);
+  });
+
   test("returns the upstream response even when local response bookkeeping fails", async () => {
     let released = false;
     const handler = createProxyHandler({

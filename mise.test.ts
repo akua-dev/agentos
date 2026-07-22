@@ -117,7 +117,7 @@ const fleetTools = {
   jq: "1.8.2",
   kubectl: "1.35.6",
   node: "24",
-  "npm:@earendil-works/pi-coding-agent": "0.80.7",
+  "npm:@earendil-works/pi-coding-agent": "0.81.1",
   "npm:@openai/codex": "0.144.5",
   "npm:chrome-devtools-axi": "0.1.26",
   "npm:gh-axi": "0.1.27",
