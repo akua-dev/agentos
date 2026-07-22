@@ -2,13 +2,15 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type {
+  OAuthCredentials,
+  OAuthDeviceCodeInfo,
+} from "@earendil-works/pi-ai/oauth";
+import { createAccountVault, createAccountVaultStore } from "./accounts.ts";
 import {
   loginOpenAICodexDeviceCode,
   refreshOpenAICodexToken,
-  type OAuthCredentials,
-  type OAuthDeviceCodeInfo,
-} from "@earendil-works/pi-ai/oauth";
-import { createAccountVault, createAccountVaultStore } from "./accounts.ts";
+} from "./codex-oauth.ts";
 import { createAIGatewayService } from "./service.ts";
 
 type Environment = Record<string, string | undefined>;

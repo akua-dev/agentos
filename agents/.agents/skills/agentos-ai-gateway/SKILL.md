@@ -120,9 +120,11 @@ a real process/Pod restart; Pi `/reload` cannot change environment. Ask before
 interrupting a Mate and preserve its native session reference through the
 normal recovery procedure.
 
-Pi needs no AgentOS extension. Configure its built-in `openai-codex` provider in
-the Agent's persistent `~/.pi/agent/models.json`; the built-in model catalog and
-Codex transport remain owned by Pi:
+Configure Pi's built-in `openai-codex` provider in the Agent's persistent
+`~/.pi/agent/models.json`; the built-in model catalog and Codex transport remain
+owned by Pi. The shared AgentOS session-lifecycle extension independently adds
+server-side compaction while preserving that transport; its artifact and
+fallback contract is documented in [`ARCHITECTURE.md`](../../../../ARCHITECTURE.md):
 
 ```json
 {
