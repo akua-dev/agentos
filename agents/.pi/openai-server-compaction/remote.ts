@@ -286,6 +286,7 @@ function recordArtifact(artifacts: Map<string, CompactionArtifact>, artifact: Co
 
 function parseCompactionEvents(events: unknown[]): ServerCompactionResult {
   let terminalType: "response.completed" | "response.done" | undefined;
+  let terminalOutput: ResponseItem[] | undefined;
   let usage: Record<string, unknown> | undefined;
   const artifacts = new Map<string, CompactionArtifact>();
 
@@ -323,13 +324,14 @@ function parseCompactionEvents(events: unknown[]): ServerCompactionResult {
       throw new Error("OpenAI server compaction terminal response was not completed.");
     }
     if (isRecord(response.usage)) usage = response.usage;
-    if (response.output !== undefined && !Array.isArray(response.output)) {
+    if (!Array.isArray(response.output) || response.output.length === 0) {
       throw new Error("OpenAI server compaction returned an invalid terminal response.");
     }
-    if (Array.isArray(response.output) && !response.output.every(isResponseItem)) {
+    if (!response.output.every(isResponseItem)) {
       throw new Error("OpenAI server compaction returned an invalid terminal response.");
     }
-    for (const output of response.output ?? []) {
+    terminalOutput = response.output;
+    for (const output of terminalOutput) {
       const artifact = artifactFrom(output);
       if (artifact) recordArtifact(artifacts, artifact);
     }
@@ -341,9 +343,10 @@ function parseCompactionEvents(events: unknown[]): ServerCompactionResult {
   if (artifacts.size !== 1) {
     throw new Error(`OpenAI server compaction expected one artifact, received ${artifacts.size}.`);
   }
-  const artifact = artifacts.values().next().value;
-  if (!artifact) throw new Error("OpenAI server compaction returned no artifact.");
-  return { output: [artifact], ...(usage ? { usage } : {}) };
+  if (!terminalOutput) {
+    throw new Error("OpenAI server compaction returned no terminal output.");
+  }
+  return { output: terminalOutput, ...(usage ? { usage } : {}) };
 }
 
 export async function requestServerCompaction(

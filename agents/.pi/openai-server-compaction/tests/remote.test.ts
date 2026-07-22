@@ -39,13 +39,29 @@ describe("OpenAI server compaction transport", () => {
   test("requests compaction over bounded SSE without any WebSocket transport", async () => {
     let request: { url: string; init: RequestInit } | undefined;
     const artifact = { type: "compaction" as const, encrypted_content: "opaque-server-state" };
+    const output = [
+      {
+        type: "message" as const,
+        role: "user" as const,
+        content: [{ type: "input_text" as const, text: "retained" }],
+        provider_metadata: { trace_id: "trace-1" },
+      },
+      {
+        type: "reasoning" as const,
+        summary: [],
+        encrypted_content: "provider-reasoning",
+        provider_metadata: { model_family: "gpt" },
+      },
+      { type: "opaque_item" as const, opaque: { provider_key: "preserve-me" } },
+      artifact,
+    ];
     const sse = [
       `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
       `data: ${JSON.stringify({
         type: "response.completed",
         response: {
           status: "completed",
-          output: [artifact],
+          output,
           usage: { input_tokens: 50, output_tokens: 3 },
         },
       })}`,
@@ -68,7 +84,7 @@ describe("OpenAI server compaction transport", () => {
       },
     });
 
-    expect(result).toEqual({ output: [artifact], usage: { input_tokens: 50, output_tokens: 3 } });
+    expect(result).toEqual({ output, usage: { input_tokens: 50, output_tokens: 3 } });
     expect(request?.url).toBe("http://ai-gateway:8787/codex/responses");
     const headers = new Headers(request?.init.headers);
     expect(headers.get("authorization")).toBe("Bearer fleet-client-token");
@@ -131,6 +147,28 @@ describe("OpenAI server compaction transport", () => {
         fetchImpl: async () => new Response(sse, { status: 200 }),
       }),
     ).resolves.toEqual({ output: [artifact], usage: { input_tokens: 7, output_tokens: 2 } });
+  });
+
+  test("rejects a completed stream without a canonical terminal output", async () => {
+    const artifact = { type: "compaction" as const, encrypted_content: "opaque-no-terminal-output" };
+    const sse = [
+      `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
+      `data: ${JSON.stringify({
+        type: "response.done",
+        response: { status: "completed" },
+      })}`,
+      "",
+    ].join("\n\n");
+
+    await expect(
+      requestServerCompaction({
+        model: model(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: async () => new Response(sse, { status: 200 }),
+      }),
+    ).rejects.toThrow("invalid terminal response");
   });
 
   test("rejects Codex response.incomplete before accepting an artifact", async () => {
