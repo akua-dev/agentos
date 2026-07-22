@@ -331,6 +331,7 @@ describe("Mate runtime", () => {
         call[1] === "start" &&
         call.includes(persistedSession),
       ),
+      6_000,
     );
     child.kill("SIGTERM");
     expect(await child.exited).toBe(0);

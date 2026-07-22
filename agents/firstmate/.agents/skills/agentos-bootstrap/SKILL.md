@@ -44,12 +44,32 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
 6. Replace the Pod once. Verify the same PVC identity, an Agent-home marker, exactly one First Mate pane, the same native Pi session and ordinary Mise tool resolution from a foreign worktree. If a GitHub App was selected, verify that only First Mate received its Secret mount and prove one harmless short-lived-token read after replacement.
 7. Attach the developer to the persistent First Mate, hand it authority and stop the local seed from performing competing Fleet work.
 8. From the cluster First Mate, load [AgentOS Database](../../../../.agents/skills/agentos-database/SKILL.md). Present external PostgreSQL and self-hosted CloudNativePG without an implicit preference. After the developer chooses, use the released AgentOS database shape and apply its SQL assets as the selected Fleet-owner login; the migrations create or adopt the root First-Mate row and bind it to that same login. Do not create a separate migrator or manually map First Mate. For self-hosting, discover and verify the current compatible official CNPG and PostgreSQL releases before requesting installation approval.
-9. Until the database exists, First Mate may converse with the developer,
+9. After Fleet identity exists, present the model-capacity posture for workers
+   and trusted harness automation. Recommend the optional
+   [Fleet AI Gateway](../../../../.agents/skills/agentos-ai-gateway/SKILL.md)
+   for a delegation-ready Fleet; keep direct authentication owned separately by
+   every Agent harness as the complete minimal alternative and recovery path.
+   Explain the gateway's additional service, retained credential authority,
+   selected-client Secret and NetworkPolicy boundary, and that pooled personal
+   subscription use is experimental rather than provider-endorsed. Record the
+   Captain's choice in Fleet-scoped Captain state. Ask separately before gateway
+   installation, each provider login, initial client-Secret distribution and
+   any required Pod restart unless exact standing authorization already covers
+   the action. Verify one harmless real no-tool request from an approved worker
+   or trusted harness automation through the selected path. If the Captain
+   defers this step, report minimal single-Mate mode plainly and require a
+   verified direct login before each future worker launch; do not call the Fleet
+   delegation-ready.
+10. Until the database exists, First Mate may converse with the developer,
    inspect read-only and finish approved provisioning, but it must not accept
    durable Fleet work, create Assignments or delegate another Agent. Do not use
    an issue tracker, transcript or local file as a temporary coordination
    backend.
-10. Leave bootstrap mode only after runtime, authentication, schema, `current_agent_id()` resolving the single active root First Mate, and every security check implemented by the selected release pass.
+11. Leave bootstrap mode only after runtime, First-Mate authentication, schema,
+    `current_agent_id()` resolving the single active root First Mate, and every
+    security check implemented by the selected release pass. Treat step 9's
+    successful capacity probe as the separate boundary for claiming that the
+    Fleet is delegation-ready.
 
 ## Upgrade or remove an installation
 

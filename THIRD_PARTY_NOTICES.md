@@ -18,12 +18,12 @@ linked-library notice, the applicable LGPL-2.0 text, and the exact Bun/WebKit
 source and relinking record. A Bun version, source revision, patch or packaging
 change requires a fresh distribution and license review before publication.
 
-## pi-quota-router
+## Prior Fleet AI Gateway implementation
 
-`services/quota-router/` derives its private atomic storage, Codex account
-identity/refresh, usage parsing and quota-selection policy from
-[`robinbraemer/pi-quota-router`](https://github.com/robinbraemer/pi-quota-router)
-at commit `f328540fb9092619c9d8e8bf07f082724c948c2a`, used under the MIT License:
+`services/ai-gateway/` derives its private atomic storage, Codex account
+identity/refresh, usage parsing and quota-selection policy from prior work by
+Robin Braemer at source revision
+`f328540fb9092619c9d8e8bf07f082724c948c2a`, used under the MIT License:
 
 > MIT License
 >
@@ -49,7 +49,7 @@ at commit `f328540fb9092619c9d8e8bf07f082724c948c2a`, used under the MIT License
 
 ## Subrouter
 
-`services/quota-router/` adapts request proxying, path normalization and session
+`services/ai-gateway/` adapts request proxying, path normalization and session
 stickiness ideas from
 [`manaflow-ai/subrouter`](https://github.com/manaflow-ai/subrouter) at commit
 `a691ae027723f31d838da543afc31ccd19d09d33`, used under the MIT License:

@@ -173,11 +173,12 @@ wrapper CLI for this sequence.
 1. Inspect effective configuration with `mise config ls`, requested versions with `mise ls --current`, and executable ownership with `mise which <tool>` before changing tools.
 2. At image build time, install the released root `mise.toml` and
    `mise.lock` as `/etc/mise/config.toml` and `/etc/mise/mise.lock`, and
-   bake their pinned Bun into the image. Seed the same reviewed Fleet pair as
-   the agent's global `~/.config/mise/config.toml` and `mise.lock` on its PVC.
-   Install the remaining startup-critical tools before adding agent-owned
-   entries under `~/.config/mise/conf.d/`; install other released tools only
-   when the task needs them.
+   bake their pinned Bun into the image. The persistent AgentOS checkout
+   supplies its reviewed root and role configuration directly; do not copy it
+   into a parallel global file on the PVC. Install the remaining
+   startup-critical tools before adding agent-owned entries under
+   `~/.config/mise/conf.d/`; install other released tools only when the task
+   needs them.
 3. Prepend Mise shims to `PATH` for interactive and non-interactive processes so released tools win over unmanaged globals. Verify ordinary tool names work without a `mise exec` prefix.
 4. Let configuration in the current repository or worktree add tools and override conflicting baseline versions. Do not copy AgentOS's project config into another repository.
 5. Inspect repository-owned Mise configuration before trust. Ask before trusting executable hooks or environment behavior that is not already approved with the project.
