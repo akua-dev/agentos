@@ -13,11 +13,19 @@ the Captain accepts one additional credential authority and service lifecycle.
 The gateway chooses credentials for the requested model; it never chooses a
 model, queues a prompt or hides the provider response. PostgreSQL remains Fleet
 coordination truth. The gateway's retained PVC owns only its OAuth vault,
-observed quota, session assignments, blocks and active reservations.
+session assignments, quota or transient blocks and active reservations. Bounded
+quota observations remain process-local and refresh after restart. The vault's
+`needsReauth` flag is the single authentication-eligibility authority.
 
 Use `ai-gateway`, `AI_GATEWAY_*` and the AI-gateway client label consistently.
 Never create a second StatefulSet or copy its credential vault during an
 upgrade.
+
+The pre-release identity replacement is intentionally breaking. Do not apply
+this topology over an existing differently named experimental gateway: there
+is no automated PVC or OAuth-vault migration. Return its clients to verified
+direct authentication, retire the old topology under the Captain's authority,
+then install and authenticate this gateway fresh.
 
 ## Decide and inspect
 

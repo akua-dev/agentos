@@ -136,4 +136,50 @@ describe("AI gateway service", () => {
     expect(second.status).toBe(503);
     expect(responseCalls).toBe(1);
   });
+
+  test("recovers the same OAuth account after a visible 401 and fresh login", async () => {
+    const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-service-"));
+    let responseCalls = 0;
+    const service = await createAIGatewayService({
+      stateDirectory,
+      clientToken: "fleet-token",
+      allowApiKeyFallback: false,
+      oauth: { refresh: async () => credentials("provider-a") },
+      fetchImpl: async (input) => {
+        if (String(input).includes("wham/usage")) {
+          return Response.json({
+            rate_limit: {
+              primary_window: {
+                used_percent: 10,
+                limit_window_seconds: 18_000,
+                reset_at: Math.floor((Date.now() + 3_600_000) / 1_000),
+              },
+              secondary_window: {
+                used_percent: 20,
+                limit_window_seconds: 604_800,
+                reset_at: Math.floor((Date.now() + 86_400_000) / 1_000),
+              },
+            },
+          });
+        }
+        responseCalls += 1;
+        return responseCalls === 1
+          ? new Response("expired credential", { status: 401 })
+          : new Response("recovered", { status: 200 });
+      },
+    });
+    await service.vault.addFromOAuth("Primary", credentials("provider-a"));
+
+    const rejected = await service.fetch(proxyRequest());
+    expect(rejected.status).toBe(401);
+    expect(await rejected.text()).toBe("expired credential");
+
+    await service.vault.addFromOAuth("Primary", credentials("provider-a"));
+    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(200);
+
+    const recovered = await service.fetch(proxyRequest());
+    expect(recovered.status).toBe(200);
+    expect(await recovered.text()).toBe("recovered");
+    expect(responseCalls).toBe(2);
+  });
 });

@@ -30,7 +30,7 @@ const RoutingStateSchema = z
       z
         .object({
           accountId: z.string().min(1),
-          kind: z.enum(["quota", "auth", "transient"]),
+          kind: z.enum(["quota", "transient"]),
           blockedAt: z.number().int().nonnegative(),
           retryAt: z.number().int().nonnegative().optional(),
         })

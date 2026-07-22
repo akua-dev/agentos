@@ -278,8 +278,10 @@ returns synchronously to the calling harness.
 
 The first implementation is a single-replica Bun service with one retained
 ReadWriteOnce PVC. Its mode-`0600` OAuth vault owns fresh server-created Codex
-refresh chains; its separate routing state owns only bounded quota observations,
-opaque session assignments, provider blocks and renewable request reservations.
+refresh chains and authentication eligibility. Bounded quota observations stay
+process-local and are refreshed after restart; the separate routing file owns
+only opaque session assignments, quota or transient blocks and renewable
+request reservations.
 It stores no prompts, model responses or harness transcripts. An OpenAI API key
 may be mounted separately as an explicitly enabled last-resort fallback and is
 never copied into the mutable OAuth vault.

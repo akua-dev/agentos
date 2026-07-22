@@ -15,7 +15,7 @@ export interface UsageSnapshot {
 
 export interface AccountBlock {
   accountId: string;
-  kind: "quota" | "auth" | "transient";
+  kind: "quota" | "transient";
   blockedAt: number;
   retryAt?: number;
 }

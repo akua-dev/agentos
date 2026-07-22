@@ -131,11 +131,6 @@ export async function createAIGatewayService(
       recordResponse: async (status, headers) => {
         if (status === 401) {
           await vault.markNeedsReauth(reservation.accountId, credential.accessToken);
-          await routing.block({
-            accountId: reservation.accountId,
-            kind: "auth",
-            blockedAt: clock(),
-          });
           return;
         }
         if (status === 429) {
