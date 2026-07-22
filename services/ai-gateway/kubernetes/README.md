@@ -2,7 +2,9 @@
 
 This topology renders one authenticated, single-replica Fleet AI Gateway with a
 retained 1 GiB ReadWriteOnce PVC. It is not part of bootstrap or the Fleet
-coordination kernel. Direct provider login inside each Agent remains complete.
+coordination kernel. Direct provider login inside each Agent remains the
+complete minimal and recovery path; the gateway is for a delegation-ready Fleet
+with Captain-approved pooled capacity.
 The Kubernetes objects, Service DNS, Secret and PVC path use the `ai-gateway`
 identity consistently.
 

@@ -5,9 +5,10 @@ pool of OpenAI Codex subscriptions across Agent Pods. It keeps sessions sticky,
 routes with quota headroom, refreshes server-owned OAuth chains and streams the
 provider's real response back to the native harness.
 
-Direct per-Agent provider login remains a complete AgentOS setup. Install this
-service only when pooled subscription capacity is worth the additional
-credential authority and operational surface. The operator workflow lives in
+Direct per-Agent provider login remains the complete minimal and recovery path.
+For a delegation-ready Fleet, install this service only when pooled
+subscription capacity is worth the Captain-approved credential authority and
+additional service lifecycle. The operator workflow lives in
 `$agentos-ai-gateway`; the stable boundary lives in `ARCHITECTURE.md`.
 
 The package derives its selection and credential-safety semantics from prior
