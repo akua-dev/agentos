@@ -6,13 +6,22 @@ import {
   type SessionBeforeCompactEvent,
   type ToolInfo,
 } from "@earendil-works/pi-coding-agent";
-import { calculateCost, type Model, type Usage } from "@earendil-works/pi-ai";
+import { calculateCost, type Usage } from "@earendil-works/pi-ai";
 import {
   requestServerCompaction,
   supportsServerCompaction,
+  type OpenAICompactionModel,
+  type OpenAICompactionReasoning,
+  type OpenAICompactionTool,
   type ServerCompactionRequest,
   type ServerCompactionResult,
 } from "./remote.ts";
+import {
+  JsonObjectSchema,
+  JsonValueSchema,
+  type JsonObject,
+  type ResponseUsage,
+} from "./schemas.ts";
 import {
   buildCompactionInput,
   nativeCompactionDetails,
@@ -30,7 +39,7 @@ type PiThinkingLevel = ReturnType<ExtensionAPI["getThinkingLevel"]>;
 
 type LocalCompactionRequest = {
   event: SessionBeforeCompactEvent;
-  model: Model<any>;
+  model: OpenAICompactionModel;
   auth: ResolvedAuth;
   thinkingLevel: PiThinkingLevel;
 };
@@ -39,10 +48,6 @@ export type OpenAIServerCompactionDependencies = {
   runLocalCompaction(request: LocalCompactionRequest): Promise<CompactionResult>;
   runServerCompaction(request: ServerCompactionRequest): Promise<ServerCompactionResult>;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function isEnabled(): boolean {
   const value = process.env.AGENTOS_OPENAI_SERVER_COMPACTION_ENABLED?.trim().toLowerCase();
@@ -73,7 +78,7 @@ function mergedHeaders(
   return result;
 }
 
-function toolsPayload(allTools: ToolInfo[], activeTools: string[]): Record<string, unknown>[] {
+function toolsPayload(allTools: ToolInfo[], activeTools: string[]): OpenAICompactionTool[] {
   const active = new Set(activeTools);
   return allTools
     .filter((tool) => active.has(tool.name))
@@ -86,7 +91,10 @@ function toolsPayload(allTools: ToolInfo[], activeTools: string[]): Record<strin
     }));
 }
 
-function reasoningFor(level: PiThinkingLevel, model: Model<any>): Record<string, unknown> | undefined {
+function reasoningFor(
+  level: PiThinkingLevel,
+  model: OpenAICompactionModel,
+): OpenAICompactionReasoning | undefined {
   if (!model.reasoning) return undefined;
   const effort = level === "max" ? "xhigh" : level === "off" ? "none" : level;
   return { effort, summary: "auto" };
@@ -111,22 +119,30 @@ const defaults: OpenAIServerCompactionDependencies = {
   runServerCompaction: requestServerCompaction,
 };
 
-function mergedDetails(localDetails: unknown, nativeDetails: Record<string, unknown>) {
-  if (isRecord(localDetails)) return { ...localDetails, ...nativeDetails };
+function mergedDetails(
+  localDetails: unknown,
+  nativeDetails: ReturnType<typeof nativeCompactionDetails>,
+): JsonObject {
+  const localObject = JsonObjectSchema.safeParse(localDetails);
+  if (localObject.success) return { ...localObject.data, ...nativeDetails };
+  const localValue = JsonValueSchema.safeParse(localDetails);
   return {
-    ...(localDetails === undefined ? {} : { piCompactionDetails: localDetails }),
+    ...(localValue.success ? { piCompactionDetails: localValue.data } : {}),
     ...nativeDetails,
   };
 }
 
-function finiteNumber(value: unknown): number {
+function finiteNumber(value: number | undefined): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
-function normalizedServerUsage(model: Model<any>, raw: Record<string, unknown> | undefined): Usage | undefined {
+function normalizedServerUsage(
+  model: OpenAICompactionModel,
+  raw: ResponseUsage | undefined,
+): Usage | undefined {
   if (!raw) return undefined;
-  const inputDetails = isRecord(raw.input_tokens_details) ? raw.input_tokens_details : undefined;
-  const outputDetails = isRecord(raw.output_tokens_details) ? raw.output_tokens_details : undefined;
+  const inputDetails = raw.input_tokens_details;
+  const outputDetails = raw.output_tokens_details;
   const inputTokens = finiteNumber(raw.input_tokens);
   const cacheRead = finiteNumber(inputDetails?.cached_tokens);
   const cacheWrite = finiteNumber(inputDetails?.cache_write_tokens);

@@ -1,13 +1,21 @@
 import { describe, expect, test } from "bun:test";
-import type { Model } from "@earendil-works/pi-ai";
+import type { Api, Model } from "@earendil-works/pi-ai";
 import {
   endpointForModel,
   requestServerCompaction,
   supportsServerCompaction,
+  type OpenAICompactionModel,
 } from "../remote.ts";
+import { parseResponseItems, type ResponseItem } from "../schemas.ts";
 
-function model(overrides: Partial<Model<any>> = {}): Model<any> {
-  return {
+function responseItems(value: unknown): ResponseItem[] {
+  const parsed = parseResponseItems(value);
+  if (!parsed) throw new Error("Invalid response item fixture.");
+  return parsed;
+}
+
+function model(overrides: Partial<Model<Api>> = {}): OpenAICompactionModel {
+  const candidate: Model<Api> = {
     id: "gpt-5.4",
     name: "GPT-5.4",
     api: "openai-codex-responses",
@@ -20,6 +28,8 @@ function model(overrides: Partial<Model<any>> = {}): Model<any> {
     maxTokens: 100_000,
     ...overrides,
   };
+  if (!supportsServerCompaction(candidate)) throw new Error("Invalid compaction model fixture.");
+  return candidate;
 }
 
 describe("OpenAI server compaction transport", () => {
@@ -31,15 +41,19 @@ describe("OpenAI server compaction transport", () => {
         model({ provider: "openai", api: "openai-responses", baseUrl: "https://api.openai.com/v1" }),
       ),
     ).toBe("https://api.openai.com/v1/responses/compact");
-    expect(supportsServerCompaction(model({ provider: "anthropic", api: "anthropic-messages" }))).toBe(
-      false,
-    );
+    expect(
+      supportsServerCompaction({
+        ...model(),
+        provider: "anthropic",
+        api: "anthropic-messages",
+      }),
+    ).toBe(false);
   });
 
   test("requests compaction over bounded SSE without any WebSocket transport", async () => {
     let request: { url: string; init: RequestInit } | undefined;
     const artifact = { type: "compaction" as const, encrypted_content: "opaque-server-state" };
-    const output = [
+    const output = responseItems([
       {
         type: "message" as const,
         role: "user" as const,
@@ -54,7 +68,7 @@ describe("OpenAI server compaction transport", () => {
       },
       { type: "opaque_item" as const, opaque: { provider_key: "preserve-me" } },
       artifact,
-    ];
+    ]);
     const sse = [
       `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
       `data: ${JSON.stringify({
@@ -76,7 +90,9 @@ describe("OpenAI server compaction transport", () => {
       sessionId: "session-1",
       input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "hello" }] }],
       instructions: "system prompt",
-      tools: [{ type: "function", name: "read", description: "Read", parameters: {} }],
+      tools: [
+        { type: "function", name: "read", description: "Read", parameters: {}, strict: false },
+      ],
       signal: undefined,
       fetchImpl: async (input, init) => {
         request = { url: String(input), init: init ?? {} };
@@ -303,7 +319,7 @@ describe("OpenAI server compaction transport", () => {
 
   test("uses the standard OpenAI compact endpoint and JSON response", async () => {
     let request: { url: string; init: RequestInit } | undefined;
-    const output = [
+    const output = responseItems([
       {
         type: "message",
         role: "user",
@@ -342,7 +358,7 @@ describe("OpenAI server compaction transport", () => {
         opaque: { trace_id: "trace-2", region: "test" },
       },
       { type: "compaction", encrypted_content: "opaque-openai", provider_metadata: { version: 2 } },
-    ];
+    ]);
     const result = await requestServerCompaction({
       model: model({
         provider: "openai",
@@ -352,7 +368,15 @@ describe("OpenAI server compaction transport", () => {
       apiKey: "openai-token",
       input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "hello" }] }],
       instructions: "system prompt",
-      tools: [{ type: "function", name: "ignored", parameters: {} }],
+      tools: [
+        {
+          type: "function",
+          name: "ignored",
+          description: "Ignored",
+          parameters: {},
+          strict: false,
+        },
+      ],
       sessionId: "session-2",
       fetchImpl: async (input, init) => {
         request = { url: String(input), init: init ?? {} };
@@ -381,6 +405,31 @@ describe("OpenAI server compaction transport", () => {
       instructions: "system prompt",
       prompt_cache_key: "session-2",
     });
+  });
+
+  test("omits malformed provider usage at the response boundary", async () => {
+    const output = [{ type: "compaction" as const, encrypted_content: "opaque-usage" }];
+
+    await expect(
+      requestServerCompaction({
+        model: model({
+          provider: "openai",
+          api: "openai-responses",
+          baseUrl: "https://api.openai.com/v1",
+        }),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              output,
+              usage: { input_tokens: "not-a-number", output_tokens: 2 },
+            }),
+            { status: 200 },
+          ),
+      }),
+    ).resolves.toEqual({ output });
   });
 
   test("returns on the bounded deadline when fetch does not settle", async () => {

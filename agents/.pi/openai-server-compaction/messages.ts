@@ -1,119 +1,28 @@
 import type { ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
 import { convertToLlm } from "@earendil-works/pi-coding-agent";
+import {
+  JsonObjectSchema,
+  ResponseItemSchema,
+  ResponseReasoningItemSchema,
+  type CompactionArtifact,
+  type JsonValue,
+  type ResponseContentItem,
+  type ResponseItem,
+} from "./schemas.ts";
+
+export type { CompactionArtifact, ResponseContentItem, ResponseItem } from "./schemas.ts";
 
 type AgentMessages = Parameters<typeof convertToLlm>[0];
 
 export type AssistantPhase = "commentary" | "final_answer";
 
-export type ResponseContentItem =
-  | { type: "input_text"; text: string }
-  | { type: "input_image"; detail: "auto"; image_url: string }
-  | { type: "output_text"; text: string; annotations: unknown[] };
-
-export type CompactionArtifact = {
-  type: "compaction";
-  encrypted_content: string;
-  [key: string]: unknown;
-};
-
-export type ResponseItem =
-  | {
-      type: "message";
-      role: "user" | "assistant";
-      content: ResponseContentItem[];
-      id?: string;
-      status?: string;
-      phase?: AssistantPhase;
-    }
-  | {
-      type: "reasoning";
-      summary: Array<Record<string, unknown>>;
-      content?: Array<Record<string, unknown>>;
-      encrypted_content?: string | null;
-      id?: string;
-      status?: string;
-      [key: string]: unknown;
-    }
-  | { type: "function_call"; id?: string; name: string; arguments: string; call_id: string }
-  | {
-      type: "function_call_output";
-      call_id: string;
-      output:
-        | string
-        | Array<
-            | { type: "input_text"; text: string }
-            | { type: "input_image"; detail: "auto"; image_url: string }
-        >;
-    }
-  | CompactionArtifact
-  | { type: string; [key: string]: unknown };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 export function isCompactionArtifact(value: unknown): value is CompactionArtifact {
-  return (
-    isRecord(value) &&
-    value.type === "compaction" &&
-    typeof value.encrypted_content === "string" &&
-    value.encrypted_content.length > 0
-  );
-}
-
-function isInputContentItem(value: unknown): boolean {
-  if (!isRecord(value)) return false;
-  if (value.type === "input_text") return typeof value.text === "string";
-  if (value.type === "input_image") {
-    return value.detail === "auto" && typeof value.image_url === "string";
-  }
-  if (value.type === "output_text") return false;
-  return typeof value.type === "string" && value.type.length > 0;
-}
-
-function isResponseContentItem(value: unknown): boolean {
-  if (!isRecord(value)) return false;
-  if (isInputContentItem(value)) return true;
-  return (
-    value.type === "output_text" &&
-    typeof value.text === "string" &&
-    Array.isArray(value.annotations)
-  );
+  const parsed = ResponseItemSchema.safeParse(value);
+  return parsed.success && parsed.data.type === "compaction";
 }
 
 export function isResponseItem(value: unknown): value is ResponseItem {
-  if (!isRecord(value) || typeof value.type !== "string" || value.type.length === 0) return false;
-  switch (value.type) {
-    case "message":
-      return (
-        (value.role === "user" || value.role === "assistant") &&
-        Array.isArray(value.content) &&
-        value.content.every(isResponseContentItem)
-      );
-    case "reasoning":
-      return (
-        Array.isArray(value.summary) &&
-        value.summary.every(isRecord) &&
-        (value.content === undefined ||
-          (Array.isArray(value.content) && value.content.every(isRecord)))
-      );
-    case "function_call":
-      return (
-        typeof value.call_id === "string" &&
-        typeof value.name === "string" &&
-        typeof value.arguments === "string"
-      );
-    case "function_call_output":
-      return (
-        typeof value.call_id === "string" &&
-        (typeof value.output === "string" ||
-          (Array.isArray(value.output) && value.output.every(isInputContentItem)))
-      );
-    case "compaction":
-      return isCompactionArtifact(value);
-    default:
-      return true;
-  }
+  return ResponseItemSchema.safeParse(value).success;
 }
 
 function imageUrl(image: ImageContent): string {
@@ -158,11 +67,12 @@ function responseItemId(id: string): string | undefined {
 
 function assistantTextMetadata(
   signature: string | undefined,
-): { id?: string; phase?: AssistantPhase; annotations: unknown[] } {
+): { id?: string; phase?: AssistantPhase; annotations: JsonValue[] } {
   if (!signature) return { annotations: [] };
   try {
-    const value = JSON.parse(signature) as unknown;
-    if (!isRecord(value)) return { annotations: [] };
+    const parsed = JsonObjectSchema.safeParse(JSON.parse(signature));
+    if (!parsed.success) return { annotations: [] };
+    const value = parsed.data;
     const phase = value.phase === "commentary" || value.phase === "final_answer" ? value.phase : undefined;
     return {
       ...(typeof value.id === "string" ? { id: value.id } : {}),
@@ -177,12 +87,8 @@ function assistantTextMetadata(
 function reasoningItem(signature: string | undefined): ResponseItem | undefined {
   if (!signature) return undefined;
   try {
-    const value = JSON.parse(signature) as unknown;
-    if (!isRecord(value) || value.type !== "reasoning") return undefined;
-    if (!Array.isArray(value.summary)) return undefined;
-    const encrypted = value.encrypted_content;
-    if (encrypted !== undefined && encrypted !== null && typeof encrypted !== "string") return undefined;
-    return value as unknown as ResponseItem;
+    const parsed = ResponseReasoningItemSchema.safeParse(JSON.parse(signature));
+    return parsed.success ? parsed.data : undefined;
   } catch {
     return undefined;
   }

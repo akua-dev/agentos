@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Message } from "@earendil-works/pi-ai";
-import { messagesToResponseItems } from "../messages.ts";
+import { isResponseItem, messagesToResponseItems } from "../messages.ts";
 
 const usage = {
   input: 10,
@@ -12,6 +12,44 @@ const usage = {
 };
 
 describe("Responses message conversion", () => {
+  test("accepts only JSON-safe opaque provider items", () => {
+    expect(
+      isResponseItem({
+        type: "future_item",
+        metadata: { nested: [1, true, null] },
+      }),
+    ).toBe(true);
+    expect(
+      isResponseItem({
+        type: "future_item",
+        callback: () => undefined,
+      }),
+    ).toBe(false);
+  });
+
+  test("rejects a malformed reasoning signature", () => {
+    const messages: Message[] = [
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "thinking",
+            thinking: "private",
+            thinkingSignature: JSON.stringify({ type: "reasoning", summary: [42] }),
+          },
+        ],
+        api: "openai-codex-responses",
+        provider: "openai-codex",
+        model: "gpt-5.4",
+        usage,
+        stopReason: "stop",
+        timestamp: 1,
+      },
+    ];
+
+    expect(messagesToResponseItems(messages)).toEqual([]);
+  });
+
   test("preserves text, images, reasoning, tool calls, and tool results", () => {
     const reasoning = JSON.stringify({
       type: "reasoning",

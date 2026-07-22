@@ -5,57 +5,27 @@ import {
   type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import {
-  isCompactionArtifact,
-  isResponseItem,
   messagesToResponseItems,
   type ResponseItem,
 } from "./messages.ts";
+import {
+  JsonObjectSchema,
+  NativeCompactionStateSchema,
+  ProviderRequestPayloadSchema,
+  type NativeCompactionState,
+  type ProviderRequestPayload,
+  type ResponseUsage,
+} from "./schemas.ts";
+
+export type { NativeCompactionState } from "./schemas.ts";
 
 export const NATIVE_DETAILS_KEY = "agentosOpenAIServerCompaction";
 
-export type NativeCompactionState = {
-  version: 1;
-  provider: string;
-  model: string;
-  replacementInput: ResponseItem[];
-  usage?: Record<string, unknown>;
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isReplayInput(value: unknown): value is ResponseItem[] {
-  return (
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every(isResponseItem) &&
-    value.filter(isCompactionArtifact).length === 1
-  );
-}
-
 function readState(entry: CompactionEntry): NativeCompactionState | undefined {
-  if (!isRecord(entry.details)) return undefined;
-  const state = entry.details[NATIVE_DETAILS_KEY];
-  if (
-    !isRecord(state) ||
-    state.version !== 1 ||
-    typeof state.provider !== "string" ||
-    state.provider.length === 0 ||
-    typeof state.model !== "string" ||
-    state.model.length === 0 ||
-    !isReplayInput(state.replacementInput)
-  ) {
-    return undefined;
-  }
-  const usage = isRecord(state.usage) ? state.usage : undefined;
-  return {
-    version: 1,
-    provider: state.provider,
-    model: state.model,
-    replacementInput: state.replacementInput,
-    ...(usage ? { usage } : {}),
-  };
+  const details = JsonObjectSchema.safeParse(entry.details);
+  if (!details.success) return undefined;
+  const state = NativeCompactionStateSchema.safeParse(details.data[NATIVE_DETAILS_KEY]);
+  return state.success ? state.data : undefined;
 }
 
 function latestCompaction(entries: SessionEntry[]) {
@@ -74,7 +44,7 @@ export function nativeCompactionDetails(
   provider: string,
   model: string,
   replacementInput: ResponseItem[],
-  usage?: Record<string, unknown>,
+  usage?: ResponseUsage,
 ): Record<typeof NATIVE_DETAILS_KEY, NativeCompactionState> {
   return {
     [NATIVE_DETAILS_KEY]: {
@@ -115,13 +85,14 @@ export function rewriteResponsesPayload(
   entries: SessionEntry[],
   provider: string,
   model: string,
-): Record<string, unknown> | undefined {
-  if (!isRecord(payload) || !Array.isArray(payload.input)) return undefined;
-  if (payload.model !== undefined && payload.model !== model) return undefined;
+): ProviderRequestPayload | undefined {
+  const parsed = ProviderRequestPayloadSchema.safeParse(payload);
+  if (!parsed.success) return undefined;
+  if (parsed.data.model !== undefined && parsed.data.model !== model) return undefined;
   const native = matchingState(entries, provider, model);
   if (!native) return undefined;
   return {
-    ...payload,
+    ...parsed.data,
     input: [
       ...native.state.replacementInput,
       ...messagesToResponseItems(messagesAfter(entries, native.index)),
