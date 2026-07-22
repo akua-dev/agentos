@@ -7,8 +7,8 @@ export type AssistantPhase = "commentary" | "final_answer";
 
 export type ResponseContentItem =
   | { type: "input_text"; text: string }
-  | { type: "input_image"; image_url: string }
-  | { type: "output_text"; text: string };
+  | { type: "input_image"; detail: "auto"; image_url: string }
+  | { type: "output_text"; text: string; annotations: unknown[] };
 
 export type CompactionArtifact = {
   type: "compaction";
@@ -20,19 +20,29 @@ export type ResponseItem =
       type: "message";
       role: "user" | "assistant";
       content: ResponseContentItem[];
+      id?: string;
+      status?: string;
       phase?: AssistantPhase;
     }
   | {
       type: "reasoning";
-      summary: Array<{ type: "summary_text"; text: string }>;
-      content?: Array<{ type: "reasoning_text" | "text"; text: string }>;
-      encrypted_content: string | null;
+      summary: Array<Record<string, unknown>>;
+      content?: Array<Record<string, unknown>>;
+      encrypted_content?: string | null;
+      id?: string;
+      status?: string;
+      [key: string]: unknown;
     }
-  | { type: "function_call"; name: string; arguments: string; call_id: string }
+  | { type: "function_call"; id?: string; name: string; arguments: string; call_id: string }
   | {
       type: "function_call_output";
       call_id: string;
-      output: string | Array<{ type: "input_text"; text: string } | { type: "input_image"; image_url: string }>;
+      output:
+        | string
+        | Array<
+            | { type: "input_text"; text: string }
+            | { type: "input_image"; detail: "auto"; image_url: string }
+          >;
     }
   | CompactionArtifact;
 
@@ -53,7 +63,7 @@ function inputContent(content: string | (TextContent | ImageContent)[]): Respons
     items.push(
       part.type === "text"
         ? { type: "input_text", text: part.text }
-        : { type: "input_image", image_url: imageUrl(part) },
+        : { type: "input_image", detail: "auto", image_url: imageUrl(part) },
     );
   }
   return items;
@@ -61,9 +71,9 @@ function inputContent(content: string | (TextContent | ImageContent)[]): Respons
 
 function toolOutput(content: (TextContent | ImageContent)[]) {
   const output = content.map((part) =>
-    part.type === "text"
-      ? { type: "input_text" as const, text: part.text }
-      : { type: "input_image" as const, image_url: imageUrl(part) },
+      part.type === "text"
+        ? { type: "input_text" as const, text: part.text }
+        : { type: "input_image" as const, detail: "auto", image_url: imageUrl(part) },
   );
   return output.length > 0 ? output : "(no tool output)";
 }
@@ -72,14 +82,26 @@ function responseCallId(id: string): string {
   return id.split("|", 1)[0] || id;
 }
 
-function assistantPhase(signature: string | undefined): AssistantPhase | undefined {
-  if (!signature) return undefined;
+function responseItemId(id: string): string | undefined {
+  const separator = id.indexOf("|");
+  return separator === -1 ? undefined : id.slice(separator + 1) || undefined;
+}
+
+function assistantTextMetadata(
+  signature: string | undefined,
+): { id?: string; phase?: AssistantPhase; annotations: unknown[] } {
+  if (!signature) return { annotations: [] };
   try {
     const value = JSON.parse(signature) as unknown;
-    if (!isRecord(value)) return undefined;
-    return value.phase === "commentary" || value.phase === "final_answer" ? value.phase : undefined;
+    if (!isRecord(value)) return { annotations: [] };
+    const phase = value.phase === "commentary" || value.phase === "final_answer" ? value.phase : undefined;
+    return {
+      ...(typeof value.id === "string" ? { id: value.id } : {}),
+      ...(phase ? { phase } : {}),
+      annotations: Array.isArray(value.annotations) ? value.annotations : [],
+    };
   } catch {
-    return undefined;
+    return { annotations: [] };
   }
 }
 
@@ -88,33 +110,10 @@ function reasoningItem(signature: string | undefined): ResponseItem | undefined 
   try {
     const value = JSON.parse(signature) as unknown;
     if (!isRecord(value) || value.type !== "reasoning") return undefined;
-    const summary = Array.isArray(value.summary)
-      ? value.summary.flatMap((part) =>
-          isRecord(part) && typeof part.text === "string"
-            ? [{ type: "summary_text" as const, text: part.text }]
-            : [],
-        )
-      : [];
-    const content = Array.isArray(value.content)
-      ? value.content.flatMap((part) =>
-          isRecord(part) && typeof part.text === "string"
-            ? [
-                {
-                  type: part.type === "reasoning_text" ? ("reasoning_text" as const) : ("text" as const),
-                  text: part.text,
-                },
-              ]
-            : [],
-        )
-      : [];
+    if (!Array.isArray(value.summary)) return undefined;
     const encrypted = value.encrypted_content;
-    if (encrypted !== null && typeof encrypted !== "string") return undefined;
-    return {
-      type: "reasoning",
-      summary,
-      ...(content.length > 0 ? { content } : {}),
-      encrypted_content: encrypted,
-    };
+    if (encrypted !== undefined && encrypted !== null && typeof encrypted !== "string") return undefined;
+    return value as unknown as ResponseItem;
   } catch {
     return undefined;
   }
@@ -138,14 +137,16 @@ function messageToResponseItems(message: Message): ResponseItem[] {
 
   const items: ResponseItem[] = [];
   let text = "";
-  let phase: AssistantPhase | undefined;
+  let textMetadata = assistantTextMetadata(undefined);
   const flushText = () => {
     if (!text) return;
     items.push({
       type: "message",
       role: "assistant",
-      content: [{ type: "output_text", text }],
-      ...(phase ? { phase } : {}),
+      content: [{ type: "output_text", text, annotations: textMetadata.annotations }],
+      status: "completed",
+      ...(textMetadata.id ? { id: textMetadata.id } : {}),
+      ...(textMetadata.phase ? { phase: textMetadata.phase } : {}),
     });
     text = "";
   };
@@ -158,15 +159,16 @@ function messageToResponseItems(message: Message): ResponseItem[] {
       continue;
     }
     if (part.type === "text") {
-      const nextPhase = assistantPhase(part.textSignature);
-      if (text && nextPhase !== phase) flushText();
-      phase = nextPhase;
+      const nextMetadata = assistantTextMetadata(part.textSignature);
+      if (text && (nextMetadata.phase !== textMetadata.phase || nextMetadata.id !== textMetadata.id)) flushText();
+      textMetadata = nextMetadata;
       text += part.text;
       continue;
     }
     flushText();
     items.push({
       type: "function_call",
+      ...(responseItemId(part.id) ? { id: responseItemId(part.id) } : {}),
       call_id: responseCallId(part.id),
       name: part.name,
       arguments: JSON.stringify(part.arguments) ?? "{}",

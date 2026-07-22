@@ -49,6 +49,30 @@ function isEnabled(): boolean {
   return value === undefined || !["0", "false", "no", "off"].includes(value);
 }
 
+function configuredRemoteTimeout(): number | undefined {
+  const value = Number(process.env.AGENTOS_OPENAI_SERVER_COMPACTION_TIMEOUT_MS?.trim());
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+}
+
+function mergedHeaders(
+  modelHeaders: Record<string, string> | undefined,
+  resolvedHeaders: Record<string, string> | undefined,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  const names = new Map<string, string>();
+  for (const [name, value] of Object.entries(modelHeaders ?? {})) {
+    result[name] = value;
+    names.set(name.toLowerCase(), name);
+  }
+  for (const [name, value] of Object.entries(resolvedHeaders ?? {})) {
+    const previous = names.get(name.toLowerCase());
+    if (previous) delete result[previous];
+    result[name] = value;
+    names.set(name.toLowerCase(), name);
+  }
+  return result;
+}
+
 function toolsPayload(allTools: ToolInfo[], activeTools: string[]): Record<string, unknown>[] {
   const active = new Set(activeTools);
   return allTools
@@ -161,13 +185,14 @@ async function handleCompaction(
   const remoteRequest: ServerCompactionRequest = {
     model,
     apiKey: resolved.apiKey,
-    headers: resolved.headers,
+    headers: mergedHeaders(model.headers, resolved.headers),
     sessionId: ctx.sessionManager.getSessionId(),
     input: buildCompactionInput(event.branchEntries, model.provider, model.id),
     instructions: ctx.getSystemPrompt(),
     tools: toolsPayload(pi.getAllTools(), pi.getActiveTools()),
     reasoning: reasoningFor(thinkingLevel, model),
     signal: event.signal,
+    timeoutMs: configuredRemoteTimeout(),
   };
 
   const [local, remote] = await Promise.allSettled([

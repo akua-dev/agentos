@@ -3,6 +3,8 @@ import type { CompactionArtifact, ResponseItem } from "./messages.ts";
 
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 const REMOTE_COMPACTION_FEATURE = "remote_compaction_v2";
+const DEFAULT_TIMEOUT_MS = 120_000;
+const MAX_TIMEOUT_MS = 600_000;
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -21,6 +23,7 @@ export type ServerCompactionRequest = {
   tools: Record<string, unknown>[];
   reasoning?: Record<string, unknown>;
   signal?: AbortSignal;
+  timeoutMs?: number;
   fetchImpl?: FetchLike;
 };
 
@@ -54,8 +57,9 @@ export function endpointForModel(model: Model<any>): string {
     if (baseUrl.endsWith("/codex")) return `${baseUrl}/responses`;
     return `${baseUrl}/codex/responses`;
   }
-  if (baseUrl.endsWith("/responses")) return baseUrl;
-  return `${baseUrl}/responses`;
+  if (baseUrl.endsWith("/responses/compact")) return baseUrl;
+  if (baseUrl.endsWith("/responses")) return `${baseUrl}/compact`;
+  return `${baseUrl}/responses/compact`;
 }
 
 function caseInsensitiveHeader(headers: Headers, name: string): string | null {
@@ -76,14 +80,117 @@ function accountIdFromToken(token: string): string | undefined {
   }
 }
 
+function isCodexModel(model: Model<any>): boolean {
+  return model.provider === "openai-codex";
+}
+
+function normalizedTimeout(value: number | undefined): number {
+  if (!Number.isFinite(value) || (value ?? 0) <= 0) return DEFAULT_TIMEOUT_MS;
+  return Math.min(Math.floor(value!), MAX_TIMEOUT_MS);
+}
+
+type Deadline = { signal: AbortSignal; cleanup: () => void };
+
+function deadlineSignal(callerSignal: AbortSignal | undefined, timeoutMs: number | undefined): Deadline {
+  const controller = new AbortController();
+  const duration = normalizedTimeout(timeoutMs);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const onCallerAbort = () => controller.abort(callerSignal?.reason);
+
+  if (callerSignal) {
+    if (callerSignal.aborted) onCallerAbort();
+    else callerSignal.addEventListener("abort", onCallerAbort, { once: true });
+  }
+  if (!controller.signal.aborted) {
+    timer = setTimeout(() => {
+      controller.abort(new Error(`OpenAI server compaction timed out after ${duration}ms.`));
+    }, duration);
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      if (timer) clearTimeout(timer);
+      callerSignal?.removeEventListener("abort", onCallerAbort);
+    },
+  };
+}
+
+function abortReason(signal: AbortSignal): Error {
+  if (signal.reason instanceof Error) return signal.reason;
+  return new Error("OpenAI server compaction request was aborted.");
+}
+
+function awaitWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    void promise.catch(() => undefined);
+    return Promise.reject(abortReason(signal));
+  }
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      reject(abortReason(signal));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
+
+async function parseCompactResponse(text: string): Promise<ServerCompactionResult> {
+  let value: unknown;
+  try {
+    value = JSON.parse(text) as unknown;
+  } catch {
+    throw new Error("OpenAI server compaction returned invalid JSON.");
+  }
+  if (!isRecord(value) || !Array.isArray(value.output)) {
+    throw new Error("OpenAI server compaction returned an invalid compacted response.");
+  }
+  const artifacts = value.output.flatMap((output) => {
+    const artifact = artifactFrom(output);
+    return artifact ? [artifact] : [];
+  });
+  if (artifacts.length !== 1) {
+    throw new Error(`OpenAI server compaction expected one artifact, received ${artifacts.length}.`);
+  }
+  const usage = isRecord(value.usage) ? value.usage : undefined;
+  return { artifact: artifacts[0]!, ...(usage ? { usage } : {}) };
+}
+
 function requestHeaders(params: ServerCompactionRequest, endpoint: string): Headers {
   const headers = new Headers(params.headers);
   if (params.apiKey) headers.set("authorization", `Bearer ${params.apiKey}`);
   if (!caseInsensitiveHeader(headers, "authorization")) {
     throw new Error("OpenAI server compaction has no resolved authorization.");
   }
-  headers.set("accept", "text/event-stream");
   headers.set("content-type", "application/json");
+
+  if (!isCodexModel(params.model)) {
+    headers.delete("x-codex-beta-features");
+    headers.delete("openai-beta");
+    headers.delete("originator");
+    headers.delete("session-id");
+    headers.set("accept", "application/json");
+    return headers;
+  }
+
+  headers.set("accept", "text/event-stream");
 
   const configured = (headers.get("x-codex-beta-features") ?? "")
     .split(",")
@@ -111,7 +218,7 @@ function requestHeaders(params: ServerCompactionRequest, endpoint: string): Head
   return headers;
 }
 
-async function boundedResponseText(response: Response): Promise<string> {
+async function boundedResponseText(response: Response, signal: AbortSignal): Promise<string> {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
     throw new Error("OpenAI server compaction response exceeded the size limit.");
@@ -123,15 +230,20 @@ async function boundedResponseText(response: Response): Promise<string> {
   let bytes = 0;
   let text = "";
   while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    bytes += value.byteLength;
-    if (bytes > MAX_RESPONSE_BYTES) {
-      await reader.cancel();
-      throw new Error("OpenAI server compaction response exceeded the size limit.");
+    try {
+      const { done, value } = await awaitWithAbort(reader.read(), signal);
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_RESPONSE_BYTES) {
+        throw new Error("OpenAI server compaction response exceeded the size limit.");
+      }
+      text += decoder.decode(value, { stream: true });
+    } catch (error) {
+      await reader.cancel().catch(() => undefined);
+      throw error;
     }
-    text += decoder.decode(value, { stream: true });
   }
+  await reader.cancel().catch(() => undefined);
   return text + decoder.decode();
 }
 
@@ -182,10 +294,21 @@ function parseCompactionEvents(events: unknown[]): ServerCompactionResult {
       if (artifact) artifacts.set(artifact.encrypted_content, artifact);
       continue;
     }
-    if (value.type !== "response.completed") continue;
+    if (value.type !== "response.completed" && value.type !== "response.done" && value.type !== "response.incomplete") {
+      continue;
+    }
+    if (value.type === "response.incomplete") {
+      throw new Error("OpenAI server compaction response was incomplete.");
+    }
     completed = true;
     const response = value.response;
-    if (!isRecord(response)) continue;
+    if (!isRecord(response)) throw new Error("OpenAI server compaction returned no terminal response.");
+    if (response.status === "incomplete") {
+      throw new Error("OpenAI server compaction response was incomplete.");
+    }
+    if (response.status === "failed" || response.status === "cancelled") {
+      throw new Error("OpenAI server compaction failed.");
+    }
     if (isRecord(response.usage)) usage = response.usage;
     if (Array.isArray(response.output)) {
       for (const output of response.output) {
@@ -210,27 +333,46 @@ export async function requestServerCompaction(
   params: ServerCompactionRequest,
 ): Promise<ServerCompactionResult> {
   const endpoint = endpointForModel(params.model);
-  const response = await (params.fetchImpl ?? fetch)(endpoint, {
-    method: "POST",
-    headers: requestHeaders(params, endpoint),
-    body: JSON.stringify({
-      model: params.model.id,
-      input: [...params.input, { type: "compaction_trigger" }],
-      instructions: params.instructions,
-      tools: params.tools,
-      parallel_tool_calls: true,
-      tool_choice: "auto",
-      stream: true,
-      store: false,
-      include: ["reasoning.encrypted_content"],
-      ...(params.sessionId ? { prompt_cache_key: params.sessionId } : {}),
-      ...(params.reasoning ? { reasoning: params.reasoning } : {}),
-    }),
-    signal: params.signal,
-  });
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error(`OpenAI server compaction request failed with HTTP ${response.status}.`);
+  const deadline = deadlineSignal(params.signal, params.timeoutMs);
+  try {
+    if (deadline.signal.aborted) throw abortReason(deadline.signal);
+    const codex = isCodexModel(params.model);
+    const body = codex
+      ? {
+          model: params.model.id,
+          input: [...params.input, { type: "compaction_trigger" }],
+          instructions: params.instructions,
+          tools: params.tools,
+          parallel_tool_calls: true,
+          tool_choice: "auto",
+          stream: true,
+          store: false,
+          include: ["reasoning.encrypted_content"],
+          ...(params.sessionId ? { prompt_cache_key: params.sessionId } : {}),
+          ...(params.reasoning ? { reasoning: params.reasoning } : {}),
+        }
+      : {
+          model: params.model.id,
+          input: params.input,
+          instructions: params.instructions,
+          ...(params.sessionId ? { prompt_cache_key: params.sessionId } : {}),
+        };
+    const response = await awaitWithAbort(
+      (params.fetchImpl ?? fetch)(endpoint, {
+        method: "POST",
+        headers: requestHeaders(params, endpoint),
+        body: JSON.stringify(body),
+        signal: deadline.signal,
+      }),
+      deadline.signal,
+    );
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined);
+      throw new Error(`OpenAI server compaction request failed with HTTP ${response.status}.`);
+    }
+    const responseText = await boundedResponseText(response, deadline.signal);
+    return codex ? parseCompactionEvents(parseSse(responseText)) : parseCompactResponse(responseText);
+  } finally {
+    deadline.cleanup();
   }
-  return parseCompactionEvents(parseSse(await boundedResponseText(response)));
 }

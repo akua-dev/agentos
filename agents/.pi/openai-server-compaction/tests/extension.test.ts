@@ -153,6 +153,43 @@ describe("AgentOS OpenAI server-compaction extension", () => {
     expect(await handlers.get("session_before_compact")?.(event, context())).toBeUndefined();
   });
 
+  test("forwards model headers and keeps resolved authentication headers authoritative", async () => {
+    let request: any;
+    const handlers = harness({
+      runLocalCompaction: async () => local,
+      runServerCompaction: async (value) => {
+        request = value;
+        return { artifact: { type: "compaction", encrypted_content: "opaque" } };
+      },
+    });
+
+    await handlers.get("session_before_compact")?.(
+      event,
+      context({
+        model: {
+          ...model(),
+          headers: {
+            "X-AI-Gateway-Token": "fleet-token",
+            Authorization: "Bearer configured-token",
+          },
+        } as any,
+        modelRegistry: {
+          getApiKeyAndHeaders: async () => ({
+            ok: true,
+            apiKey: "resolved-token",
+            headers: { authorization: "Bearer resolved-header", "X-Resolved": "yes" },
+          }),
+        } as any,
+      }),
+    );
+
+    expect(request.headers).toEqual({
+      "X-AI-Gateway-Token": "fleet-token",
+      authorization: "Bearer resolved-header",
+      "X-Resolved": "yes",
+    });
+  });
+
   test("replays persisted native state through Pi's existing provider request", () => {
     const artifact = { type: "compaction" as const, encrypted_content: "opaque" };
     const entries: SessionEntry[] = [

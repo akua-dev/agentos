@@ -15,10 +15,12 @@ describe("Responses message conversion", () => {
   test("preserves text, images, reasoning, tool calls, and tool results", () => {
     const reasoning = JSON.stringify({
       type: "reasoning",
+      id: "rs_1",
       summary: [{ type: "summary_text", text: "kept summary" }],
       encrypted_content: "opaque-reasoning",
+      status: "completed",
     });
-    const phase = JSON.stringify({ v: 1, id: "text-1", phase: "commentary" });
+    const phase = JSON.stringify({ v: 1, id: "msg_1", phase: "commentary" });
     const messages: Message[] = [
       {
         role: "user",
@@ -61,22 +63,27 @@ describe("Responses message conversion", () => {
         role: "user",
         content: [
           { type: "input_text", text: "inspect this" },
-          { type: "input_image", image_url: "data:image/png;base64,aW1hZ2U=" },
+          { type: "input_image", detail: "auto", image_url: "data:image/png;base64,aW1hZ2U=" },
         ],
       },
       {
         type: "reasoning",
+        id: "rs_1",
         summary: [{ type: "summary_text", text: "kept summary" }],
         encrypted_content: "opaque-reasoning",
+        status: "completed",
       },
       {
         type: "message",
         role: "assistant",
-        content: [{ type: "output_text", text: "I will inspect it." }],
+        content: [{ type: "output_text", text: "I will inspect it.", annotations: [] }],
+        status: "completed",
+        id: "msg_1",
         phase: "commentary",
       },
       {
         type: "function_call",
+        id: "fc-1",
         call_id: "call-1",
         name: "read",
         arguments: '{"path":"a.ts"}',
@@ -86,7 +93,7 @@ describe("Responses message conversion", () => {
         call_id: "call-1",
         output: [
           { type: "input_text", text: "contents" },
-          { type: "input_image", image_url: "data:image/jpeg;base64,cmVzdWx0" },
+          { type: "input_image", detail: "auto", image_url: "data:image/jpeg;base64,cmVzdWx0" },
         ],
       },
     ]);

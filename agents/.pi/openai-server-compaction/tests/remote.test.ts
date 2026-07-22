@@ -30,7 +30,7 @@ describe("OpenAI server compaction transport", () => {
       endpointForModel(
         model({ provider: "openai", api: "openai-responses", baseUrl: "https://api.openai.com/v1" }),
       ),
-    ).toBe("https://api.openai.com/v1/responses");
+    ).toBe("https://api.openai.com/v1/responses/compact");
     expect(supportsServerCompaction(model({ provider: "anthropic", api: "anthropic-messages" }))).toBe(
       false,
     );
@@ -100,5 +100,108 @@ describe("OpenAI server compaction transport", () => {
           ),
       }),
     ).rejects.toThrow("before response.completed");
+  });
+
+  test("accepts Codex response.done as a successful terminal event", async () => {
+    const artifact = { type: "compaction" as const, encrypted_content: "opaque-done" };
+    const sse = [
+      `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
+      `data: ${JSON.stringify({
+        type: "response.done",
+        response: { output: [artifact], usage: { input_tokens: 7, output_tokens: 2 } },
+      })}`,
+      "data: [DONE]",
+      "",
+    ].join("\n\n");
+
+    await expect(
+      requestServerCompaction({
+        model: model(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: async () => new Response(sse, { status: 200 }),
+      }),
+    ).resolves.toEqual({ artifact, usage: { input_tokens: 7, output_tokens: 2 } });
+  });
+
+  test("rejects Codex response.incomplete before accepting an artifact", async () => {
+    const artifact = { type: "compaction" as const, encrypted_content: "opaque-incomplete" };
+    const sse = [
+      `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
+      `data: ${JSON.stringify({ type: "response.incomplete", response: { output: [artifact] } })}`,
+      "",
+    ].join("\n\n");
+
+    await expect(
+      requestServerCompaction({
+        model: model(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: async () => new Response(sse, { status: 200 }),
+      }),
+    ).rejects.toThrow("incomplete");
+  });
+
+  test("uses the standard OpenAI compact endpoint and JSON response", async () => {
+    let request: { url: string; init: RequestInit } | undefined;
+    const artifact = { type: "compaction" as const, encrypted_content: "opaque-openai" };
+    const result = await requestServerCompaction({
+      model: model({
+        provider: "openai",
+        api: "openai-responses",
+        baseUrl: "https://api.openai.com/v1",
+      }),
+      apiKey: "openai-token",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "hello" }] }],
+      instructions: "system prompt",
+      tools: [{ type: "function", name: "ignored", parameters: {} }],
+      sessionId: "session-2",
+      fetchImpl: async (input, init) => {
+        request = { url: String(input), init: init ?? {} };
+        return new Response(
+          JSON.stringify({
+            id: "cmp_1",
+            object: "response.compaction",
+            output: [artifact],
+            usage: { input_tokens: 40, output_tokens: 4 },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      },
+    });
+
+    expect(result).toEqual({ artifact, usage: { input_tokens: 40, output_tokens: 4 } });
+    expect(request?.url).toBe("https://api.openai.com/v1/responses/compact");
+    const headers = new Headers(request?.init.headers);
+    expect(headers.get("authorization")).toBe("Bearer openai-token");
+    expect(headers.get("accept")).toBe("application/json");
+    expect(headers.has("x-codex-beta-features")).toBe(false);
+    expect(headers.has("openai-beta")).toBe(false);
+    expect(JSON.parse(String(request?.init.body))).toEqual({
+      model: "gpt-5.4",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "hello" }] }],
+      instructions: "system prompt",
+      prompt_cache_key: "session-2",
+    });
+  });
+
+  test("returns on the bounded deadline when fetch does not settle", async () => {
+    const started = performance.now();
+    await expect(
+      requestServerCompaction({
+        model: model(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        timeoutMs: 10,
+        fetchImpl: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          return new Response("", { status: 200 });
+        },
+      }),
+    ).rejects.toThrow();
+    expect(performance.now() - started).toBeLessThan(80);
   });
 });
