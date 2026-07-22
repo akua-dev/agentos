@@ -58,6 +58,33 @@ describe("authenticated raw Responses proxy", () => {
     expect(upstream?.headers.has("x-ai-gateway-session")).toBe(false);
   });
 
+  test("strips inbound provider credential headers before forwarding", async () => {
+    let upstream: Request | undefined;
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "selected-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => undefined,
+      }),
+      fetchImpl: async (input, init) => {
+        upstream = new Request(input instanceof Request ? input.url : input.toString(), init);
+        return new Response("ok");
+      },
+    });
+    const gatewayRequest = request();
+    gatewayRequest.headers.set("api-key", "inbound-api-key");
+    gatewayRequest.headers.set("x-api-key", "inbound-x-api-key");
+
+    expect((await handler(gatewayRequest)).status).toBe(200);
+    expect(upstream?.headers.get("authorization")).toBe("Bearer selected-secret");
+    expect(upstream?.headers.has("api-key")).toBe(false);
+    expect(upstream?.headers.has("x-api-key")).toBe(false);
+  });
+
   test("normalizes OAuth upstream headers/path and streams the real response", async () => {
     let upstream: Request | undefined;
     let released = false;

@@ -4,12 +4,14 @@ import type { RouteLease } from "./types.ts";
 const ALLOWED_PATHS = new Set(["/responses", "/v1/responses", "/codex/responses"]);
 const REQUEST_HEADERS_TO_REMOVE = new Set([
   "authorization",
+  "api-key",
   "chatgpt-account-id",
   "host",
   "content-length",
   "connection",
   "proxy-authorization",
   "proxy-authenticate",
+  "x-api-key",
   "te",
   "trailer",
   "transfer-encoding",
