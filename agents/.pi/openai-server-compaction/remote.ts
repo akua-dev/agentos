@@ -328,6 +328,7 @@ function recordArtifact(artifacts: Map<string, CompactionArtifact>, artifact: Co
 function parseCompactionEvents(events: ProviderEvent[]): ServerCompactionResult {
   let terminalType: "response.completed" | "response.done" | undefined;
   let terminalOutput: ResponseItem[] | undefined;
+  const streamedOutput: ResponseItem[] = [];
   let usage: ResponseUsage | undefined;
   const artifacts = new Map<string, CompactionArtifact>();
 
@@ -348,6 +349,7 @@ function parseCompactionEvents(events: ProviderEvent[]): ServerCompactionResult 
       if (!event.success) {
         throw new Error("OpenAI server compaction returned an invalid output item.");
       }
+      streamedOutput.push(event.data.item);
       const artifact = artifactFrom(event.data.item);
       if (artifact) recordArtifact(artifacts, artifact);
       continue;
@@ -366,14 +368,16 @@ function parseCompactionEvents(events: ProviderEvent[]): ServerCompactionResult 
       throw new Error("OpenAI server compaction terminal response was not completed.");
     }
     usage = requiredResponseUsage(response.usage);
-    const parsedOutput = parseResponseItems(response.output);
-    if (!parsedOutput || parsedOutput.length === 0) {
-      throw new Error("OpenAI server compaction returned an invalid terminal response.");
-    }
-    terminalOutput = parsedOutput;
-    for (const output of terminalOutput) {
-      const artifact = artifactFrom(output);
-      if (artifact) recordArtifact(artifacts, artifact);
+    if (response.output !== undefined && response.output !== null) {
+      const parsedOutput = parseResponseItems(response.output);
+      if (!parsedOutput || parsedOutput.length === 0) {
+        throw new Error("OpenAI server compaction returned an invalid terminal response.");
+      }
+      terminalOutput = parsedOutput;
+      for (const output of terminalOutput) {
+        const artifact = artifactFrom(output);
+        if (artifact) recordArtifact(artifacts, artifact);
+      }
     }
   }
 
@@ -383,16 +387,17 @@ function parseCompactionEvents(events: ProviderEvent[]): ServerCompactionResult 
   if (artifacts.size !== 1) {
     throw new Error(`OpenAI server compaction expected one artifact, received ${artifacts.size}.`);
   }
-  if (!terminalOutput) {
-    throw new Error("OpenAI server compaction returned no terminal output.");
+  const output = terminalOutput ?? streamedOutput;
+  if (output.length === 0) {
+    throw new Error("OpenAI server compaction returned no canonical output.");
   }
-  const terminalArtifacts = terminalOutput.filter(artifactFrom);
-  if (terminalArtifacts.length !== 1) {
+  const outputArtifacts = output.filter(artifactFrom);
+  if (outputArtifacts.length !== 1) {
     throw new Error(
-      `OpenAI server compaction terminal output expected one artifact, received ${terminalArtifacts.length}.`,
+      `OpenAI server compaction canonical output expected one artifact, received ${outputArtifacts.length}.`,
     );
   }
-  return { output: terminalOutput, ...(usage ? { usage } : {}) };
+  return { output, ...(usage ? { usage } : {}) };
 }
 
 export async function requestServerCompaction(

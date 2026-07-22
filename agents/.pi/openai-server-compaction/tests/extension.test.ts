@@ -190,6 +190,24 @@ describe("AgentOS OpenAI server-compaction extension", () => {
     });
   });
 
+  test("forwards Pi custom compaction instructions to the native request", async () => {
+    let request: { instructions?: string } | undefined;
+    const handlers = harness({
+      runLocalCompaction: async () => local,
+      runServerCompaction: async (value) => {
+        request = value;
+        return { output: [{ type: "compaction", encrypted_content: "opaque" }] };
+      },
+    });
+
+    await handlers.get("session_before_compact")?.(
+      { ...event, customInstructions: "Keep the deployment caveat." },
+      context(),
+    );
+
+    expect(request?.instructions).toBe("system\n\nKeep the deployment caveat.");
+  });
+
   test("replays persisted native state through Pi's existing provider request", () => {
     const artifact = { type: "compaction" as const, encrypted_content: "opaque" };
     const entries: SessionEntry[] = [

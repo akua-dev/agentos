@@ -100,6 +100,11 @@ function reasoningFor(
   return { effort, summary: "auto" };
 }
 
+function compactionInstructions(systemPrompt: string, customInstructions: string | undefined): string {
+  const custom = customInstructions?.trim();
+  return custom ? `${systemPrompt}\n\n${custom}` : systemPrompt;
+}
+
 async function defaultLocalCompaction(request: LocalCompactionRequest): Promise<CompactionResult> {
   return compact(
     request.event.preparation,
@@ -204,7 +209,7 @@ async function handleCompaction(
     headers: mergedHeaders(model.headers, resolved.headers),
     sessionId: ctx.sessionManager.getSessionId(),
     input: buildCompactionInput(event.branchEntries, model.provider, model.id),
-    instructions: ctx.getSystemPrompt(),
+    instructions: compactionInstructions(ctx.getSystemPrompt(), event.customInstructions),
     tools: toolsPayload(pi.getAllTools(), pi.getActiveTools()),
     reasoning: reasoningFor(thinkingLevel, model),
     signal: event.signal,

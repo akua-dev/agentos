@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Message } from "@earendil-works/pi-ai";
 import { isResponseItem, messagesToResponseItems } from "../messages.ts";
+import { parseResponseUsage } from "../schemas.ts";
 
 const usage = {
   input: 10,
@@ -25,6 +26,64 @@ describe("Responses message conversion", () => {
         callback: () => undefined,
       }),
     ).toBe(false);
+  });
+
+  test("validates known provider discriminants instead of treating malformed items as opaque", () => {
+    expect(
+      isResponseItem({
+        type: "web_search_call",
+        id: "ws_1",
+        status: "completed",
+      }),
+    ).toBe(true);
+    expect(
+      isResponseItem({
+        type: "web_search_call",
+        id: "ws_1",
+        status: 42,
+      }),
+    ).toBe(false);
+    expect(
+      isResponseItem({
+        type: "file_search_call",
+        queries: ["find"],
+        status: "completed",
+      }),
+    ).toBe(false);
+    expect(
+      isResponseItem({
+        type: "computer_call",
+        id: "cc_1",
+        call_id: "call_1",
+        pending_safety_checks: [],
+        status: "completed",
+        action: "click",
+      }),
+    ).toBe(false);
+  });
+
+  test("accepts valid Responses message roles, image details, and file content", () => {
+    expect(
+      isResponseItem({
+        type: "message",
+        role: "system",
+        content: [
+          { type: "input_image", detail: "high", file_id: "file-image" },
+          { type: "input_file", file_id: "file-document" },
+        ],
+      }),
+    ).toBe(true);
+    expect(
+      isResponseItem({
+        type: "function_call_output",
+        call_id: "call_1",
+        output: [{ type: "input_file", file_url: "https://example.test/document.pdf" }],
+      }),
+    ).toBe(true);
+  });
+
+  test("rejects fractional token usage", () => {
+    expect(parseResponseUsage({ input_tokens: 1.5, output_tokens: 2 })).toBeUndefined();
   });
 
   test("rejects a malformed reasoning signature", () => {

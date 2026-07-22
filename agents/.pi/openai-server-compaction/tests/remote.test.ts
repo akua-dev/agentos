@@ -165,6 +165,36 @@ describe("OpenAI server compaction transport", () => {
     ).resolves.toEqual({ output: [artifact], usage: { input_tokens: 7, output_tokens: 2 } });
   });
 
+  test("uses completed output items when the terminal response omits output", async () => {
+    const artifact = { type: "compaction" as const, encrypted_content: "opaque-done-items" };
+    const output = responseItems([
+      { type: "message", role: "user", content: [{ type: "input_text", text: "retained" }] },
+      artifact,
+    ]);
+    const sse = [
+      ...output.map((item) => `data: ${JSON.stringify({ type: "response.output_item.done", item })}`),
+      `data: ${JSON.stringify({
+        type: "response.completed",
+        response: {
+          status: "completed",
+          output: null,
+          usage: { input_tokens: 8, output_tokens: 2 },
+        },
+      })}`,
+      "",
+    ].join("\n\n");
+
+    await expect(
+      requestServerCompaction({
+        model: model(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: async () => new Response(sse, { status: 200 }),
+      }),
+    ).resolves.toEqual({ output, usage: { input_tokens: 8, output_tokens: 2 } });
+  });
+
   test("rejects a stream whose only artifact is outside terminal output", async () => {
     const artifact = { type: "compaction" as const, encrypted_content: "opaque-noncanonical" };
     const sse = [
@@ -187,13 +217,11 @@ describe("OpenAI server compaction transport", () => {
         tools: [],
         fetchImpl: async () => new Response(sse, { status: 200 }),
       }),
-    ).rejects.toThrow("terminal output expected one artifact");
+    ).rejects.toThrow("canonical output expected one artifact");
   });
 
-  test("rejects a completed stream without a canonical terminal output", async () => {
-    const artifact = { type: "compaction" as const, encrypted_content: "opaque-no-terminal-output" };
+  test("rejects a completed stream without any canonical output", async () => {
     const sse = [
-      `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
       `data: ${JSON.stringify({
         type: "response.done",
         response: { status: "completed" },
@@ -209,7 +237,7 @@ describe("OpenAI server compaction transport", () => {
         tools: [],
         fetchImpl: async () => new Response(sse, { status: 200 }),
       }),
-    ).rejects.toThrow("invalid terminal response");
+    ).rejects.toThrow("expected one artifact");
   });
 
   test("rejects Codex response.incomplete before accepting an artifact", async () => {
