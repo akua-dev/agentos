@@ -1,5 +1,10 @@
+import { mkdtemp } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { describe, expect, test } from "bun:test";
 import type { Api, Model } from "@earendil-works/pi-ai";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+import { createAIGatewayService } from "../../../../services/ai-gateway/src/service.ts";
 import {
   endpointForModel,
   requestServerCompaction,
@@ -7,6 +12,7 @@ import {
   type OpenAICompactionModel,
 } from "../remote.ts";
 import { parseResponseItems, type ResponseItem } from "../schemas.ts";
+import { nativeCompactionDetails, rewriteResponsesPayload } from "../session.ts";
 
 const completeUsage = {
   input_tokens: 40,
@@ -41,6 +47,92 @@ function model(overrides: Partial<Model<Api>> = {}): OpenAICompactionModel {
 }
 
 describe("OpenAI server compaction transport", () => {
+  test("composes the gateway handler, compaction transport, and persisted replay", async () => {
+    const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-compaction-"));
+    const artifact = { type: "compaction" as const, encrypted_content: "opaque-gateway-state" };
+    const output = responseItems([artifact]);
+    const sse = [
+      `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
+      `data: ${JSON.stringify({
+        type: "response.completed",
+        response: {
+          status: "completed",
+          output,
+          usage: { input_tokens: 10, output_tokens: 1, total_tokens: 11 },
+        },
+      })}`,
+      "data: [DONE]",
+      "",
+    ].join("\n\n");
+    let forwarded: Request | undefined;
+    const service = await createAIGatewayService({
+      stateDirectory,
+      clientToken: "fleet-token",
+      allowApiKeyFallback: true,
+      openAIApiKey: "provider-fixture-key",
+      oauth: { refresh: async () => { throw new Error("OAuth is not used by this fixture."); } },
+      fetchImpl: async (input, init) => {
+        forwarded = new Request(input instanceof Request ? input.url : input.toString(), init);
+        return new Response(sse, { status: 200, headers: { "content-type": "text/event-stream" } });
+      },
+    });
+
+    const result = await requestServerCompaction({
+      model: model(),
+      apiKey: "fleet-token",
+      sessionId: "session-1",
+      input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "old" }] }],
+      tools: [],
+      fetchImpl: (input, init) =>
+        service.fetch(new Request(input instanceof Request ? input.url : input.toString(), init)),
+    });
+
+    expect(forwarded?.url).toBe("https://api.openai.com/v1/responses");
+    expect(forwarded?.headers.get("authorization")).toBe("Bearer provider-fixture-key");
+    expect(JSON.parse(await forwarded!.text())).toEqual(
+      expect.objectContaining({
+        input: [expect.any(Object), { type: "compaction_trigger" }],
+        stream: true,
+      }),
+    );
+
+    const entries: SessionEntry[] = [
+      {
+        type: "message",
+        id: "m1",
+        parentId: null,
+        timestamp: "2026-01-01T00:00:00.000Z",
+        message: { role: "user", content: "old", timestamp: 1 },
+      },
+      {
+        type: "compaction",
+        id: "c1",
+        parentId: "m1",
+        timestamp: "2026-01-01T00:00:01.000Z",
+        summary: "portable",
+        firstKeptEntryId: "m1",
+        tokensBefore: 100,
+        details: nativeCompactionDetails("openai-codex", "gpt-5.4", result.output, result.usage),
+      },
+      {
+        type: "message",
+        id: "m2",
+        parentId: "c1",
+        timestamp: "2026-01-01T00:00:02.000Z",
+        message: { role: "user", content: "new", timestamp: 2 },
+      },
+    ];
+
+    expect(rewriteResponsesPayload({ model: "gpt-5.4", input: [] }, entries, "openai-codex", "gpt-5.4"))
+      .toEqual({
+        model: "gpt-5.4",
+        input: [
+          ...output,
+          { type: "message", role: "user", content: [{ type: "input_text", text: "new" }] },
+        ],
+      });
+  });
+
   test("supports only native OpenAI Responses models and resolves their endpoints", () => {
     expect(supportsServerCompaction(model())).toBe(true);
     expect(endpointForModel(model())).toBe("http://ai-gateway:8787/codex/responses");
