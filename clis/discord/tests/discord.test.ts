@@ -42,6 +42,55 @@ describe("discord", () => {
     expect(result.stderr).toContain("DISCORD_BOT_TOKEN_FILE");
   });
 
+  test("reports an unreadable token file as structured configuration failure", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "agentos-discord-cli-"));
+    const output: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      const exitCode = await runDiscordCli(
+        ["request", "GET", "/users/@me", "--axi"],
+        {
+          environment: { DISCORD_BOT_TOKEN_FILE: join(directory, "missing") },
+          write: (text) => output.push(text),
+          writeError: (text) => errors.push(text),
+        },
+      );
+
+      expect(exitCode).toBe(2);
+      expect(errors).toEqual([]);
+      expect(output.join("")).toContain("code: discord_configuration");
+      expect(output.join("")).toContain("DISCORD_BOT_TOKEN_FILE");
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
+
+  test("classifies an empty token file as configuration failure", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "agentos-discord-cli-"));
+    const tokenFile = join(directory, "token");
+    const output: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      await writeFile(tokenFile, "\n", { mode: 0o600 });
+      const exitCode = await runDiscordCli(
+        ["request", "GET", "/users/@me", "--axi"],
+        {
+          environment: { DISCORD_BOT_TOKEN_FILE: tokenFile },
+          write: (text) => output.push(text),
+          writeError: (text) => errors.push(text),
+        },
+      );
+
+      expect(exitCode).toBe(2);
+      expect(errors).toEqual([]);
+      expect(output.join("")).toContain("code: discord_configuration");
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
+
   test("reads the bot token from a file and sends a stdin body to a relative API path", async () => {
     const directory = await mkdtemp(join(tmpdir(), "agentos-discord-cli-"));
     const tokenFile = join(directory, "token");

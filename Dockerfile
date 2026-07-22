@@ -138,6 +138,9 @@ COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/node_modules/ \
   /opt/agentos/node_modules/
 COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/clis/discord/node_modules/ \
+  /opt/agentos/clis/discord/node_modules/
+COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/clis/pg-listen/node_modules/ \
   /opt/agentos/clis/pg-listen/node_modules/
 COPY --from=agentos-runtime-dependencies \
@@ -146,6 +149,9 @@ COPY --from=agentos-runtime-dependencies \
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/discord-ingress/node_modules/ \
   /opt/agentos/services/discord-ingress/node_modules/
+
+RUN bun /opt/agentos/clis/discord/discord.ts --help >/dev/null \
+  && bun /opt/agentos/services/discord-ingress/src/main.ts --help >/dev/null
 
 RUN chmod 0644 \
     /etc/mise/config.toml \

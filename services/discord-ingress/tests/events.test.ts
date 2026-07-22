@@ -185,6 +185,44 @@ describe("Discord external-event routing", () => {
     expect(events).toEqual([]);
   });
 
+  test("ignores bot- and webhook-authored interactions before persistence or acknowledgement", async () => {
+    const { acknowledgements, events, router } = setup();
+    await router.handle(
+      dispatch("READY", { user: { id: "firstmate-bot" } }, 1),
+    );
+
+    expect(
+      await router.handle(
+        dispatch("INTERACTION_CREATE", {
+          id: "bot-interaction",
+          token: "bot-interaction-secret",
+          type: 3,
+          guild_id: "guild-1",
+          channel_id: "channel-owned",
+          member: { user: { id: "other-bot", bot: true } },
+          data: { custom_id: "agentos:follow-up:bot" },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      await router.handle(
+        dispatch("INTERACTION_CREATE", {
+          id: "webhook-interaction",
+          token: "webhook-interaction-secret",
+          type: 3,
+          guild_id: "guild-1",
+          channel_id: "channel-owned",
+          webhook_id: "webhook-1",
+          member: { user: { id: "human" } },
+          data: { custom_id: "agentos:follow-up:webhook" },
+        }),
+      ),
+    ).toBe(false);
+
+    expect(events).toEqual([]);
+    expect(acknowledgements).toEqual([]);
+  });
+
   test("keeps relevant edits and deletion in the same conversation batch", async () => {
     const { events, router } = setup();
     await router.handle(

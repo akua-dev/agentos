@@ -240,7 +240,7 @@ function connectOnce(
         reconnectAfterProcessing(!NON_RESUMABLE_CLOSE_CODES.has(event.code));
       }
     };
-    const onError = () => reconnectAfterProcessing(true);
+    const onError = () => undefined;
 
     options.signal?.addEventListener("abort", onAbort, { once: true });
     socket.addEventListener("message", onMessage);

@@ -24,6 +24,7 @@ type FetchImplementation = (
 
 class DiscordUsageError extends Error {}
 class DiscordAxiOutputError extends Error {}
+export class DiscordConfigurationError extends Error {}
 
 const usage =
   "Usage: discord request <METHOD> </relative/api/path> [--axi [--full]]";
@@ -41,11 +42,20 @@ export async function resolveDiscordBotToken(
   environment: Environment,
 ): Promise<string> {
   const tokenFile = environment.DISCORD_BOT_TOKEN_FILE?.trim();
-  const token = tokenFile
-    ? (await readFile(tokenFile, "utf8")).trim()
-    : environment.DISCORD_BOT_TOKEN?.trim();
+  let token: string | undefined;
+  if (tokenFile) {
+    try {
+      token = (await readFile(tokenFile, "utf8")).trim();
+    } catch {
+      throw new DiscordConfigurationError(
+        "DISCORD_BOT_TOKEN_FILE could not be read",
+      );
+    }
+  } else {
+    token = environment.DISCORD_BOT_TOKEN?.trim();
+  }
   if (!token) {
-    throw new Error(
+    throw new DiscordConfigurationError(
       "DISCORD_BOT_TOKEN_FILE or DISCORD_BOT_TOKEN is required",
     );
   }
@@ -140,7 +150,7 @@ export async function runDiscordCli(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const redacted = redact(message, options.environment ?? process.env);
-    const configurationFailure = message.includes("DISCORD_BOT_TOKEN");
+    const configurationFailure = error instanceof DiscordConfigurationError;
     const exitCode =
       error instanceof DiscordUsageError || configurationFailure ? 2 : 1;
     if (axi) {

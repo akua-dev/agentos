@@ -92,6 +92,7 @@ export class DiscordEventRouter {
     }
 
     if (!this.#botUserId) return false;
+    if (isBotOrWebhookAuthored(dispatch.d)) return false;
     if (dispatch.t === "INTERACTION_CREATE") {
       return this.#handleInteraction(dispatch);
     }
@@ -103,7 +104,6 @@ export class DiscordEventRouter {
     if (guildId && guildId !== this.#guildId) return false;
 
     const author = asObject(dispatch.d.author);
-    if (author.bot === true || stringValue(dispatch.d.webhook_id)) return false;
     if (dispatch.t === "MESSAGE_CREATE" && !objectId(author)) return false;
 
     const managedCategoryId = guildId
@@ -258,6 +258,22 @@ function mentionsUser(value: unknown, userId: string) {
   return (
     Array.isArray(value) &&
     value.some((mention) => objectId(asObject(mention)) === userId)
+  );
+}
+
+function isBotOrWebhookAuthored(data: Record<string, unknown>) {
+  const member = asObject(data.member);
+  const message = asObject(data.message);
+  const authors = [
+    asObject(data.author),
+    asObject(data.user),
+    asObject(member.user),
+    asObject(message.author),
+  ];
+  return (
+    authors.some((author) => author.bot === true) ||
+    stringValue(data.webhook_id) !== undefined ||
+    stringValue(message.webhook_id) !== undefined
   );
 }
 

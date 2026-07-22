@@ -197,6 +197,74 @@ describe("Discord Gateway lifecycle", () => {
     });
   }
 
+  test("lets a fatal close remain authoritative when error races close", async () => {
+    const controller = new AbortController();
+    const nativeWebSocket = globalThis.WebSocket;
+    let instances = 0;
+
+    class FakeWebSocket extends EventTarget {
+      static readonly OPEN = 1;
+      readonly url: string;
+      readyState = FakeWebSocket.OPEN;
+
+      constructor(url: string | URL) {
+        super();
+        this.url = String(url);
+        instances += 1;
+        queueMicrotask(() => {
+          this.dispatchEvent(
+            new MessageEvent("message", {
+              data: JSON.stringify({
+                op: 10,
+                d: { heartbeat_interval: 100 },
+              }),
+            }),
+          );
+          if (instances > 1) controller.abort();
+        });
+      }
+
+      send(value: string): void {
+        const payload = JSON.parse(value) as { op?: number };
+        if (payload.op !== 2) return;
+        queueMicrotask(() => this.dispatchEvent(new Event("error")));
+        queueMicrotask(() =>
+          this.dispatchEvent(
+            new CloseEvent("close", { code: 4_004, reason: "fatal" }),
+          ),
+        );
+      }
+
+      close(): void {
+        this.readyState = 3;
+      }
+    }
+
+    Object.defineProperty(globalThis, "WebSocket", {
+      configurable: true,
+      value: FakeWebSocket,
+    });
+
+    try {
+      await expect(
+        runDiscordGateway({
+          token: "bot-secret",
+          fetchImpl: async () =>
+            Response.json({ url: "ws://discord.test/gateway" }),
+          signal: controller.signal,
+          onDispatch: async () => undefined,
+        }),
+      ).rejects.toThrow("4004");
+      expect(instances).toBe(1);
+    } finally {
+      Object.defineProperty(globalThis, "WebSocket", {
+        configurable: true,
+        value: nativeWebSocket,
+      });
+      controller.abort();
+    }
+  });
+
   test("drains an accepted dispatch before resuming after a close", async () => {
     const controller = new AbortController();
     let startPersistence!: () => void;

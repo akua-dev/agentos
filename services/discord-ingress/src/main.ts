@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import {
+  DiscordConfigurationError,
   requestDiscord,
   resolveDiscordBotToken,
 } from "../../../clis/discord/discord.ts";
@@ -143,7 +144,10 @@ export async function runDiscordIngress(
         // The original visible provider or persistence failure remains primary.
       }
     }
-    return isConfigurationError(message) ? 2 : 1;
+    return error instanceof DiscordConfigurationError ||
+      isConfigurationError(message)
+      ? 2
+      : 1;
   } finally {
     process.off("SIGINT", stop);
     process.off("SIGTERM", stop);
