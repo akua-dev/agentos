@@ -15,6 +15,16 @@
         "typescript": "7.0.2",
       },
     },
+    "clis/discord": {
+      "name": "@agentos/discord",
+      "version": "0.0.0",
+      "bin": {
+        "discord": "./discord.ts",
+      },
+      "dependencies": {
+        "@toon-format/toon": "4.0.0",
+      },
+    },
     "clis/github-app-token": {
       "name": "@agentos/github-app-token",
       "version": "0.0.0",
@@ -64,11 +74,29 @@
         "@types/proper-lockfile": "4.1.4",
       },
     },
+    "services/discord-ingress": {
+      "name": "@agentos/discord-ingress",
+      "version": "0.0.0",
+      "bin": {
+        "discord-ingress": "./src/main.ts",
+      },
+      "dependencies": {
+        "@agentos/discord": "workspace:*",
+        "pg": "8.22.0",
+      },
+      "devDependencies": {
+        "@types/pg": "8.20.0",
+      },
+    },
   },
   "packages": {
     "@agentos/ai-gateway": ["@agentos/ai-gateway@workspace:services/ai-gateway"],
 
     "@agentos/database": ["@agentos/database@workspace:database"],
+
+    "@agentos/discord": ["@agentos/discord@workspace:clis/discord"],
+
+    "@agentos/discord-ingress": ["@agentos/discord-ingress@workspace:services/discord-ingress"],
 
     "@agentos/github-app-token": ["@agentos/github-app-token@workspace:clis/github-app-token"],
 
@@ -261,6 +289,8 @@
     "@smithy/util-buffer-from": ["@smithy/util-buffer-from@2.2.0", "", { "dependencies": { "@smithy/is-array-buffer": "^2.2.0", "tslib": "^2.6.2" } }, "sha512-IJdWBbTcMQ6DA0gdNhh/BwrLkDR+ADW5Kr1aZmd4k3DIF6ezMV4R2NIAmT08wQJ3yUK82thHWmC/TnK/wpMMIA=="],
 
     "@smithy/util-utf8": ["@smithy/util-utf8@2.3.0", "", { "dependencies": { "@smithy/util-buffer-from": "^2.2.0", "tslib": "^2.6.2" } }, "sha512-R8Rdn8Hy72KKcebgLiv8jQcQkXoLMOGGv5uI1/k0l+snqkOzQ1R0ChUBCxWMlBsFMekWjq0wRudIweFs7sKT5A=="],
+
+    "@toon-format/toon": ["@toon-format/toon@4.0.0", "", {}, "sha512-0mCchUNCqYX2jZapNhcX3t+Dkl+ARp6EUF41MgXOv9p0iddh9uZfdkpzgALsrxv4jiWMlBNoiwbGl5yrfYuT7g=="],
 
     "@types/bun": ["@types/bun@1.3.14", "", { "dependencies": { "bun-types": "1.3.14" } }, "sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw=="],
 

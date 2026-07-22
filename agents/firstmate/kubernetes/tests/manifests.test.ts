@@ -401,4 +401,94 @@ describe("First Mate Kubernetes resources", () => {
       configMap: { name: "existing-runtime" },
     });
   });
+
+  test("mounts Discord bot identity and category configuration only into First Mate", async () => {
+    const resources = await render(join(runtime, "base"));
+    const original = resource(resources, "StatefulSet", "agentos-firstmate");
+    const live = structuredClone(original);
+    const livePod = live.spec!.template.spec;
+    const liveImage = `ghcr.io/akua-dev/agentos@sha256:${"d".repeat(64)}`;
+    for (const container of [...livePod.initContainers, ...livePod.containers]) {
+      container.image = liveImage;
+      container.imagePullPolicy = "IfNotPresent";
+    }
+    livePod.containers[0].env.push({
+      name: "DATABASE_URL",
+      value: "postgresql://owner@postgres.example/agentos",
+    });
+    livePod.volumes = [
+      { name: "existing-runtime", configMap: { name: "existing-runtime" } },
+    ];
+
+    const statefulSet = await applyStrategicPatch(
+      live,
+      join(runtime, "patches", "discord.yaml"),
+    );
+    const pod = statefulSet.spec!.template.spec;
+    const firstmate = pod.containers[0];
+    const environment = Object.fromEntries(
+      firstmate.env.map(
+        ({ name, value, valueFrom }: Record<string, unknown>) => [
+          name,
+          value ?? valueFrom,
+        ],
+      ),
+    );
+
+    expect(
+      [...pod.initContainers, ...pod.containers].map(
+        ({ image, imagePullPolicy }: Record<string, unknown>) => ({
+          image,
+          imagePullPolicy,
+        }),
+      ),
+    ).toEqual([
+      { image: liveImage, imagePullPolicy: "IfNotPresent" },
+      { image: liveImage, imagePullPolicy: "IfNotPresent" },
+      { image: liveImage, imagePullPolicy: "IfNotPresent" },
+    ]);
+    expect(
+      pod.initContainers.every((container: Record<string, any>) =>
+        !(container.volumeMounts ?? []).some(
+          (mount: Record<string, string>) => mount.name === "discord-bot",
+        ),
+      ),
+    ).toBe(true);
+    expect(firstmate.volumeMounts).toContainEqual({
+      mountPath: "/var/run/secrets/agentos/discord",
+      name: "discord-bot",
+      readOnly: true,
+    });
+    expect(environment).toMatchObject({
+      DATABASE_URL: "postgresql://owner@postgres.example/agentos",
+      DISCORD_BOT_TOKEN_FILE: "/var/run/secrets/agentos/discord/token",
+      DISCORD_GUILD_ID: {
+        configMapKeyRef: { key: "guild-id", name: "agentos-discord" },
+      },
+      DISCORD_MANAGED_CATEGORY_IDS: {
+        configMapKeyRef: {
+          key: "managed-category-ids",
+          name: "agentos-discord",
+        },
+      },
+    });
+    expect(firstmate.command).toEqual(["mise"]);
+    expect(firstmate.args).toEqual([
+      "run",
+      "--skip-tools",
+      "firstmate:run",
+    ]);
+    expect(pod.volumes).toContainEqual({
+      name: "discord-bot",
+      secret: {
+        defaultMode: 288,
+        items: [{ key: "token", path: "token" }],
+        secretName: "agentos-discord-bot",
+      },
+    });
+    expect(pod.volumes).toContainEqual({
+      name: "existing-runtime",
+      configMap: { name: "existing-runtime" },
+    });
+  });
 });

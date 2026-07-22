@@ -1,0 +1,4 @@
+interface:
+  display_name: "Operate Discord"
+  short_description: "Connect First Mate to a Discord workspace"
+  default_prompt: "Use $agentos-discord to configure or operate the Fleet Discord communication surface."

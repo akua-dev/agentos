@@ -430,7 +430,16 @@ All core rows have immutable identifiers and `created_at` values plus a PostgreS
 
 External providers are bidirectional human surfaces, not independent fleet authorities and not one-way projections. A GitHub or Linear comment, description edit, status change, assignment or related action is untrusted human intent until a responsible First or Second Mate reconciles it with Fleet state. Provider authentication proves who performed an action and what that account could do in the provider; it does not by itself grant authority over an AgentOS project scope.
 
-Every accepted delivery is appended to `external_events` with the complete provider payload in raw `jsonb`. AgentOS adds only routing and coordination columns such as provider, delivery identifier, event type, actor identifier, coalescing key, batch identifier and reconciliation status. It does not strip or normalize the payload into a lossy internal event format. Agents project only the JSON fields needed by the current SQL query; a GIN index supports containment and JSON-path lookup without loading every payload into model context.
+Every accepted delivery is appended to `external_events` with the provider
+payload in raw `jsonb`. Temporary provider credentials, including Discord
+interaction reply tokens, are replaced by an explicit redaction marker and
+named in request metadata before persistence; payload semantics are otherwise
+not stripped or normalized into a lossy internal format. AgentOS adds only
+routing and coordination columns such as provider, delivery identifier, event
+type, actor identifier, coalescing key, batch identifier and reconciliation
+status. Agents project only the JSON fields needed by the current SQL query; a
+GIN index supports containment and JSON-path lookup without loading every
+payload into model context.
 
 Ingress persists first and never invokes a model directly. Deliveries for the same provider resource share a coalescing key. A short quiet window combines a burst of related actions, while a hard maximum window makes the batch eligible after 30 seconds even if events continue arriving. Exact provider delivery identifiers are idempotent.
 
@@ -441,6 +450,61 @@ New events for a claimed key remain durable and pending. Before an external effe
 The final local mutation is one short PostgreSQL transaction. It updates all coupled Tasks and Inbox rows and completes the claimed external rows together; a stale token or a newly pending event aborts the whole transaction. Model reasoning and provider commands never run while that transaction is open.
 
 Agents invoke provider tools such as `gh-axi` directly and synchronously instead of writing an AgentOS outbox. They observe the actual exit status and remain responsible for failure and recovery in their persistent harness session. Cross-system atomicity is impossible: after a successful provider command and before the local transaction, a crash can still occur. State-setting provider operations should be idempotent; non-idempotent operations such as comments use a deterministic action identifier when supported. Recovery checks the already persisted webhook payloads first and queries the provider only when local evidence is inconclusive, avoiding routine duplicate API and model work.
+
+### Optional Discord communication surface
+
+Discord is one optional Captain and team surface, not Fleet authority. The
+Captain may grant broad read-only context plus a category in which First Mate
+can create channels and threads, reply and arrange conversations. Enduring
+domains use real channels; temporary topics use threads. Discord permission
+overwrites and the privileged Message Content intent remain explicit provider
+choices, and the bot never requires Discord `Administrator`.
+
+Discord is an Agent-operated workspace rather than a fixed AgentOS bot UI.
+Within the Captain-approved provider authority, First Mate uses the raw Discord
+REST primitive to change channels, threads, topics, status cards and contextual
+components in response to the Captain's natural-language preferences. Active
+Fleet-scoped `communication.primary` and `communication.discord` Captain rows
+remember the selected surface, fallback, actor mapping, provider IDs and
+natural-language use contract. Superseded rows are archived. Discord topology
+is a rebuildable projection; Pi history and channel names are not that durable
+contract. The non-secret Discord ConfigMap is an explicit ingress runtime
+projection of the same active contract and is checked for drift rather than
+treated as another source of intent.
+
+Ordinary Discord messages arrive through a persistent Gateway connection, not
+an HTTP webhook. The optional `discord-ingress` process runs inside the
+First-Mate runtime, owns only heartbeat, reconnect, process-local resume and
+dispatch filtering, and writes accepted raw Gateway payloads through
+`agentos.ingest_external_event`. It keeps no durable queue or cursor, invokes no
+model and writes no Task or Inbox row. PostgreSQL idempotency, batching,
+fencing and `agentos_events` notification then provide the same durable
+reconciliation path as other external providers.
+
+The ingress may persist recognized generic component and modal interactions and
+acknowledge them after database acceptance. It redacts their temporary reply
+token before persistence. The existing `pg-listen agentos_events` background
+command remains the single Pi wake owner: one completion produces one custom
+Pi follow-up pointer, rather than copying Discord content into Pi as a user
+message. Neither ingress nor a Discord-specific extension sends another wake.
+Component delivery labels preserve follow-up, steering or stop intent for the
+Mate to reconcile; the current release does not claim immediate Pi steering or
+hard cancellation without a reviewed public Pi control boundary.
+
+By default, ingress accepts human messages, edits and deletes in explicitly
+managed categories and their descendants, direct messages, and explicit bot
+mentions elsewhere in the selected guild. General server history remains
+pull-on-demand context instead of a model-triggering firehose. Discord actor and
+role identity is checked against Captain-approved authority before a Mate acts;
+guild membership alone is not Captain authority.
+
+Outbound effects use the raw `discord request` REST primitive synchronously,
+with JSON on standard input and the real provider status returned to the Mate.
+Its default output is the unchanged provider body; an explicitly selected AXI
+view provides compact TOON without changing the request or provider effect.
+There is no AgentOS Discord outbox or conversation abstraction. A process
+replacement may require bounded REST recovery for known managed channels;
+unrecoverable Gateway gaps are reported rather than hidden behind shadow state.
 
 The exact tables, indexes, Functions, Triggers, grants, RLS policies, retention
 and immutability guarantees are defined only by versioned SQL and SQL tests
@@ -531,6 +595,14 @@ in minimal single-Mate mode without the gateway, but AgentOS does not call the
 Fleet delegation-ready until one approved worker or trusted harness automation
 has completed a harmless real model request through the selected capacity path.
 
+Bootstrap also asks how the Captain wants to communicate with First Mate. The
+attached Pi session is the complete minimal path; a selected issue tracker and
+optional surfaces such as Discord can provide cleaner human planning or
+conversation without replacing PostgreSQL coordination. The choice and actor
+authority mapping become active Fleet-scoped `communication.primary` and, when
+selected, `communication.discord` Captain state, while each provider credential
+stays in its approved secret authority.
+
 For a stable install, the seed resolves the latest published GitHub release,
 verifies that release is immutable, and applies only its fixed-name assets
 under that versioned release URL. An explicitly chosen preview instead uses an
@@ -553,7 +625,7 @@ checkout while keeping operational roles out of contributor sessions:
 - `.agents/skills/` contains workflows that apply from every AgentOS checkout
   working directory: repository development, organization evaluation and
   post-evaluation improvement review;
-- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication, database, optional pooled AI capacity and Discord communication, image-build, registry and ArtifactFS Scout operations;
 - `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
 - a future subtree under `clis/`, `packages/` or `services/` may add its own `.agents/skills/` when development there needs a reusable workflow.
@@ -635,6 +707,7 @@ workspace. The tree reflects ownership, not deployment order:
 │       └── kubernetes/               reusable separate-Pod worker base
 ├── clis/
 │   ├── AGENTS.md                     admission boundary for shipped commands
+│   ├── discord/                      raw Discord REST request primitive
 │   └── pg-listen/                    one-notification PostgreSQL primitive
 ├── database/
 │   ├── AGENTS.md                     SQL-first schema-development boundary
@@ -650,7 +723,8 @@ workspace. The tree reflects ownership, not deployment order:
 │   └── tests/                        observable runtime behavior tests
 ├── services/
 │   ├── AGENTS.md                     admission boundary for optional services
-│   └── ai-gateway/                   service, tests and optional K8s topology
+│   ├── ai-gateway/                   service, tests and optional K8s topology
+│   └── discord-ingress/              Discord Gateway-to-PostgreSQL ingress
 ├── release/kubernetes/               reviewed manifest release assembly
 ├── docs/                             supporting assets and stable pointers
 ├── Dockerfile                        common AgentOS image build
@@ -672,9 +746,9 @@ workspace. The tree reflects ownership, not deployment order:
   consumer requires a library boundary. There is intentionally no empty
   `packages/` directory.
 - Put a reviewed optional long-running network capability in
-  `services/<name>/` only when native tools cannot safely provide its cross-Pod
-  state and request lifecycle. Keep it authenticated, independently testable
-  and outside Fleet coordination authority.
+  `services/<name>/` only when native tools cannot safely provide its persistent
+  connection, cross-boundary state or request lifecycle. Keep it authenticated,
+  independently testable and outside Fleet coordination authority.
 - Put retained-home, Pod-security and role-neutral Herdr mechanics shared by
   persistent Agents in `runtime/kubernetes/base/`. Add the persistent Pi Mate
   lifecycle in `runtime/kubernetes/mate/`; put role identity, credentials,
@@ -742,6 +816,13 @@ workspace keeps one `bun.lock`.
   plane, its private credential/routing files, behavior tests and Kubernetes
   topology; it does not own harness choice, PostgreSQL state or general Fleet
   traffic.
+- `services/discord-ingress/` owns the optional Discord Gateway connection,
+  approved dispatch filtering and behavior tests. It persists accepted raw
+  events only through the released database Function and owns no Fleet policy,
+  reply workflow, Task state or durable cursor.
+- `clis/discord/` owns the fixed-origin raw Discord REST primitive; the shared
+  `$agentos-discord` Skill owns conditional provider and reconciliation
+  judgment, while First Mate owns its role-specific Secret mount patch.
 - `database/AGENTS.md` governs SQL-first schema development without selecting an Agent role.
 - `database/kubernetes/cloudnative-pg/` is authoritative only for the optional
   self-hosted CloudNativePG topology; it does not own SQL schema, controller

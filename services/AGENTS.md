@@ -1,8 +1,8 @@
 # AgentOS service boundary
 
 This subtree contains optional long-running network processes. A service belongs
-here only when a reviewed cross-Pod capability cannot be composed safely from
-the native tools already carried by AgentOS.
+here only when a reviewed persistent network lifecycle cannot be composed
+safely from the native tools already carried by AgentOS.
 
 - Keep every service optional unless `ARCHITECTURE.md` explicitly makes it part
   of the Fleet kernel.
@@ -27,3 +27,14 @@ the native tools already carried by AgentOS.
 
 Reject a proposed service when a Skill plus native Git, `kubectl`, `psql`,
 Herdr, Mise or provider CLI already solves the boundary.
+
+## Qualification examples
+
+- `discord-ingress` qualifies because ordinary Discord messages require a
+  persistent Gateway WebSocket with heartbeat, reconnect and resume behavior;
+  no native Discord CLI or webhook provides that inbound lifecycle. It may
+  append approved non-credential dispatches through the released PostgreSQL
+  ingestion Function and acknowledge a recognized interaction after
+  persistence, but it must not interpret messages, invoke a model, reply
+  conversationally, create Tasks or Inbox rows, call Pi, or keep a second
+  durable cursor or queue.

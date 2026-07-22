@@ -1,0 +1,21 @@
+{
+  "name": "@agentos/discord-ingress",
+  "version": "0.0.0",
+  "description": "Persist approved Discord Gateway events for AgentOS reconciliation",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "discord-ingress": "./src/main.ts"
+  },
+  "scripts": {
+    "test": "bun test tests",
+    "typecheck": "tsc --project ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@agentos/discord": "workspace:*",
+    "pg": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/pg": "8.20.0"
+  }
+}

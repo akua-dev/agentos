@@ -1,0 +1,17 @@
+{
+  "name": "@agentos/discord",
+  "version": "0.0.0",
+  "description": "Make one authenticated Discord REST request with raw or optional AXI output",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "discord": "./discord.ts"
+  },
+  "scripts": {
+    "test": "bun test tests",
+    "typecheck": "tsc --project ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@toon-format/toon": "4.0.0"
+  }
+}

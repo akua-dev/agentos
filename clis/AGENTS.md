@@ -47,6 +47,15 @@ new command.
   for one PostgreSQL notification, print it, and exit,” which `psql` does not
   expose as a clean non-interactive command. It adds no Fleet policy, interprets
   no payload and remains useful outside AgentOS.
+- `discord` qualifies because Discord provides no official general-purpose CLI
+  and its bot token must not be repeated in request arguments. It exposes one
+  fixed-origin REST request with a standard-input body and the real provider
+  status. Its default output is the unchanged provider body; the explicitly
+  selected AXI view changes presentation only. Category policy, conversations
+  and Fleet reconciliation remain in `$agentos-discord` and PostgreSQL.
+- A persistent Discord Gateway connection does not qualify as a CLI wrapper.
+  Its heartbeat, resume and dispatch lifecycle belongs to the optional
+  `services/discord-ingress/` process instead.
 
 Before adding another CLI, document the missing native capability and reject
 the addition if direct composition of reviewed tools already solves it.

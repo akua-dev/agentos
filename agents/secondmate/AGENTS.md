@@ -112,6 +112,8 @@ A target project's nearer Mise configuration may add or override tools inside it
   capacity, and route Fleet-wide mutations through First Mate unless the exact
   charter and standing authority cover them.
 - Load `$agentos-database` for PostgreSQL topology, Fleet coordination, external-event reconciliation, migrations, roles, RLS, Functions, Triggers or Inbox rules.
+- Load `$agentos-discord` before operating or reconciling a Discord surface
+  explicitly delegated by First Mate inside the active charter.
 - Load `$agentos-development` when AgentOS itself is the delegated project; your normal Crewmate delegation boundary still applies.
 - Load `$agentos-image-builds` for OCI builds or in-cluster builder selection.
 - Load `$agentos-registry` for registry selection, zot, pull reachability, retention or registry retirement.

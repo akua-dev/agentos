@@ -60,12 +60,26 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
    defers this step, report minimal single-Mate mode plainly and require a
    verified direct login before each future worker launch; do not call the Fleet
    delegation-ready.
-10. Until the database exists, First Mate may converse with the developer,
+10. Explain that the developer is the Captain and ask how Captain and First
+    Mate should communicate. Present the attached Pi session as the complete
+    minimal path, the Captain-selected issue tracker as a human planning and
+    delivery surface, and optional provider surfaces such as Discord for a
+    cleaner Captain/team conversation. Record the primary surface and fallback
+    under active Fleet-scoped `communication.primary` Captain state. If Discord
+    is selected, record its natural-language use contract and non-secret actor,
+    guild, category and channel mapping under active Fleet-scoped
+    `communication.discord` state. Then
+    load [AgentOS Discord](../../../../.agents/skills/agentos-discord/SKILL.md)
+    and use its official setup references plus separately approved provider,
+    credential, permission, Kubernetes and verification steps. Do not make an
+    optional surface a bootstrap completion requirement or a second Fleet
+    authority.
+11. Until the database exists, First Mate may converse with the developer,
    inspect read-only and finish approved provisioning, but it must not accept
    durable Fleet work, create Assignments or delegate another Agent. Do not use
    an issue tracker, transcript or local file as a temporary coordination
    backend.
-11. Leave bootstrap mode only after runtime, First-Mate authentication, schema,
+12. Leave bootstrap mode only after runtime, First-Mate authentication, schema,
     `current_agent_id()` resolving the single active root First Mate, and every
     security check implemented by the selected release pass. Treat step 9's
     successful capacity probe as the separate boundary for claiming that the

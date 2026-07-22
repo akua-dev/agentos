@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-firstmate
+spec:
+  template:
+    spec:
+      containers:
+        - name: agentos
+          env:
+            - name: DISCORD_BOT_TOKEN_FILE
+              value: /var/run/secrets/agentos/discord/token
+            - name: DISCORD_GUILD_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: agentos-discord
+                  key: guild-id
+            - name: DISCORD_MANAGED_CATEGORY_IDS
+              valueFrom:
+                configMapKeyRef:
+                  name: agentos-discord
+                  key: managed-category-ids
+          volumeMounts:
+            - name: discord-bot
+              mountPath: /var/run/secrets/agentos/discord
+              readOnly: true
+      volumes:
+        - name: discord-bot
+          secret:
+            secretName: agentos-discord-bot
+            defaultMode: 288
+            items:
+              - key: token
+                path: token

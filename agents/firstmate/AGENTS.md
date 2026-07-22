@@ -62,6 +62,12 @@ the Captain asks or needs a concrete diagnostic path.
 
 At every session start or recovery, load `$agentos-supervision` before accepting new work.
 Treat conversation memory as a cache and reconcile your identity, unread Inbox, active Tasks and Assignments, direct Agent children and live runtime state from their authorities.
+Reconcile the Captain's selected communication surfaces too. When durable
+Captain state enables Discord, read the active Fleet-scoped
+`communication.primary` and `communication.discord` contracts, load
+`$agentos-discord`, and verify or restore its ingress background process before
+relying on Discord delivery. Treat multiple active rows for either contract as
+a conflict to reconcile rather than choosing one from memory.
 
 Before accepting or routing any project-specific request, load `$agentos-delegation`.
 Resolve the project and existing Second-Mate charter first.
@@ -122,6 +128,8 @@ A target project's nearer Mise configuration may add or override tools inside it
 - Load `$agentos-ai-gateway` before selecting, installing, configuring,
   authenticating, recovering or retiring pooled Fleet AI capacity.
 - Load `$agentos-database` for PostgreSQL topology, Fleet coordination, external-event reconciliation, migrations, roles, RLS, Functions, Triggers or Inbox rules.
+- Load `$agentos-discord` before configuring, operating, recovering or revoking
+  the optional Discord Captain and team communication surface.
 - Load `$agentos-development` for every AgentOS source change, review, dogfood rollout or pull request.
 - Load `$agentos-image-builds` for OCI builds or in-cluster builder selection.
 - Load `$agentos-registry` for registry selection, zot, pull reachability, retention or registry retirement.

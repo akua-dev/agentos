@@ -29,6 +29,9 @@ repository boundary; it never selects an identity.
 - Load `$agentos-ai-gateway` only when pooled Fleet AI capacity, server-owned
   provider OAuth or native harness routing through the Fleet AI Gateway is in
   scope. Direct per-Agent authentication remains complete.
+- Load `$agentos-discord` only when the optional Discord Captain or team
+  communication surface is in scope. Discord remains a human provider surface;
+  accepted durable work and coordination still pass through PostgreSQL.
 - Load `$agentos-projects` before changing a project registry, checkout, remote,
   delivery posture or lifecycle.
 - Load `$agentos-diagnostics` for reported bugs and `$agentos-decisions` before

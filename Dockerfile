@@ -104,23 +104,32 @@ FROM agentos-base AS agentos-runtime-dependencies
 WORKDIR /tmp/agentos-dependencies
 
 COPY package.json bun.lock ./
+COPY clis/discord/package.json clis/discord/package.json
 COPY clis/github-app-token/package.json clis/github-app-token/package.json
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY services/discord-ingress/package.json services/discord-ingress/package.json
+COPY clis/discord/discord.ts clis/discord/discord.ts
 COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
 COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
+COPY database/runtime/database-credentials.ts database/runtime/database-credentials.ts
+COPY services/discord-ingress/src/ services/discord-ingress/src/
 
 RUN bun install \
       --frozen-lockfile \
       --ignore-scripts \
       --no-progress \
       --production \
+      --filter @agentos/discord \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
       --filter @agentos/ai-gateway \
+      --filter @agentos/discord-ingress \
+  && bun clis/discord/discord.ts --help >/dev/null \
   && bun clis/github-app-token/github-app-token.ts --help >/dev/null \
-  && bun clis/pg-listen/pg-listen.ts --help >/dev/null
+  && bun clis/pg-listen/pg-listen.ts --help >/dev/null \
+  && bun services/discord-ingress/src/main.ts --help >/dev/null
 
 FROM agentos-base
 
@@ -134,6 +143,9 @@ COPY --from=agentos-runtime-dependencies \
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/ai-gateway/node_modules/ \
   /opt/agentos/services/ai-gateway/node_modules/
+COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/services/discord-ingress/node_modules/ \
+  /opt/agentos/services/discord-ingress/node_modules/
 
 RUN chmod 0644 \
     /etc/mise/config.toml \
@@ -149,9 +161,14 @@ RUN chmod 0644 \
     /opt/agentos/runtime/run-mate.ts \
     /opt/agentos/runtime/health.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \
+    /opt/agentos/services/discord-ingress/src/main.ts \
   && chmod 0755 \
+    /opt/agentos/clis/discord/discord.ts \
     /opt/agentos/clis/github-app-token/github-app-token.ts \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
+  && ln -s \
+    /opt/agentos/clis/discord/discord.ts \
+    /usr/local/bin/discord \
   && ln -s \
     /opt/agentos/clis/github-app-token/github-app-token.ts \
     /usr/local/bin/github-app-token \
@@ -161,6 +178,9 @@ RUN chmod 0644 \
   && ln -s \
     /opt/agentos/services/ai-gateway/src/main.ts \
     /usr/local/bin/ai-gateway \
+  && ln -s \
+    /opt/agentos/services/discord-ingress/src/main.ts \
+    /usr/local/bin/discord-ingress \
   && git config --system --add safe.directory /opt/agentos \
   && git config --system --add safe.directory /opt/agentos/.git
 
