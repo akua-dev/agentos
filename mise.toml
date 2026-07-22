@@ -15,6 +15,7 @@ fd = "10.4.2"
 "npm:chrome-devtools-axi" = "0.1.26"
 "npm:lavish-axi" = "0.1.42"
 "npm:quota-axi" = "0.1.5"
+"github:akua-dev/cli" = "v0.9.0"
 
 [tools."http:bun"]
 version = "1.4.0-canary.1+3979cbe80"
