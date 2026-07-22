@@ -81,6 +81,7 @@ export function createAtomicJsonStore<T>(options: AtomicJsonStoreOptions<T>): At
 
   const readOrCreate = async (): Promise<T> => {
     try {
+      await chmod(options.path, FILE_MODE);
       return await readValidated(options.path, options.schema);
     } catch (error) {
       if (!isMissingFile(error)) throw error;

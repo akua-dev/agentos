@@ -43,4 +43,19 @@ describe("atomic private JSON storage", () => {
     await expect(store.read()).rejects.toBeInstanceOf(StoreValidationError);
     expect(await store.inspect()).toEqual({ exists: true, valid: false, mode: 0o600 });
   });
+
+  test("restores private mode before reading state widened by a volume mount", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-remounted-store-"));
+    const path = join(root, "state.json");
+    await Bun.write(path, JSON.stringify({ version: 1, value: 7 }));
+    await chmod(path, 0o660);
+    const store = createAtomicJsonStore({
+      path,
+      schema: CounterSchema,
+      createDefault: () => ({ version: 1 as const, value: 0 }),
+    });
+
+    expect(await store.read()).toEqual({ version: 1, value: 7 });
+    expect((await stat(path)).mode & 0o777).toBe(0o600);
+  });
 });
