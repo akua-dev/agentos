@@ -67,6 +67,45 @@ checksum = "sha256:c2d6acc935cd2f00e2144d7e036d5cd82e6b6bd5594e8c75aa75ef2a4ed6a
 url = "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_windows_amd64.zip"
 provenance = "github-attestations"
 
+[[tools."github:akua-dev/cli"]]
+version = "0.9.0"
+backend = "github:akua-dev/cli"
+
+[tools."github:akua-dev/cli"."platforms.linux-arm64"]
+checksum = "sha256:524b421df58e841e9dba03fec2604542fe430af99a13d12c5251dceefba603d7"
+url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182656"
+
+[tools."github:akua-dev/cli"."platforms.linux-arm64-musl"]
+checksum = "sha256:524b421df58e841e9dba03fec2604542fe430af99a13d12c5251dceefba603d7"
+url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182656"
+
+[tools."github:akua-dev/cli"."platforms.linux-x64"]
+checksum = "sha256:2e218fa0b41a42f6d4179396f8fec7a069ae57f8cb6650d323360ee2a92d0b93"
+url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-linux-x64.tar.gz"
+url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182657"
+
+[tools."github:akua-dev/cli"."platforms.linux-x64-musl"]
+checksum = "sha256:2e218fa0b41a42f6d4179396f8fec7a069ae57f8cb6650d323360ee2a92d0b93"
+url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-linux-x64.tar.gz"
+url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182657"
+
+[tools."github:akua-dev/cli"."platforms.macos-arm64"]
+checksum = "sha256:693dd34907ae25624f76dfbf04118677e0a17eb7e929a399c3deaa6d86e338ee"
+url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182652"
+
+[tools."github:akua-dev/cli"."platforms.macos-x64"]
+checksum = "sha256:c53a7aa485faff8a67ff3bf7185a4273674440f484b3a9fda5da6d3778cf633a"
+url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-darwin-x64.tar.gz"
+url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182655"
+
+[tools."github:akua-dev/cli"."platforms.windows-x64"]
+checksum = "sha256:70610d549f04800e5627a68210e31d90a4e1da8cfd35460ba8847fb486329026"
+url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-windows-x64.zip"
+url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182653"
+
 [[tools."github:kunchenguid/no-mistakes"]]
 version = "1.40.0"
 backend = "github:kunchenguid/no-mistakes"
