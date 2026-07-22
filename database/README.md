@@ -32,19 +32,23 @@ DATABASE_URL="<approved process-only value>" bun run --cwd "$workspace" migrate
 ```
 
 For the released in-cluster CloudNativePG shape, keep the generated password in
-the mode-`0600` `~/.pgpass` file and use a non-secret process-only URL:
+the mode-`0600` `~/.pgpass` file, mount only the cluster CA certificate, and
+use a non-secret process-only URL:
 
 ```sh
 workspace="$(mise run database:prepare)"
 PGPASSFILE="$HOME/.pgpass" \
-  DATABASE_URL="postgresql://agentos@agentos-postgres-rw:5432/agentos?uselibpqcompat=true&sslmode=require" \
+  PGSSLROOTCERT="/var/run/agentos/postgres/ca.crt" \
+  NODE_EXTRA_CA_CERTS="/var/run/agentos/postgres/ca.crt" \
+  DATABASE_URL="postgresql://agentos@agentos-postgres-rw:5432/agentos?sslmode=verify-full" \
   bun run --cwd "$workspace" migrate
 ```
 
-The pinned `pg` 8 driver needs `uselibpqcompat=true` to give
-`sslmode=require` its libpq meaning. Without it, the driver attempts full
-certificate verification against CNPG's private cluster CA. Revalidate this
-connection option when upgrading to `pg` 9 or later.
+The released First-Mate database patch mounts `ca.crt` at that path and sets
+the same verification environment for direct clients. `verify-full` keeps
+encryption, CA validation and Service-hostname verification intact; never
+substitute libpq compatibility or a no-verify mode merely to bypass CNPG's
+private CA. Revalidate this handoff when upgrading the PostgreSQL driver.
 The migration config resolves the matching mode-`0600` pgpass entry into its
 in-memory connection URL before Drizzle constructs `pg`; it never puts the
 password in a command argument and avoids `pg`'s deprecated implicit pgpass
@@ -172,7 +176,7 @@ administrative repair. This makes read-but-unresolved delivery recoverable and
 lets a Crewmate receive a durable row after only a concise Herdr doorbell.
 `tests/inbox-receipt.test.ts` proves the receipt, retry and authorization paths.
 
-`0010_preserve_runtime_privileges.sql` carries the complete latest runtime-grant
+`0010_preserve_runtime_privileges.sql` carries the cumulative runtime-grant
 configuration forward while retaining `receive_inbox` execution. In particular,
 adding the receipt primitive must not erase Second Mate's later Captain-domain,
 Assignment-artifact or durable-coordination privileges. The full authorization

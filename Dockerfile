@@ -107,7 +107,7 @@ COPY package.json bun.lock ./
 COPY clis/github-app-token/package.json clis/github-app-token/package.json
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
-COPY services/quota-router/package.json services/quota-router/package.json
+COPY services/ai-gateway/package.json services/ai-gateway/package.json
 COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
 COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
 
@@ -118,7 +118,7 @@ RUN bun install \
       --production \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
-      --filter @agentos/quota-router \
+      --filter @agentos/ai-gateway \
   && bun clis/github-app-token/github-app-token.ts --help >/dev/null \
   && bun clis/pg-listen/pg-listen.ts --help >/dev/null
 
@@ -132,8 +132,8 @@ COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/clis/pg-listen/node_modules/ \
   /opt/agentos/clis/pg-listen/node_modules/
 COPY --from=agentos-runtime-dependencies \
-  /tmp/agentos-dependencies/services/quota-router/node_modules/ \
-  /opt/agentos/services/quota-router/node_modules/
+  /tmp/agentos-dependencies/services/ai-gateway/node_modules/ \
+  /opt/agentos/services/ai-gateway/node_modules/
 
 RUN chmod 0644 \
     /etc/mise/config.toml \
@@ -148,7 +148,7 @@ RUN chmod 0644 \
     /opt/agentos/runtime/create-image-seed.ts \
     /opt/agentos/runtime/run-mate.ts \
     /opt/agentos/runtime/health.ts \
-    /opt/agentos/services/quota-router/src/main.ts \
+    /opt/agentos/services/ai-gateway/src/main.ts \
   && chmod 0755 \
     /opt/agentos/clis/github-app-token/github-app-token.ts \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
@@ -159,8 +159,8 @@ RUN chmod 0644 \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
     /usr/local/bin/pg-listen \
   && ln -s \
-    /opt/agentos/services/quota-router/src/main.ts \
-    /usr/local/bin/quota-router \
+    /opt/agentos/services/ai-gateway/src/main.ts \
+    /usr/local/bin/ai-gateway \
   && git config --system --add safe.directory /opt/agentos \
   && git config --system --add safe.directory /opt/agentos/.git
 

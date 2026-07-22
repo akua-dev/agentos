@@ -81,10 +81,10 @@ your life. AgentOS harnesses agents into a company.
 
 ## What we refuse to build
 
-No wrapper APIs. No heartbeats. No autonomous schedulers inventing work at 3am.
-No agent that quietly retires another agent's unfinished business. Every one of
-these is a way to hide failure, and hidden failure is how you learn to distrust
-your own fleet.
+No wrapper APIs over native Fleet authorities. No heartbeats. No autonomous
+schedulers inventing work at 3am. No agent that quietly retires another
+agent's unfinished business. Every one of these is a way to hide failure, and
+hidden failure is how you learn to distrust your own fleet.
 
 Also not on the list: a chatbot with nautical branding; a visual workflow
 builder that makes humans pre-plan every agent step; a giant universal agent
@@ -156,12 +156,12 @@ first immutable release and public bootstrap, delivery and recovery evidence
 exist; one proven Fleet is not yet broad production maturity. The remaining gap
 closes in public.
 
-The current focus, in order: make one persistent First Mate dependable enough
-to be the daily company interface; make the first experience a conversation,
-not an installation manual; make delegation, supervision, handoff and recovery
-truthful end to end; make AgentOS excellent at building AgentOS itself. After
-that: persistent Second Mates for real domains, the complete loop from external
-signal to delivered change, and more verified working-agent choices.
+The current focus is adoption: make first contact and Captain communication
+obvious; make team-owned provider identity and worker capacity predictable;
+and prove a live Fleet operating real company work. The deeper product loop
+remains the same: persistent Second Mates for real domains, external signals
+becoming owned work, and more verified working-agent choices without weakening
+authority or visibility.
 
 ## Open source and Akua
 

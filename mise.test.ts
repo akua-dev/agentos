@@ -108,7 +108,7 @@ async function installFleetBaseline(systemConfigDirectory: string) {
 const fleetTools = {
   fd: "10.4.2",
   gh: "2.96.0",
-  "github:kunchenguid/no-mistakes": "1.37.0",
+  "github:kunchenguid/no-mistakes": "1.40.0",
   "github:kunchenguid/treehouse": "2.0.0",
   "github:ogulcancelik/herdr": "0.7.3",
   "http:bun": bunRevision,

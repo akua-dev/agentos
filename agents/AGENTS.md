@@ -26,9 +26,9 @@ repository boundary; it never selects an identity.
 - Load `$agentos-artifact-fs` only when a read-heavy Scout may benefit from lazy
   access to large or multiple repositories. It never changes the active role or
   makes FUSE a Fleet default.
-- Load `$agentos-quota-router` only when pooled Fleet AI capacity, server-owned
-  provider OAuth or the explicit `fleet-codex` provider is in scope. Direct
-  per-Agent authentication remains complete.
+- Load `$agentos-ai-gateway` only when pooled Fleet AI capacity, server-owned
+  provider OAuth or native harness routing through the Fleet AI Gateway is in
+  scope. Direct per-Agent authentication remains complete.
 - Load `$agentos-projects` before changing a project registry, checkout, remote,
   delivery posture or lifecycle.
 - Load `$agentos-diagnostics` for reported bugs and `$agentos-decisions` before

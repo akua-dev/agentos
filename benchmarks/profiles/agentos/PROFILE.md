@@ -122,5 +122,6 @@ coordination. It may delegate detailed diagnosis to a bounded Scout after the
 evidence is frozen. Live evaluation does not inject faults, interrupt work,
 change instructions or store benchmark analytics in the Fleet database.
 
-Official AgentOS result manifests are absent until real runs satisfy the
-portable reporting rules and reference immutable evidence artifacts.
+Official AgentOS result manifests live under
+[`../../results/agentos/`](../../results/agentos/) only after real runs satisfy
+the portable reporting rules and reference immutable evidence artifacts.

@@ -15,6 +15,9 @@ the native tools already carried by AgentOS.
   smallest namespace/network reachability.
 - Preserve native caller semantics: return actual upstream status and output;
   never turn a provider failure into apparent success.
+- Do not turn one optional service into a mandatory Fleet-wide ingress, egress
+  or service-mesh boundary. Every additional mediated protocol requires its
+  own reviewed authority, failure and credential model.
 - Never log or persist credentials, authorization headers, prompts, model
   responses or provider payloads unless a separately reviewed contract requires
   that exact data.
