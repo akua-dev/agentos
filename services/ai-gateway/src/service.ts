@@ -58,8 +58,10 @@ export async function createAIGatewayService(
         }
         let snapshot = usage.get(summary.id);
         if (!snapshot || clock() - snapshot.observedAt >= USAGE_CACHE_MS) {
+          let probedAccessToken: string | undefined;
           try {
             const credential = await vault.getFreshCredential(summary.id, signal);
+            probedAccessToken = credential.accessToken;
             snapshot = await fetchCodexUsage({
               accessToken: credential.accessToken,
               providerAccountId: credential.providerAccountId,
@@ -71,8 +73,12 @@ export async function createAIGatewayService(
             usage.set(summary.id, snapshot);
           } catch (error) {
             signal.throwIfAborted();
-            if (error instanceof CodexUsageHttpError && error.status === 401) {
-              await vault.markNeedsReauth(summary.id);
+            if (
+              error instanceof CodexUsageHttpError &&
+              error.status === 401 &&
+              probedAccessToken !== undefined
+            ) {
+              await vault.markNeedsReauth(summary.id, probedAccessToken);
               return { accountId: summary.id, label: summary.label, needsReauth: true };
             }
             if (snapshot) snapshot = { ...snapshot, stale: true };
