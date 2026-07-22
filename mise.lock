@@ -68,43 +68,43 @@ url = "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_windows_am
 provenance = "github-attestations"
 
 [[tools."github:kunchenguid/no-mistakes"]]
-version = "1.37.0"
+version = "1.40.0"
 backend = "github:kunchenguid/no-mistakes"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.linux-arm64"]
-checksum = "sha256:b0edeced334361cb2c2aa244b7259e00dc3ee7136c00726001e5c9cb0c158caa"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.37.0/no-mistakes-v1.37.0-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/475011090"
+checksum = "sha256:e679370ccfe20e3028c59ed984510e7077996a0d17b8dc196e5b199218f1db9d"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.0/no-mistakes-v1.40.0-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/481049641"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.linux-arm64-musl"]
-checksum = "sha256:b0edeced334361cb2c2aa244b7259e00dc3ee7136c00726001e5c9cb0c158caa"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.37.0/no-mistakes-v1.37.0-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/475011090"
+checksum = "sha256:e679370ccfe20e3028c59ed984510e7077996a0d17b8dc196e5b199218f1db9d"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.0/no-mistakes-v1.40.0-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/481049641"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.linux-x64"]
-checksum = "sha256:29d000f6443997c4f65eb8cf42780d0b7e702fe5943dc17e737bfddcc6797bf4"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.37.0/no-mistakes-v1.37.0-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/475011123"
+checksum = "sha256:2445b65179d0e8e9bbf408322f57190f344f9946cfed3971c84fa16ce4122e91"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.0/no-mistakes-v1.40.0-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/481049653"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.linux-x64-musl"]
-checksum = "sha256:29d000f6443997c4f65eb8cf42780d0b7e702fe5943dc17e737bfddcc6797bf4"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.37.0/no-mistakes-v1.37.0-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/475011123"
+checksum = "sha256:2445b65179d0e8e9bbf408322f57190f344f9946cfed3971c84fa16ce4122e91"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.0/no-mistakes-v1.40.0-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/481049653"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.macos-arm64"]
-checksum = "sha256:8f2ac871c0ca35dae957bf3e20eb7cafcfd5fc7de622c46e5e519081924749a1"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.37.0/no-mistakes-v1.37.0-darwin-arm64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/475011491"
+checksum = "sha256:8d4e80be27e8bfb041fc4ed7e935bf4b2b0eefa1d94e596634c94fc6dc94fa6d"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.0/no-mistakes-v1.40.0-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/481049711"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.macos-x64"]
-checksum = "sha256:d081ac49c7c40473bf51e759639be5ede7adb735407207131bc7eadcb739d656"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.37.0/no-mistakes-v1.37.0-darwin-amd64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/475011398"
+checksum = "sha256:8f13aad0a892762cfa86e1e05cb1be5555289a9d8ba3d3ab904c1f67570c4b29"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.0/no-mistakes-v1.40.0-darwin-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/481049583"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.windows-x64"]
-checksum = "sha256:c921a30ca97e0ae8fff45e5c6b6f2057b37cade3ec8c75a400c6b44e100ee280"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.37.0/no-mistakes-v1.37.0-windows-amd64.zip"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/475010842"
+checksum = "sha256:14a7ceef665af775a028bf50ab7a20fb105d6984b8c5092b4dd5770252a70011"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.0/no-mistakes-v1.40.0-windows-amd64.zip"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/481049301"
 
 [[tools."github:kunchenguid/treehouse"]]
 version = "2.0.0"
