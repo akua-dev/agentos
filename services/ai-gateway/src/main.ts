@@ -9,7 +9,7 @@ import {
   type OAuthDeviceCodeInfo,
 } from "@earendil-works/pi-ai/oauth";
 import { createAccountVault, createAccountVaultStore } from "./accounts.ts";
-import { createQuotaRouterService } from "./service.ts";
+import { createAIGatewayService } from "./service.ts";
 
 type Environment = Record<string, string | undefined>;
 type LoginImplementation = (options: {
@@ -26,7 +26,7 @@ export interface ServerHandle {
   stop(closeActiveConnections?: boolean): unknown;
 }
 
-export interface RunQuotaRouterCliOptions {
+export interface RunAIGatewayCliOptions {
   environment?: Environment;
   writeLine?: (line: string) => void;
   writeError?: (line: string) => void;
@@ -41,15 +41,16 @@ export interface RunQuotaRouterCliOptions {
   waitForShutdown?: () => Promise<void>;
 }
 
-export async function runQuotaRouterCli(
+export async function runAIGatewayCli(
   args: string[],
-  options: RunQuotaRouterCliOptions = {},
+  options: RunAIGatewayCliOptions = {},
 ): Promise<number> {
   const environment = options.environment ?? process.env;
   const writeLine = options.writeLine ?? console.log;
   const writeError = options.writeError ?? console.error;
   const stateDirectory =
-    environment.QUOTA_ROUTER_STATE_DIR ?? join(homedir(), ".local", "state", "quota-router");
+    environment.AI_GATEWAY_STATE_DIR?.trim() ||
+    join(homedir(), ".local", "state", "ai-gateway");
   const refresh = options.refresh ?? refreshOpenAICodexToken;
   const vault = createAccountVault({
     store: createAccountVaultStore(join(stateDirectory, "accounts.json")),
@@ -88,17 +89,17 @@ export async function runQuotaRouterCli(
     }
 
     if (command === "status") {
-      const clientToken = environment.QUOTA_ROUTER_TOKEN?.trim();
+      const clientToken = environment.AI_GATEWAY_TOKEN?.trim();
       if (!clientToken) {
-        writeError("QUOTA_ROUTER_TOKEN is required for status");
+        writeError("AI_GATEWAY_TOKEN is required for status");
         return 1;
       }
       const response = await (options.fetchImpl ?? fetch)(
-        `http://127.0.0.1:${parsePort(environment.QUOTA_ROUTER_PORT)}/status`,
+        `http://127.0.0.1:${parsePort(environment.AI_GATEWAY_LISTEN_PORT)}/status`,
         { headers: { authorization: `Bearer ${clientToken}` } },
       );
       if (!response.ok) {
-        writeError(`quota-router status returned HTTP ${response.status}`);
+        writeError(`ai-gateway status returned HTTP ${response.status}`);
         return 1;
       }
       writeLine(await response.text());
@@ -108,7 +109,7 @@ export async function runQuotaRouterCli(
     if (command === "remove") {
       const id = args[1];
       if (!id) {
-        writeError("remove requires an opaque account ID from quota-router list");
+        writeError("remove requires an opaque account ID from ai-gateway list");
         return 2;
       }
       if (!(await vault.remove(id))) {
@@ -120,37 +121,38 @@ export async function runQuotaRouterCli(
     }
 
     if (command === "serve") {
-      const clientToken = environment.QUOTA_ROUTER_TOKEN?.trim();
+      const clientToken = environment.AI_GATEWAY_TOKEN?.trim();
       if (!clientToken) {
-        writeError("QUOTA_ROUTER_TOKEN is required to serve");
+        writeError("AI_GATEWAY_TOKEN is required to serve");
         return 1;
       }
-      const service = await createQuotaRouterService({
+      const service = await createAIGatewayService({
         stateDirectory,
         clientToken,
-        allowApiKeyFallback: environment.QUOTA_ROUTER_ALLOW_API_KEY_FALLBACK === "true",
+        allowApiKeyFallback:
+          environment.AI_GATEWAY_ALLOW_API_KEY_FALLBACK?.trim() === "true",
         ...(environment.OPENAI_API_KEY ? { openAIApiKey: environment.OPENAI_API_KEY } : {}),
         oauth: { refresh },
         fetchImpl: options.fetchImpl ?? fetch,
       });
-      const hostname = environment.QUOTA_ROUTER_HOST ?? "0.0.0.0";
-      const port = parsePort(environment.QUOTA_ROUTER_PORT);
+      const hostname = environment.AI_GATEWAY_LISTEN_HOST?.trim() || "0.0.0.0";
+      const port = parsePort(environment.AI_GATEWAY_LISTEN_PORT);
       const server = (options.startServer ?? defaultStartServer)({
         hostname,
         port,
         fetch: service.fetch,
       });
-      writeLine(`quota-router listening on ${hostname}:${port}`);
+      writeLine(`ai-gateway listening on ${hostname}:${port}`);
       await (options.waitForShutdown ?? waitForShutdown)();
       await server.stop(false);
       return 0;
     }
 
-    writeLine("Usage: quota-router <serve|login [label]|list|status|remove <id>>");
+    writeLine("Usage: ai-gateway <serve|login [label]|list|status|remove <id>>");
     return command === "help" || command === "--help" || command === "-h" ? 0 : 2;
   } catch (error) {
     const name = error instanceof Error ? error.name : "UnknownError";
-    writeError(`quota-router ${command} failed (${name})`);
+    writeError(`ai-gateway ${command} failed (${name})`);
     return 1;
   }
 }
@@ -159,7 +161,7 @@ function parsePort(value: string | undefined): number {
   if (value === undefined) return 8787;
   const port = Number(value);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error("QUOTA_ROUTER_PORT must be an integer from 1 to 65535");
+    throw new Error("AI_GATEWAY_LISTEN_PORT must be an integer from 1 to 65535");
   }
   return port;
 }
@@ -185,5 +187,5 @@ function waitForShutdown(): Promise<void> {
 }
 
 if (import.meta.main) {
-  process.exitCode = await runQuotaRouterCli(process.argv.slice(2));
+  process.exitCode = await runAIGatewayCli(process.argv.slice(2));
 }

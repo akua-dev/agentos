@@ -36,7 +36,7 @@ const candidates: Candidate[] = [
 
 describe("durable routing state", () => {
   test("selects and reserves atomically, persists explicit stickiness, renews and releases", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quota-router-routing-"));
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-routing-"));
     const store = createRoutingStateStore(join(root, "routing.json"));
     const routing = createRoutingState(store);
 
@@ -69,7 +69,7 @@ describe("durable routing state", () => {
   });
 
   test("does not invent stickiness without an explicit session key and removes expired leases", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quota-router-routing-"));
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-routing-"));
     const store = createRoutingStateStore(join(root, "routing.json"));
     const routing = createRoutingState(store);
     const acquired = await routing.acquire({

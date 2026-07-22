@@ -1,14 +1,15 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: quota-router
+  name: ai-gateway
   labels:
-    app.kubernetes.io/name: quota-router
+    app.kubernetes.io/name: ai-gateway
+    app.kubernetes.io/component: ai-gateway
     app.kubernetes.io/part-of: agentos
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: quota-router
+      app.kubernetes.io/name: ai-gateway
   policyTypes:
     - Ingress
   ingress:
@@ -18,7 +19,7 @@ spec:
               kubernetes.io/metadata.name: agentos
           podSelector:
             matchLabels:
-              agentos.akua.dev/quota-router-client: "true"
+              agentos.akua.dev/ai-gateway-client: "true"
       ports:
         - protocol: TCP
           port: 8787

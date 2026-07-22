@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, test } from "bun:test";
 import type { OAuthCredentials } from "@earendil-works/pi-ai/oauth";
-import { createQuotaRouterService } from "../src/service.ts";
+import { createAIGatewayService } from "../src/service.ts";
 
 function accessToken(accountId: string): string {
   const payload = Buffer.from(
@@ -17,17 +17,17 @@ function credentials(accountId: string): OAuthCredentials {
 }
 
 function proxyRequest(path = "/responses", token = "fleet-token") {
-  return new Request(`http://router.test${path}`, {
+  return new Request(`http://gateway.test${path}`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify({ model: "gpt-test", input: "hello" }),
   });
 }
 
-describe("quota router service", () => {
+describe("AI gateway service", () => {
   test("keeps health public, readiness honest, and status authenticated", async () => {
-    const stateDirectory = await mkdtemp(join(tmpdir(), "quota-router-service-"));
-    const service = await createQuotaRouterService({
+    const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-service-"));
+    const service = await createAIGatewayService({
       stateDirectory,
       clientToken: "fleet-token",
       allowApiKeyFallback: false,
@@ -35,20 +35,29 @@ describe("quota router service", () => {
       fetchImpl: fetch,
     });
 
-    expect((await service.fetch(new Request("http://router.test/healthz"))).status).toBe(200);
-    expect((await service.fetch(new Request("http://router.test/readyz"))).status).toBe(503);
-    expect((await service.fetch(new Request("http://router.test/status"))).status).toBe(401);
+    expect((await service.fetch(new Request("http://gateway.test/healthz"))).status).toBe(200);
+    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(503);
+    expect((await service.fetch(new Request("http://gateway.test/status"))).status).toBe(401);
+    expect(
+      (
+        await service.fetch(
+          new Request("http://gateway.test/status", {
+            headers: { "x-ai-gateway-token": "fleet-token" },
+          }),
+        )
+      ).status,
+    ).toBe(200);
 
     const accountId = await service.vault.addFromOAuth("Primary", credentials("provider-a"));
-    expect((await service.fetch(new Request("http://router.test/readyz"))).status).toBe(200);
+    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(200);
     await service.vault.markNeedsReauth(accountId);
-    expect((await service.fetch(new Request("http://router.test/readyz"))).status).toBe(503);
+    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(503);
   });
 
   test("uses the explicitly enabled API-key fallback without storing it in status", async () => {
-    const stateDirectory = await mkdtemp(join(tmpdir(), "quota-router-service-"));
+    const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-service-"));
     let upstreamAuth: string | null = null;
-    const service = await createQuotaRouterService({
+    const service = await createAIGatewayService({
       stateDirectory,
       clientToken: "fleet-token",
       allowApiKeyFallback: true,
@@ -64,11 +73,11 @@ describe("quota router service", () => {
       },
     });
 
-    expect((await service.fetch(new Request("http://router.test/readyz"))).status).toBe(200);
+    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(200);
     expect(await (await service.fetch(proxyRequest())).text()).toBe("fallback-ok");
     expect(upstreamAuth as unknown).toBe("Bearer api-secret");
     const status = await service.fetch(
-      new Request("http://router.test/status", {
+      new Request("http://gateway.test/status", {
         headers: { authorization: "Bearer fleet-token" },
       }),
     );
@@ -83,9 +92,9 @@ describe("quota router service", () => {
   });
 
   test("routes through an OAuth account and makes a visible 429 ineligible for the next request", async () => {
-    const stateDirectory = await mkdtemp(join(tmpdir(), "quota-router-service-"));
+    const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-service-"));
     let responseCalls = 0;
-    const service = await createQuotaRouterService({
+    const service = await createAIGatewayService({
       stateDirectory,
       clientToken: "fleet-token",
       allowApiKeyFallback: false,

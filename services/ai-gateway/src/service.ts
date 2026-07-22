@@ -1,8 +1,11 @@
-import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import type { CodexOAuthClient, AccountVault } from "./accounts.ts";
 import { createAccountVault, createAccountVaultStore } from "./accounts.ts";
-import { createProxyHandler, type FetchImplementation } from "./proxy.ts";
+import {
+  createProxyHandler,
+  isClientAuthorized,
+  type FetchImplementation,
+} from "./proxy.ts";
 import { createRoutingState, createRoutingStateStore } from "./routing-state.ts";
 import { defaultRoutingConfig } from "./selection.ts";
 import type { Candidate, RouteLease, UsageSnapshot } from "./types.ts";
@@ -10,7 +13,7 @@ import { CodexUsageHttpError, fetchCodexUsage } from "./usage.ts";
 
 const USAGE_CACHE_MS = 60_000;
 
-export interface QuotaRouterServiceOptions {
+export interface AIGatewayServiceOptions {
   stateDirectory: string;
   clientToken: string;
   allowApiKeyFallback: boolean;
@@ -20,14 +23,14 @@ export interface QuotaRouterServiceOptions {
   clock?: () => number;
 }
 
-export interface QuotaRouterService {
+export interface AIGatewayService {
   vault: AccountVault;
   fetch(request: Request): Promise<Response>;
 }
 
-export async function createQuotaRouterService(
-  options: QuotaRouterServiceOptions,
-): Promise<QuotaRouterService> {
+export async function createAIGatewayService(
+  options: AIGatewayServiceOptions,
+): Promise<AIGatewayService> {
   const clock = options.clock ?? Date.now;
   const vault = createAccountVault({
     store: createAccountVaultStore(join(options.stateDirectory, "accounts.json")),
@@ -169,7 +172,7 @@ export async function createQuotaRouterService(
         return Response.json({ status: ready ? "ready" : "not_ready" }, { status: ready ? 200 : 503 });
       }
       if (request.method === "GET" && url.pathname === "/status") {
-        if (!isAuthorized(request, options.clientToken)) {
+        if (!isClientAuthorized(request, options.clientToken)) {
           return Response.json({ error: "unauthorized" }, { status: 401 });
         }
         const accounts = (await vault.list()).map((account) => {
@@ -208,16 +211,4 @@ function parseRetryAfter(value: string | null, now: number): number | undefined 
   if (Number.isFinite(seconds) && seconds >= 0) return now + Math.ceil(seconds * 1_000);
   const date = Date.parse(value);
   return Number.isNaN(date) ? undefined : Math.max(now, date);
-}
-
-function isAuthorized(request: Request, expected: string): boolean {
-  if (!expected) return false;
-  const dedicated = request.headers.get("x-quota-router-token")?.trim();
-  const authorization = request.headers.get("authorization")?.trim();
-  const bearer = authorization?.toLowerCase().startsWith("bearer ")
-    ? authorization.slice(7).trim()
-    : undefined;
-  const left = Buffer.from(dedicated ?? bearer ?? "");
-  const right = Buffer.from(expected);
-  return left.length === right.length && timingSafeEqual(left, right);
 }

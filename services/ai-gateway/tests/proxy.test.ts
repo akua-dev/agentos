@@ -3,7 +3,7 @@ import { createProxyHandler } from "../src/proxy.ts";
 import type { RouteLease } from "../src/types.ts";
 
 function request(path = "/responses", token = "fleet-token") {
-  return new Request(`http://router.test${path}`, {
+  return new Request(`http://gateway.test${path}`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${token}`,
@@ -29,6 +29,33 @@ describe("authenticated raw Responses proxy", () => {
     const response = await handler(request("/responses", "wrong"));
     expect(response.status).toBe(401);
     expect(acquired).toBe(false);
+  });
+
+  test("accepts and strips the dedicated Fleet client headers", async () => {
+    let upstream: Request | undefined;
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => undefined,
+      }),
+      fetchImpl: async (input, init) => {
+        upstream = new Request(input instanceof Request ? input.url : input.toString(), init);
+        return new Response("ok");
+      },
+    });
+    const gatewayRequest = request();
+    gatewayRequest.headers.delete("authorization");
+    gatewayRequest.headers.set("x-ai-gateway-token", "fleet-token");
+    gatewayRequest.headers.set("x-ai-gateway-session", "gateway-session");
+
+    expect((await handler(gatewayRequest)).status).toBe(200);
+    expect(upstream?.headers.has("x-ai-gateway-token")).toBe(false);
+    expect(upstream?.headers.has("x-ai-gateway-session")).toBe(false);
   });
 
   test("normalizes OAuth upstream headers/path and streams the real response", async () => {

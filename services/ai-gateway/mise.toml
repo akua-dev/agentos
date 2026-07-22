@@ -1,0 +1,3 @@
+[tasks."ai-gateway:serve"]
+description = "Run the optional Fleet AI gateway"
+file = "src/main.ts"

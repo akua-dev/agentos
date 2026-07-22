@@ -5,7 +5,13 @@ description: Establish, inspect, rotate, revoke, and recover model-provider or s
 
 # Manage AgentOS authentication
 
-Handle provider credentials inside the owning agent's persistent runtime whenever the provider supports it. This direct path is a complete AgentOS setup. If the Captain explicitly selects pooled Fleet capacity instead, load `$agentos-quota-router`; its server-owned vault and client Secret are a different credential boundary, not a shortcut for copying Agent auth.
+Handle provider credentials inside the owning Agent's persistent runtime
+whenever the provider supports it. This direct path is the complete minimal
+setup and recovery boundary. For a delegation-ready Fleet, recommend
+`$agentos-ai-gateway` when several Agents or trusted harness automations need
+model capacity and the Captain accepts its service lifecycle. Its server-owned
+vault and client Secret are a different credential boundary, never a shortcut
+for copying Agent auth.
 
 ## Guardrails
 
@@ -44,6 +50,27 @@ Handle provider credentials inside the owning agent's persistent runtime wheneve
 9. Let Pi own and refresh `~/.pi/agent/auth.json` on the Agent PVC. Verify ownership, mode `0600`, and the presence of the `openai-codex` provider key without printing or copying credential values.
 10. After login, let the Captain select or retain Pi's native defaults. Load `$agentos-harnesses` before proposing a model or thinking change. Do not simulate model-selection key presses or install a defaults-reconciliation extension.
 11. Verify Pi status, then request a short fixed response with no tools. Record only the effective provider, model, thinking level and success. Detach from Herdr without stopping the agent with `Ctrl+B`, then lowercase `q`.
+
+## Fleet model capacity
+
+After First Mate has working direct authentication and Fleet identity, present
+two complete postures before the first worker dispatch:
+
+- Recommend the AI gateway for a Fleet expected to run multiple Agents or
+  trusted harness automation. The gateway owns fresh provider OAuth chains and
+  selected workloads receive only its client credential.
+- Keep direct per-Agent authentication as the minimal alternative. Every
+  harness owns and refreshes its own credential on its own PVC; another
+  Agent's Pi, Codex or provider auth file is never its bootstrap input.
+
+Record the Captain's selection in Fleet-scoped Captain state. Reuse that
+posture for no-mistakes and other trusted harness automation rather than
+inventing another authentication choice at delivery time. The standing choice
+does not itself authorize installation, provider login, Secret distribution,
+cost or a live workload restart; record exact standing authority separately.
+Before calling the Fleet delegation-ready, verify one harmless real no-tool
+request from an approved selected client. If the posture is deferred, report
+minimal single-Mate mode and keep every unauthenticated worker launch blocked.
 
 ## Secret-based fallback
 

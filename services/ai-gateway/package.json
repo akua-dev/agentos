@@ -1,11 +1,11 @@
 {
-  "name": "@agentos/quota-router",
+  "name": "@agentos/ai-gateway",
   "version": "0.0.0",
-  "description": "Optional authenticated quota-aware proxy for Fleet AI provider accounts",
+  "description": "Optional authenticated Fleet AI Gateway for pooled provider accounts",
   "private": true,
   "type": "module",
   "bin": {
-    "quota-router": "./src/main.ts"
+    "ai-gateway": "./src/main.ts"
   },
   "scripts": {
     "test": "bun test tests",

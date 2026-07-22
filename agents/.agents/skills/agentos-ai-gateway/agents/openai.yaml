@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS Fleet AI Gateway"
+  short_description: "Operate optional pooled Fleet AI capacity"
+  default_prompt: "Use $agentos-ai-gateway to configure or operate the Fleet AI gateway safely."

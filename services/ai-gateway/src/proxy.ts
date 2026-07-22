@@ -39,7 +39,7 @@ export interface ProxyHandlerOptions {
 
 export function createProxyHandler(options: ProxyHandlerOptions) {
   return async (request: Request): Promise<Response> => {
-    if (!isAuthorized(request, options.clientToken)) {
+    if (!isClientAuthorized(request, options.clientToken)) {
       return jsonResponse(401, { error: "unauthorized" });
     }
     const url = new URL(request.url);
@@ -81,7 +81,7 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
     } catch {
       // The caller must still see the real upstream result. State repair can be
       // retried independently; never replace a provider response with it.
-      console.error("quota-router: response bookkeeping failed");
+      console.error("ai-gateway: response bookkeeping failed");
     }
 
     const responseHeaders = new Headers(upstream.headers);
@@ -104,9 +104,9 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
   };
 }
 
-function isAuthorized(request: Request, expected: string): boolean {
+export function isClientAuthorized(request: Request, expected: string): boolean {
   if (!expected) return false;
-  const dedicated = request.headers.get("x-quota-router-token")?.trim();
+  const dedicated = request.headers.get("x-ai-gateway-token")?.trim();
   const authorization = request.headers.get("authorization")?.trim();
   const bearer = authorization?.toLowerCase().startsWith("bearer ")
     ? authorization.slice(7).trim()
@@ -122,7 +122,7 @@ function constantTimeEqual(actual: string, expected: string): boolean {
 
 function explicitSessionKey(headers: Headers): string | undefined {
   for (const name of [
-    "x-quota-router-session",
+    "x-ai-gateway-session",
     "session-id",
     "x-codex-session-id",
     "x-codex-window-id",
@@ -137,8 +137,8 @@ function explicitSessionKey(headers: Headers): string | undefined {
 
 function sanitizedRequestHeaders(input: Headers): Headers {
   const headers = new Headers(input);
-  headers.delete("x-quota-router-token");
-  headers.delete("x-quota-router-session");
+  headers.delete("x-ai-gateway-token");
+  headers.delete("x-ai-gateway-session");
   for (const name of REQUEST_HEADERS_TO_REMOVE) headers.delete(name);
   return headers;
 }

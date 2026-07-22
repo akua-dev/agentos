@@ -25,7 +25,7 @@ function credentials(accountId: string, expires: number, refresh = "refresh-secr
 
 describe("server-owned Codex account vault", () => {
   test("uses a stable opaque ID and exposes no provider identity or token in list output", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quota-router-accounts-"));
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-accounts-"));
     const vault = createAccountVault({
       store: createAccountVaultStore(join(root, "accounts.json")),
       refreshDirectory: root,
@@ -43,7 +43,7 @@ describe("server-owned Codex account vault", () => {
   });
 
   test("serializes refresh and persists one rotated credential", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quota-router-refresh-"));
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-refresh-"));
     let refreshes = 0;
     const store = createAccountVaultStore(join(root, "accounts.json"));
     const vault = createAccountVault({
@@ -71,7 +71,7 @@ describe("server-owned Codex account vault", () => {
   });
 
   test("marks the account for reauthentication when refresh changes identity", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quota-router-identity-"));
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-identity-"));
     const store = createAccountVaultStore(join(root, "accounts.json"));
     const vault = createAccountVault({
       store,

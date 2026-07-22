@@ -1,11 +1,11 @@
-# Quota router boundary
+# Fleet AI Gateway boundary
 
 This package owns the optional Fleet-local AI request data plane and its private
 credential/routing state.
 
 Its `kubernetes/` directory owns the optional deployment shape. Runtime
 semantics stay in this service package; operator judgment, approvals and
-credential workflows stay in the shared quota-router Skill.
+credential workflows stay in the shared `$agentos-ai-gateway` Skill.
 
 - Version one is Codex-subscription-first. Keep provider-specific behavior
   behind narrow adapters so another provider does not weaken Codex semantics.
@@ -21,5 +21,13 @@ credential workflows stay in the shared quota-router Skill.
   key fallback stays outside the mutable vault and must be enabled explicitly.
 - Keep the released topology single-replica until a reviewed transactional
   multi-replica authority replaces file state.
+- Keep the request plane AI-specific. Do not proxy Git, PostgreSQL, Kubernetes,
+  Herdr, registries or arbitrary Fleet egress through this service, and do not
+  introduce a general dynamic-route control plane.
+- Treat vault and routing-file updates as the live configuration mechanism.
+  Provider adapters and selection semantics are reviewed source, not mutable
+  admin configuration.
+- Use the `ai-gateway` identity consistently across the package, executable,
+  Kubernetes resources, storage, environment and client interface.
 - Tests use mock upstreams and credentials. Real login and paid model traffic
   require separate explicit approval.

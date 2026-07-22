@@ -21,7 +21,7 @@ Each kind of state has one authority:
 | Terminal and harness runtime | Herdr inside each runtime pod |
 | Agent home and unfinished work | Agent-owned PVC |
 | Delivered code | Git and its remote |
-| Optional pooled AI credentials and routing state | Quota-router PVC and process |
+| Optional pooled AI credentials and routing state | Fleet AI Gateway PVC and process |
 
 AgentOS does not continuously mirror one authority into another.
 PostgreSQL stores pod locators, not heartbeats; Kubernetes is inspected when live state matters.
@@ -265,13 +265,16 @@ Helm and additional harnesses until implemented behavior requires them.
 
 ## Optional pooled AI capacity
 
-Direct provider authentication inside each Agent's persistent harness is a
-complete AgentOS topology and remains the default. A Captain may instead select
-the optional Fleet quota router when several approved Agents should share a
-pool of Codex subscriptions. That service is capacity infrastructure, not the
-Fleet coordination kernel: PostgreSQL still owns work and communication, the
-harness still chooses the requested provider/model, and the provider response
-still returns synchronously to the calling harness.
+Direct provider authentication inside each Agent's persistent harness is the
+complete minimal topology and recovery path. For a delegation-ready Fleet,
+AgentOS recommends the optional Fleet AI Gateway when several approved Agents or
+trusted harness automations need model capacity and the Captain accepts the
+additional credential authority and service lifecycle. The gateway avoids
+repeated worker logins and credential-file copying while keeping provider
+credentials out of Agent homes. It is capacity infrastructure, not the Fleet
+coordination kernel: PostgreSQL still owns work and communication, the harness
+still chooses the requested provider/model, and the provider response still
+returns synchronously to the calling harness.
 
 The first implementation is a single-replica Bun service with one retained
 ReadWriteOnce PVC. Its mode-`0600` OAuth vault owns fresh server-created Codex
@@ -281,27 +284,42 @@ It stores no prompts, model responses or harness transcripts. An OpenAI API key
 may be mounted separately as an explicitly enabled last-resort fallback and is
 never copied into the mutable OAuth vault.
 
+The product, package, Skill and executable are named Fleet AI Gateway and
+`ai-gateway`. Kubernetes objects, Service DNS, Secret, PVC path, environment,
+client label and headers use that identity consistently: `AI_GATEWAY_*`,
+`agentos.akua.dev/ai-gateway-client` and `x-ai-gateway-*`.
+
 Every client request is authenticated before its body is read. Selected Agent
 Pods receive only a Fleet client token and are also constrained by a
-selected-client NetworkPolicy. The router removes inbound credentials, selects
+selected-client NetworkPolicy. The gateway removes inbound credentials, selects
 and reserves an eligible account, normalizes the OpenAI Responses path, injects
 that account's upstream credential and streams the actual response. Existing
 sessions remain sticky while eligible. A sent request is never retried silently
 on another account; upstream `401`, `429`, timeout and provider failures remain
 visible to Pi or Codex and affect only later selection.
 
-Pi exposes the router as the explicit `fleet-codex` provider through a
-role-local extension that is inert without its two environment values. Codex
-uses native `model_providers` configuration, not an AgentOS wrapper. Neither
-path selects a model or rewrites a persistent default. `quota-axi` remains an
-observation-only tool and has no routing, login or mutation authority.
+Pi routes its built-in `openai-codex` provider through the gateway with native
+`models.json` base-URL, authentication and header settings. Codex uses native
+`model_providers` configuration. AgentOS ships no provider extension or harness
+wrapper for either path. Enabling the route is an explicit configuration
+change; it never selects a model. `quota-axi` remains an observation-only tool
+and has no routing, login or mutation authority.
+
+This is not a universal AgentOS proxy. Git, PostgreSQL, Kubernetes, Herdr,
+registries and other provider tools continue through their native interfaces.
+Adding another mediated protocol requires a separate review of its authority,
+credentials and failure semantics; similarity to HTTP traffic is insufficient.
+The gateway's account vault and routing state use locked atomic files that are
+read during live operations, so account login, rotation, reservations and
+blocks do not require a reverse-proxy reload. Provider adapters and selection
+semantics remain reviewed source and change through the normal image lifecycle;
+there is no generic dynamic-route control plane.
 
 The released service, tests and optional Kubernetes topology live together in
-`services/quota-router/`. First Mate may operate that topology through its
+`services/ai-gateway/`. First Mate may operate that topology through its
 reviewed Skill and RBAC without owning the component's source directory.
-Claude, Gemini, WebSockets,
-multi-replica authority, public ingress and general-purpose AI gateway behavior
-remain outside the first contract.
+Claude, Gemini, WebSockets, multi-replica authority, public ingress and
+general-purpose egress proxy behavior remain outside the first contract.
 
 ## Health and recovery
 
@@ -449,7 +467,7 @@ Workers do not inherit First Mate authority automatically.
 Agent runtimes remain ordinary versioned Kubernetes resources; AgentOS does not
 introduce its own CRDs or autonomous operator. Only the optional self-hosted
 database path uses the external CloudNativePG CRDs and controller.
-The optional quota router is an ordinary single-replica StatefulSet and
+The optional Fleet AI Gateway is an ordinary single-replica StatefulSet and
 ClusterIP Service; it adds no Kubernetes controller or CRD.
 
 ## Bootstrap
@@ -479,8 +497,16 @@ Source-provider authentication is a separate choice. Personal native `gh`
 login remains complete; teams may select the GitHub App path defined by the
 auth Skill, with its private key mounted only into First Mate and short-lived
 installation tokens consumed directly by native provider tools.
-The optional quota router is not required for either bootstrap stage. It may be
-selected later through its dedicated Skill after direct First-Mate auth works.
+Direct First-Mate authentication remains the fastest initial handoff and a
+verified recovery path. After Fleet identity exists, First Mate presents two
+worker-capacity postures: the recommended Fleet AI Gateway for a delegation-ready
+Fleet, or direct authentication owned separately by every worker harness. The
+Captain's selection is durable Fleet policy. Installing the gateway, starting
+provider login and distributing its client Secret remain explicit or standing
+authorizations; recommendation never makes them implicit. Bootstrap may finish
+in minimal single-Mate mode without the gateway, but AgentOS does not call the
+Fleet delegation-ready until one approved worker or trusted harness automation
+has completed a harmless real model request through the selected capacity path.
 
 For a stable install, the seed resolves the latest published GitHub release,
 verifies that release is immutable, and applies only its fixed-name assets
@@ -570,7 +596,6 @@ workspace. The tree reflects ownership, not deployment order:
 │   ├── AGENTS.md                     shared rules for running Agent roles
 │   ├── .agents/skills/               operational Skills shared by both Mates
 │   ├── .pi/background-tasks/         shared Pi extension implementation
-│   ├── .pi/quota-router/             optional Fleet Codex provider extension
 │   ├── firstmate/
 │   │   ├── AGENTS.md                 complete First-Mate identity and duties
 │   │   ├── .agents/skills/           First-Mate-only workflows
@@ -601,7 +626,7 @@ workspace. The tree reflects ownership, not deployment order:
 │   └── tests/                        observable runtime behavior tests
 ├── services/
 │   ├── AGENTS.md                     admission boundary for optional services
-│   └── quota-router/                 service, tests and optional K8s topology
+│   └── ai-gateway/                   service, tests and optional K8s topology
 ├── release/kubernetes/               reviewed manifest release assembly
 ├── docs/                             supporting assets and stable pointers
 ├── Dockerfile                        common AgentOS image build
@@ -689,9 +714,10 @@ workspace keeps one `bun.lock`.
 - `services/AGENTS.md` admits only explicitly reviewed optional network
   processes and rejects native-tool wrappers, prompt queues and shadow Fleet
   state.
-- `services/quota-router/` owns the optional authenticated AI request data
+- `services/ai-gateway/` owns the optional authenticated Fleet AI request data
   plane, its private credential/routing files, behavior tests and Kubernetes
-  topology; it does not own harness choice or PostgreSQL state.
+  topology; it does not own harness choice, PostgreSQL state or general Fleet
+  traffic.
 - `database/AGENTS.md` governs SQL-first schema development without selecting an Agent role.
 - `database/kubernetes/cloudnative-pg/` is authoritative only for the optional
   self-hosted CloudNativePG topology; it does not own SQL schema, controller
@@ -706,8 +732,8 @@ workspace keeps one `bun.lock`.
   patches and surrounding resources. A role-owned client patch wires that
   workload to a component; it does not move the component's topology into the
   role subtree.
-- `services/quota-router/kubernetes/` is authoritative for the optional
-  single-replica router topology; its Secret values and local overlays are not
+- `services/ai-gateway/kubernetes/` is authoritative for the optional
+  single-replica gateway topology; its Secret values and local overlays are not
   repository state.
 - `release/kubernetes/` is authoritative for human-readable
   First-Mate and database manifest rendering; stable generated assets belong
@@ -731,5 +757,6 @@ Patching, linking, embedding Herdr source, or otherwise tightening that boundary
 
 AgentOS does not introduce autonomous schedulers, heartbeat infrastructure,
 AgentOS-specific Kubernetes CRDs or operators, a PostgreSQL wrapper API,
-prompt queues, transcript-capturing AI gateways, task-specific PVCs, mandatory
-semantic indexing, or compatibility with the failed predecessor implementation.
+prompt queues, universal traffic proxies, transcript-capturing AI gateways,
+task-specific PVCs, mandatory semantic indexing, or compatibility with the
+failed predecessor implementation.

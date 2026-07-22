@@ -46,11 +46,11 @@
         "@electric-sql/pglite": "0.5.4",
       },
     },
-    "services/quota-router": {
-      "name": "@agentos/quota-router",
+    "services/ai-gateway": {
+      "name": "@agentos/ai-gateway",
       "version": "0.0.0",
       "bin": {
-        "quota-router": "./src/main.ts",
+        "ai-gateway": "./src/main.ts",
       },
       "dependencies": {
         "@earendil-works/pi-ai": "0.80.7",
@@ -63,13 +63,13 @@
     },
   },
   "packages": {
+    "@agentos/ai-gateway": ["@agentos/ai-gateway@workspace:services/ai-gateway"],
+
     "@agentos/database": ["@agentos/database@workspace:database"],
 
     "@agentos/github-app-token": ["@agentos/github-app-token@workspace:clis/github-app-token"],
 
     "@agentos/pg-listen": ["@agentos/pg-listen@workspace:clis/pg-listen"],
-
-    "@agentos/quota-router": ["@agentos/quota-router@workspace:services/quota-router"],
 
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.91.1", "", { "dependencies": { "json-schema-to-ts": "^3.1.1" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw=="],
 

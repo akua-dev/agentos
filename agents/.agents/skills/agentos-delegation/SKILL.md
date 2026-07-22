@@ -72,6 +72,10 @@ Use released PostgreSQL schema for durable coordination and native tools against
    Require remote images to be approved and pinned by digest.
    Load `$agentos-harnesses`; consult scoped natural-language dispatch policy
    on every intake and record the concrete resolution on the Assignment.
+   Resolve the durable model-capacity posture at the same time. Select the
+   recommended AI Gateway path when recorded, or direct authentication owned
+   by this worker; never create an Assignment whose harness is expected to stop
+   at an unresolved login prompt.
 3. Ensure the target Agent identity is active and inside the caller's managed hierarchy.
    If the selected release lacks an authorized Agent-provisioning primitive, request the parent Mate to provision it; never bypass grants or invent SQL.
 4. Create the Task and active Assignment before starting asynchronous work.
@@ -102,7 +106,9 @@ Use released PostgreSQL schema for durable coordination and native tools against
 7. Create the dedicated workload from `../crewmate/kubernetes/base` through a
    reviewed per-Agent Kustomize overlay and native kubectl, then start the
    selected harness through the pod-local Herdr CLI with the complete rendered
-   brief as its initial prompt.
+   brief as its initial prompt. Before launch, provision and verify the selected
+   direct credential or standing-authorized ai-gateway client boundary without
+   copying another Agent's provider auth.
    Confirm its Agent identity, Task Assignment, PVC, pod and Herdr session without treating terminal text as durable state.
 8. Load `$agentos-supervision` immediately after dispatch.
 

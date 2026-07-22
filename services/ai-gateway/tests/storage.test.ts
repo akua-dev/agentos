@@ -9,7 +9,7 @@ const CounterSchema = z.object({ version: z.literal(1), value: z.number().int() 
 
 describe("atomic private JSON storage", () => {
   test("creates a private directory and file and preserves concurrent updates", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quota-router-store-"));
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-store-"));
     const path = join(root, "state", "counter.json");
     const store = createAtomicJsonStore({
       path,
@@ -30,7 +30,7 @@ describe("atomic private JSON storage", () => {
   });
 
   test("fails closed when persisted state does not match its schema", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quota-router-invalid-"));
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-invalid-"));
     const path = join(root, "state.json");
     await Bun.write(path, JSON.stringify({ version: 1, value: "secret-shape" }));
     await chmod(path, 0o600);
