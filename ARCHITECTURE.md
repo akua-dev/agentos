@@ -304,23 +304,29 @@ Pi routes its built-in `openai-codex` provider through the gateway with native
 `models.json` base-URL, authentication and header settings. Codex uses native
 `model_providers` configuration. Independently, the persistent First- and
 Second-Mate Pi projects load one shared AgentOS-owned session-lifecycle
-extension that asks OpenAI for a native compaction artifact and persists it in
-Pi's existing compaction entry alongside Pi's portable summary. On subsequent
-requests, the extension replays that opaque artifact only for the exact
-provider and model that created it; a newer local-only compaction supersedes an
-older artifact. Provider failure keeps the portable summary, while unverifiable
-or incomplete artifacts are never persisted. Setting
+extension that asks OpenAI for a native compaction result and persists the
+complete canonical compact output—including its opaque compaction artifact and
+provider metadata—in Pi's existing compaction entry alongside Pi's portable
+summary. It persists that result only after one completed terminal response
+with valid full output and exactly one compaction artifact. On subsequent
+requests, the extension replays that saved output only for the exact provider
+and model that created it; a newer local-only compaction supersedes an older
+result. Provider failure keeps the portable summary, while unverifiable or
+incomplete results are never persisted. Setting
 `AGENTOS_OPENAI_SERVER_COMPACTION_ENABLED=0` restores Pi's native compaction
 path.
 
-The extension preserves Pi's built-in `openai-codex` transport. It uses a
-bounded HTTP/SSE request for compaction and introduces no additional package or
-WebSocket runtime dependency. The gateway forwards that request and its
-response as ordinary opaque Responses traffic and stores neither. AgentOS ships
-no provider-transport replacement or harness wrapper for either path. Enabling
-the route is an explicit configuration change; it never selects a model.
-`quota-axi` remains an observation-only tool and has no routing, login or
-mutation authority.
+The extension preserves Pi's built-in `openai-codex` transport and supports both
+the configured direct OpenAI Responses endpoint and the gateway's Codex
+Responses endpoint. It uses bounded HTTP/SSE for Codex, bounded JSON for direct
+OpenAI Responses, and introduces no additional package or WebSocket runtime
+dependency. The gateway is body-blind: after authenticating, it strips only
+credential, gateway/session-routing and hop-by-hop headers, then forwards the
+remaining headers, request body and provider response opaquely without storing
+either body. AgentOS ships no provider-transport replacement or harness wrapper
+for either path. Enabling the route is an explicit configuration change; it
+never selects or changes a provider or model. `quota-axi` remains an
+observation-only tool and has no routing, login or mutation authority.
 
 This is not a universal AgentOS proxy. Git, PostgreSQL, Kubernetes, Herdr,
 registries and other provider tools continue through their native interfaces.
