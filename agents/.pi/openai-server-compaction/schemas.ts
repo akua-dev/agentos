@@ -1,9 +1,43 @@
-import { z } from "zod";
+import { createRequire } from "node:module";
+import { join } from "node:path";
+import type * as Zod from "zod";
+
+type ZodNamespace = typeof import("zod");
+
+const ZOD_VERSION = "4.4.3";
+const requireFromSchemas = createRequire(import.meta.url);
+
+function loadZod(): ZodNamespace {
+  const releaseRoot = process.env.AGENTOS_RELEASE_ROOT ?? "/opt/agentos";
+  const candidates = [
+    "zod",
+    join(releaseRoot, "node_modules", "zod"),
+    join(releaseRoot, "services", "ai-gateway", "node_modules", "zod"),
+    ...(process.env.PI_CODING_AGENT_DIR
+      ? [join(process.env.PI_CODING_AGENT_DIR, "npm", "node_modules", "zod")]
+      : []),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const manifest: { version?: string } = requireFromSchemas(join(candidate, "package.json"));
+      if (manifest.version !== ZOD_VERSION) continue;
+      const module: ZodNamespace = requireFromSchemas(candidate);
+      return module;
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error(`AgentOS OpenAI server compaction requires zod@${ZOD_VERSION}.`);
+}
+
+const { z } = loadZod();
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
 export type JsonObject = { [key: string]: JsonValue };
 
-export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+export const JsonValueSchema: Zod.ZodType<JsonValue> = z.lazy(() =>
   z.union([
     z.string(),
     z.number().finite(),
@@ -14,7 +48,7 @@ export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   ]),
 );
 
-export const JsonObjectSchema: z.ZodType<JsonObject> = z.record(z.string(), JsonValueSchema);
+export const JsonObjectSchema: Zod.ZodType<JsonObject> = z.record(z.string(), JsonValueSchema);
 
 const knownContentTypes = new Set(["input_text", "input_image", "output_text"]);
 const knownResponseTypes = new Set([
@@ -208,14 +242,14 @@ export const TerminalEventSchema = z
   })
   .catchall(JsonValueSchema);
 
-export type ResponseContentItem = z.infer<typeof ResponseContentItemSchema>;
-export type CompactionArtifact = z.infer<typeof CompactionArtifactSchema>;
-export type OpaqueProviderItem = z.infer<typeof OpaqueProviderItemSchema>;
-export type ResponseItem = z.infer<typeof ResponseItemSchema>;
-export type ResponseUsage = z.infer<typeof ResponseUsageSchema>;
-export type NativeCompactionState = z.infer<typeof NativeCompactionStateSchema>;
-export type ProviderRequestPayload = z.infer<typeof ProviderRequestPayloadSchema>;
-export type ProviderEvent = z.infer<typeof ProviderEventSchema>;
+export type ResponseContentItem = Zod.infer<typeof ResponseContentItemSchema>;
+export type CompactionArtifact = Zod.infer<typeof CompactionArtifactSchema>;
+export type OpaqueProviderItem = Zod.infer<typeof OpaqueProviderItemSchema>;
+export type ResponseItem = Zod.infer<typeof ResponseItemSchema>;
+export type ResponseUsage = Zod.infer<typeof ResponseUsageSchema>;
+export type NativeCompactionState = Zod.infer<typeof NativeCompactionStateSchema>;
+export type ProviderRequestPayload = Zod.infer<typeof ProviderRequestPayloadSchema>;
+export type ProviderEvent = Zod.infer<typeof ProviderEventSchema>;
 
 export function parseResponseItem(value: unknown): ResponseItem | undefined {
   const parsed = ResponseItemSchema.safeParse(value);

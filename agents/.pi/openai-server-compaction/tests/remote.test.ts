@@ -165,6 +165,31 @@ describe("OpenAI server compaction transport", () => {
     ).resolves.toEqual({ output: [artifact], usage: { input_tokens: 7, output_tokens: 2 } });
   });
 
+  test("rejects a stream whose only artifact is outside terminal output", async () => {
+    const artifact = { type: "compaction" as const, encrypted_content: "opaque-noncanonical" };
+    const sse = [
+      `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
+      `data: ${JSON.stringify({
+        type: "response.done",
+        response: {
+          status: "completed",
+          output: [{ type: "message", role: "user", content: [] }],
+        },
+      })}`,
+      "",
+    ].join("\n\n");
+
+    await expect(
+      requestServerCompaction({
+        model: model(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: async () => new Response(sse, { status: 200 }),
+      }),
+    ).rejects.toThrow("terminal output expected one artifact");
+  });
+
   test("rejects a completed stream without a canonical terminal output", async () => {
     const artifact = { type: "compaction" as const, encrypted_content: "opaque-no-terminal-output" };
     const sse = [
@@ -407,7 +432,7 @@ describe("OpenAI server compaction transport", () => {
     });
   });
 
-  test("omits malformed provider usage at the response boundary", async () => {
+  test("rejects malformed provider usage at the response boundary", async () => {
     const output = [{ type: "compaction" as const, encrypted_content: "opaque-usage" }];
 
     await expect(
@@ -429,7 +454,33 @@ describe("OpenAI server compaction transport", () => {
             { status: 200 },
           ),
       }),
-    ).resolves.toEqual({ output });
+    ).rejects.toThrow("invalid usage");
+  });
+
+  test("rejects malformed provider usage in the SSE terminal response", async () => {
+    const artifact = { type: "compaction" as const, encrypted_content: "opaque-sse-usage" };
+    const sse = [
+      `data: ${JSON.stringify({ type: "response.output_item.done", item: artifact })}`,
+      `data: ${JSON.stringify({
+        type: "response.done",
+        response: {
+          status: "completed",
+          output: [artifact],
+          usage: { input_tokens: "not-a-number", output_tokens: 2 },
+        },
+      })}`,
+      "",
+    ].join("\n\n");
+
+    await expect(
+      requestServerCompaction({
+        model: model(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: async () => new Response(sse, { status: 200 }),
+      }),
+    ).rejects.toThrow("invalid usage");
   });
 
   test("returns on the bounded deadline when fetch does not settle", async () => {

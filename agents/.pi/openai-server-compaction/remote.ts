@@ -205,7 +205,7 @@ async function parseCompactResponse(text: string): Promise<ServerCompactionResul
   if (artifacts.length !== 1) {
     throw new Error(`OpenAI server compaction expected one artifact, received ${artifacts.length}.`);
   }
-  const usage = parseResponseUsage(parsed.data.usage);
+  const usage = requiredResponseUsage(parsed.data.usage);
   return { output, ...(usage ? { usage } : {}) };
 }
 
@@ -308,6 +308,15 @@ function artifactFrom(value: unknown): CompactionArtifact | undefined {
   return isCompactionArtifact(value) ? value : undefined;
 }
 
+function requiredResponseUsage(value: unknown): ResponseUsage | undefined {
+  if (value === undefined) return undefined;
+  const usage = parseResponseUsage(value);
+  if (!usage) {
+    throw new Error("OpenAI server compaction returned invalid usage.");
+  }
+  return usage;
+}
+
 function recordArtifact(artifacts: Map<string, CompactionArtifact>, artifact: CompactionArtifact): void {
   const existing = artifacts.get(artifact.encrypted_content);
   if (existing && JSON.stringify(existing) !== JSON.stringify(artifact)) {
@@ -356,7 +365,7 @@ function parseCompactionEvents(events: ProviderEvent[]): ServerCompactionResult 
     if (response.status !== "completed") {
       throw new Error("OpenAI server compaction terminal response was not completed.");
     }
-    usage = parseResponseUsage(response.usage);
+    usage = requiredResponseUsage(response.usage);
     const parsedOutput = parseResponseItems(response.output);
     if (!parsedOutput || parsedOutput.length === 0) {
       throw new Error("OpenAI server compaction returned an invalid terminal response.");
@@ -376,6 +385,12 @@ function parseCompactionEvents(events: ProviderEvent[]): ServerCompactionResult 
   }
   if (!terminalOutput) {
     throw new Error("OpenAI server compaction returned no terminal output.");
+  }
+  const terminalArtifacts = terminalOutput.filter(artifactFrom);
+  if (terminalArtifacts.length !== 1) {
+    throw new Error(
+      `OpenAI server compaction terminal output expected one artifact, received ${terminalArtifacts.length}.`,
+    );
   }
   return { output: terminalOutput, ...(usage ? { usage } : {}) };
 }
