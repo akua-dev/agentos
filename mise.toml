@@ -7,6 +7,7 @@ vcluster = "0.35.2"
 ripgrep = "15.1.0"
 fd = "10.4.2"
 "github:ogulcancelik/herdr" = "0.7.3"
+"github:derailed/k9s" = "0.51.0"
 "github:kunchenguid/no-mistakes" = "1.40.0"
 "github:kunchenguid/treehouse" = "2.0.0"
 "npm:@earendil-works/pi-coding-agent" = "0.80.7"
@@ -15,7 +16,7 @@ fd = "10.4.2"
 "npm:chrome-devtools-axi" = "0.1.26"
 "npm:lavish-axi" = "0.1.42"
 "npm:quota-axi" = "0.1.5"
-"github:akua-dev/cli" = "v0.9.0"
+"github:akua-dev/cli" = "v0.9.0" # Upstream publishes glibc Linux archives, not musl.
 
 [tools."http:bun"]
 version = "1.4.0-canary.1+3979cbe80"

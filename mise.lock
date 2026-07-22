@@ -76,17 +76,7 @@ checksum = "sha256:524b421df58e841e9dba03fec2604542fe430af99a13d12c5251dceefba60
 url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-linux-arm64.tar.gz"
 url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182656"
 
-[tools."github:akua-dev/cli"."platforms.linux-arm64-musl"]
-checksum = "sha256:524b421df58e841e9dba03fec2604542fe430af99a13d12c5251dceefba603d7"
-url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182656"
-
 [tools."github:akua-dev/cli"."platforms.linux-x64"]
-checksum = "sha256:2e218fa0b41a42f6d4179396f8fec7a069ae57f8cb6650d323360ee2a92d0b93"
-url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-linux-x64.tar.gz"
-url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182657"
-
-[tools."github:akua-dev/cli"."platforms.linux-x64-musl"]
 checksum = "sha256:2e218fa0b41a42f6d4179396f8fec7a069ae57f8cb6650d323360ee2a92d0b93"
 url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-linux-x64.tar.gz"
 url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182657"
@@ -105,6 +95,45 @@ url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182655"
 checksum = "sha256:70610d549f04800e5627a68210e31d90a4e1da8cfd35460ba8847fb486329026"
 url = "https://github.com/akua-dev/cli/releases/download/v0.9.0/akua-v0.9.0-windows-x64.zip"
 url_api = "https://api.github.com/repos/akua-dev/cli/releases/assets/477182653"
+
+[[tools."github:derailed/k9s"]]
+version = "0.51.0"
+backend = "github:derailed/k9s"
+
+[tools."github:derailed/k9s"."platforms.linux-arm64"]
+checksum = "sha256:3ee05c82e5f9198928a4e86133608ba6a2c10a2244d6a7789e820f78319d640c"
+url = "https://github.com/derailed/k9s/releases/download/v0.51.0/k9s_Linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/derailed/k9s/releases/assets/440226045"
+
+[tools."github:derailed/k9s"."platforms.linux-arm64-musl"]
+checksum = "sha256:3ee05c82e5f9198928a4e86133608ba6a2c10a2244d6a7789e820f78319d640c"
+url = "https://github.com/derailed/k9s/releases/download/v0.51.0/k9s_Linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/derailed/k9s/releases/assets/440226045"
+
+[tools."github:derailed/k9s"."platforms.linux-x64"]
+checksum = "sha256:c3752ad51a5a4015a113819c4eeb6e55a4d0e4b8e652494797532f6fc8161dd7"
+url = "https://github.com/derailed/k9s/releases/download/v0.51.0/k9s_Linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/derailed/k9s/releases/assets/440224321"
+
+[tools."github:derailed/k9s"."platforms.linux-x64-musl"]
+checksum = "sha256:c3752ad51a5a4015a113819c4eeb6e55a4d0e4b8e652494797532f6fc8161dd7"
+url = "https://github.com/derailed/k9s/releases/download/v0.51.0/k9s_Linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/derailed/k9s/releases/assets/440224321"
+
+[tools."github:derailed/k9s"."platforms.macos-arm64"]
+checksum = "sha256:9b8c0e8f461e5d33aeee43a67f5ef4aff646a008a786887b8266cbb153c610cc"
+url = "https://github.com/derailed/k9s/releases/download/v0.51.0/k9s_Darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/derailed/k9s/releases/assets/440224326"
+
+[tools."github:derailed/k9s"."platforms.macos-x64"]
+checksum = "sha256:7e8802c57c45a0cd389e8fc38472243fe4cf48d8ad5957e189ce370e19e5eda0"
+url = "https://github.com/derailed/k9s/releases/download/v0.51.0/k9s_Darwin_amd64.tar.gz"
+url_api = "https://api.github.com/repos/derailed/k9s/releases/assets/440224322"
+
+[tools."github:derailed/k9s"."platforms.windows-x64"]
+checksum = "sha256:bba299f1877913979831543a008f2e104995d2ea4ac8f23d7f49c0444857d973"
+url = "https://github.com/derailed/k9s/releases/download/v0.51.0/k9s_Windows_amd64.zip"
+url_api = "https://api.github.com/repos/derailed/k9s/releases/assets/440224317"
 
 [[tools."github:kunchenguid/no-mistakes"]]
 version = "1.40.0"
