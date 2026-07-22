@@ -131,7 +131,7 @@ export async function runDiscordCli(
       if (axi) {
         write(renderAxiError(response.status, body, full));
       } else {
-        writeError(`Discord HTTP ${response.status}\n${body}`);
+        writeError(body);
       }
       return 1;
     }
@@ -237,9 +237,11 @@ function renderAxiSuccess(
     !full &&
     method.toUpperCase() === "GET" &&
     Array.isArray(value) &&
-    (value.every(isDiscordMessage) || isDiscordMessagesPath(path))
+    (value.length === 0
+      ? isDiscordMessagesPath(path)
+      : value.every(isDiscordMessage))
   ) {
-    const messages = value.filter(isDiscordMessage);
+    const messages = value as Array<Record<string, unknown>>;
     const visible = messages.slice(0, 20).map(projectDiscordMessage);
     return `${encode({
       summary: {

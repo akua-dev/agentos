@@ -175,6 +175,48 @@ describe("discord", () => {
     expect(result).not.toContain("not-useful");
   });
 
+  test("preserves mixed message-path arrays losslessly in AXI mode", async () => {
+    const output: string[] = [];
+
+    const exitCode = await runDiscordCli(
+      ["request", "GET", "/channels/123/messages?limit=2", "--axi"],
+      {
+        environment: { DISCORD_BOT_TOKEN: "bot-secret" },
+        fetchImpl: async () =>
+          Response.json([
+            { id: "1", channel_id: "123", content: "known" },
+            { kind: "unknown", content: "retained" },
+          ]),
+        write: (text) => output.push(text),
+        writeError: () => undefined,
+      },
+    );
+
+    const result = output.join("");
+    expect(exitCode).toBe(0);
+    expect(result).toContain("retained");
+    expect(result).not.toContain("summary:");
+  });
+
+  test("does not classify an empty non-message array in AXI mode", async () => {
+    const output: string[] = [];
+
+    const exitCode = await runDiscordCli(
+      ["request", "GET", "/users/@me", "--axi"],
+      {
+        environment: { DISCORD_BOT_TOKEN: "bot-secret" },
+        fetchImpl: async () => Response.json([]),
+        write: (text) => output.push(text),
+        writeError: () => undefined,
+      },
+    );
+
+    const result = output.join("");
+    expect(exitCode).toBe(0);
+    expect(result).not.toContain("summary:");
+    expect(result).not.toContain("empty: true");
+  });
+
   test("projects one Discord message read to a content-first AXI view", async () => {
     const output: string[] = [];
 
@@ -267,6 +309,8 @@ describe("discord", () => {
     const output: string[] = [];
     const errors: string[] = [];
     let requests = 0;
+    const providerBody =
+      '{"message":"You are being rate limited.","retry_after":1.25}';
 
     const exitCode = await runDiscordCli(
       ["request", "GET", "/channels/123/messages?limit=1"],
@@ -274,10 +318,7 @@ describe("discord", () => {
         environment: { DISCORD_BOT_TOKEN: "bot-secret" },
         fetchImpl: async () => {
           requests += 1;
-          return Response.json(
-            { message: "You are being rate limited.", retry_after: 1.25 },
-            { status: 429 },
-          );
+          return new Response(providerBody, { status: 429 });
         },
         readStdin: async () => "",
         write: (text) => output.push(text),
@@ -288,8 +329,7 @@ describe("discord", () => {
     expect(exitCode).toBe(1);
     expect(requests).toBe(1);
     expect(output).toEqual([]);
-    expect(errors.join("")).toContain("Discord HTTP 429");
-    expect(errors.join("")).toContain('"retry_after":1.25');
+    expect(errors).toEqual([providerBody]);
     expect(errors.join("")).not.toContain("bot-secret");
   });
 

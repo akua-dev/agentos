@@ -47,6 +47,7 @@ type ConnectionOutcome =
 
 const DISCORD_GATEWAY_INTENTS = 1 | 512 | 4_096 | 32_768;
 const FATAL_CLOSE_CODES = new Set([4_004, 4_010, 4_011, 4_012, 4_013, 4_014]);
+const NON_RESUMABLE_CLOSE_CODES = new Set([1_000, 1_001, 4_007, 4_009]);
 
 async function getGatewayUrl(options: DiscordGatewayOptions): Promise<string> {
   const base = options.apiBaseUrl ?? "https://discord.com/api/v10";
@@ -114,6 +115,15 @@ function connectOnce(
       });
       close();
     };
+    const afterProcessing = (callback: () => void) => {
+      const pending = processing;
+      void pending.then(() => {
+        if (!settled) callback();
+      });
+    };
+    const reconnectAfterProcessing = (canResume = true) => {
+      afterProcessing(() => reconnect(canResume));
+    };
     const fail = (error: Error) => {
       settle({ kind: "fatal", error });
       close();
@@ -129,7 +139,7 @@ function connectOnce(
     const sendHeartbeat = () => {
       if (settled || socket.readyState !== WebSocket.OPEN) return;
       if (!heartbeatAcknowledged) {
-        reconnect(true);
+        reconnectAfterProcessing(true);
         return;
       }
       heartbeatAcknowledged = false;
@@ -193,11 +203,11 @@ function connectOnce(
             return;
           }
           if (payload.op === 7) {
-            reconnect(true);
+            reconnectAfterProcessing(true);
             return;
           }
           if (payload.op === 9) {
-            reconnect(payload.d === true);
+            reconnectAfterProcessing(payload.d === true);
             return;
           }
           if (payload.op !== 0 || !payload.t || typeof payload.s !== "number") {
@@ -223,12 +233,14 @@ function connectOnce(
     const onClose = (event: CloseEvent) => {
       if (settled) return;
       if (FATAL_CLOSE_CODES.has(event.code)) {
-        fail(new Error(`Discord Gateway closed with fatal code ${event.code}`));
+        afterProcessing(() =>
+          fail(new Error(`Discord Gateway closed with fatal code ${event.code}`)),
+        );
       } else {
-        reconnect(event.code !== 1_000);
+        reconnectAfterProcessing(!NON_RESUMABLE_CLOSE_CODES.has(event.code));
       }
     };
-    const onError = () => reconnect(true);
+    const onError = () => reconnectAfterProcessing(true);
 
     options.signal?.addEventListener("abort", onAbort, { once: true });
     socket.addEventListener("message", onMessage);
