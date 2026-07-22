@@ -319,8 +319,8 @@ path.
 The extension preserves Pi's built-in `openai-codex` transport and supports both
 the configured direct OpenAI Responses endpoint and the gateway's Codex
 Responses endpoint. It uses bounded HTTP/SSE for Codex, bounded JSON for direct
-OpenAI Responses, and introduces no additional package or WebSocket runtime
-dependency. The gateway is body-blind: after authenticating, it strips only
+OpenAI Responses, and introduces no WebSocket runtime dependency. The gateway is
+body-blind: after authenticating, it strips only
 credential, gateway/session-routing and hop-by-hop headers, then forwards the
 remaining headers, request body and provider response opaquely without storing
 either body. AgentOS ships no provider-transport replacement or harness wrapper
