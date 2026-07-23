@@ -265,6 +265,87 @@ describe("Discord Gateway lifecycle", () => {
     }
   });
 
+  test("drains an accepted dispatch before completing shutdown", async () => {
+    const controller = new AbortController();
+    const restoreWebSocket = installShutdownWebSocket();
+    let startPersistence!: () => void;
+    let releasePersistence!: () => void;
+    let persistenceCompleted = false;
+    const persistenceStarted = new Promise<void>((resolve) => {
+      startPersistence = resolve;
+    });
+    const persistenceReleased = new Promise<void>((resolve) => {
+      releasePersistence = resolve;
+    });
+
+    const runPromise = runDiscordGateway({
+      token: "bot-secret",
+      fetchImpl: async () =>
+        Response.json({ url: "ws://discord.test/gateway" }),
+      signal: controller.signal,
+      async onDispatch(dispatch) {
+        if (dispatch.t !== "MESSAGE_CREATE") return;
+        startPersistence();
+        controller.abort();
+        await persistenceReleased;
+        persistenceCompleted = true;
+      },
+    });
+
+    try {
+      await persistenceStarted;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(persistenceCompleted).toBe(false);
+      releasePersistence();
+      await runPromise;
+      expect(persistenceCompleted).toBe(true);
+    } finally {
+      releasePersistence();
+      controller.abort();
+      restoreWebSocket();
+      await runPromise.catch(() => undefined);
+    }
+  });
+
+  test("surfaces a dispatch persistence failure during shutdown", async () => {
+    const controller = new AbortController();
+    const restoreWebSocket = installShutdownWebSocket();
+    let startPersistence!: () => void;
+    let releasePersistence!: () => void;
+    const persistenceStarted = new Promise<void>((resolve) => {
+      startPersistence = resolve;
+    });
+    const persistenceReleased = new Promise<void>((resolve) => {
+      releasePersistence = resolve;
+    });
+
+    const runPromise = runDiscordGateway({
+      token: "bot-secret",
+      fetchImpl: async () =>
+        Response.json({ url: "ws://discord.test/gateway" }),
+      signal: controller.signal,
+      async onDispatch(dispatch) {
+        if (dispatch.t !== "MESSAGE_CREATE") return;
+        startPersistence();
+        controller.abort();
+        await persistenceReleased;
+        throw new Error("shutdown persistence failed");
+      },
+    });
+
+    try {
+      await persistenceStarted;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      releasePersistence();
+      await expect(runPromise).rejects.toThrow("shutdown persistence failed");
+    } finally {
+      releasePersistence();
+      controller.abort();
+      restoreWebSocket();
+      await runPromise.catch(() => undefined);
+    }
+  });
+
   test("drains an accepted dispatch before resuming after a close", async () => {
     const controller = new AbortController();
     let startPersistence!: () => void;
@@ -488,3 +569,73 @@ describe("Discord Gateway lifecycle", () => {
     }
   });
 });
+
+function installShutdownWebSocket() {
+  const nativeWebSocket = globalThis.WebSocket;
+
+  class FakeWebSocket extends EventTarget {
+    static readonly OPEN = 1;
+    readyState = FakeWebSocket.OPEN;
+
+    constructor(_url: string | URL) {
+      super();
+      queueMicrotask(() => {
+        this.dispatchEvent(
+          new MessageEvent("message", {
+            data: JSON.stringify({
+              op: 10,
+              d: { heartbeat_interval: 100 },
+            }),
+          }),
+        );
+      });
+    }
+
+    send(value: string): void {
+      const payload = JSON.parse(value) as { op?: number };
+      if (payload.op !== 2) return;
+      queueMicrotask(() => {
+        this.dispatchEvent(
+          new MessageEvent("message", {
+            data: JSON.stringify({
+              op: 0,
+              t: "READY",
+              s: 1,
+              d: {
+                session_id: "session-1",
+                resume_gateway_url: "ws://discord.test/gateway",
+              },
+            }),
+          }),
+        );
+      });
+      queueMicrotask(() => {
+        this.dispatchEvent(
+          new MessageEvent("message", {
+            data: JSON.stringify({
+              op: 0,
+              t: "MESSAGE_CREATE",
+              s: 2,
+              d: { id: "message-1", channel_id: "channel-1" },
+            }),
+          }),
+        );
+      });
+    }
+
+    close(): void {
+      this.readyState = 3;
+    }
+  }
+
+  Object.defineProperty(globalThis, "WebSocket", {
+    configurable: true,
+    value: FakeWebSocket,
+  });
+  return () => {
+    Object.defineProperty(globalThis, "WebSocket", {
+      configurable: true,
+      value: nativeWebSocket,
+    });
+  };
+}

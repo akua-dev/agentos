@@ -223,6 +223,24 @@ describe("Discord external-event routing", () => {
     expect(acknowledgements).toEqual([]);
   });
 
+  test("ignores an authorless deletion for a message this process never accepted", async () => {
+    const { events, router } = setup();
+    await router.handle(
+      dispatch("READY", { user: { id: "firstmate-bot" } }, 1),
+    );
+
+    expect(
+      await router.handle(
+        dispatch("MESSAGE_DELETE", {
+          id: "unknown-message",
+          guild_id: "guild-1",
+          channel_id: "channel-owned",
+        }),
+      ),
+    ).toBe(false);
+    expect(events).toEqual([]);
+  });
+
   test("keeps relevant edits and deletion in the same conversation batch", async () => {
     const { events, router } = setup();
     await router.handle(

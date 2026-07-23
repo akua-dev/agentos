@@ -83,6 +83,7 @@ function connectOnce(
   let heartbeatTimer: ReturnType<typeof setTimeout> | undefined;
   let heartbeatAcknowledged = true;
   let settled = false;
+  let stopping = false;
   let processing = Promise.resolve();
 
   return new Promise<ConnectionOutcome>((resolve) => {
@@ -122,14 +123,20 @@ function connectOnce(
       });
     };
     const reconnectAfterProcessing = (canResume = true) => {
-      afterProcessing(() => reconnect(canResume));
+      afterProcessing(() => {
+        if (!settled && !stopping) reconnect(canResume);
+      });
     };
     const fail = (error: Error) => {
       settle({ kind: "fatal", error });
       close();
     };
     const onAbort = () => {
-      settle({ kind: "stopped" });
+      if (settled || stopping) return;
+      stopping = true;
+      afterProcessing(() => {
+        if (!settled) settle({ kind: "stopped" });
+      });
       try {
         socket.close(1_000, "shutdown");
       } catch {
@@ -137,7 +144,7 @@ function connectOnce(
       }
     };
     const sendHeartbeat = () => {
-      if (settled || socket.readyState !== WebSocket.OPEN) return;
+      if (settled || stopping || socket.readyState !== WebSocket.OPEN) return;
       if (!heartbeatAcknowledged) {
         reconnectAfterProcessing(true);
         return;
@@ -148,7 +155,7 @@ function connectOnce(
     const scheduleHeartbeat = (interval: number) => {
       const heartbeat = () => {
         sendHeartbeat();
-        if (!settled) heartbeatTimer = setTimeout(heartbeat, interval);
+        if (!settled && !stopping) heartbeatTimer = setTimeout(heartbeat, interval);
       };
       heartbeatTimer = setTimeout(
         heartbeat,
@@ -231,7 +238,7 @@ function connectOnce(
         );
     };
     const onClose = (event: CloseEvent) => {
-      if (settled) return;
+      if (settled || stopping) return;
       if (FATAL_CLOSE_CODES.has(event.code)) {
         afterProcessing(() =>
           fail(new Error(`Discord Gateway closed with fatal code ${event.code}`)),

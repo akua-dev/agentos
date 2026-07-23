@@ -103,6 +103,8 @@ export class DiscordEventRouter {
     if (!messageId || !channelId) return false;
     if (guildId && guildId !== this.#guildId) return false;
 
+    const wasAccepted = this.#acceptedMessageIds.has(messageId);
+    if (dispatch.t === "MESSAGE_DELETE" && !wasAccepted) return false;
     const author = asObject(dispatch.d.author);
     if (dispatch.t === "MESSAGE_CREATE" && !objectId(author)) return false;
 
@@ -110,7 +112,6 @@ export class DiscordEventRouter {
       ? await this.#resolveManagedCategory(channelId)
       : undefined;
     const isMention = mentionsUser(dispatch.d.mentions, this.#botUserId);
-    const wasAccepted = this.#acceptedMessageIds.has(messageId);
     const relevant = !guildId || Boolean(managedCategoryId) || isMention || wasAccepted;
     if (!relevant) return false;
 
