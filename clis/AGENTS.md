@@ -47,6 +47,11 @@ new command.
   for one PostgreSQL notification, print it, and exit,” which `psql` does not
   expose as a clean non-interactive command. It adds no Fleet policy, interprets
   no payload and remains useful outside AgentOS.
+- `composition-verify` qualifies because no native origin, filesystem or
+  harness CLI can validate the shared versioned manifest, canonical manifest
+  digest, exact selected material tree and absence of unselected context as one
+  deterministic boundary. It never fetches, copies, installs, loads or
+  activates material.
 
 Before adding another CLI, document the missing native capability and reject
 the addition if direct composition of reviewed tools already solves it.

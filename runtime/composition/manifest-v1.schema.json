@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/akua-dev/agentos/main/runtime/composition/manifest-v1.schema.json",
+  "title": "AgentOS resolved Agent composition manifest v1",
+  "type": "object",
+  "required": ["version", "harness", "materials"],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "harness": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "materials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "origin", "digest", "entrypoint"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+          },
+          "kind": {
+            "enum": ["instructions", "skill"]
+          },
+          "origin": {
+            "$ref": "#/$defs/origin"
+          },
+          "digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "entrypoint": {
+            "$ref": "#/$defs/safePath"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "skill"
+                }
+              },
+              "required": ["kind"]
+            },
+            "then": {
+              "properties": {
+                "entrypoint": {
+                  "type": "string",
+                  "pattern": "(^|/)SKILL\\.md$"
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": true
+      }
+    },
+    "composer": {
+      "$ref": "#/$defs/reference"
+    },
+    "profile": {
+      "$ref": "#/$defs/reference"
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "capability_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "access"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "access": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "authority_ref": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "origin": {
+      "type": "object",
+      "required": ["kind", "locator"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "locator": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "path": {
+          "$ref": "#/$defs/safePath"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      },
+      "additionalProperties": true
+    },
+    "reference": {
+      "type": "object",
+      "required": ["id", "origin", "digest"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$"
+        },
+        "origin": {
+          "$ref": "#/$defs/origin"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "additionalProperties": true
+    },
+    "safePath": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\)[^\\u0000-\\u001f\\u007f]{1,512}$"
+    }
+  }
+}

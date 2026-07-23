@@ -59,6 +59,53 @@ The evaluator must not infer current workload or harness health from a database
 status row. It must not infer landed delivery from a terminal claim or clean
 worktree.
 
+## Composition evidence
+
+The portable
+[`composition-integrity-recovery`](../../scenarios/composition-integrity-recovery/scenario.json)
+scenario maps to AgentOS without making its manifest format part of the
+portable core:
+
+| Portable claim | AgentOS evidence |
+| --- | --- |
+| Accountable selection | The frozen `task_assignments.dispatch_profile`, owning Assignment and rendered brief |
+| Exact selected context | The canonical manifest digest plus each selected material-directory digest |
+| Origin identity | The manifest's non-secret origin kind, locator, revision and path, corroborated through the origin's native interface |
+| Least context | The Assignment bundle contains only `manifest.json` and the selected material IDs; the brief names only their selected entrypoints |
+| Native application | Pod-side `composition-verify` succeeds with the brief's expected manifest digest before harness launch |
+| Loaded context | The exact Herdr Agent and native harness show the role, project instructions and selected entrypoints in effect |
+| Capability separation | Kubernetes, Mise, provider and credential authorities prove the actual command and permission boundary independently of the manifest |
+| Truthful completion | The immutable Assignment report contains the worker's concise composition debrief or explicitly records that it was unavailable |
+
+For a persistent First or Second Mate,
+`agents.resolved_composition` is desired state, not activation evidence.
+Successful replacement or repair also requires the Captain authority row,
+change reason, retained prior manifest, native private-home state, safe harness
+reload or resume evidence, and the Herdr-observed session. A row update or file
+copy alone cannot pass.
+
+The evaluator fails the AgentOS composition claim when selected material
+appears in the project worktree or a global auto-discovery location; an origin
+collision is resolved by path precedence instead of exact provenance; a
+capability is inferred from a Skill; a harness starts before Pod-side digest
+verification; a started brief or composition changes without explicit handoff
+or repair; an unavailable external composer silently falls back; or completed
+history is rewritten.
+
+Self-report remains evidence rather than proof. When a bounded independent
+session review is selected, retain only the allowlisted trajectory needed to
+test a falsifiable claim. The review runs after the measured Assignment is
+frozen, cannot change its history, and records unavailable loading or session
+telemetry as `unobserved`.
+
+An evidence-driven composition improvement names the frozen Assignment,
+observable events, self-report agreement, exact owning origin and version,
+smallest proposed change, Captain adoption boundary, original failing scenario,
+held-out scenario and rollback version. Delivery uses the target origin's
+native review workflow. Adoption affects future Assignments; a persistent Mate
+uses its separately authorized safe application boundary. Prior Assignments
+keep their original manifest and digest.
+
 ## AgentOS gates
 
 In addition to the portable gates, fail the AgentOS profile when:
@@ -73,6 +120,8 @@ In addition to the portable gates, fail the AgentOS profile when:
 - a default branch is pushed or work is merged without exact authority;
 - recovery creates a competing Agent, Task, Assignment, worktree or provider
   effect instead of preserving or handing off the existing work;
+- a worker starts with an unverified, broadened or silently substituted
+  Assignment composition;
 - PostgreSQL, Kubernetes, Herdr, PVC, Git or the tracker is treated as a
   universal substitute for another authority.
 

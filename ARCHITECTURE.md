@@ -82,11 +82,13 @@ the persistent role directory; an init container
 installs Node and the remaining startup-critical Fleet tools onto the Mate's persistent home.
 Ordinary tool additions remain in that Mise-managed home. Crewmates instead
 receive a task-suited image selected by the responsible Mate. The judgment-based
-dispatch profile
-may add an optional `image` beside `harness`, `model` and `effort`; omission uses
-the released lightweight default, while a remote image must come from an
-approved registry and be pinned by digest. Large language- or Codex-oriented
-images are therefore explicit task costs, not the universal fleet runtime.
+dispatch profile records the concrete harness and may preserve its other
+resolved native choices in an opaque `settings` object. Model, effort, fast
+mode, compaction, context limits and image are examples rather than AgentOS
+schema fields. An omitted image choice uses the released lightweight default;
+a remote image must come from an approved registry and be pinned by digest.
+Large language- or Codex-oriented images are therefore explicit task costs,
+not the universal fleet runtime.
 Read-heavy Scouts may opt into a separate ArtifactFS image and a reviewed
 platform-specific FUSE Pod profile for fast lazy access to large or multiple
 repositories. ArtifactFS is never installed in the common Mate image, and its
@@ -208,6 +210,71 @@ Agent home, Fleet rows, task briefs or source control; only non-secret scope,
 expiry and Secret references may be recorded. Repository permissions are a
 Captain-reviewed provider boundary, not Fleet authority; the accepted delivery
 workflow still controls which write or merge is allowed.
+
+## Agent composition
+
+AgentOS composes an Agent from one versioned manifest rather than introducing
+fixed occupational roles or an extension registry. The same contract can name
+Markdown instructions and Agent Skills together with the selected harness,
+opaque harness-native settings and non-secret capability requirements.
+`harness` is the only runtime choice AgentOS interprets. Structural identity,
+Assignment authority and real provider, database and Kubernetes permissions
+remain outside that manifest and always outrank it.
+The top-level envelope is closed for each manifest version; runtime evolution
+belongs inside opaque `settings`, not in an expanding list of AgentOS fields.
+
+`agents.resolved_composition` is the desired persistent composition for a
+First or Second Mate. `task_assignments.dispatch_profile` pins the resolved
+composition for one Assignment. PostgreSQL validates their common versioned
+shape and identity match; it stores neither material bodies nor credentials.
+Origins remain independently owned Git repositories, filesystems, object
+stores or other Captain-approved authorities. A Mate discovers and fetches
+them with their native interfaces.
+
+AgentOS supplies structural and content-digest validation, not an activation
+workflow. The responsible Mate loads `$agentos-composition`, inspects the real
+runtime and uses native origin, filesystem and harness interfaces to arrange
+the selected context. It chooses a safe update and rollback approach for that
+Agent's actual scope, then verifies the exact observed harness before claiming
+the resolved setup is active. No AgentOS command publishes files, edits Pi
+settings or maintains a second activation state.
+
+Mise configuration, CLIs, MCP servers, harness extensions, images,
+environment, credentials, provider access and Kubernetes RBAC remain native
+runtime capabilities. Selected Skills may teach a Mate how to arrange them
+under existing authority, but the composition contract neither installs them
+nor adds a material kind for their current implementation.
+
+For a persistent Mate, First Mate records Captain-authorized desired
+composition before applying it at a safe native harness boundary. The
+immediately prior manifest and change reason remain available for explicit
+repair, while native files and Herdr remain observed state. For an Assignment,
+the supervising Mate stages exact material outside project and auto-discovery
+paths, pins the manifest with the authoritative brief, verifies the scoped
+bundle in the child home and only then starts the harness. Once execution
+starts, the brief, start time and composition are immutable; changed material
+requires a handoff or replacement Assignment. A narrow, reasoned First-Mate
+Function can repair proven corrupt active dispatch data while retaining its
+prior values; completed history remains immutable. An Agent harness cannot
+drift away from an active Assignment.
+
+Composition origins are plural and storage-neutral. An optional
+Captain-selected external composer may interpret company profiles and several
+native origins, but the built-in Skill retains validation and authority
+boundaries. Git is the easiest reviewable default, not an AgentOS storage API.
+Unknown origin kinds do not require core schema changes.
+
+Every reachable Crewmate returns a concise composition debrief before
+completion. Failures, unusual retry patterns, composition changes and selected
+samples may receive a bounded independent review of observable session
+evidence. Findings route to a separate improvement Assignment against the
+authority that owns the material. Adoption uses that target's native reviewed
+workflow, applies only to future work or a safe persistent-Mate boundary and
+retains rollback. Completion never edits its controlling policy automatically.
+
+Composition selection, application, review and improvement remain conditional
+Agent judgment taught by the composition Skill. Deterministic runtime code owns
+only the generic manifest, canonical digest and material-integrity guarantees.
 
 ## Toolchains and worktrees
 
@@ -553,7 +620,7 @@ checkout while keeping operational roles out of contributor sessions:
 - `.agents/skills/` contains workflows that apply from every AgentOS checkout
   working directory: repository development, organization evaluation and
   post-evaluation improvement review;
-- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including delegation, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including composition, delegation, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
 - `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
 - a future subtree under `clis/`, `packages/` or `services/` may add its own `.agents/skills/` when development there needs a reusable workflow.
@@ -635,6 +702,8 @@ workspace. The tree reflects ownership, not deployment order:
 │       └── kubernetes/               reusable separate-Pod worker base
 ├── clis/
 │   ├── AGENTS.md                     admission boundary for shipped commands
+│   ├── composition-verify/           exact composition-bundle verifier
+│   ├── github-app-token/             short-lived installation-token minting
 │   └── pg-listen/                    one-notification PostgreSQL primitive
 ├── database/
 │   ├── AGENTS.md                     SQL-first schema-development boundary
@@ -644,6 +713,7 @@ workspace. The tree reflects ownership, not deployment order:
 │   └── tests/                        behavioral PGlite contract tests
 ├── runtime/
 │   ├── AGENTS.md                     shared persistent-Agent runtime boundary
+│   ├── composition/                  context-manifest and digest validation
 │   ├── kubernetes/base/              retained-home Agent StatefulSet
 │   ├── kubernetes/mate/              Pi lifecycle for First/Second Mate
 │   ├── *.ts                          typed image and home lifecycle mechanics
@@ -729,6 +799,8 @@ workspace keeps one `bun.lock`.
 - `agents/.agents/skills/` contains operational workflows shared by First and
   Second Mate without exposing them to contributor or runtime-development
   sessions.
+- `agents/.agents/skills/agentos-composition/` owns model-directed composition
+  selection, native application and observed verification.
 - `agents/firstmate/` and `agents/secondmate/` contain the two persistent role instruction surfaces, their Pi configuration and role-scoped skills.
 - `agents/crewmate/BRIEF.md` is the canonical bounded-worker contract rendered into each Assignment brief.
 - `agents/crewmate/images/` owns optional task-specific worker images; it never

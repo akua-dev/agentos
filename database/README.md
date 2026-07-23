@@ -181,3 +181,43 @@ configuration forward while retaining `receive_inbox` execution. In particular,
 adding the receipt primitive must not erase Second Mate's later Captain-domain,
 Assignment-artifact or durable-coordination privileges. The full authorization
 and coordination suites exercise the preserved grants with real roles.
+
+`0011_agent_composition.sql` defines one versioned composition-manifest
+contract for persistent Agents and bounded Assignments. A nullable
+`agents.resolved_composition` is desired persistent state; the existing
+`task_assignments.dispatch_profile` becomes the pinned Assignment-scoped form
+of the same contract. PostgreSQL validates recognized material kinds, exact
+provenance, content digests, safe relative entrypoints and matching harness
+identity. The recognized materials are Markdown instructions and Agent Skills;
+all other native runtime choices are preserved as opaque `settings` that
+PostgreSQL deliberately does not interpret. The versioned top-level envelope
+is closed so new native knobs cannot leak back into the core schema. Runtime
+capabilities such as Mise, MCP and harness extensions remain native rather than
+becoming material kinds.
+Existing dispatch profiles are upgraded in place without losing their runtime
+choices. Every registered Agent keeps the complete read view, while no child
+runtime receives a new composition-update grant. The pure manifest validators
+remain executable for registered table writers because PostgreSQL evaluates
+the Assignment `CHECK` as its caller; the persistent mutation Functions remain
+closed.
+`tests/composition-manifests.test.ts` exercises accepted and rejected manifests,
+harness consistency and real role permissions against the complete chain.
+
+An Assignment's `brief`, `started_at` and `dispatch_profile` freeze when
+execution starts. Its Agent cannot change to a harness that contradicts an
+active Assignment. Genuinely corrupt active dispatch data can be corrected only
+through `agentos.repair_task_assignment_dispatch` by First Mate with the
+complete replacement brief, valid matching composition and a durable reason;
+the prior values remain in Assignment metadata. Completed Assignment history
+cannot be repaired in place.
+
+Persistent composition changes go through
+`agentos.replace_agent_composition` with an active Fleet- or Agent-scoped
+Captain row under the exact `agent-composition-authority` topic and a durable
+reason. An unrelated Captain preference is not mutation authority. Only First
+Mate can change its own or a direct Second Mate's desired composition; the
+immediately prior manifest is retained
+in Agent metadata for one explicit rollback. Incorrect durable state uses the
+separate `agentos.repair_agent_composition` path so repair is visible rather
+than disguised as ordinary selection. These rows still do not claim that Pi,
+files or Herdr loaded the desired setup.

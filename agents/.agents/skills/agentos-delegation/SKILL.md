@@ -67,7 +67,12 @@ Use released PostgreSQL schema for durable coordination and native tools against
    required repositories and permissions through the auth Skill. A child that
    lacks scope requests the exact delta upward; it never receives First Mate's
    App key or silently falls back to another identity.
-2. Select a reviewed harness, model, effort and image that fit the task and recorded Captain policy.
+2. Load `$agentos-composition`, then select the smallest reviewed composition
+   that fits the task and recorded Captain policy. Resolve the concrete harness,
+   ordered instruction and Skill material, opaque native settings and non-secret
+   capability requirements into the versioned Assignment manifest. Model,
+   effort, image and every other harness-native knob belong under `settings`;
+   never restore the legacy flat dispatch-profile shape.
    Keep First and Second Mates on Pi; permit a worker harness only when the selected release verifies it.
    Require remote images to be approved and pinned by digest.
    Load `$agentos-harnesses`; consult scoped natural-language dispatch policy
@@ -78,10 +83,10 @@ Use released PostgreSQL schema for durable coordination and native tools against
    at an unresolved login prompt.
 3. Ensure the target Agent identity is active and inside the caller's managed hierarchy.
    If the selected release lacks an authorized Agent-provisioning primitive, request the parent Mate to provision it; never bypass grants or invent SQL.
-4. Create the Task and active Assignment before starting asynchronous work.
+4. Create the Task and Assignment before starting asynchronous work.
    Set `created_by_agent_id` and `assigned_by_agent_id` to the authenticated
-   Mate, store the complete brief in `task_assignments.brief`, store harness and
-   any selected model, effort or immutable image in `dispatch_profile`, and
+   Mate, store the complete brief in `task_assignments.brief`, store the complete
+   versioned resolved composition in `dispatch_profile`, and
    set `assignment_role` to `ship` or `scout` with concise explanatory status
    text. The brief must name the selected delivery workflow, delivery target,
    authorized outward effects, merge authority and achievable Definition of
@@ -92,8 +97,10 @@ Use released PostgreSQL schema for durable coordination and native tools against
    marker with the owning Mate, Agent, Task, Assignment, work kind, project,
    primary checkout, workspace kind, isolated workspace, outcome, acceptance
    criteria, constraints, delivery workflow, delivery target, authorized
-   outward effects, merge authority and Definition of Done. Reject an unresolved
-   marker or contradictory ship contract. Copy it to the Agent-owned
+   outward effects, merge authority, Definition of Done, Assignment composition
+   bundle, manifest digest, selected entrypoints and capability requirements.
+   Use explicit `None` values when no optional material or requirement was
+   selected. Reject an unresolved marker or contradictory ship contract. Copy it to the Agent-owned
    `AGENTOS_BRIEF_PATH` before harness launch and regenerate it from PostgreSQL
    after loss; the PVC file is not a second authority. Put longer supporting
    context in the Task body rather than a terminal message.
@@ -105,8 +112,11 @@ Use released PostgreSQL schema for durable coordination and native tools against
    promoted directly into delivered work.
 7. Create the dedicated workload from `../crewmate/kubernetes/base` through a
    reviewed per-Agent Kustomize overlay and native kubectl, then start the
-   selected harness through the pod-local Herdr CLI with the complete rendered
-   brief as its initial prompt. Before launch, provision and verify the selected
+   selected harness through the pod-local Herdr CLI only after the complete
+   rendered brief and exact Assignment-scoped composition bundle have been
+   delivered to the child home and verified there through their recorded
+   digests. Load `$agentos-composition` for that pre-launch boundary. Before
+   launch, provision and verify the selected
    direct credential or standing-authorized ai-gateway client boundary without
    copying another Agent's provider auth.
    Confirm its Agent identity, Task Assignment, PVC, pod and Herdr session without treating terminal text as durable state.
@@ -188,7 +198,10 @@ Use released PostgreSQL schema for durable coordination and native tools against
    delivery and applies the state effect atomically; load `$agentos-database`
    rather than splitting those writes across turns.
 2. Store the final or handoff report, then end the Assignment with explanatory
-   status and timestamp. For ship work, record branch, commit, review URL when
+   status and timestamp. Include the composition Skill's concise debrief while
+   the worker still holds its task context; if the worker is unavailable,
+   record that honestly and preserve only the bounded evidence needed for a
+   selected independent review. For ship work, record branch, commit, review URL when
    applicable, validation result and current delivery state. Add a remote review
    URL to the Task's `external_links`; do not call the Assignment review-ready
    while its declared artifact is missing.

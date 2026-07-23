@@ -1,0 +1,13 @@
+{
+  "name": "@agentos/composition-verify",
+  "version": "0.0.0",
+  "description": "Verify one resolved Agent composition bundle",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "composition-verify": "./composition-verify.ts"
+  },
+  "dependencies": {
+    "ajv": "8.20.0"
+  }
+}

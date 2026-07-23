@@ -45,6 +45,13 @@ and preserve it.
   in one short transaction.
 - Keep the complete Assignment brief, final or handoff report, concrete dispatch
   profile and append-only handoff history in `task_assignments`.
+- Keep Agent- and Assignment-scoped composition on the shared versioned
+  manifest contract. Freeze the Assignment brief and composition at execution
+  start, block active harness drift, and expose only the released reasoned
+  First-Mate repair for corrupt active dispatch data; completed history remains
+  immutable. Keep persistent replacement or repair behind the released
+  Captain-authorized Functions. PostgreSQL records desired composition and the
+  immediate rollback manifest; native harness state remains observed authority.
 - Preserve accepted provider payloads intact in `external_events.payload`. The same event rows own their small burst, claim and reconciliation state; do not add a reconciliation table or background outbox.
 - Keep `agentos_events` notifications as small transactional wake hints only.
   Never put row contents, credentials or durable delivery state in a payload;
