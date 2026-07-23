@@ -14,7 +14,9 @@ Function.
   evidence and reconciliation; do not add a cursor table, queue, cache file or
   another database schema.
 - Accept only configured guild/category traffic, explicit bot mentions and
-  direct messages. Ignore bot and webhook authors to prevent feedback loops.
+  direct messages, plus lifecycle updates and deletes for messages this process
+  already accepted. Ignore unknown deletes and bot or webhook authors to prevent
+  fabricated evidence and feedback loops.
 - Preserve complete accepted Gateway dispatches except temporary provider
   credentials. Redact an interaction token before persistence, name the
   redacted field in request metadata, and retain the real token in memory only

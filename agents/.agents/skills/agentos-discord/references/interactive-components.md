@@ -90,11 +90,11 @@ like an informational acknowledgement.
 ## Reconcile a click
 
 The Gateway delivers a recognized component as `INTERACTION_CREATE`. Ingress
-accepts it only inside a managed category, replaces the temporary interaction
-token with `[REDACTED]`, persists it through
-`agentos.ingest_external_event`, and then acknowledges the provider. The
-ordinary `pg-listen agentos_events` continuity wait wakes the Mate; no second
-Discord-specific Pi message exists.
+accepts it inside a managed category for guild interactions or in a direct
+message, replaces the temporary interaction token with `[REDACTED]`, persists it
+through `agentos.ingest_external_event`, and then acknowledges the provider.
+The ordinary `pg-listen agentos_events` continuity wait wakes the Mate; no
+second Discord-specific Pi message exists.
 
 When reconciling:
 

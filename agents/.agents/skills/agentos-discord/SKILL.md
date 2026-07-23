@@ -267,9 +267,11 @@ custom message, not two turns. Rearm the continuity wait after reconciliation;
 the supervision guard may remind you only when that lifecycle evidence is
 missing.
 
-The ingress accepts human message creates, edits and deletes in the managed
-category or its descendants, direct messages, explicit bot mentions elsewhere
-in the selected guild, and generic AgentOS component or modal interactions. It
+The ingress accepts human message creates and edits in the managed category or
+its descendants, direct messages, or explicit bot mentions elsewhere in the
+selected guild. It also accepts lifecycle updates and deletes for messages
+already accepted by this process; unknown deletes are ignored. Generic AgentOS
+component or modal interactions follow the same configured-surface filter. It
 ignores bot and webhook authors. It stores the Gateway dispatch in
 `external_events` with temporary interaction reply tokens explicitly redacted,
 then lets the released quiet/max window coalesce related activity before a

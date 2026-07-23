@@ -45,7 +45,11 @@ and preserve it.
   in one short transaction.
 - Keep the complete Assignment brief, final or handoff report, concrete dispatch
   profile and append-only handoff history in `task_assignments`.
-- Preserve accepted provider payloads intact in `external_events.payload`. The same event rows own their small burst, claim and reconciliation state; do not add a reconciliation table or background outbox.
+- Preserve accepted provider payload semantics in `external_events.payload`; an
+  approved ingress may replace temporary provider credentials with explicit
+  redaction markers before persistence. The same event rows own their small
+  burst, claim and reconciliation state; do not add a reconciliation table or
+  background outbox.
 - Keep `agentos_events` notifications as small transactional wake hints only.
   Never put row contents, credentials or durable delivery state in a payload;
   listeners must query authorized Fleet rows after wake.

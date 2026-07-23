@@ -491,12 +491,14 @@ Component delivery labels preserve follow-up, steering or stop intent for the
 Mate to reconcile; the current release does not claim immediate Pi steering or
 hard cancellation without a reviewed public Pi control boundary.
 
-By default, ingress accepts human messages, edits and deletes in explicitly
-managed categories and their descendants, direct messages, and explicit bot
-mentions elsewhere in the selected guild. General server history remains
-pull-on-demand context instead of a model-triggering firehose. Discord actor and
-role identity is checked against Captain-approved authority before a Mate acts;
-guild membership alone is not Captain authority.
+By default, ingress accepts human message creates and edits in explicitly
+managed categories and their descendants, direct messages, or explicit bot
+mentions elsewhere in the selected guild. It also accepts lifecycle updates and
+deletes for messages already accepted by this process; unknown deletes are
+ignored. General server history remains pull-on-demand context instead of a
+model-triggering firehose. Discord actor and role identity is checked against
+Captain-approved authority before a Mate acts; guild membership alone is not
+Captain authority.
 
 Outbound effects use the raw `discord request` REST primitive synchronously,
 with JSON on standard input and the real provider status returned to the Mate.
