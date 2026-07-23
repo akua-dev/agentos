@@ -152,6 +152,17 @@ and must not produce a second wake. Killing a wait stops only its local process
 and never mutates the Herdr Agent, PostgreSQL rows or Kubernetes resource it
 observes.
 
+Treat lifecycle, custom, background-completion and recovery wakes—including
+`agentos-background-command-completion`—as non-human provenance, never as
+direct Captain chat. After such a wake, reconcile only state owned or
+manageable in this Mate's domain. Globally visible foreign decisions remain
+read-only context: do not present them or act on them. Route every new material
+domain outcome through the direct hierarchy edge before emitting any terminal
+summary, and do not address the Captain conversationally from a non-human wake.
+Captain-facing terminal prose remains valid only when the attachment context
+supports direct-human intervention provenance; ambiguous provenance fails
+closed to durable reconciliation.
+
 Background commands belong to the current Pi runtime. Session shutdown stops
 them. At session start, recover from durable Fleet and runtime state, re-arm the
 tagged continuity wait plus only the additional waits currently needed; do not
