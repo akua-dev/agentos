@@ -43,8 +43,8 @@ and preserve it.
   future speech act with a state effect: one released idempotent Function must
   record the response, close the delivery and apply the coupled state mutation
   in one short transaction.
-- Keep the complete Assignment brief, final or handoff report, concrete dispatch
-  profile and append-only handoff history in `task_assignments`.
+- Keep the complete Assignment brief, final or handoff report, versioned
+  composition manifest and append-only handoff history in `task_assignments`.
 - Keep Agent- and Assignment-scoped composition on the shared versioned
   manifest contract. Freeze the Assignment brief and composition at execution
   start, block active harness drift, and expose only the released reasoned
