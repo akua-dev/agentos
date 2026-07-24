@@ -32,7 +32,7 @@ export async function verifyCompositionBundle(
   expectedManifestDigest?: string,
 ) {
   const bundle = resolve(directory);
-  const root = await lstat(bundle);
+  const root = await lstat(bundle, { bigint: true });
   if (root.isSymbolicLink() || !root.isDirectory()) {
     throw new Error("composition bundle must be a non-symlink directory");
   }
@@ -54,36 +54,12 @@ export async function verifyCompositionBundle(
 
   const selected = new Set(manifest.materials.map((material) => material.id));
   const materialsDirectory = join(bundle, "materials");
-  const allowedRootEntries = new Set(["manifest.json"]);
-  if (manifest.materials.length > 0) allowedRootEntries.add("materials");
-
-  for (const entry of await readdir(bundle, { withFileTypes: true })) {
-    if (!allowedRootEntries.has(entry.name)) {
-      throw new Error(`composition bundle contains unselected entry: ${entry.name}`);
-    }
-  }
-
-  if (manifest.materials.length > 0) {
-    const materialsMetadata = await lstat(materialsDirectory);
-    if (materialsMetadata.isSymbolicLink() || !materialsMetadata.isDirectory()) {
-      throw new Error(
-        "composition materials directory must be a non-symlink directory",
-      );
-    }
-    const entries = await readdir(materialsDirectory, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!selected.has(entry.name)) {
-        throw new Error(`composition bundle contains unselected material: ${entry.name}`);
-      }
-      const path = join(materialsDirectory, entry.name);
-      const metadata = await lstat(path);
-      if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
-        throw new Error(
-          `composition material must be a non-symlink directory: ${entry.name}`,
-        );
-      }
-    }
-  }
+  await verifySelectedBundleEntries(
+    bundle,
+    materialsDirectory,
+    selected,
+    manifest.materials.length > 0,
+  );
 
   for (const material of manifest.materials) {
     const materialDirectory = join(materialsDirectory, material.id);
@@ -109,10 +85,64 @@ export async function verifyCompositionBundle(
     }
   }
 
+  await verifySelectedBundleEntries(
+    bundle,
+    materialsDirectory,
+    selected,
+    manifest.materials.length > 0,
+  );
+  const rootAfter = await lstat(bundle, { bigint: true });
+  if (
+    rootAfter.isSymbolicLink() ||
+    !rootAfter.isDirectory() ||
+    metadataChanged(root, rootAfter) ||
+    (await realpath(bundle)) !== bundleRealPath
+  ) {
+    throw new Error("composition bundle changed while verifying");
+  }
+
   return {
     manifest_digest: manifestDigest,
     materials: manifest.materials.length,
   };
+}
+
+async function verifySelectedBundleEntries(
+  bundle: string,
+  materialsDirectory: string,
+  selected: Set<string>,
+  hasMaterials: boolean,
+) {
+  const allowedRootEntries = new Set(["manifest.json"]);
+  if (hasMaterials) allowedRootEntries.add("materials");
+
+  for (const entry of await readdir(bundle, { withFileTypes: true })) {
+    if (!allowedRootEntries.has(entry.name)) {
+      throw new Error(`composition bundle contains unselected entry: ${entry.name}`);
+    }
+  }
+
+  if (!hasMaterials) return;
+  const materialsMetadata = await lstat(materialsDirectory);
+  if (materialsMetadata.isSymbolicLink() || !materialsMetadata.isDirectory()) {
+    throw new Error(
+      "composition materials directory must be a non-symlink directory",
+    );
+  }
+  for (const entry of await readdir(materialsDirectory, {
+    withFileTypes: true,
+  })) {
+    if (!selected.has(entry.name)) {
+      throw new Error(`composition bundle contains unselected material: ${entry.name}`);
+    }
+    const path = join(materialsDirectory, entry.name);
+    const metadata = await lstat(path);
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+      throw new Error(
+        `composition material must be a non-symlink directory: ${entry.name}`,
+      );
+    }
+  }
 }
 
 function verifySkillEntrypoint(
@@ -173,7 +203,9 @@ async function readManifest(
 ): Promise<CompositionManifest> {
   const file = await open(
     path,
-    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+    constants.O_RDONLY |
+      (constants.O_NOFOLLOW ?? 0) |
+      (constants.O_NONBLOCK ?? 0),
   );
   try {
     const before = await file.stat({ bigint: true });

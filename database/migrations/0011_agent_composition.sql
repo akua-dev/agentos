@@ -141,7 +141,12 @@ BEGIN
        OR NOT agentos.valid_composition_path(v_material ->> 'entrypoint')
        OR (
          v_material ->> 'kind' = 'skill'
-         AND v_material ->> 'entrypoint' <> 'SKILL.md'
+         AND (
+           v_material ->> 'entrypoint' <> 'SKILL.md'
+           OR length(v_material ->> 'id') > 64
+           OR v_material ->> 'id'
+              !~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+         )
        ) THEN
       RETURN false;
     END IF;
@@ -215,7 +220,6 @@ BEGIN
   v_legacy_dispatch_upgrade :=
     jsonb_typeof(OLD.dispatch_profile) = 'object'
     AND OLD.dispatch_profile ? 'harness'
-    AND NOT OLD.dispatch_profile ? 'version'
     AND NEW.dispatch_profile IS NOT DISTINCT FROM jsonb_build_object(
       'version', 1,
       'harness', OLD.dispatch_profile ->> 'harness',
@@ -307,12 +311,11 @@ UPDATE agentos.task_assignments AS assignment
    SET dispatch_profile =
          jsonb_build_object(
            'version', 1,
-           'harness', agent.harness,
+           'harness', assignment.dispatch_profile ->> 'harness',
            'materials', '[]'::jsonb,
            'settings', assignment.dispatch_profile - 'harness'
          )
-  FROM agentos.agents AS agent
- WHERE agent.id = assignment.agent_id;
+ WHERE assignment.dispatch_profile ? 'harness';
 
 ALTER TABLE agentos.task_assignments
   ALTER COLUMN dispatch_profile DROP DEFAULT,
@@ -374,7 +377,8 @@ BEGIN
   SELECT agent.harness
     INTO v_agent_harness
     FROM agentos.agents AS agent
-   WHERE agent.id = NEW.agent_id;
+   WHERE agent.id = NEW.agent_id
+   FOR SHARE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Assignment composition requires an existing Agent';

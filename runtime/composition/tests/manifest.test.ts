@@ -177,6 +177,10 @@ describe("composition manifest preflight", () => {
       },
       {
         ...manifest(),
+        materials: [material("invalid_skill", "skill")],
+      },
+      {
+        ...manifest(),
         materials: [
           {
             ...material("blank-origin", "skill"),
@@ -334,6 +338,22 @@ describe("composition material digest", () => {
     await expect(digesting).rejects.toThrow(
       /changed while hashing|changed path identity|resolves outside/,
     );
+  });
+
+  test("rejects a file added below an already-scanned nested directory", async () => {
+    const directory = await temporaryDirectory(
+      "agentos-composition-nested-race-",
+    );
+    const nested = join(directory, "nested");
+    await mkdir(nested);
+    await writeFile(join(nested, "000-large.bin"), "");
+    await truncate(join(nested, "000-large.bin"), 128 * 1024 * 1024);
+
+    const digesting = digestMaterialDirectory(directory);
+    await Bun.sleep(5);
+    await writeFile(join(nested, "late.md"), "not in the snapshot\n", "utf8");
+
+    await expect(digesting).rejects.toThrow(/changed while hashing/);
   });
 });
 

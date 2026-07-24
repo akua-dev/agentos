@@ -47,6 +47,11 @@
             },
             "then": {
               "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                },
                 "entrypoint": {
                   "type": "string",
                   "const": "SKILL.md"

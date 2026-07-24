@@ -5,10 +5,12 @@ import {
   rename,
   rm,
   symlink,
+  truncate,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { verifyCompositionBundle } from "../composition-verify.ts";
 import { digestMaterialDirectory } from "../../../runtime/composition/digest.ts";
 import {
   canonicalCompositionJson,
@@ -88,6 +90,28 @@ describe("composition-verify", () => {
     expect(result.stderr).toContain("unselected material");
   });
 
+  test("rejects a top-level entry added while material verification runs", async () => {
+    const { bundle, manifest } = await createBundle();
+    const materialDirectory = join(bundle, "materials", "delivery");
+    await writeFile(join(materialDirectory, "000-large.bin"), "");
+    await truncate(join(materialDirectory, "000-large.bin"), 128 * 1024 * 1024);
+    manifest.materials[0]!.digest =
+      await digestMaterialDirectory(materialDirectory);
+    await writeFile(
+      join(bundle, "manifest.json"),
+      `${canonicalCompositionJson(manifest)}\n`,
+      "utf8",
+    );
+
+    const verifying = verifyCompositionBundle(bundle);
+    await Bun.sleep(10);
+    await writeFile(join(bundle, "late.md"), "not selected\n", "utf8");
+
+    await expect(verifying).rejects.toThrow(
+      /unselected entry|changed while verifying/,
+    );
+  });
+
   test("rejects a materials directory that points outside the bundle", async () => {
     const { bundle } = await createBundle();
     const externalDirectory = await mkdtemp(
@@ -153,19 +177,6 @@ describe("composition-verify", () => {
     expect(result.stderr).toContain(
       "Skill delivery requires a non-empty description",
     );
-  });
-
-  test("rejects a material ID that is not a valid Skill name", async () => {
-    const { bundle } = await createBundle({
-      materialId: "delivery.v2",
-      skillName: "delivery.v2",
-    });
-
-    const result = await run(bundle);
-
-    expect(result.exitCode).toBe(1);
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toContain("Skill delivery.v2 has an invalid Skill name");
   });
 
   test("rejects a Skill description too large for native discovery", async () => {

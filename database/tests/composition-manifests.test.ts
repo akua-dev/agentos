@@ -139,10 +139,14 @@ beforeAll(async () => {
       '${ids.firstMate}', 'worker', 'completed', 'Legacy work completed',
       'Prove the migration preserves every native knob.',
       'Legacy work remains immutable after its representation upgrade.',
-      '{"harness":"codex","model":"gpt-5.6-sol","effort":"medium","fast_mode":true,"compaction":{"strategy":"server"},"context_limit":200000}'::jsonb,
+      '{"harness":"codex","version":"native-setting","model":"gpt-5.6-sol","effort":"medium","fast_mode":true,"compaction":{"strategy":"server"},"context_limit":200000}'::jsonb,
       transaction_timestamp() - interval '1 minute',
       transaction_timestamp()
     );
+
+    UPDATE agentos.agents
+       SET harness = 'codex-next'
+     WHERE id = '${ids.legacyCrewmate}';
   `);
 
   const migration = await import(
@@ -200,6 +204,7 @@ describe.serial("resolved Agent composition manifests", () => {
       harness: "codex",
       materials: [],
       settings: {
+        version: "native-setting",
         model: "gpt-5.6-sol",
         effort: "medium",
         fast_mode: true,

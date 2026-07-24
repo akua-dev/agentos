@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { constants } from "node:fs";
+import { constants, type BigIntStats } from "node:fs";
 import { lstat, open, readdir, realpath } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import {
   assertOpenedFileStillAtPath,
   metadataChanged,
@@ -35,11 +35,14 @@ export async function inspectMaterialDirectory(
 
   const hash = createHash("sha256");
   let observedPrefix: Uint8Array | undefined;
+  const directories = new Map<string, BigIntStats>();
 
-  for await (const path of regularFiles(directory)) {
+  for await (const path of regularFiles(directory, directories)) {
     const file = await open(
       path,
-      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+      constants.O_RDONLY |
+        (constants.O_NOFOLLOW ?? 0) |
+        (constants.O_NONBLOCK ?? 0),
     );
     try {
       const before = await file.stat({ bigint: true });
@@ -115,16 +118,21 @@ export async function inspectMaterialDirectory(
     }
   }
 
-  const rootAfter = await lstat(directory, { bigint: true });
-  if (
-    rootAfter.isSymbolicLink() ||
-    !rootAfter.isDirectory() ||
-    metadataChanged(root, rootAfter) ||
-    (await realpath(directory)) !== rootRealPath
-  ) {
-    throw new Error(
-      `Composition material root changed while hashing: ${directory}`,
-    );
+  for (const [path, before] of directories) {
+    const after = await lstat(path, { bigint: true });
+    const fromRoot = relative(rootRealPath, await realpath(path));
+    if (
+      after.isSymbolicLink() ||
+      !after.isDirectory() ||
+      metadataChanged(before, after) ||
+      fromRoot === ".." ||
+      fromRoot.startsWith(`..${sep}`) ||
+      isAbsolute(fromRoot)
+    ) {
+      throw new Error(
+        `Composition material directory changed while hashing: ${path}`,
+      );
+    }
   }
 
   if (observedFile !== undefined && observedPrefix === undefined) {
@@ -139,7 +147,17 @@ export async function inspectMaterialDirectory(
   };
 }
 
-async function* regularFiles(directory: string): AsyncGenerator<string> {
+async function* regularFiles(
+  directory: string,
+  directories: Map<string, BigIntStats>,
+): AsyncGenerator<string> {
+  const directoryMetadata = await lstat(directory, { bigint: true });
+  if (directoryMetadata.isSymbolicLink() || !directoryMetadata.isDirectory()) {
+    throw new Error(
+      `Composition material contains a non-directory path: ${directory}`,
+    );
+  }
+  directories.set(directory, directoryMetadata);
   const entries = await readdir(directory, { withFileTypes: true });
 
   for (const entry of entries.sort((left, right) =>
@@ -151,7 +169,7 @@ async function* regularFiles(directory: string): AsyncGenerator<string> {
       throw new Error(`Composition material contains a symlink: ${path}`);
     }
     if (metadata.isDirectory()) {
-      yield* regularFiles(path);
+      yield* regularFiles(path, directories);
       continue;
     }
     if (!metadata.isFile()) {
