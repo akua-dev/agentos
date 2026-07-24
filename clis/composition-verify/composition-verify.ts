@@ -4,7 +4,10 @@ import { constants } from "node:fs";
 import { lstat, open, readdir, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseDocument } from "yaml";
-import { inspectMaterialDirectory } from "../../runtime/composition/digest.ts";
+import {
+  digestMaterialDirectory,
+  inspectMaterialDirectory,
+} from "../../runtime/composition/digest.ts";
 import {
   assertOpenedFileStillAtPath,
   metadataChanged,
@@ -91,6 +94,23 @@ export async function verifyCompositionBundle(
     selected,
     manifest.materials.length > 0,
   );
+  const finalManifest = await readManifest(
+    join(bundle, "manifest.json"),
+    bundleRealPath,
+  );
+  if (digestCompositionManifest(finalManifest) !== manifestDigest) {
+    throw new Error("composition manifest changed while verifying");
+  }
+  for (const material of manifest.materials) {
+    const finalDigest = await digestMaterialDirectory(
+      join(materialsDirectory, material.id),
+    );
+    if (finalDigest !== material.digest) {
+      throw new Error(
+        `composition material changed while verifying: ${material.id}`,
+      );
+    }
+  }
   const rootAfter = await lstat(bundle, { bigint: true });
   if (
     rootAfter.isSymbolicLink() ||

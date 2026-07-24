@@ -205,13 +205,16 @@ harness consistency and real role permissions against the complete chain.
 
 An Assignment's `brief`, `started_at` and `dispatch_profile` freeze when
 execution starts. Its Agent cannot change to a harness that contradicts an
-active Assignment. Genuinely corrupt active dispatch data can be corrected only
-through `agentos.repair_task_assignment_dispatch` by First Mate with the
-complete replacement brief, valid matching composition and a durable reason;
-the prior values remain in Assignment metadata. Completed Assignment history
-cannot be repaired in place.
+active Assignment. The released repair path for genuinely corrupt active
+dispatch data is `agentos.repair_task_assignment_dispatch`: First Mate supplies
+the complete replacement brief, valid matching composition and a durable
+reason, and the prior values remain in Assignment metadata. First Mate is also
+the PostgreSQL owner and therefore retains explicit administrative repair
+authority that PostgreSQL cannot meaningfully deny to its owner; such a direct
+repair is outside the released Function contract and must not be represented as
+Function-authorized. Completed Assignment history cannot be repaired in place.
 
-Persistent composition changes go through
+The released persistent-composition path goes through
 `agentos.replace_agent_composition` with an active Fleet- or Agent-scoped
 Captain row under the exact `agent-composition-authority` topic and a durable
 reason. An unrelated Captain preference is not mutation authority. Only First
@@ -219,5 +222,6 @@ Mate can change its own or a direct Second Mate's desired composition; the
 immediately prior manifest is retained
 in Agent metadata for one explicit rollback. Incorrect durable state uses the
 separate `agentos.repair_agent_composition` path so repair is visible rather
-than disguised as ordinary selection. These rows still do not claim that Pi,
-files or Herdr loaded the desired setup.
+than disguised as ordinary selection. Owner-level administrative writes remain
+possible by definition and are not evidence that these released checks ran.
+These rows still do not claim that Pi, files or Herdr loaded the desired setup.

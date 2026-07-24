@@ -47,11 +47,14 @@ and preserve it.
   composition manifest and append-only handoff history in `task_assignments`.
 - Keep Agent- and Assignment-scoped composition on the shared versioned
   manifest contract. Freeze the Assignment brief and composition at execution
-  start, block active harness drift, and expose only the released reasoned
+  start, block active harness drift, and expose the released reasoned
   First-Mate repair for corrupt active dispatch data; completed history remains
-  immutable. Keep persistent replacement or repair behind the released
-  Captain-authorized Functions. PostgreSQL records desired composition and the
-  immediate rollback manifest; native harness state remains observed authority.
+  immutable. Use the Captain-authorized Functions as the released persistent
+  replacement or repair path. First Mate remains the PostgreSQL owner: its
+  explicit administrative writes are outside this subordinate authorization
+  boundary and must never be described as proof that a released Function ran.
+  PostgreSQL records desired composition and the immediate rollback manifest;
+  native harness state remains observed authority.
 - Preserve accepted provider payloads intact in `external_events.payload`. The same event rows own their small burst, claim and reconciliation state; do not add a reconciliation table or background outbox.
 - Keep `agentos_events` notifications as small transactional wake hints only.
   Never put row contents, credentials or durable delivery state in a payload;

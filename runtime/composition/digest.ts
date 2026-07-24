@@ -7,6 +7,9 @@ import {
   metadataChanged,
 } from "./filesystem.ts";
 
+const maximumMaterialEntries = 4096;
+const maximumMaterialDepth = 32;
+
 export async function digestMaterialDirectory(
   directory: string,
 ): Promise<string> {
@@ -35,9 +38,10 @@ export async function inspectMaterialDirectory(
 
   const hash = createHash("sha256");
   let observedPrefix: Uint8Array | undefined;
-  const directories = new Map<string, BigIntStats>();
+  const snapshot = await collectMaterialSnapshot(directory);
+  const files = new Map<string, BigIntStats>();
 
-  for await (const path of regularFiles(directory, directories)) {
+  for (const path of snapshot.files) {
     const file = await open(
       path,
       constants.O_RDONLY |
@@ -109,6 +113,7 @@ export async function inspectMaterialDirectory(
         after,
         "Composition material",
       );
+      files.set(path, after);
       if (observesThisFile) {
         observedPrefix = Buffer.concat(prefixChunks);
       }
@@ -118,7 +123,15 @@ export async function inspectMaterialDirectory(
     }
   }
 
-  for (const [path, before] of directories) {
+  for (const [path, before] of files) {
+    await assertOpenedFileStillAtPath(
+      path,
+      rootRealPath,
+      before,
+      "Composition material",
+    );
+  }
+  for (const [path, before] of snapshot.directories) {
     const after = await lstat(path, { bigint: true });
     const fromRoot = relative(rootRealPath, await realpath(path));
     if (
@@ -147,34 +160,65 @@ export async function inspectMaterialDirectory(
   };
 }
 
-async function* regularFiles(
-  directory: string,
-  directories: Map<string, BigIntStats>,
-): AsyncGenerator<string> {
-  const directoryMetadata = await lstat(directory, { bigint: true });
-  if (directoryMetadata.isSymbolicLink() || !directoryMetadata.isDirectory()) {
-    throw new Error(
-      `Composition material contains a non-directory path: ${directory}`,
-    );
-  }
-  directories.set(directory, directoryMetadata);
-  const entries = await readdir(directory, { withFileTypes: true });
+async function collectMaterialSnapshot(directory: string): Promise<{
+  directories: Map<string, BigIntStats>;
+  files: string[];
+}> {
+  const directories = new Map<string, BigIntStats>();
+  const files: string[] = [];
+  const pending = [{ depth: 0, path: directory }];
+  let entriesSeen = 0;
 
-  for (const entry of entries.sort((left, right) =>
-    Buffer.compare(Buffer.from(left.name, "utf8"), Buffer.from(right.name, "utf8")),
-  )) {
-    const path = join(directory, entry.name);
-    const metadata = await lstat(path);
-    if (metadata.isSymbolicLink()) {
-      throw new Error(`Composition material contains a symlink: ${path}`);
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    if (current.depth > maximumMaterialDepth) {
+      throw new Error(
+        `Composition material exceeds maximum depth ${maximumMaterialDepth}`,
+      );
     }
-    if (metadata.isDirectory()) {
-      yield* regularFiles(path, directories);
-      continue;
+    const directoryMetadata = await lstat(current.path, { bigint: true });
+    if (
+      directoryMetadata.isSymbolicLink() ||
+      !directoryMetadata.isDirectory()
+    ) {
+      throw new Error(
+        `Composition material contains a non-directory path: ${current.path}`,
+      );
     }
-    if (!metadata.isFile()) {
-      throw new Error(`Composition material contains a special file: ${path}`);
+    directories.set(current.path, directoryMetadata);
+
+    for (const entry of await readdir(current.path, {
+      withFileTypes: true,
+    })) {
+      entriesSeen += 1;
+      if (entriesSeen > maximumMaterialEntries) {
+        throw new Error(
+          `Composition material exceeds ${maximumMaterialEntries} entries`,
+        );
+      }
+      const path = join(current.path, entry.name);
+      const metadata = await lstat(path);
+      if (metadata.isSymbolicLink()) {
+        throw new Error(`Composition material contains a symlink: ${path}`);
+      }
+      if (metadata.isDirectory()) {
+        pending.push({ depth: current.depth + 1, path });
+        continue;
+      }
+      if (!metadata.isFile()) {
+        throw new Error(
+          `Composition material contains a special file: ${path}`,
+        );
+      }
+      files.push(path);
     }
-    yield path;
   }
+
+  files.sort((left, right) =>
+    Buffer.compare(
+      Buffer.from(relative(directory, left), "utf8"),
+      Buffer.from(relative(directory, right), "utf8"),
+    ),
+  );
+  return { directories, files };
 }
