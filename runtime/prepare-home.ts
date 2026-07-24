@@ -30,6 +30,7 @@ const agentCheckout =
 const piAgentDirectory =
   process.env.PI_CODING_AGENT_DIR ?? join(home, ".pi", "agent");
 const piExtensionDirectory = join(piAgentDirectory, "extensions");
+const piSettings = join(piAgentDirectory, "settings.json");
 
 await Promise.all(
   [
@@ -69,6 +70,8 @@ if (!(await exists(herdrConfig))) {
     { mode: 0o600 },
   );
 }
+
+if (usesPi) await reconcileSelectedPiDefaults();
 
 await $`mise trust ${systemConfig}`;
 if (usesPi) {
@@ -122,6 +125,53 @@ async function copyPrivateFileAtomic(source: string, destination: string) {
   const next = `${destination}.agentos-next`;
   await copyPrivateFile(source, next);
   await rename(next, destination);
+}
+
+async function reconcileSelectedPiDefaults() {
+  const selectedModel = selectedEnvironment("AGENTOS_MODEL");
+  const selectedThinking = selectedEnvironment("AGENTOS_THINKING");
+  if (!selectedModel && !selectedThinking) return;
+
+  const settings = (await exists(piSettings))
+    ? JSON.parse(await readFile(piSettings, "utf8"))
+    : {};
+  if (
+    settings === null ||
+    Array.isArray(settings) ||
+    typeof settings !== "object"
+  ) {
+    throw new Error(`${piSettings} must contain a JSON object`);
+  }
+
+  const selectedDefaults: Record<string, string> = {};
+  if (selectedModel) {
+    const separator = selectedModel.indexOf("/");
+    if (separator <= 0 || separator === selectedModel.length - 1) {
+      throw new Error("AGENTOS_MODEL must use Pi's provider/model form");
+    }
+    selectedDefaults.defaultProvider = selectedModel.slice(0, separator);
+    selectedDefaults.defaultModel = selectedModel.slice(separator + 1);
+  }
+  if (selectedThinking) {
+    selectedDefaults.defaultThinkingLevel = selectedThinking;
+  }
+
+  const next = `${piSettings}.agentos-next`;
+  await writeFile(
+    next,
+    `${JSON.stringify({ ...settings, ...selectedDefaults }, null, 2)}\n`,
+    { mode: 0o600 },
+  );
+  await chmod(next, 0o600);
+  await rename(next, piSettings);
+}
+
+function selectedEnvironment(name: string): string | undefined {
+  const raw = process.env[name];
+  if (raw === undefined) return undefined;
+  const value = raw.trim();
+  if (!value) throw new Error(`${name} must be non-empty when configured`);
+  return value;
 }
 
 async function ensureAgentosCheckout() {

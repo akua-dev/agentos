@@ -30,6 +30,11 @@ export type PostgresNotification = {
   payload: string;
 };
 
+export type PostgresListenerReady = {
+  state: "listening";
+  channel: string;
+};
+
 export type PgPassConnection = {
   host: string;
   port: number;
@@ -45,16 +50,20 @@ Usage:
   pg-listen <channel>
 
 Connects through standard PostgreSQL environment/configuration, executes only
-LISTEN on the selected channel, and prints the first notification as one JSON
-line without interpreting its payload.
+LISTEN on the selected channel, prints a readiness JSON line to standard error
+after LISTEN is registered, and prints the first notification as one JSON line
+to standard output without interpreting its payload.
 `;
 
 export async function waitForNotification(
   client: PostgresListenerClient,
   channel: string,
   write: (text: string) => void = (text) => process.stdout.write(text),
+  writeReady?: (text: string) => void,
 ): Promise<PostgresNotification> {
   let settled = false;
+  let listening = false;
+  let pendingNotification: PostgresNotification | undefined;
   let resolveNotification!: (notification: PostgresNotification) => void;
   let rejectNotification!: (error: Error) => void;
   const notification = new Promise<PostgresNotification>((resolve, reject) => {
@@ -93,7 +102,12 @@ export async function waitForNotification(
   };
   const onNotification = (message: Notification) => {
     if (message.channel !== channel || settled) return;
-    void settle({ channel, payload: message.payload ?? "" });
+    const result = { channel, payload: message.payload ?? "" };
+    if (!listening) {
+      pendingNotification ??= result;
+      return;
+    }
+    void settle(result);
   };
   const onError = (error: Error) => {
     void settle(undefined, error);
@@ -112,6 +126,10 @@ export async function waitForNotification(
   try {
     await client.connect();
     await client.query(`LISTEN ${escapeIdentifier(channel)}`);
+    const ready: PostgresListenerReady = { state: "listening", channel };
+    writeReady?.(`${JSON.stringify(ready)}\n`);
+    listening = true;
+    if (pendingNotification) void settle(pendingNotification);
   } catch (error) {
     void settle(
       undefined,
@@ -176,7 +194,12 @@ if (import.meta.main) {
     } else {
       const client = createPostgresListenerClient();
       try {
-        await waitForNotification(client, channel);
+        await waitForNotification(
+          client,
+          channel,
+          undefined,
+          (text) => process.stderr.write(text),
+        );
       } catch (error) {
         process.stderr.write(
           `${error instanceof Error ? error.message : String(error)}\n`,

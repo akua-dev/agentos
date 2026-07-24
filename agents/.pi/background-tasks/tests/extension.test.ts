@@ -77,6 +77,21 @@ class FakePi {
   >();
   readonly handlers = new Map<string, EventHandler[]>();
   readonly messages: Array<{ message: any; options: unknown }> = [];
+  readonly entries: Array<{
+    type: "custom";
+    customType: string;
+    data: unknown;
+  }>;
+
+  constructor(
+    entries: Array<{
+      type: "custom";
+      customType: string;
+      data: unknown;
+    }> = [],
+  ) {
+    this.entries = [...entries];
+  }
 
   registerTool(tool: AnyToolDefinition) {
     this.tools.set(tool.name, tool);
@@ -105,7 +120,9 @@ class FakePi {
     this.messages.push({ message, options });
   }
 
-  appendEntry() {}
+  appendEntry(customType: string, data: unknown) {
+    this.entries.push({ type: "custom", customType, data });
+  }
 
   extensionApi() {
     return this as unknown as ExtensionAPI;
@@ -113,7 +130,10 @@ class FakePi {
 
   async emit(event: string) {
     const context = {
-      sessionManager: { getEntries: () => [] },
+      sessionManager: {
+        getBranch: () => this.entries,
+        getEntries: () => this.entries,
+      },
       ui: { notify: () => undefined },
     } as unknown as ExtensionContext;
     for (const handler of this.handlers.get(event) ?? []) {
@@ -197,6 +217,373 @@ describe("AgentOS Pi background commands", () => {
     ).rejects.toThrow("Unknown background command: missing-task");
   });
 
+  test("reports a readiness start failure without claiming the command started", async () => {
+    const pi = new FakePi();
+    registerAgentosBackgroundTasks(pi.extensionApi(), {
+      startCommand: async () => {
+        throw new Error(
+          'Background command did not produce readiness output "listening" within 20ms',
+        );
+      },
+      rootDirectory: await root(),
+      createId: () => "bg-not-ready",
+      batchDelayMs: 5,
+    });
+
+    const result = await execute(pi.tools.get("run_background_command"), {
+      command: "pg-listen agentos_events",
+      description: "Wait for LISTEN readiness",
+      ready_output: "listening",
+      ready_timeout: 20,
+    });
+    await Bun.sleep(20);
+
+    expect(result.details).toMatchObject({
+      id: "bg-not-ready",
+      state: "failed",
+      summary: "Background command failed to start",
+    });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Background command "bg-not-ready" failed');
+    expect(text).toContain("did not produce readiness output");
+    expect(text).not.toContain("Started background command");
+    expect(pi.messages).toEqual([]);
+  });
+
+  test("keeps the public timeout surface limited to ordinary failure", async () => {
+    const commands = controlledCommands();
+    const pi = new FakePi();
+    registerAgentosBackgroundTasks(pi.extensionApi(), {
+      startCommand: commands.start,
+      rootDirectory: await root(),
+      createId: () => "bg-expiring",
+    });
+
+    const parameters = pi.tools.get("run_background_command")?.parameters as {
+      properties?: Record<string, unknown>;
+    };
+    expect(parameters.properties).not.toHaveProperty("timeout_behavior");
+  });
+
+  test("forwards a bounded literal readiness condition to the background command", async () => {
+    const commands = controlledCommands();
+    const pi = new FakePi();
+    registerAgentosBackgroundTasks(pi.extensionApi(), {
+      startCommand: commands.start,
+      rootDirectory: await root(),
+      createId: () => "bg-ready",
+    });
+
+    await execute(pi.tools.get("run_background_command"), {
+      command: "pg-listen agentos_events",
+      description: "Wait for a Fleet event after LISTEN is registered",
+      ready_output: '"state":"listening"',
+      ready_timeout: 30_000,
+    });
+
+    expect(commands.requests).toEqual([
+      {
+        command: "pg-listen agentos_events",
+        description: "Wait for a Fleet event after LISTEN is registered",
+        readyOutput: '"state":"listening"',
+        readyTimeout: 30_000,
+      },
+    ]);
+  });
+
+  test("defaults to running tasks and pages explicitly selected history", async () => {
+    const commands = controlledCommands();
+    const pi = new FakePi();
+    let sequence = 0;
+    registerAgentosBackgroundTasks(pi.extensionApi(), {
+      startCommand: commands.start,
+      rootDirectory: await root(),
+      createId: () => `bg-${++sequence}`,
+    });
+
+    for (let index = 1; index <= 24; index += 1) {
+      await execute(pi.tools.get("run_background_command"), {
+        command: `command-${index}`,
+        description: `Command ${index}`,
+      });
+    }
+    for (const control of commands.controls.slice(0, 22)) {
+      control.resolve({
+        state: "succeeded",
+        summary: "Command completed",
+        exitCode: 0,
+      });
+    }
+    await Bun.sleep(10);
+
+    const running = await execute(pi.tools.get("list_background_commands"), {});
+    const runningText = (running.content[0] as { text: string }).text;
+    expect(runningText.split("\n")).toEqual([
+      "bg-23 running Command 23",
+      "bg-24 running Command 24",
+    ]);
+    expect(running.details).toMatchObject({
+      tasks: [
+        { id: "bg-23", state: "running" },
+        { id: "bg-24", state: "running" },
+      ],
+    });
+
+    const firstPage = await execute(
+      pi.tools.get("list_background_commands"),
+      { state: "succeeded", limit: 3 },
+    );
+    expect((firstPage.content[0] as { text: string }).text.split("\n").slice(0, 3))
+      .toEqual([
+      "bg-22 succeeded exit=0 Command 22",
+      "bg-21 succeeded exit=0 Command 21",
+      "bg-20 succeeded exit=0 Command 20",
+    ]);
+    expect(firstPage.details).toMatchObject({
+      tasks: [
+        { id: "bg-22" },
+        { id: "bg-21" },
+        { id: "bg-20" },
+      ],
+      nextCursor: "bg-20",
+    });
+
+    const all = await execute(pi.tools.get("list_background_commands"), {
+      state: "all",
+      limit: 1,
+    });
+    expect(
+      (all.details as { tasks: Array<{ id: string }> }).tasks.map(({ id }) => id),
+    ).toEqual(["bg-23", "bg-24", "bg-22"]);
+
+    const secondPage = await execute(
+      pi.tools.get("list_background_commands"),
+      {
+        state: "succeeded",
+        limit: 3,
+        before_task_id: "bg-20",
+      },
+    );
+    expect(
+      (secondPage.details as { tasks: Array<{ id: string }> }).tasks.map(
+        ({ id }) => id,
+      ),
+    ).toEqual(["bg-19", "bg-18", "bg-17"]);
+  });
+
+  test("orders terminal history by completion time", async () => {
+    const commands = controlledCommands();
+    const pi = new FakePi();
+    let sequence = 0;
+    registerAgentosBackgroundTasks(pi.extensionApi(), {
+      startCommand: commands.start,
+      rootDirectory: await root(),
+      createId: () => `bg-finished-${++sequence}`,
+    });
+    await execute(pi.tools.get("run_background_command"), {
+      command: "first",
+      description: "Started first and finished last",
+    });
+    await Bun.sleep(2);
+    await execute(pi.tools.get("run_background_command"), {
+      command: "second",
+      description: "Started second and finished first",
+    });
+    commands.controls[1]!.resolve({
+      state: "succeeded",
+      summary: "Second completed",
+      exitCode: 0,
+    });
+    await Bun.sleep(2);
+    commands.controls[0]!.resolve({
+      state: "succeeded",
+      summary: "First completed",
+      exitCode: 0,
+    });
+    await Bun.sleep(10);
+
+    const history = await execute(
+      pi.tools.get("list_background_commands"),
+      { state: "succeeded" },
+    );
+    expect(
+      (history.details as { tasks: Array<{ id: string }> }).tasks.map(
+        ({ id }) => id,
+      ),
+    ).toEqual(["bg-finished-1", "bg-finished-2"]);
+  });
+
+  test("persists lifecycle metadata and restores unfinished work as interrupted", async () => {
+    const directory = await root();
+    const firstCommands = controlledCommands();
+    const firstPi = new FakePi();
+    registerAgentosBackgroundTasks(firstPi.extensionApi(), {
+      startCommand: firstCommands.start,
+      rootDirectory: directory,
+      createId: () => "bg-restart",
+    });
+
+    await execute(firstPi.tools.get("run_background_command"), {
+      command: "pg-listen agentos_events",
+      description: "[agentos-supervision] Wait for a durable Fleet event",
+    });
+    await writeFile(join(directory, "bg-restart.log"), "listener booted\n");
+
+    expect(firstPi.entries).toEqual([
+      expect.objectContaining({
+        type: "custom",
+        customType: "agentos-background-command-lifecycle",
+        data: expect.objectContaining({
+          version: 1,
+          task: expect.objectContaining({
+            id: "bg-restart",
+            state: "running",
+          }),
+        }),
+      }),
+    ]);
+    expect(
+      (
+        firstPi.entries[0]!.data as {
+          task: Record<string, unknown>;
+        }
+      ).task,
+    ).not.toHaveProperty("outputTail");
+
+    const secondPi = new FakePi(firstPi.entries);
+    registerAgentosBackgroundTasks(secondPi.extensionApi(), {
+      startCommand: controlledCommands().start,
+      rootDirectory: directory,
+    });
+    await secondPi.emit("session_start");
+
+    const restored = await execute(
+      secondPi.tools.get("list_background_commands"),
+      { state: "interrupted" },
+    );
+    expect(restored.details).toMatchObject({
+      tasks: [
+        {
+          id: "bg-restart",
+          state: "interrupted",
+          command: "pg-listen agentos_events",
+          description: "[agentos-supervision] Wait for a durable Fleet event",
+        },
+      ],
+    });
+    const output = await execute(
+      secondPi.tools.get("get_background_command_output"),
+      { task_id: "bg-restart" },
+    );
+    expect((output.content[0] as { text: string }).text).toContain(
+      "listener booted",
+    );
+    expect(secondPi.messages).toEqual([]);
+  });
+
+  test("restores shutdown cancellations as interrupted but preserves explicit kills", async () => {
+    const directory = await root();
+    const firstCommands = controlledCommands();
+    const firstPi = new FakePi();
+    let sequence = 0;
+    registerAgentosBackgroundTasks(firstPi.extensionApi(), {
+      startCommand: firstCommands.start,
+      rootDirectory: directory,
+      createId: () => `bg-restore-${++sequence}`,
+    });
+
+    await execute(firstPi.tools.get("run_background_command"), {
+      command: "sleep 10",
+      description: "Explicitly killed",
+    });
+    await execute(firstPi.tools.get("run_background_command"), {
+      command: "sleep 20",
+      description: "Stopped by Pi shutdown",
+    });
+    await execute(firstPi.tools.get("kill_background_command"), {
+      task_id: "bg-restore-1",
+    });
+    await firstPi.emit("session_shutdown");
+
+    const secondPi = new FakePi(firstPi.entries);
+    registerAgentosBackgroundTasks(secondPi.extensionApi(), {
+      startCommand: controlledCommands().start,
+      rootDirectory: directory,
+    });
+    await secondPi.emit("session_start");
+
+    const interrupted = await execute(
+      secondPi.tools.get("list_background_commands"),
+      { state: "interrupted" },
+    );
+    expect(interrupted.details).toMatchObject({
+      tasks: [
+        {
+          id: "bg-restore-2",
+          state: "interrupted",
+          description: "Stopped by Pi shutdown",
+        },
+      ],
+    });
+
+    const cancelled = await execute(
+      secondPi.tools.get("list_background_commands"),
+      { state: "cancelled" },
+    );
+    expect(cancelled.details).toMatchObject({
+      tasks: [
+        {
+          id: "bg-restore-1",
+          state: "cancelled",
+          explicitlyKilled: true,
+        },
+      ],
+    });
+  });
+
+  test("checkpoints running lifecycle metadata on Pi tree navigation", async () => {
+    const directory = await root();
+    const firstPi = new FakePi();
+    registerAgentosBackgroundTasks(firstPi.extensionApi(), {
+      startCommand: controlledCommands().start,
+      rootDirectory: directory,
+      createId: () => "bg-tree",
+    });
+    await execute(firstPi.tools.get("run_background_command"), {
+      command: "pg-listen agentos_events",
+      description: "[agentos-supervision] Wait across tree navigation",
+    });
+
+    firstPi.entries.length = 0;
+    await firstPi.emit("session_tree");
+
+    expect(firstPi.entries).toEqual([
+      expect.objectContaining({
+        customType: "agentos-background-command-lifecycle",
+        data: expect.objectContaining({
+          task: expect.objectContaining({
+            id: "bg-tree",
+            state: "running",
+          }),
+        }),
+      }),
+    ]);
+
+    const secondPi = new FakePi(firstPi.entries);
+    registerAgentosBackgroundTasks(secondPi.extensionApi(), {
+      startCommand: controlledCommands().start,
+      rootDirectory: directory,
+    });
+    await secondPi.emit("session_start");
+    const interrupted = await execute(
+      secondPi.tools.get("list_background_commands"),
+      { state: "interrupted" },
+    );
+    expect(interrupted.details).toMatchObject({
+      tasks: [{ id: "bg-tree", state: "interrupted" }],
+    });
+  });
+
   test("surfaces a background start error in tool output", async () => {
     const commands = controlledCommands();
     const pi = new FakePi();
@@ -222,6 +609,34 @@ describe("AgentOS Pi background commands", () => {
     });
     expect((inspected.content[0] as { text: string }).text).toContain(
       "Error: Bun is not defined",
+    );
+  });
+
+  test("separates terminal state from a terminating signal", async () => {
+    const commands = controlledCommands();
+    const pi = new FakePi();
+    registerAgentosBackgroundTasks(pi.extensionApi(), {
+      startCommand: commands.start,
+      rootDirectory: await root(),
+      createId: () => "bg-signalled",
+    });
+    await execute(pi.tools.get("run_background_command"), {
+      command: "sleep 10",
+      description: "Wait until stopped",
+    });
+    commands.controls[0]!.resolve({
+      state: "cancelled",
+      summary: "Command stopped",
+      signal: "SIGTERM",
+    });
+    await Bun.sleep(10);
+
+    const listed = await execute(
+      pi.tools.get("list_background_commands"),
+      { state: "cancelled" },
+    );
+    expect((listed.content[0] as { text: string }).text).toContain(
+      "bg-signalled cancelled signal=SIGTERM Wait until stopped",
     );
   });
 

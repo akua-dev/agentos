@@ -15,7 +15,10 @@ boundary in `../ARCHITECTURE.md` before changing its ownership.
 - Keep Captain policy, delegation judgment, model choice, thinking level and
   harness routing in role instructions and skills.
 - Treat Pi settings and authentication as agent-owned PVC state. Never seed or
-  reconcile a release-wide provider, model or thinking default.
+  reconcile a release-wide provider, model or thinking default. The
+  `prepare-home` init step may merge an explicitly selected per-Mate
+  `AGENTOS_MODEL=<provider>/<model>` and `AGENTOS_THINKING=<level>` into that
+  state before Pi starts; omission preserves the existing settings.
 - Use native tools directly. Do not add spawn, render or provider wrappers.
 - Seed the image's exact Git revision once into the persistent AgentOS checkout,
   preserve its configured remotes, and run each Mate from that checkout.

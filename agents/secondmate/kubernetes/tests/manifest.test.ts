@@ -46,6 +46,7 @@ describe("Second Mate Kubernetes base", () => {
     });
     const pod = statefulSet.spec?.template.spec;
     expect(pod.serviceAccountName).toBe("agentos-secondmate");
+    expect(pod.automountServiceAccountToken).toBe(true);
     expect(pod.initContainers).toHaveLength(2);
     expect(pod.containers).toHaveLength(1);
     const container = pod.containers[0];

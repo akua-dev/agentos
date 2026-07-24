@@ -7,6 +7,13 @@ This subtree owns the reusable persistent Second Mate workload base.
   Second-Mate identity, working directory, tasks and credentials here.
 - Require a distinct ServiceAccount, retained home PVC, database identity and
   Herdr session for each Second Mate.
+- Explicitly mount the kubelet-rotated projected ServiceAccount identity in
+  every persistent Second-Mate Pod. Native in-cluster `kubectl` must use that
+  identity; never substitute a separately minted bearer token as steady-state
+  supervision authentication.
+- Keep child access out of this reusable base. The reviewed per-Agent overlay
+  owns least-privilege Role and RoleBinding resources for exact managed child
+  Pod names; never grant label-wide or sibling access here.
 - Keep Second Mate on Pi while leaving Pi model and thinking settings on its
   agent-owned PVC.
 - Never add a spawn/render wrapper or silently create RBAC and credentials.

@@ -48,7 +48,7 @@ async function run(script: string, env: Record<string, string>) {
 }
 
 describe("Mate home preparation", () => {
-  test("seeds a persistent checkout while preserving the agent-owned home", async () => {
+  test("seeds a checkout and selected Pi defaults while preserving the agent-owned home", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "agentos-firstmate-home-"));
     temporaryDirectories.push(sandbox);
     const home = join(sandbox, "home");
@@ -118,6 +118,8 @@ if (args.join(" ") === "integration install pi") {
     const environment = {
       AGENTOS_RELEASE_ROOT: repository,
       AGENTOS_AGENT_ROLE: "first_mate",
+      AGENTOS_MODEL: "openai-codex/gpt-5.6-sol",
+      AGENTOS_THINKING: "xhigh",
       FAKE_LOG_DIRECTORY: logDirectory,
       HERDR_CONFIG_PATH: herdrConfig,
       HOME: home,
@@ -154,6 +156,9 @@ if (args.join(" ") === "integration install pi") {
       [checkout]: true,
     });
     expect(JSON.parse(await readFile(piSettings, "utf8"))).toEqual({
+      defaultModel: "gpt-5.6-sol",
+      defaultProvider: "openai-codex",
+      defaultThinkingLevel: "xhigh",
       theme: "agent-owned",
     });
     expect(await readFile(join(home, ".pgpass"), "utf8")).toBe(
@@ -210,9 +215,9 @@ if (args.join(" ") === "integration install pi") {
     );
     expect(await readFile(customTool, "utf8")).toBe("agent-owned\n");
     expect(JSON.parse(await readFile(piSettings, "utf8"))).toEqual({
-      defaultModel: "gpt-5.4",
+      defaultModel: "gpt-5.6-sol",
       defaultProvider: "openai-codex",
-      defaultThinkingLevel: "low",
+      defaultThinkingLevel: "xhigh",
       theme: "agent-owned",
     });
     const persistentMarker = join(checkout, ".fleet-marker");

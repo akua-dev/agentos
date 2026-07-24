@@ -55,6 +55,9 @@ describe("AgentOS Mate supervision guard", () => {
       },
       options: { deliverAs: "followUp", triggerTurn: true },
     });
+    expect(pi.messages[0]!.message.content).toContain(
+      'list_background_commands with state "interrupted"',
+    );
   });
 
   test("can be disabled for the whole Pi runtime through environment", async () => {
@@ -143,10 +146,12 @@ describe("AgentOS Mate supervision guard", () => {
     await pi.emit("tool_result", {
       toolName: "list_background_commands",
       isError: false,
-      details: [
-        { id: "bg-done", state: "succeeded" },
-        { id: "bg-failed", state: "failed" },
-      ],
+      details: {
+        tasks: [
+          { id: "bg-done", state: "succeeded" },
+          { id: "bg-failed", state: "failed" },
+        ],
+      },
     });
 
     await pi.emit("agent_settled");
@@ -160,14 +165,16 @@ describe("AgentOS Mate supervision guard", () => {
     await pi.emit("tool_result", {
       toolName: "list_background_commands",
       isError: false,
-      details: [
-        {
-          id: "bg-unrelated",
-          state: "running",
-          description: "Watch an unrelated build",
-          command: "anything-the-mate-selected --with its-own-rules",
-        },
-      ],
+      details: {
+        tasks: [
+          {
+            id: "bg-unrelated",
+            state: "running",
+            description: "Watch an unrelated build",
+            command: "anything-the-mate-selected --with its-own-rules",
+          },
+        ],
+      },
     });
 
     await pi.emit("agent_settled");
@@ -181,15 +188,55 @@ describe("AgentOS Mate supervision guard", () => {
     await pi.emit("tool_result", {
       toolName: "list_background_commands",
       isError: false,
-      details: [
-        {
-          id: "bg-watch",
-          state: "running",
-          description:
-            "[agentos-supervision] Wait for the next Fleet coordination event",
-          command: "anything-the-mate-selected --with its-own-rules",
-        },
-      ],
+      details: {
+        tasks: [
+          {
+            id: "bg-watch",
+            state: "running",
+            description:
+              "[agentos-supervision] Wait for the next Fleet coordination event",
+            command: "anything-the-mate-selected --with its-own-rules",
+          },
+        ],
+      },
+    });
+
+    await pi.emit("agent_settled");
+
+    expect(pi.messages).toEqual([]);
+  });
+
+  test("does not erase a known running wait after listing interrupted history", async () => {
+    const pi = new FakePi();
+    registerAgentosSupervisionGuard(pi.extensionApi());
+    await pi.emit("tool_result", {
+      toolName: "run_background_command",
+      input: {
+        description:
+          "[agentos-supervision] Wait for the next Fleet coordination event",
+      },
+      isError: false,
+      details: {
+        id: "bg-watch",
+        state: "running",
+        description:
+          "[agentos-supervision] Wait for the next Fleet coordination event",
+      },
+    });
+    await pi.emit("tool_result", {
+      toolName: "list_background_commands",
+      input: { state: "interrupted" },
+      isError: false,
+      details: {
+        tasks: [
+          {
+            id: "bg-old",
+            state: "interrupted",
+            description:
+              "[agentos-supervision] An older interrupted continuity wait",
+          },
+        ],
+      },
     });
 
     await pi.emit("agent_settled");

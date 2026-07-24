@@ -80,6 +80,29 @@ console.log(JSON.stringify({ output, result }));
     expect(output.tail()).toContain("stderr");
   });
 
+  test("recognizes readiness output split across stream chunks", async () => {
+    const output = await sink("ready");
+    const handle = spawnTaskProcess(
+      "printf rea >&2; sleep 0.02; printf dy >&2; sleep 0.02",
+      { output, readyOutput: "ready" },
+    );
+
+    expect(await handle.readiness).toBe(true);
+    expect(output.tail()).toContain("ready");
+    expect(await handle.completion).toMatchObject({ exitCode: 0, signal: null });
+  });
+
+  test("reports when a process exits before its readiness output", async () => {
+    const output = await sink("not-ready");
+    const handle = spawnTaskProcess("printf booting", {
+      output,
+      readyOutput: "ready",
+    });
+
+    expect(await handle.readiness).toBe(false);
+    expect(await handle.completion).toMatchObject({ exitCode: 0, signal: null });
+  });
+
   test("concurrent stops share one bounded TERM-to-KILL completion", async () => {
     const output = await sink("stop");
     const handle = spawnTaskProcess(

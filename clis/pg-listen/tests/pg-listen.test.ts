@@ -56,16 +56,34 @@ describe("pg-listen", () => {
 
     const client = new FakePostgresClient();
     const output: string[] = [];
+    const readiness: string[] = [];
+    let resolveReady!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      resolveReady = resolve;
+    });
     const waiting = (
       wait as (
         client: FakePostgresClient,
         channel: string,
         write: (text: string) => void,
+        writeReady: (text: string) => void,
       ) => Promise<unknown>
-    )(client, "fleet.events", (text) => output.push(text));
+    )(
+      client,
+      "fleet.events",
+      (text) => output.push(text),
+      (text) => {
+        readiness.push(text);
+        resolveReady();
+      },
+    );
 
-    await client.listening;
+    await ready;
     expect(client.queries).toEqual(['LISTEN "fleet.events"']);
+    expect(readiness).toEqual([
+      '{"state":"listening","channel":"fleet.events"}\n',
+    ]);
+    expect(output).toEqual([]);
     client.emit("notification", {
       channel: "other_channel",
       payload: "ignored",
@@ -105,6 +123,27 @@ describe("pg-listen", () => {
     });
 
     await expect(result).rejects.toThrow("output failed");
+    expect(client.ended).toBe(true);
+  });
+
+  test("announces readiness before an immediately available notification", async () => {
+    const client = new FakePostgresClient({
+      channel: "agentos_events",
+      payload: '{"table":"inbox"}',
+    });
+    const events: string[] = [];
+
+    await postgresListener.waitForNotification(
+      client,
+      "agentos_events",
+      (text) => events.push(`notification:${text}`),
+      (text) => events.push(`ready:${text}`),
+    );
+
+    expect(events).toEqual([
+      'ready:{"state":"listening","channel":"agentos_events"}\n',
+      'notification:{"channel":"agentos_events","payload":"{\\"table\\":\\"inbox\\"}"}\n',
+    ]);
     expect(client.ended).toBe(true);
   });
 
@@ -190,9 +229,17 @@ class FakePostgresClient extends EventEmitter {
   ended = false;
   readonly listening: Promise<void>;
   #resolveListening!: () => void;
+  readonly #notificationDuringListen?: {
+    channel: string;
+    payload?: string;
+  };
 
-  constructor() {
+  constructor(notificationDuringListen?: {
+    channel: string;
+    payload?: string;
+  }) {
     super();
+    this.#notificationDuringListen = notificationDuringListen;
     this.listening = new Promise<void>((resolve) => {
       this.#resolveListening = resolve;
     });
@@ -202,6 +249,9 @@ class FakePostgresClient extends EventEmitter {
 
   async query(statement: string) {
     this.queries.push(statement);
+    if (this.#notificationDuringListen) {
+      this.emit("notification", this.#notificationDuringListen);
+    }
     this.#resolveListening();
     return {};
   }

@@ -45,8 +45,10 @@ new command.
   manager or an AgentOS tool-install command.
 - `pg-listen` qualifies because the required primitive is specifically “wait
   for one PostgreSQL notification, print it, and exit,” which `psql` does not
-  expose as a clean non-interactive command. It adds no Fleet policy, interprets
-  no payload and remains useful outside AgentOS.
+  expose as a clean non-interactive command. It also emits a small readiness
+  record on stderr after registering `LISTEN`, so a caller can close the
+  notification gap before catching up durable state. It adds no Fleet policy,
+  interprets no payload and remains useful outside AgentOS.
 - `composition-verify` qualifies because no native origin, filesystem or
   harness CLI can validate the shared versioned manifest, canonical manifest
   digest, exact selected material tree, absence of unselected context and

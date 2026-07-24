@@ -3,9 +3,16 @@ export type BackgroundCommandRequest = {
   description: string;
   cwd?: string;
   timeout?: number;
+  readyOutput?: string;
+  readyTimeout?: number;
 };
 
-export type TaskState = "running" | "succeeded" | "failed" | "cancelled";
+export type TaskState =
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "interrupted"
+  | "cancelled";
 
 export type TaskTerminalResult = {
   state: Exclude<TaskState, "running">;

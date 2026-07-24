@@ -17,6 +17,7 @@ spec:
         agentos.akua.dev/agent: secondmate
         app.kubernetes.io/name: agentos-secondmate
     spec:
+      automountServiceAccountToken: true
       serviceAccountName: agentos-secondmate
       initContainers:
         - name: install-tools

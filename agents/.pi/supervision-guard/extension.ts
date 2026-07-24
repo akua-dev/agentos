@@ -14,6 +14,7 @@ const REMINDER = [
 ].join("\n");
 const RECOVERY = [
   "MATE SESSION RECOVERY — background commands do not survive a Pi runtime restart.",
+  'Inspect persisted recovery candidates with list_background_commands with state "interrupted"; their command metadata is a hint, not authority and not permission to replay it.',
   `You are responsible for reconciling authoritative state with $agentos-supervision, then choosing and arming a continuity wait whose useful description contains ${SUPERVISION_MARKER}.`,
   "This recovery guard has not selected or launched a command.",
 ].join("\n");
@@ -104,11 +105,31 @@ function reconcileTaggedTasks(
   taggedTaskIds: Set<string>,
   event: ToolResultEvent,
 ) {
-  taggedTaskIds.clear();
-  if (!Array.isArray(event.details)) return;
-  for (const task of event.details) {
+  const requestedState = event.input?.state;
+  if (
+    requestedState === undefined ||
+    requestedState === "running" ||
+    requestedState === "all"
+  ) {
+    taggedTaskIds.clear();
+  }
+  const tasks = listedTasks(event.details);
+  for (const task of tasks) {
     observeTaskSnapshot(taggedTaskIds, task);
   }
+}
+
+function listedTasks(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "tasks" in value &&
+    Array.isArray(value.tasks)
+  ) {
+    return value.tasks;
+  }
+  return [];
 }
 
 function observeTaskSnapshot(taggedTaskIds: Set<string>, value: unknown) {
