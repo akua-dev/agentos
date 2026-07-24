@@ -172,10 +172,11 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   new database restrictions merely to prevent First Mate from exercising that
   judgment; the released grants, RLS, constraints, Functions and completed-row
   immutability remain the deterministic boundaries.
-- Every new Assignment has a PostgreSQL-authoritative `brief` and concrete
-  `dispatch_profile`. Render the brief into the PVC for the harness; regenerate
-  it rather than reconciling two peers. Store a final or handoff `report` before
-  ending the Assignment.
+- Every new Assignment has a PostgreSQL-authoritative `brief` and versioned
+  composition manifest in `dispatch_profile`. Load `$agentos-composition` for
+  material selection and native harness loading; render the brief into the PVC
+  for the harness and regenerate it rather than reconciling two peers. Store a
+  final or handoff `report` before ending the Assignment.
 - Transfer work only with `agentos.handoff_task_assignment`. It ends the old
   Assignment and creates one replacement for the same Task atomically and
   idempotently; never rewrite Assignment ownership or clone the Task.
