@@ -18,7 +18,7 @@ weighted score.
 ## Published proof
 
 Version `0.1.0` defines the portable semantics, metric catalog, fixed scenario
-rubrics, evidence and compact-result schemas, and first two scenarios. These
+rubrics, evidence and compact-result schemas, and initial scenarios. These
 published results exercise the full contract rather than describing future
 work:
 
@@ -47,6 +47,7 @@ portable validator and hard gates do not invoke or require it.
 2. Select and freeze a versioned scenario before starting the subject:
    - [`quickstart-to-delivery`](./scenarios/quickstart-to-delivery/scenario.json)
    - [`interrupted-worker-recovery`](./scenarios/interrupted-worker-recovery/scenario.json)
+   - [`hierarchy-reporting-after-background-wake`](./scenarios/hierarchy-reporting-after-background-wake/scenario.json)
 3. Record the exact subject, model, harness, tool, environment and permission
    versions.
 4. Operate the subject through its own public interfaces. Do not install an
