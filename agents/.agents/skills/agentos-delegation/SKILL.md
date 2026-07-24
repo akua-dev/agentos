@@ -115,8 +115,11 @@ Use released PostgreSQL schema for durable coordination and native tools against
    selected harness through the pod-local Herdr CLI only after the complete
    rendered brief and exact Assignment-scoped composition bundle have been
    delivered to the child home and verified there through their recorded
-   digests. Load `$agentos-composition` for that pre-launch boundary. Before
-   launch, provision and verify the selected
+   digests. Load `$agentos-composition` for that pre-launch boundary, construct
+   the selected harness's exact native Skill and instruction loading view, and
+   verify its observed catalog; a bundle path or discovery link alone is not
+   proof that the worker received it. Before launch, provision and verify the
+   selected
    direct credential or standing-authorized ai-gateway client boundary without
    copying another Agent's provider auth.
    Confirm its Agent identity, Task Assignment, PVC, pod and Herdr session without treating terminal text as durable state.

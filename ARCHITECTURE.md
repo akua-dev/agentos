@@ -239,6 +239,16 @@ Agent's actual scope, then verifies the exact observed harness before claiming
 the resolved setup is active. No AgentOS command publishes files, edits Pi
 settings or maintains a second activation state.
 
+For a bounded Assignment, Pi receives selected Skills and instructions through
+its explicit repeatable launch paths with ordinary Skill discovery disabled.
+Codex receives selected Skills through an exact Assignment-private user
+discovery view in its dedicated home because it has no equivalent launch flag.
+Both point to the verified bundle rather than copying it, preserve
+project-owned and release-owned context as separate authorities, and require
+native catalog plus exact-session evidence before the worker is accepted as
+started. Herdr launches the resulting real harness argv; AgentOS adds no
+launcher or context daemon.
+
 Mise configuration, CLIs, MCP servers, harness extensions, images,
 environment, credentials, provider access and Kubernetes RBAC remain native
 runtime capabilities. Selected Skills may teach a Mate how to arrange them

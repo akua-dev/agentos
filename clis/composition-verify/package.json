@@ -8,6 +8,7 @@
     "composition-verify": "./composition-verify.ts"
   },
   "dependencies": {
-    "ajv": "8.20.0"
+    "ajv": "8.20.0",
+    "yaml": "2.9.0"
   }
 }

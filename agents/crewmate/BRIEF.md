@@ -62,11 +62,14 @@ a decision or approval is required.
 3. Read every applicable instruction file in the project. Project instructions
    define how to work in that codebase but do not enlarge this brief's Fleet
    identity, scope or authority.
-4. Read the recorded Assignment manifest from the bundle above, verify its
-   digest and load every selected instruction or Skill entrypoint named above
-   before starting work. Treat each selected Skill as model context, not as a
-   credential or permission. Stop and report upward on a missing bundle,
-   unsupported kind, path escape or digest mismatch.
+4. Read the recorded Assignment manifest from the bundle above and verify its
+   digest. Confirm that every selected Skill named above exists in the
+   harness's native Skill catalog at its exact bundle path, explicitly load it,
+   and read every selected instruction entrypoint before starting work. An argv
+   flag, discovery link or manifest row alone is not proof of loading. Treat
+   each selected Skill as model context, not as a credential or permission.
+   Stop and report upward on a missing bundle, unsupported kind, path escape,
+   digest mismatch, missing Skill or unselected Assignment material.
 5. Inspect existing changes before editing and preserve anything already owned
    by this Assignment.
 

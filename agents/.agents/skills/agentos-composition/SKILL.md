@@ -163,23 +163,55 @@ neither global installation nor composition policy.
    Every selected entrypoint resolves as
    `materials/<material-id>/<entrypoint>`. Material IDs are unique inside the
    manifest, so placement never derives a path from an origin locator.
-   Never put task material in the project worktree, a global auto-loaded Skill
-   directory or another Assignment's bundle.
+   This bundle remains the only Assignment-owned material copy. Never put task
+   material in the project worktree or another Assignment's bundle. A
+   harness-native discovery view may point into the verified bundle but never
+   becomes a second material authority.
 5. Deliver the bundle and rendered `AGENTOS_BRIEF_PATH` through native
    Kubernetes file operations. Run
    `composition-verify <bundle-directory> --manifest-digest <sha256>` inside
    the target Pod to recheck the canonical manifest, every material digest and
-   absence of unselected material.
-6. The rendered brief names the Assignment bundle, manifest digest, selected
+   absence of unselected material. For every selected Skill, this also proves
+   that its frontmatter name equals its material ID and that its native
+   discovery metadata is valid.
+6. Construct the selected harness's native loading boundary from the verified
+   manifest, never by scanning the Assignment directory:
+
+   - For Pi, pass `--no-skills`, then one absolute
+     `--skill <bundle>/materials/<id>` for every selected Skill and one
+     `--append-system-prompt <entrypoint>` for every selected instruction.
+     Explicitly add any reviewed project-owned Skill roots that apply to the
+     worktree; `--no-skills` excludes unrelated global discovery while
+     preserving these explicit paths.
+   - Codex has no Assignment Skill-path flag. In the Crewmate's dedicated home,
+     stage an exact `$HOME/.agents/skills` view containing one link named
+     `<material-id>` to each verified Skill material directory. Preserve the
+     previous view for rollback, replace it only while no Codex process is
+     running, and compare its complete entries and resolved targets with the
+     manifest before launch. The bundle remains authority; the links are only
+     the Assignment-private user discovery view. Repository, admin and bundled
+     Skills remain separate native authorities. Name each selected Skill as
+     `$<material-id>` in the initial brief so Codex explicitly loads it; the
+     brief separately requires every selected instruction entrypoint to be read.
+7. Prove native discovery rather than inferring it from argv or links. Pi can
+   expose the exact Skill catalog through its `get_commands` RPC using the same
+   loading arguments before the interactive launch. For Codex, inspect the
+   native `/skills` catalog and the first explicit Skill resolutions in the
+   exact Herdr session. Require every selected Assignment Skill to resolve from
+   its bundle path and no unselected Assignment material to appear. Project,
+   release-admin and harness-bundled Skills are allowed only as their separately
+   reviewed authorities.
+8. The rendered brief names the Assignment bundle, manifest digest, selected
    entrypoints and capability requirements. Start the harness through the
    pod-local Herdr CLI only after those checks pass. Verify that the exact Agent
    is processing the brief and selected entrypoints, then arm supervision.
 
 On recovery, query the authoritative Assignment and manifest, recover the same
 workspace and bundle from retained exact bytes or recorded immutable origins,
-verify digests, and resume the native harness session. Never silently select a
-new revision. If exact bytes cannot be reconstructed, keep the Assignment
-blocked or hand it off with an honest report.
+verify digests, reconstruct and recheck the same native loading boundary, and
+resume the native harness session. Never silently select a new revision. If
+exact bytes cannot be reconstructed, keep the Assignment blocked or hand it
+off with an honest report.
 
 ## Debrief and selectively review
 

@@ -56,8 +56,8 @@
     {
       "id": "least-context",
       "kind": "hard-gate",
-      "description": "The worker receives every selected context entrypoint and no unrelated discoverable context item.",
-      "verification": "Inspect the bounded worker context through the harness-native loading boundary and compare it with the frozen selection."
+      "description": "The worker's native harness catalog resolves every selected Assignment Skill from its verified bundle path and exposes no unselected Assignment material; separately reviewed project, release-admin and harness-bundled context remains distinguishable.",
+      "verification": "Inspect the native Skill catalog and exact worker session, then compare Assignment paths and loaded entrypoints with the frozen selection rather than inferring loading from a manifest, argv or discovery link."
     },
     {
       "id": "authority-separated",

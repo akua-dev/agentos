@@ -29,8 +29,9 @@ company tooling or runtime capability installation.
   choices must not require a new SQL enum, TypeScript union or AgentOS
   activation handler.
 - Deterministic code may validate manifest structure, canonical manifest
-  digests, safe paths and exact content digests. It must not discover origins,
-  choose context, fetch
+  digests, safe paths, exact content digests and the portable name/description
+  metadata required for selected Agent Skills to enter native discovery. It
+  must not interpret a Skill's workflow, discover origins, choose context, fetch
   repositories, stage or publish files, edit harness settings, install
   capabilities, call a harness reload command or maintain activation state.
 - Stream material traversal and file hashing with bounded working memory.

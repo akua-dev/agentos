@@ -3,20 +3,24 @@
 import { constants, type BigIntStats } from "node:fs";
 import { lstat, open, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { parseDocument } from "yaml";
 import { digestMaterialDirectory } from "../../runtime/composition/digest.ts";
 import {
   digestCompositionManifest,
   parseCompositionManifest,
+  type CompositionMaterial,
   type CompositionManifest,
 } from "../../runtime/composition/manifest.ts";
 
 const maximumManifestBytes = 8 * 1024 * 1024;
+const maximumSkillFrontmatterBytes = 64 * 1024;
 const digestPattern = /^sha256:[0-9a-f]{64}$/;
 const help = `Usage: composition-verify <bundle-directory> [--manifest-digest <sha256>]
 
 Validate one resolved composition manifest and every selected material in its
-Assignment-scoped bundle. Prints the canonical manifest digest and material
-count as JSON. It does not fetch, copy, install, load or activate anything.
+Assignment-scoped bundle, including native-loadable Skill metadata. Prints the
+canonical manifest digest and material count as JSON.
+It does not fetch, copy, install, load or activate anything.
 `;
 
 export async function verifyCompositionBundle(
@@ -84,12 +88,116 @@ export async function verifyCompositionBundle(
         `composition material entrypoint is not a regular file: ${material.id}`,
       );
     }
+    if (material.kind === "skill") {
+      await verifySkillEntrypoint(
+        join(materialDirectory, material.entrypoint),
+        material,
+      );
+    }
   }
 
   return {
     manifest_digest: manifestDigest,
     materials: manifest.materials.length,
   };
+}
+
+async function verifySkillEntrypoint(
+  path: string,
+  material: CompositionMaterial,
+) {
+  const frontmatter = await readSkillFrontmatter(path);
+  const document = parseDocument(frontmatter, {
+    schema: "core",
+  });
+  if (document.errors.length > 0) {
+    throw new Error(
+      `Skill ${material.id} has invalid YAML frontmatter: ${document.errors[0]!.message}`,
+    );
+  }
+
+  const value = document.toJS({ maxAliasCount: 0 });
+  if (!isRecord(value)) {
+    throw new Error(`Skill ${material.id} frontmatter must be an object`);
+  }
+
+  const name = value.name;
+  if (typeof name !== "string" || name !== material.id) {
+    throw new Error(
+      `Skill name ${typeof name === "string" ? name : "<missing>"} does not match material ID ${material.id}`,
+    );
+  }
+  if (
+    name.length > 64 ||
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)
+  ) {
+    throw new Error(`Skill ${material.id} has an invalid Skill name`);
+  }
+  const description = value.description;
+  if (typeof description !== "string" || description.trim() === "") {
+    throw new Error(`Skill ${material.id} requires a non-empty description`);
+  }
+  if (description.length > 1024) {
+    throw new Error(`Skill ${material.id} description exceeds 1024 characters`);
+  }
+}
+
+async function readSkillFrontmatter(path: string): Promise<string> {
+  const file = await open(
+    path,
+    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+  );
+  try {
+    const before = await file.stat({ bigint: true });
+    if (!before.isFile() || before.nlink > 1n) {
+      throw new Error("Skill entrypoint must be one regular file");
+    }
+
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    const prefixChunks: Uint8Array[] = [];
+    let prefixBytes = 0;
+    let bytesRead = 0n;
+    try {
+      for await (const chunk of file.createReadStream({ autoClose: false })) {
+        bytesRead += BigInt(chunk.byteLength);
+        decoder.decode(chunk, { stream: true });
+        if (prefixBytes < maximumSkillFrontmatterBytes) {
+          const retained = chunk.subarray(
+            0,
+            maximumSkillFrontmatterBytes - prefixBytes,
+          );
+          prefixChunks.push(Uint8Array.from(retained));
+          prefixBytes += retained.byteLength;
+        }
+      }
+      decoder.decode();
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new Error("Skill entrypoint is not valid UTF-8");
+      }
+      throw error;
+    }
+
+    const after = await file.stat({ bigint: true });
+    if (bytesRead !== before.size || changedDuringRead(before, after)) {
+      throw new Error("Skill entrypoint changed while reading");
+    }
+    const prefix = new TextDecoder("utf-8").decode(Buffer.concat(prefixChunks));
+    const normalized = prefix.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const match = normalized.match(/^---\n([\s\S]*?)\n---(?:\n|$)/);
+    if (!match) {
+      throw new Error(
+        `Skill entrypoint requires YAML frontmatter within ${maximumSkillFrontmatterBytes} bytes`,
+      );
+    }
+    return match[1]!;
+  } finally {
+    await file.close();
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 async function readManifest(path: string): Promise<CompositionManifest> {

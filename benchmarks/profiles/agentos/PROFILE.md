@@ -71,9 +71,9 @@ portable core:
 | Accountable selection | The frozen `task_assignments.dispatch_profile`, owning Assignment and rendered brief |
 | Exact selected context | The canonical manifest digest plus each selected material-directory digest |
 | Origin identity | The manifest's non-secret origin kind, locator, revision and path, corroborated through the origin's native interface |
-| Least context | The Assignment bundle contains only `manifest.json` and the selected material IDs; the brief names only their selected entrypoints |
-| Native application | Pod-side `composition-verify` succeeds with the brief's expected manifest digest before harness launch |
-| Loaded context | The exact Herdr Agent and native harness show the role, project instructions and selected entrypoints in effect |
+| Least context | The Assignment bundle contains only `manifest.json` and the selected material IDs; the native harness catalog resolves only those Assignment Skills while keeping separately reviewed project and release context distinguishable |
+| Native application | Pod-side `composition-verify` succeeds with the brief's expected manifest digest, then the exact Pi launch paths or Codex Assignment-private discovery view are verified before harness launch |
+| Loaded context | The exact Herdr Agent and native harness catalog/session show the role, project instructions and selected entrypoints in effect |
 | Capability separation | Kubernetes, Mise, provider and credential authorities prove the actual command and permission boundary independently of the manifest |
 | Truthful completion | The immutable Assignment report contains the worker's concise composition debrief or explicitly records that it was unavailable |
 
@@ -84,13 +84,14 @@ change reason, retained prior manifest, native private-home state, safe harness
 reload or resume evidence, and the Herdr-observed session. A row update or file
 copy alone cannot pass.
 
-The evaluator fails the AgentOS composition claim when selected material
-appears in the project worktree or a global auto-discovery location; an origin
-collision is resolved by path precedence instead of exact provenance; a
+The evaluator fails the AgentOS composition claim when selected material is
+copied into the project worktree or persistent global discovery state; an
+Assignment-private native discovery view contains an extra or wrong target; an
+origin collision is resolved by path precedence instead of exact provenance; a
 capability is inferred from a Skill; a harness starts before Pod-side digest
-verification; a started brief or composition changes without explicit handoff
-or repair; an unavailable external composer silently falls back; or completed
-history is rewritten.
+and native-catalog verification; a started brief or composition changes without
+explicit handoff or repair; an unavailable external composer silently falls
+back; or completed history is rewritten.
 
 Self-report remains evidence rather than proof. When a bounded independent
 session review is selected, retain only the allowlisted trajectory needed to
