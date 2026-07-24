@@ -63,16 +63,16 @@ persistent Mate.
 1. Query the exact named Herdr Agent and record its pane, session and semantic
    status. If it is working or the composer state is ambiguous, do not type over
    it; wait for a safe boundary or use the reviewed recovery path.
-2. Write only the canonical supervisor marker plus
+2. Submit only the canonical supervisor marker plus
    `Inbox <kind> <uuid> — <subject>; load it from PostgreSQL.` with native
-   `herdr agent send <handle> <text> --session <session>`. This command writes
-   literal text into the target terminal; it does not submit it.
-3. Submit that text with native
-   `herdr pane send-keys <pane_id> enter --session <session>`.
-4. Verify the exact Agent enters `working` with `herdr agent wait`, or that the
+   `herdr pane run <pane_id> <text> --session <session>`. This command writes
+   the literal text and Enter in one operation. Do not split submission across
+   `herdr agent send` and `herdr pane send-keys`; success of the first command
+   does not prove that Enter was sent.
+3. Verify the exact Agent enters `working` with `herdr agent wait`, or that the
    matching Inbox row acquired `read_at` before the observation. Pane text alone
    is not receipt evidence.
-5. If delivery fails before receipt, preserve and retry the same Inbox UUID.
+4. If delivery fails before receipt, preserve and retry the same Inbox UUID.
    Never create a duplicate row or include the full body in the terminal.
 
 Run these commands through the target Pod's own Herdr CLI. From outside the
@@ -104,12 +104,25 @@ wrapper CLI for this sequence.
 1. Load `$agentos-delegation`, `$agentos-database` and `$agentos-harnesses`.
    Provision the Agent, Task, Assignment, database login and approved pgpass
    Secret before Kubernetes mutation.
-2. Create `$HOME/.local/state/agentos/workloads/<handle>/kustomization.yaml`.
+2. Resolve the owning Mate's namespace, Pod and `serviceAccountName` from
+   Kubernetes. Require its standard projected ServiceAccount token, CA and
+   namespace mounts and native in-cluster `kubectl`; never create, copy or
+   persist a bearer token or generated kubeconfig for steady-state child
+   supervision.
+3. Create `$HOME/.local/state/agentos/workloads/<handle>/kustomization.yaml`.
    Reference the released child base and patch every placeholder: resource
    names, Agent labels and UUID, Herdr session, database URL and Secret, Task
    and Assignment UUIDs where applicable, storage, selected image and image
-   pull policy. Published images require an immutable digest.
-3. Render a review artifact with native kubectl:
+   pull policy. Published images require an immutable digest. In the managed
+   child's namespace, add one reviewed Role and RoleBinding that bind the
+   owning Mate's exact ServiceAccount and select only the child's stable Pod
+   name. Grant core `pods` `get`, `list` and `watch`; grant `pods/exec`
+   `create` only when the approved launch, attach, doorbell or recovery path
+   requires it. The RoleBinding subject must use the owning ServiceAccount's
+   exact name and namespace. Every rule must use `resourceNames`; never grant
+   sibling, label-wide or wildcard access. Remove a retired child name rather
+   than accumulating access.
+4. Render a review artifact with native kubectl:
 
    ```console
    kubectl kustomize --load-restrictor LoadRestrictionsNone \
@@ -117,11 +130,14 @@ wrapper CLI for this sequence.
      --output "$HOME/.local/state/agentos/workloads/<handle>/rendered.yaml"
    ```
 
-4. Inspect the complete rendered resources. Require exactly one dedicated
-   ServiceAccount, headless Service and retained one-replica StatefulSet; reject
-   placeholder values, unexpected RBAC, public endpoints, mutable remote images
+5. Inspect the complete rendered resources. Require exactly one dedicated
+   ServiceAccount, headless Service and retained one-replica StatefulSet. The
+   child Pod must explicitly enable its projected ServiceAccount identity when
+   it is a persistent Mate that will supervise its own children. Require only
+   the exact-parent Role and RoleBinding selected in step 3; reject placeholder
+   values, any other or broader RBAC, public endpoints, mutable remote images
    and ownership conflicts.
-5. Ask for any installation, cost or RBAC approval not already recorded. Then
+6. Ask for any installation, cost or RBAC approval not already recorded. Then
    validate against the API server and inspect the diff:
 
    ```console
@@ -133,7 +149,7 @@ wrapper CLI for this sequence.
 
    `kubectl diff` exit status `1` means a diff exists; other non-zero statuses
    are failures.
-6. Apply synchronously and retain the native result:
+7. Apply synchronously and retain the native result:
 
    ```console
    kubectl --namespace <namespace> apply --server-side \
@@ -141,11 +157,18 @@ wrapper CLI for this sequence.
    kubectl --namespace <namespace> rollout status statefulset/<name>
    ```
 
-7. Verify observed image IDs, ServiceAccount, Pod, PVC, Secret mount, Agent
-   environment and Herdr status. For a Crewmate, create or recover the project
-   and Treehouse lease inside that pod. Copy the PostgreSQL-authoritative
-   brief's rendered harness view with
-   native kubectl and verify its digest inside the pod:
+8. Verify observed image IDs, ServiceAccount, Pod, PVC, Secret mount, Agent
+   environment and Herdr status; for a persistent Mate, also verify the
+   projected token mount. From the owning Mate identity, use
+   `kubectl auth can-i` to verify exact named-Pod `get` and `watch`; an external
+   reviewer may use `--as` only when its current identity already has
+   impersonation authority. Verify any selected `pods/exec` grant through the
+   already-approved native launch or attach action. A denial blocks unattended
+   supervision; a network or API failure remains a visible failure rather than
+   a reason to mint another token. For a Crewmate, create or recover the
+   project and Treehouse lease inside that pod. Copy the
+   PostgreSQL-authoritative brief's rendered harness view with native kubectl
+   and verify its digest inside the pod:
 
    ```console
    kubectl --namespace <namespace> cp \
@@ -159,7 +182,7 @@ wrapper CLI for this sequence.
    `$agentos-harnesses` to invoke
    `herdr agent start ... -- <native-harness-argv> <brief>` through
    `kubectl exec`.
-8. Record verified Kubernetes and Herdr locators in Fleet state. Treat launch
+9. Record verified Kubernetes and Herdr locators in Fleet state. Treat launch
    as successful only after the native harness is processing the complete brief
    without a trust or routine command-approval dialog. The owning Mate must use
    `$agentos-harnesses` to reconcile a missing unattended launch or reviewed

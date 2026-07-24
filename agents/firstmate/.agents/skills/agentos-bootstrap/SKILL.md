@@ -40,7 +40,14 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
 2. Explain the namespace-scoped `agentos-firstmate.yaml` and the dedicated-target `agentos-firstmate-cluster-admin.yaml`, including the recovery operations unavailable in scoped mode. A dedicated real cluster or isolated vCluster normally uses cluster-admin inside that target; a direct shared host installation requires a separate explicit decision. Ask for the selected RBAC and installation approval.
 3. Load [AgentOS Runtime](../../../../.agents/skills/agentos-runtime/SKILL.md). Apply the selected stable release URL or reviewed local preview manifest with `kubectl --context <target-context> apply -f <source>`. Never apply the AgentOS manifest through the host context when vCluster was selected.
 4. Wait for the StatefulSet and verify a bound retained PVC, two successful sequential init containers, one running First Mate container, exactly one Herdr agent named `firstmate`, and the selected image digest on all three containers.
-5. Load [AgentOS Authentication](../../../../.agents/skills/agentos-auth/SKILL.md). Authenticate Pi inside the persistent pod and verify a harmless real model request. Present personal GitHub login and the organization-owned GitHub App path separately; GitHub is optional until a selected project workflow requires it, and either path needs its own approval.
+5. Load [AgentOS Authentication](../../../../.agents/skills/agentos-auth/SKILL.md). Authenticate Pi inside the persistent pod and verify a harmless real model request.
+   When the Captain selects a concrete First-Mate model or thinking level after
+   the initial Pi session already exists, apply it through Pi's native live
+   interface and verify the effective live profile; writing `settings.json`
+   alone prepares a future process and does not change the running session.
+   Present personal GitHub login and the organization-owned GitHub App path
+   separately; GitHub is optional until a selected project workflow requires
+   it, and either path needs its own approval.
 6. Replace the Pod once. Verify the same PVC identity, an Agent-home marker, exactly one First Mate pane, the same native Pi session and ordinary Mise tool resolution from a foreign worktree. If a GitHub App was selected, verify that only First Mate received its Secret mount and prove one harmless short-lived-token read after replacement.
 7. Attach the developer to the persistent First Mate, hand it authority and stop the local seed from performing competing Fleet work.
 8. From the cluster First Mate, load [AgentOS Database](../../../../.agents/skills/agentos-database/SKILL.md). Present external PostgreSQL and self-hosted CloudNativePG without an implicit preference. After the developer chooses, use the released AgentOS database shape and apply its SQL assets as the selected Fleet-owner login; the migrations create or adopt the root First-Mate row and bind it to that same login. Do not create a separate migrator or manually map First Mate. For self-hosting, discover and verify the current compatible official CNPG and PostgreSQL releases before requesting installation approval.

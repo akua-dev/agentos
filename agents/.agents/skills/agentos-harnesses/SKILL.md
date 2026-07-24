@@ -89,6 +89,16 @@ level, inspect the installed `pi --help`; Pi owns the accepted values. Do not
 simulate TUI key presses, write defaults merely to avoid omission or install an
 extension that reasserts AgentOS-selected defaults after login.
 
+When an explicit persistent-Mate profile is selected before Pod creation, put
+its fully qualified Pi model in `AGENTOS_MODEL=<provider>/<model>` and its
+selected native level in `AGENTOS_THINKING=<level>` on the reviewed
+`prepare-home` init-container overlay. The init step atomically merges only
+those selected axes into the Mate-owned `settings.json` before the runtime
+container can launch Pi and preserves unrelated settings. Omit an unselected
+axis and never add these variables to the shared release base as defaults.
+Settings written after a Pi session starts do not prove its effective profile;
+verify the live Pi model and thinking level before declaring the Mate ready.
+
 Pi has no separate command-approval bypass in this reviewed path. First and
 Second Mate load only their reviewed role-local extensions and run directly
 inside their dedicated Pods. For an inspected Assignment worktree,

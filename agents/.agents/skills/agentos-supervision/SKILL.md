@@ -66,12 +66,16 @@ canonical definition of work nor logic inside the Pi guard.
 
 1. Keep one verified Fleet-coordination continuity wait owned by the current
    Mate session even when its queue is empty. `pg-listen agentos_events` is the
-   normal baseline. Its useful condition-specific description must contain
-   `[agentos-supervision]` so the Pi backstop can recognize that the Mate armed
-   its selected continuity path. While at least one direct report is active,
-   add native waits only for concrete live risks that PostgreSQL cannot signal,
-   such as a selected Pod losing readiness, a specific Herdr Agent changing
-   status or a bounded pane match needed for a known recovery condition.
+   normal baseline. Its useful description must contain
+   `[agentos-supervision]` and identify it as a broad durable Fleet-event wake,
+   for example `[agentos-supervision] wait for a durable Fleet event; reconcile
+   current Inbox, Tasks, Assignments and external events`. It may name current
+   reconciliation priorities after that boundary, but must not present them as
+   predicates filtered by the channel-wide listener. While at least one direct
+   report is active, add native waits only for concrete live risks that
+   PostgreSQL cannot signal, such as a selected Pod losing readiness, a
+   specific Herdr Agent changing status or a bounded pane match needed for a
+   known recovery condition.
 2. Let the supervising Mate choose the smallest useful wait set. Several
    background commands may be active when independent signals matter, and one
    native command may select several resources when its own interface supports
@@ -82,8 +86,19 @@ canonical definition of work nor logic inside the Pi guard.
    protocol. In Pi, use `run_background_command`, give every wait a concise
    condition-specific `description`, and retain its task ID. Useful native
    primitives include:
-   - Use `pg-listen agentos_events` for one notification, then query
-     durable Inbox, Tasks, Assignments and external events with `psql`.
+   - Use `pg-listen agentos_events` for one channel-wide notification. On every
+     arm or re-arm, pass `ready_output: '"state":"listening"'` to
+     `run_background_command`. The readiness wait defaults to 30 seconds;
+     override `ready_timeout` only when the selected native command has a
+     reviewed different startup bound. The tool returns only after PostgreSQL
+     has registered `LISTEN`; immediately after that result, query and drain
+     durable Inbox, Tasks, Assignments and external events with `psql`. This
+     ready-then-catch-up order closes the notification gap without putting
+     Fleet policy in `pg-listen`. The CLI never reconciles Inbox itself. If the
+     one-shot listener completes during catch-up, reconcile the durable rows,
+     re-arm with the same readiness gate and catch up again before yielding.
+     Its small table-and-operation hint routes reconciliation but does not
+     identify which current business priority changed.
    - Use `herdr agent wait <handle> --status <idle|working|blocked|unknown>
      [--timeout <ms>] --session <session>` or `herdr wait agent-status
      <pane_id> --status <idle|working|blocked|done|unknown> [--timeout <ms>]
@@ -103,7 +118,11 @@ canonical definition of work nor logic inside the Pi guard.
      --for=condition=Ready=false --timeout=<duration>` for selected active
      reports. Pod readiness and harness status are different evidence; for the
      current Crewmate runtime, a live Herdr server does not prove the worker
-     harness still exists.
+     harness still exists. Use the Mate's kubelet-rotated projected
+     ServiceAccount identity and the exact-child grant established by
+     `$agentos-runtime`. If that mount or grant is absent, denied or revoked,
+     wake and report the supervision gap; never mint or persist an expiring
+     bearer token to keep the wait alive.
    - Use another installed native CLI when it already provides the required
      blocking wait. Add a small AgentOS CLI only for a genuinely missing
      primitive, as with PostgreSQL `LISTEN`.
@@ -122,7 +141,9 @@ canonical definition of work nor logic inside the Pi guard.
    has `[agentos-supervision]` in its useful description. The Pi backstop tracks
    tagged task starts and terminal events. A successful
    `run_background_command` result and its returned task ID are sufficient
-   evidence that the wait started; do not immediately call
+   evidence that the wait started; for `pg-listen`, the required
+   `ready_output` also proves that `LISTEN` was registered before catch-up. Do
+   not immediately call
    `list_background_commands` to re-prove it. Use the list only after missing,
    ambiguous or contradictory lifecycle evidence. While any direct report
    remains active, also ensure that every
@@ -166,10 +187,12 @@ supports direct-human intervention provenance; reconcile any material direct
 instruction durably. Ambiguous provenance fails closed to silent durable
 reconciliation.
 
-Background commands belong to the current Pi runtime. Session shutdown stops
-them. At session start, recover from durable Fleet and runtime state, re-arm the
-tagged continuity wait plus only the additional waits currently needed; do not
-replay an old process from task metadata.
+Background processes belong to the current Pi runtime. Session shutdown stops
+them. At session start, inspect `list_background_commands` with state
+`interrupted`, then recover from durable Fleet and runtime state and re-arm the
+tagged continuity wait plus only the additional waits currently needed.
+Persisted task metadata is a recovery hint, not authority or permission to
+replay an old command.
 
 `LISTEN/NOTIFY` may wake an already-running listener but never replaces the durable row or starts a pod.
 Herdr CLI waits and socket events expose terminal changes but never replace

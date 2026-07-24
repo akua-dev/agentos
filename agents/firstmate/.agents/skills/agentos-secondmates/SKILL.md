@@ -67,14 +67,26 @@ reviewed shared AgentOS or project instruction change.
    `$HOME/.local/state/agentos/workloads/<handle>/`. Patch the returned Agent
    UUID, Kubernetes-safe handle, immutable AgentOS image digest, namespace,
    password-free PostgreSQL URL, Secret name, labels, Herdr session and storage.
+   If a persistent-Mate model or thinking level was selected, follow
+   `$agentos-harnesses` and patch its `AGENTOS_MODEL` and `AGENTOS_THINKING`
+   values onto the `prepare-home` init container before rendering or applying
+   the workload. Do not add an omitted axis or a shared release default.
 6. Use the runtime skill's native `kubectl kustomize`, server-side dry-run,
    `kubectl diff` and synchronous `kubectl apply` sequence. Stop on an existing
    resource with conflicting identity rather than adopting it by name. The
-   overlay creates no database role, Secret, RBAC binding or public endpoint.
+   overlay creates no database role, Secret, broad RBAC or public endpoint.
+   It must retain the base's projected ServiceAccount identity and include only
+   the runtime skill's reviewed exact-parent supervision Role and RoleBinding.
+   Later Crewmate overlays add their own exact-child grants for this Second
+   Mate through the same runtime workflow.
 7. Attach to the Second Mate Pod and load `$agentos-auth` for Pi's browser login.
    Login happens in the persistent Pi home; never copy First Mate's or the local bootstrap agent's token directory.
 8. Verify the PostgreSQL session resolves the expected Agent identity, parent and charter through the password-free URL and persisted mode-`0600` pgpass file.
-   Verify the PVC is Bound, exactly one named Herdr Agent is Ready, the selected model can answer a harmless request, and a Pod replacement restores the same PVC and native Pi session.
+   Verify the PVC is Bound, exactly one named Herdr Agent is Ready, the selected
+   model can answer a harmless request, and Pi's live model and thinking level
+   match every explicitly selected axis. A matching `settings.json` alone is
+   not runtime evidence. Verify that a Pod replacement restores the same PVC,
+   native Pi session and effective selected profile.
 9. In one short database transaction, record the verified Kubernetes and Herdr locators, set useful status text and change lifecycle state from `provisioning` to `active`.
    On partial failure, preserve the row and runtime evidence in `provisioning` state for reconciliation; do not create a replacement identity or destructively roll back the PVC.
 10. Move accepted in-scope Tasks with

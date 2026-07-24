@@ -79,6 +79,7 @@ export class BackgroundTaskBroker {
           }),
       );
     } catch (error) {
+      record.suppressWake = true;
       await this.#finalize(record, {
         state: "failed",
         summary: "Background command failed to start",
@@ -114,10 +115,47 @@ export class BackgroundTaskBroker {
   }
 
   async list(): Promise<TaskSnapshot[]> {
-    const snapshots = await Promise.all(
-      [...this.#records.keys()].map((id) => this.get(id, { outputBytes: 0 })),
-    );
-    return snapshots.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    return [...this.#records.values()]
+      .map(({ snapshot }) => {
+        const listed = structuredClone(snapshot);
+        listed.outputTail = "";
+        return listed;
+      })
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  }
+
+  restore(snapshots: readonly TaskSnapshot[]) {
+    if (this.#records.size > 0) {
+      throw new Error("Cannot restore background commands after this broker started");
+    }
+    for (const snapshot of snapshots) {
+      if (snapshot.state === "running") {
+        throw new Error(`Cannot restore running background command: ${snapshot.id}`);
+      }
+      if (this.#records.has(snapshot.id)) {
+        throw new Error(`Duplicate restored background command: ${snapshot.id}`);
+      }
+      const restored = structuredClone(snapshot);
+      restored.outputPath = join(this.#rootDirectory, `${restored.id}.log`);
+      restored.outputTail = "";
+      restored.outputTruncated = false;
+      restored.outputBytes = 0;
+      restored.completionObserved = true;
+      const controller = new AbortController();
+      this.#records.set(restored.id, {
+        request: {
+          command: restored.command,
+          description: restored.description,
+          ...(restored.cwd === undefined ? {} : { cwd: restored.cwd }),
+        },
+        snapshot: restored,
+        controller,
+        terminal: Promise.resolve(),
+        resolveTerminal: () => undefined,
+        blockingWaiters: 0,
+        suppressWake: true,
+      });
+    }
   }
 
   async kill(id: string): Promise<TaskSnapshot> {
@@ -201,8 +239,8 @@ export class BackgroundTaskBroker {
     if (record.snapshot.state !== "running") return;
     if (record.finalizing) return record.finalizing;
     record.finalizing = (async () => {
-      await this.#refreshOutput(record, this.#tailBytes);
       const finished = this.#now();
+      await this.#refreshOutput(record, this.#tailBytes);
       record.snapshot.state = result.state;
       record.snapshot.finishedAt = finished.toISOString();
       record.snapshot.durationMs = Math.max(
