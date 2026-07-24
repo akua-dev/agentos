@@ -1,6 +1,6 @@
 ---
 name: agentos-evaluation
-description: Evaluate an Agent organization through the public AgentOS benchmark. Use when measuring Quickstart, Fleet delivery, recovery, human attention, efficiency, robustness, safety or accountability; running conformance, live or offline evaluations; or producing and validating a sanitized evidence bundle.
+description: Evaluate an Agent organization through the public AgentOS benchmark. Use when measuring Quickstart, Fleet delivery, composition integrity, recovery, human attention, efficiency, robustness, safety or accountability; running conformance, live or offline evaluations; or producing and validating a sanitized evidence bundle.
 ---
 
 # Evaluate an Agent organization
@@ -40,6 +40,15 @@ authority:
 - the Agent PVC for retained home, native session and unfinished workspace;
 - Git and the selected provider for the delivered branch, commit and review
   artifact.
+
+For the AgentOS composition scenario, resolve the pinned manifest and
+Assignment from PostgreSQL, exact selected bytes and digests from the bounded
+bundle, native origin revisions from their own interfaces, Pod-side verifier
+result from the worker runtime, loaded context from the exact harness and
+Herdr Agent, real capabilities from their independent authorities, and the
+debrief from immutable completion history. Treat desired persistent composition
+as distinct from observed native activation. Do not copy material bodies or
+complete sessions into the evidence bundle merely to prove their digest.
 
 Session files are optional evidence. When authorized, normalize only tool name,
 sanitized arguments, result or error class, timing and retry relationships.

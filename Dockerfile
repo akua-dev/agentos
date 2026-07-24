@@ -104,21 +104,30 @@ FROM agentos-base AS agentos-runtime-dependencies
 WORKDIR /tmp/agentos-dependencies
 
 COPY package.json bun.lock ./
+COPY clis/composition-verify/package.json clis/composition-verify/package.json
 COPY clis/github-app-token/package.json clis/github-app-token/package.json
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY clis/composition-verify/composition-verify.ts clis/composition-verify/composition-verify.ts
 COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
 COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
+COPY runtime/composition/digest.ts runtime/composition/digest.ts
+COPY runtime/composition/filesystem.ts runtime/composition/filesystem.ts
+COPY runtime/composition/manifest-v1.schema.json runtime/composition/manifest-v1.schema.json
+COPY runtime/composition/manifest.ts runtime/composition/manifest.ts
 
 RUN bun install \
       --frozen-lockfile \
       --ignore-scripts \
       --no-progress \
       --production \
+      --filter @agentos/root \
+      --filter @agentos/composition-verify \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
       --filter @agentos/ai-gateway \
+  && bun clis/composition-verify/composition-verify.ts --help >/dev/null \
   && bun clis/github-app-token/github-app-token.ts --help >/dev/null \
   && bun clis/pg-listen/pg-listen.ts --help >/dev/null
 
@@ -128,6 +137,9 @@ COPY --from=agentos-seed /opt/agentos-seed/ /opt/agentos/
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/node_modules/ \
   /opt/agentos/node_modules/
+COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/clis/composition-verify/node_modules/ \
+  /opt/agentos/clis/composition-verify/node_modules/
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/clis/pg-listen/node_modules/ \
   /opt/agentos/clis/pg-listen/node_modules/
@@ -150,8 +162,12 @@ RUN chmod 0644 \
     /opt/agentos/runtime/health.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \
   && chmod 0755 \
+    /opt/agentos/clis/composition-verify/composition-verify.ts \
     /opt/agentos/clis/github-app-token/github-app-token.ts \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
+  && ln -s \
+    /opt/agentos/clis/composition-verify/composition-verify.ts \
+    /usr/local/bin/composition-verify \
   && ln -s \
     /opt/agentos/clis/github-app-token/github-app-token.ts \
     /usr/local/bin/github-app-token \

@@ -1,6 +1,6 @@
 ---
 name: agentos-improvement-review
-description: Turn a frozen AgentOS evaluation into the smallest reviewed, regression-tested improvement. Use after benchmark or operational evidence exposes wrong tool use, repeated trial and error, unclear instructions, stale Skill guidance, runtime failure, an authority violation or another reproducible Fleet weakness.
+description: Turn a frozen AgentOS evaluation into the smallest reviewed, regression-tested improvement. Use after benchmark or operational evidence exposes wrong tool use, repeated trial and error, unclear instructions, stale Skill or composition guidance, runtime failure, an authority violation or another reproducible Fleet weakness.
 ---
 
 # Improve AgentOS from frozen evidence
@@ -43,6 +43,13 @@ failure, and the causal counterfactual: the smallest change that should prevent
 it. Long trial-and-error is evidence of a navigation or feedback defect, not
 automatically evidence that another wrapper CLI is needed.
 
+For composition evidence, distinguish selection, material delivery, observable
+loading, runtime capability and compliance. A selected Skill that was not used
+is different from a Skill that was absent; a missing command is different from
+missing instructions; a debrief disagreement is a review trigger, not proof
+that the worker or reviewer is right. Resolve the authoritative target from the
+recorded origin rather than copying company material into AgentOS.
+
 ## Make a reviewed improvement
 
 1. Propose the smallest change at the source that owns the behavior. Keep
@@ -60,6 +67,11 @@ automatically evidence that another wrapper CLI is needed.
 5. Publish before-and-after evidence, exact revisions and remaining
    uncertainty. A plausible explanation without counterfactual evidence is a
    hypothesis, not a learned improvement.
+6. Adopt only under the recorded Captain boundary. An origin change applies to
+   future Assignments; a persistent Mate change uses the separately authorized
+   native safe-boundary flow. Record the previous resolvable version and prove
+   rollback. Never let the composer or measured worker approve or activate its
+   own replacement during the work it governed.
 
 Do not hot-reload or deploy the change into a live Fleet unless that separate
 action is explicitly authorized.

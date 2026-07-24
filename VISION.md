@@ -43,7 +43,8 @@ queue is healthy; accepted work and real events create demand.
 
 The higher-stakes layer changes the trust posture. OpenClaw and Hermes make
 skill discovery and installation part of their product. AgentOS keeps
-Fleet-operating skills in reviewed Git and pins executable tools and images.
+Fleet-operating skills in reviewed, provenance-pinned sources and pins
+executable tools and images.
 Every authenticated Agent is bound to a PostgreSQL identity and RLS limits
 what it can mutate; role contracts require Captain approval or an exact
 durable standing authorization before consequences. Extensibility is not the

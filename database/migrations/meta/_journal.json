@@ -78,6 +78,13 @@
       "when": 1784409309452,
       "tag": "0010_preserve_runtime_privileges",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784810821916,
+      "tag": "0011_agent_composition",
+      "breakpoints": true
     }
   ]
 }

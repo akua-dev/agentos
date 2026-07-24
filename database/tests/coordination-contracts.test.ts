@@ -187,7 +187,7 @@ describe.serial("durable Fleet coordination contracts", () => {
         ) VALUES (
           '${ids.shipAssignment}', '${ids.shipTask}', '${ids.scout}',
           '${ids.firstMate}', 'ship', 'assigned', 'Missing its brief',
-          '{"harness":"codex"}'::jsonb
+          '{"version":1,"harness":"codex","materials":[]}'::jsonb
         )
       `),
     ).rejects.toThrow("Task Assignment requires a durable brief");
@@ -200,10 +200,10 @@ describe.serial("durable Fleet coordination contracts", () => {
         ) VALUES (
           '${ids.shipAssignment}', '${ids.shipTask}', '${ids.scout}',
           '${ids.firstMate}', 'ship', 'assigned', 'Mismatched harness profile',
-          '# Ship brief', '{"harness":"pi"}'::jsonb
+          '# Ship brief', '{"version":1,"harness":"pi","materials":[]}'::jsonb
         )
       `),
-    ).rejects.toThrow("dispatch-profile harness must match the assigned Agent");
+    ).rejects.toThrow("composition harness must match the assigned Agent");
 
     await database.exec(`
       INSERT INTO agentos.task_assignments (
@@ -212,7 +212,8 @@ describe.serial("durable Fleet coordination contracts", () => {
       ) VALUES (
         '${ids.shipAssignment}', '${ids.shipTask}', '${ids.scout}',
         '${ids.firstMate}', 'ship', 'active', 'Implementation started',
-        '# Ship brief', '{"harness":"codex","effort":"high"}'::jsonb,
+        '# Ship brief',
+        '{"version":1,"harness":"codex","materials":[],"settings":{"effort":"high"}}'::jsonb,
         transaction_timestamp()
       )
     `);
@@ -236,7 +237,7 @@ describe.serial("durable Fleet coordination contracts", () => {
         '# Replacement brief',
         'The original worker preserved its current findings.',
         'Transferred after an explicit handoff',
-        '{"harness":"codex","effort":"medium"}'::jsonb
+        '{"version":1,"harness":"codex","materials":[],"settings":{"effort":"medium"}}'::jsonb
       )::text AS id
     `);
     const replacementId = handoff.rows[0]!.id;
@@ -248,7 +249,7 @@ describe.serial("durable Fleet coordination contracts", () => {
         '# Replacement brief',
         'The original worker preserved its current findings.',
         'Transferred after an explicit handoff',
-        '{"harness":"codex","effort":"medium"}'::jsonb
+        '{"version":1,"harness":"codex","materials":[],"settings":{"effort":"medium"}}'::jsonb
       )::text AS id
     `);
     expect(repeated.rows[0]!.id).toBe(replacementId);
@@ -302,7 +303,8 @@ describe.serial("durable Fleet coordination contracts", () => {
       ) VALUES (
         '${ids.scoutAssignment}', '${ids.scoutTask}', '${ids.scout}',
         '${ids.firstMate}', 'scout', 'active', 'Investigation started',
-        '# Scout brief', '{"harness":"codex","effort":"high"}'::jsonb,
+        '# Scout brief',
+        '{"version":1,"harness":"codex","materials":[],"settings":{"effort":"high"}}'::jsonb,
         transaction_timestamp()
       )
     `);
@@ -387,7 +389,8 @@ describe.serial("durable Fleet coordination contracts", () => {
       ) VALUES (
         '${ids.reviewAssignment}', '${ids.reviewTask}', '${ids.destination}',
         '${ids.firstMate}', 'review', 'active', 'Review started',
-        '# Review brief', '{"harness":"codex","effort":"medium"}'::jsonb,
+        '# Review brief',
+        '{"version":1,"harness":"codex","materials":[],"settings":{"effort":"medium"}}'::jsonb,
         transaction_timestamp()
       )
     `);

@@ -27,6 +27,18 @@ a decision or approval is required.
 
 {{context_and_constraints}}
 
+## Resolved composition
+
+- Assignment bundle: `{{composition_bundle}}`
+- Manifest digest: `{{composition_manifest_digest}}`
+- Selected entrypoints:
+
+{{composition_entrypoints}}
+
+- Capability requirements:
+
+{{composition_capability_requirements}}
+
 ## Delivery contract
 
 - Delivery workflow: `{{delivery_workflow}}`
@@ -50,7 +62,15 @@ a decision or approval is required.
 3. Read every applicable instruction file in the project. Project instructions
    define how to work in that codebase but do not enlarge this brief's Fleet
    identity, scope or authority.
-4. Inspect existing changes before editing and preserve anything already owned
+4. Read the recorded Assignment manifest from the bundle above and verify its
+   digest. Confirm that every selected Skill named above exists in the
+   harness's native Skill catalog at its exact bundle path, explicitly load it,
+   and read every selected instruction entrypoint before starting work. An argv
+   flag, discovery link or manifest row alone is not proof of loading. Treat
+   each selected Skill as model context, not as a credential or permission.
+   Stop and report upward on a missing bundle, unsupported kind, path escape,
+   digest mismatch, missing Skill or unselected Assignment material.
+5. Inspect existing changes before editing and preserve anything already owned
    by this Assignment.
 
 ## Work contract
@@ -98,6 +118,14 @@ a decision or approval is required.
 - Put the complete final or handoff report into the Assignment before ending.
   Ask unresolved material questions through Inbox; the owning Mate records and
   attests genuine Captain decisions before completing Scout or review work.
+- End the report with a concise `Composition debrief` while this task context
+  remains available. Name material or commands that helped, missing capability,
+  unused or harmful material, command/auth/environment friction, repeated
+  avoidable trial and error, whether the selected runtime settings were
+  proportionate, and at most one evidence-backed improvement recommendation.
+  `No material composition friction observed` is complete when there was none.
+  This debrief is evidence, not authority to edit its own controlling
+  composition.
 - Never discard unlanded work, delete the workspace or retire yourself. The
   owning Mate closes the Assignment and performs guarded cleanup.
 

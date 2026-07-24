@@ -1,0 +1,224 @@
+import { createHash } from "node:crypto";
+import { constants, type BigIntStats } from "node:fs";
+import { lstat, open, readdir, realpath } from "node:fs/promises";
+import { isAbsolute, join, relative, sep } from "node:path";
+import {
+  assertOpenedFileStillAtPath,
+  metadataChanged,
+} from "./filesystem.ts";
+
+const maximumMaterialEntries = 4096;
+const maximumMaterialDepth = 32;
+
+export async function digestMaterialDirectory(
+  directory: string,
+): Promise<string> {
+  return (await inspectMaterialDirectory(directory)).digest;
+}
+
+export async function inspectMaterialDirectory(
+  directory: string,
+  observedFile?: {
+    path: string;
+    maximumPrefixBytes?: number;
+    requireUtf8?: boolean;
+  },
+): Promise<{
+  digest: string;
+  observedPrefix?: Uint8Array;
+}> {
+  const root = await lstat(directory, { bigint: true });
+  if (root.isSymbolicLink()) {
+    throw new Error(`Composition material root is a symlink: ${directory}`);
+  }
+  if (!root.isDirectory()) {
+    throw new Error(`Composition material root is not a directory: ${directory}`);
+  }
+  const rootRealPath = await realpath(directory);
+
+  const hash = createHash("sha256");
+  let observedPrefix: Uint8Array | undefined;
+  const snapshot = await collectMaterialSnapshot(directory);
+  const files = new Map<string, BigIntStats>();
+
+  for (const path of snapshot.files) {
+    const file = await open(
+      path,
+      constants.O_RDONLY |
+        (constants.O_NOFOLLOW ?? 0) |
+        (constants.O_NONBLOCK ?? 0),
+    );
+    try {
+      const before = await file.stat({ bigint: true });
+      if (!before.isFile()) {
+        throw new Error(
+          `Composition material changed into a non-file while hashing: ${path}`,
+        );
+      }
+      if (before.nlink > 1n) {
+        throw new Error(
+          `Composition material contains a hard-linked file: ${path}`,
+        );
+      }
+
+      const relativePath = relative(directory, path).split(sep).join("/");
+      const observesThisFile = observedFile?.path === relativePath;
+      const maximumPrefixBytes = observedFile?.maximumPrefixBytes ?? 0;
+      const prefixChunks: Uint8Array[] = [];
+      let prefixBytes = 0;
+      const decoder =
+        observesThisFile && observedFile?.requireUtf8
+          ? new TextDecoder("utf-8", { fatal: true })
+          : undefined;
+      hash.update("file\0");
+      hash.update(relativePath, "utf8");
+      hash.update("\0");
+      hash.update(before.mode & 0o111n ? "executable" : "regular");
+      hash.update("\0");
+      hash.update(String(before.size));
+      hash.update("\0");
+
+      let bytesRead = 0n;
+      try {
+        for await (const chunk of file.createReadStream({ autoClose: false })) {
+          bytesRead += BigInt(chunk.byteLength);
+          hash.update(chunk);
+          decoder?.decode(chunk, { stream: true });
+          if (observesThisFile && prefixBytes < maximumPrefixBytes) {
+            const retained = chunk.subarray(
+              0,
+              maximumPrefixBytes - prefixBytes,
+            );
+            prefixChunks.push(Uint8Array.from(retained));
+            prefixBytes += retained.byteLength;
+          }
+        }
+        decoder?.decode();
+      } catch (error) {
+        if (error instanceof TypeError && decoder) {
+          throw new Error(
+            `Composition material observed file is not valid UTF-8: ${path}`,
+          );
+        }
+        throw error;
+      }
+
+      const after = await file.stat({ bigint: true });
+      if (bytesRead !== before.size || metadataChanged(before, after)) {
+        throw new Error(`Composition material changed while hashing: ${path}`);
+      }
+      await assertOpenedFileStillAtPath(
+        path,
+        rootRealPath,
+        after,
+        "Composition material",
+      );
+      files.set(path, after);
+      if (observesThisFile) {
+        observedPrefix = Buffer.concat(prefixChunks);
+      }
+      hash.update("\0");
+    } finally {
+      await file.close();
+    }
+  }
+
+  for (const [path, before] of files) {
+    await assertOpenedFileStillAtPath(
+      path,
+      rootRealPath,
+      before,
+      "Composition material",
+    );
+  }
+  for (const [path, before] of snapshot.directories) {
+    const after = await lstat(path, { bigint: true });
+    const fromRoot = relative(rootRealPath, await realpath(path));
+    if (
+      after.isSymbolicLink() ||
+      !after.isDirectory() ||
+      metadataChanged(before, after) ||
+      fromRoot === ".." ||
+      fromRoot.startsWith(`..${sep}`) ||
+      isAbsolute(fromRoot)
+    ) {
+      throw new Error(
+        `Composition material directory changed while hashing: ${path}`,
+      );
+    }
+  }
+
+  if (observedFile !== undefined && observedPrefix === undefined) {
+    throw new Error(
+      `Composition material observed file is not a regular file: ${observedFile.path}`,
+    );
+  }
+
+  return {
+    digest: `sha256:${hash.digest("hex")}`,
+    observedPrefix,
+  };
+}
+
+async function collectMaterialSnapshot(directory: string): Promise<{
+  directories: Map<string, BigIntStats>;
+  files: string[];
+}> {
+  const directories = new Map<string, BigIntStats>();
+  const files: string[] = [];
+  const pending = [{ depth: 0, path: directory }];
+  let entriesSeen = 0;
+
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    if (current.depth > maximumMaterialDepth) {
+      throw new Error(
+        `Composition material exceeds maximum depth ${maximumMaterialDepth}`,
+      );
+    }
+    const directoryMetadata = await lstat(current.path, { bigint: true });
+    if (
+      directoryMetadata.isSymbolicLink() ||
+      !directoryMetadata.isDirectory()
+    ) {
+      throw new Error(
+        `Composition material contains a non-directory path: ${current.path}`,
+      );
+    }
+    directories.set(current.path, directoryMetadata);
+
+    for (const entry of await readdir(current.path, {
+      withFileTypes: true,
+    })) {
+      entriesSeen += 1;
+      if (entriesSeen > maximumMaterialEntries) {
+        throw new Error(
+          `Composition material exceeds ${maximumMaterialEntries} entries`,
+        );
+      }
+      const path = join(current.path, entry.name);
+      const metadata = await lstat(path);
+      if (metadata.isSymbolicLink()) {
+        throw new Error(`Composition material contains a symlink: ${path}`);
+      }
+      if (metadata.isDirectory()) {
+        pending.push({ depth: current.depth + 1, path });
+        continue;
+      }
+      if (!metadata.isFile()) {
+        throw new Error(
+          `Composition material contains a special file: ${path}`,
+        );
+      }
+      files.push(path);
+    }
+  }
+
+  files.sort((left, right) =>
+    Buffer.compare(
+      Buffer.from(relative(directory, left), "utf8"),
+      Buffer.from(relative(directory, right), "utf8"),
+    ),
+  );
+  return { directories, files };
+}

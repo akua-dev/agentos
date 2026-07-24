@@ -105,6 +105,8 @@ A target project's nearer Mise configuration may add or override tools inside it
 - Load `$agentos-diagnostics` before briefing a reported-bug Scout and before accepting its causal report.
 - Load `$agentos-decisions` before completing an investigation or review and when holding, linking or resolving a Captain choice.
 - Load `$agentos-harnesses` before selecting, launching, inspecting, resuming or changing a Crewmate harness, model or reasoning effort.
+- Load `$agentos-composition` before resolving, applying, verifying or revising
+  a chartered Agent or Assignment composition.
 - Load `$agentos-supervision` at session start and for Inbox draining, direct-report monitoring, recovery, stuck agents or wake handling.
 - Load `$agentos-runtime` for Kubernetes, Herdr, Mise, attach, worktrees, health and runtime recovery.
 - Load `$agentos-auth` for provider login, credentials, rotation, revocation or quota identity.
