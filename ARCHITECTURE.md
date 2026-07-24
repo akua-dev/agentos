@@ -478,13 +478,16 @@ the recipient's model context, while `resolved_at` means its requested action or
 disposition was durably handled. A read but unresolved row therefore remains
 recoverable work after a crash.
 Transactional Fleet triggers publish small table-and-operation hints on the
-`agentos_events` channel. A running Pi Mate can arm `pg-listen agentos_events` through
-its generic background-command tool for a prompt wake, then must query its
-authorized durable rows. The wake contains no Fleet row data and
+`agentos_events` channel. A running Pi Mate readiness-gates its native
+`pg-listen agentos_events` wait, then catches up by querying its authorized
+durable rows before relying on the one-shot listener. The detailed re-arm and
+catch-up judgment belongs to `$agentos-supervision`; the wake contains no Fleet
+row data and
 `LISTEN/NOTIFY` never starts a pod or replaces Inbox, Task or external-event
 truth. The same generic tool may own additional native blocking commands for
 selected Kubernetes resources, Herdr state transitions or bounded pane output;
-their completion is only a wake to re-query the named authority.
+their completion is only a wake to re-query the named authority. Terminal output
+is never a generic wake path.
 
 One PostgreSQL database is one Fleet. Core tables therefore carry no `fleet_id`; a developer who intentionally needs an isolated second Fleet creates another database. Released objects live in the `agentos` schema. The `local` schema is an approved First-Mate playground whose objects are never treated as released AgentOS behavior until they return through a reviewed migration.
 
@@ -559,6 +562,16 @@ known. Topology does not change schema or security semantics.
 
 Kubernetes owns pod existence, phase, readiness and failure state.
 Each workload uses an explicit namespace, ServiceAccount, PVC mapping and immutable AgentOS image reference.
+
+Persistent Mates that supervise child Pods use the kubelet-rotated projected
+ServiceAccount identity mounted by their dedicated Pod. A reviewed per-Agent
+overlay grants only the owning Mate's exact child Pod names the narrowly needed
+`get`, `list` and `watch` access, with `pods/exec` only when an approved native
+launch, attach, doorbell or recovery path requires it. It never grants
+label-wide, sibling or wildcard access and never mints or persists a separate
+expiring supervision bearer token. This is a Kubernetes supervision boundary,
+not the broader provider-credential mediation proposed in [the workload-identity
+exploration](https://github.com/akua-dev/agentos/issues/27), which remains open.
 
 After explicit RBAC approval, the default dedicated-cluster path grants First Mate cluster-administrator access so it can inspect and recover agents.
 Shared or sensitive clusters must offer a scoped mode and explain which recovery operations become unavailable.
