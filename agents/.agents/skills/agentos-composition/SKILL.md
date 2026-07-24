@@ -45,12 +45,17 @@ provider authority always outrank selected model context.
 5. Select the concrete harness. Put every other harness-native choice under
    opaque `settings`. Model, effort, fast mode, compaction, context limits and
    image are examples, not AgentOS fields. Preserve the vocabulary understood
-   by the selected runtime or company policy.
+   by the selected runtime or company policy. Treat an image as an explicit
+   whole-workload choice; never infer an image change from selected material or
+   from a missing capability.
 6. Record non-secret capability requirements separately from material.
    A Skill may teach how to use a Mise command, MCP server, harness extension,
    image or credential, but selecting it neither installs nor grants that
    capability. Verify every required command, credential, provider permission,
-   Secret and RBAC boundary through its owner before relying on it.
+   Secret and RBAC boundary through its owner before relying on it. A reviewed
+   persistent-Mate tool may be retained on the home PVC and exposed through the
+   agent-owned native command path; that is one native arrangement, not a new
+   composition material kind or generic AgentOS installer.
 7. Resolve exact bytes, reject path traversal, symlinks and special files, and
    calculate the full material-directory digests. Assemble the neutral
    `manifest.json` plus `materials/<material-id>/` validation layout and run
@@ -105,7 +110,10 @@ files, Pi packages and the Herdr-visible session remain observed state.
 4. Arrange selected instructions and Skills in a private-home layout supported
    by the real harness. Keep the role checkout and closer `AGENTS.md`
    authoritative. Apply Mise, extension, MCP, image, environment, credential
-   and RBAC changes separately through their native reviewed boundaries.
+   and RBAC changes separately through their native reviewed boundaries. Do
+   not replace the whole Mate image merely to satisfy one command or extension
+   requirement; an image change requires its own explicit workload selection
+   and rollout evidence.
 5. At a safe turn boundary, use the harness's documented reload or resume
    behavior. For Pi instruction or Skill changes, `/reload` is the ordinary
    safe-boundary path. Do not interrupt a live Mate merely because desired
@@ -122,12 +130,14 @@ files, Pi packages and the Herdr-visible session remain observed state.
 An Agent harness cannot change while an active Assignment pins a different
 harness. Change or hand off accountable work first.
 
-An external Captain surface such as Discord is composed the same way: select
-only its reviewed instruction and Skill material into the persistent Mate,
-arrange its CLI, Pi extension, receiver and credential through their own native
-runtime authorities, reload at a safe boundary, and verify the existing Mate
-session. The integration process remains integration-owned; it does not become
-an AgentOS daemon or manifest material.
+An external Captain surface is composed the same way: select only its reviewed
+instruction and Skill material into the persistent Mate, arrange its client,
+receiver and credential through the integration's native runtime authorities,
+reload at a safe boundary, and verify the existing Mate session. Adding that
+surface does not imply a derived Mate image. Provider-specific installation and
+lifecycle remain in the integration's private repository; they do not become an
+AgentOS plugin manager, installer, daemon, controller, schema or shadow
+activation state, nor manifest material.
 
 ## Apply an Assignment composition
 
