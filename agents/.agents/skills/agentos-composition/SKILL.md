@@ -179,7 +179,8 @@ neither global installation nor composition policy.
 
    - For Pi, pass `--no-skills`, then one absolute
      `--skill <bundle>/materials/<id>` for every selected Skill and one
-     `--append-system-prompt <entrypoint>` for every selected instruction.
+     `--append-system-prompt <bundle>/materials/<id>/<entrypoint>` for every
+     selected instruction.
      Explicitly add any reviewed project-owned Skill roots that apply to the
      worktree; `--no-skills` excludes unrelated global discovery while
      preserving these explicit paths.
