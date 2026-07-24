@@ -138,8 +138,8 @@ Second Mates never create further Second Mates.
 
 Every accepted work item has one durable Task and at least one explicit Assignment before an asynchronous worker begins.
 A Task keeps one stable identity across handoff. Each Assignment stores its
-complete authoritative brief, resolved harness profile and final or handoff
-report; its PVC copy is only the harness view. A handoff ends the prior
+complete authoritative brief, resolved composition and final or handoff report;
+its PVC copy is only the harness view. A handoff ends the prior
 Assignment and creates the replacement atomically instead of rewriting history
 or cloning the Task.
 A ship Crewmate works in an isolated worktree until its changes are durably landed or handed off.

@@ -42,9 +42,10 @@ its highest verified non-`max` value. This fallback is an Assignment decision,
 not a Pi setting or persistent Agent default.
 
 Read durable natural-language dispatch policy from scoped Captain state at
-every Crewmate intake. Record the resolved harness and only the model, effort or
-image values actually chosen in `task_assignments.dispatch_profile`. Keep
-natural-language policy out of scripts and TypeScript unions.
+every Crewmate intake. Record the resolved harness and every selected
+harness-native choice in the versioned composition manifest, with those native
+choices under its opaque `settings` object. Keep natural-language policy out of
+scripts and TypeScript unions.
 
 ## Keep worker harnesses unattended
 
