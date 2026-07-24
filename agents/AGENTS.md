@@ -29,6 +29,8 @@ repository boundary; it never selects an identity.
 - Load `$agentos-ai-gateway` only when pooled Fleet AI capacity, server-owned
   provider OAuth or native harness routing through the Fleet AI Gateway is in
   scope. Direct per-Agent authentication remains complete.
+- Load `$agentos-composition` before resolving, applying, verifying or revising
+  a persistent-Mate or Assignment composition.
 - Load `$agentos-projects` before changing a project registry, checkout, remote,
   delivery posture or lifecycle.
 - Load `$agentos-diagnostics` for reported bugs and `$agentos-decisions` before

@@ -7,6 +7,7 @@ import evidenceBundleSchema from "./schemas/evidence-bundle.schema.json";
 import metricCatalogSchema from "./schemas/metric-catalog.schema.json";
 import scenarioSchema from "./schemas/scenario.schema.json";
 import metricCatalog from "./metrics/catalog.json";
+import compositionRecoveryScenario from "./scenarios/composition-integrity-recovery/scenario.json";
 import hierarchyReportingScenario from "./scenarios/hierarchy-reporting-after-background-wake/scenario.json";
 import recoveryScenario from "./scenarios/interrupted-worker-recovery/scenario.json";
 import quickstartScenario from "./scenarios/quickstart-to-delivery/scenario.json";
@@ -23,7 +24,12 @@ const validators: Record<ContractKind, ValidateFunction> = {
   scenario: ajv.compile(scenarioSchema),
 };
 const scenarios = new Map(
-  [quickstartScenario, recoveryScenario, hierarchyReportingScenario].map((scenario) => [scenario.id, scenario]),
+  [
+    quickstartScenario,
+    recoveryScenario,
+    compositionRecoveryScenario,
+    hierarchyReportingScenario,
+  ].map((scenario) => [scenario.id, scenario]),
 );
 const catalogMetrics = new Map(metricCatalog.metrics.map((metric) => [metric.id, metric]));
 

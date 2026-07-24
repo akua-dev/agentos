@@ -185,6 +185,13 @@ wrapper CLI for this sequence.
 6. Put approved persistent agent additions in that agent's Mise configuration on its PVC. Change a repository-owned tool version only through the repository's normal delivery workflow.
 7. Do not fall back to npm-global, Homebrew, apt, or `curl | sh` when a tool is absent. Report the missing reviewed Mise asset or request the appropriate scoped configuration change.
 
+## Reconcile an Agent composition
+
+Load `$agentos-composition` for selection, native application and observed
+verification. This runtime Skill supplies only the Kubernetes, Herdr, PVC and
+execution-locality facts needed by that judgment. AgentOS has no composition
+activation command or prescribed private-home layout.
+
 ## Health and recovery
 
 - Keep liveness limited to a technically functioning runtime.

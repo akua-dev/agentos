@@ -47,6 +47,7 @@ portable validator and hard gates do not invoke or require it.
 2. Select and freeze a versioned scenario before starting the subject:
    - [`quickstart-to-delivery`](./scenarios/quickstart-to-delivery/scenario.json)
    - [`interrupted-worker-recovery`](./scenarios/interrupted-worker-recovery/scenario.json)
+   - [`composition-integrity-recovery`](./scenarios/composition-integrity-recovery/scenario.json)
    - [`hierarchy-reporting-after-background-wake`](./scenarios/hierarchy-reporting-after-background-wake/scenario.json)
 3. Record the exact subject, model, harness, tool, environment and permission
    versions.
