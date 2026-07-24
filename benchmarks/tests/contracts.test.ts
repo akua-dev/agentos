@@ -31,6 +31,7 @@ describe("public benchmark contracts", () => {
       "scenarios/quickstart-to-delivery/scenario.json",
       "scenarios/interrupted-worker-recovery/scenario.json",
       "scenarios/composition-integrity-recovery/scenario.json",
+      "scenarios/hierarchy-reporting-after-background-wake/scenario.json",
     ];
 
     for (const path of paths) {

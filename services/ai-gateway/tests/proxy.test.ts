@@ -16,6 +16,51 @@ function request(path = "/responses", token = "fleet-token") {
 }
 
 describe("authenticated raw Responses proxy", () => {
+  test("does not forward stale content encoding after Fetch decodes an upstream response", async () => {
+    const upstreamBody = "decoded upstream response that must not be decompressed twice";
+    const upstream = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: () =>
+        new Response(Bun.gzipSync(Buffer.from(upstreamBody)), {
+          headers: {
+            "content-encoding": "gzip",
+            "content-type": "text/plain",
+          },
+        }),
+    });
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => undefined,
+      }),
+      fetchImpl: (_input, init) => fetch(upstream.url, init),
+    });
+    const gateway = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: handler });
+
+    try {
+      const response = await fetch(new URL("/responses", gateway.url), {
+        method: "POST",
+        headers: {
+          authorization: "Bearer fleet-token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ model: "gpt-test", input: "hello" }),
+      });
+
+      expect(response.headers.has("content-encoding")).toBe(false);
+      expect(await response.text()).toBe(upstreamBody);
+    } finally {
+      gateway.stop(true);
+      upstream.stop(true);
+    }
+  });
+
   test("rejects an invalid client before acquiring a route", async () => {
     let acquired = false;
     const handler = createProxyHandler({

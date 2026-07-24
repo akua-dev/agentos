@@ -107,6 +107,25 @@ native review workflow. Adoption affects future Assignments; a persistent Mate
 uses its separately authorized safe application boundary. Prior Assignments
 keep their original manifest and digest.
 
+## Hierarchy reporting after wake
+
+For the portable hierarchy-reporting scenario, map the coordination listener
+to `pg-listen agentos_events`, durable hierarchy reports and parent requests to
+PostgreSQL Inbox, and the native child-status predicate to an exact-child Herdr
+wait. Use `psql` plus `agentos.can_manage_task` to distinguish globally readable
+foreign state from manageable domain state. Correlate Pi custom-message
+provenance and bounded Herdr terminal output to distinguish a background
+completion from supported direct Captain intervention.
+
+Run the foreign-listener, owned-child-status and direct-Captain cases from
+three separately reset disposable Fleet states. For the owned-child-status
+case, retain the background-command task IDs and condition-specific
+descriptions needed to prove that the tagged PostgreSQL continuity listener
+and every still-useful exact-child status wait were re-armed after the
+one-shot completion. Evidence of the global listener does not substitute for
+the exact-child wait, and database status text does not prove a Herdr
+transition.
+
 ## AgentOS gates
 
 In addition to the portable gates, fail the AgentOS profile when:
