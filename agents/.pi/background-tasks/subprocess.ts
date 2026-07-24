@@ -16,6 +16,7 @@ export type TaskProcessResult = {
 
 export type TaskProcessHandle = {
   readonly pid: number;
+  readonly readiness: Promise<boolean>;
   readonly completion: Promise<TaskProcessResult>;
   stop(): Promise<TaskProcessResult>;
 };
@@ -25,6 +26,7 @@ export type TaskProcessOptions = {
   cwd?: string;
   env?: Record<string, string | undefined>;
   terminateGraceMs?: number;
+  readyOutput?: string;
 };
 
 export function spawnTaskProcess(
@@ -32,6 +34,9 @@ export function spawnTaskProcess(
   options: TaskProcessOptions,
 ): TaskProcessHandle {
   if (!command.trim()) throw new Error("Background command must not be empty");
+  if (options.readyOutput !== undefined && options.readyOutput.length === 0) {
+    throw new Error("Readiness output must not be empty");
+  }
 
   const shell =
     process.platform === "win32"
@@ -46,24 +51,48 @@ export function spawnTaskProcess(
     stdio: ["ignore", "pipe", "pipe"],
   });
   const terminateGraceMs = options.terminateGraceMs ?? 2_000;
+  const readyMarker =
+    options.readyOutput === undefined
+      ? undefined
+      : Buffer.from(options.readyOutput);
   let settled = false;
   let resolveCompletion!: (result: TaskProcessResult) => void;
+  let resolveReadiness!: (ready: boolean) => void;
   let stopPromise: Promise<TaskProcessResult> | undefined;
   let outputLimitReached = false;
+  let readinessSettled = readyMarker === undefined;
 
   const completion = new Promise<TaskProcessResult>((resolve) => {
     resolveCompletion = resolve;
   });
+  const readiness = new Promise<boolean>((resolve) => {
+    resolveReadiness = resolve;
+    if (readinessSettled) resolve(true);
+  });
 
   const consume = async (stream: Readable) => {
+    let readinessTail = Buffer.alloc(0);
     for await (const chunk of stream) {
+      const bytes = Buffer.from(chunk);
       try {
-        await options.output.write(Buffer.from(chunk));
+        await options.output.write(bytes);
       } catch (error) {
         if (!(error instanceof TaskOutputLimitError)) throw error;
         outputLimitReached = true;
         void stop();
         return;
+      }
+      if (!readinessSettled && readyMarker) {
+        const candidate = Buffer.concat([readinessTail, bytes]);
+        if (candidate.indexOf(readyMarker) !== -1) {
+          readinessSettled = true;
+          resolveReadiness(true);
+        } else {
+          const retainedBytes = Math.max(0, readyMarker.length - 1);
+          readinessTail = candidate.subarray(
+            Math.max(0, candidate.length - retainedBytes),
+          );
+        }
       }
     }
   };
@@ -78,6 +107,10 @@ export function spawnTaskProcess(
     settled = true;
     await Promise.allSettled([stdout, stderr]);
     await options.output.close();
+    if (!readinessSettled) {
+      readinessSettled = true;
+      resolveReadiness(false);
+    }
     resolveCompletion({ ...result, outputLimitReached });
   };
 
@@ -120,6 +153,7 @@ export function spawnTaskProcess(
 
   return {
     pid: child.pid ?? 0,
+    readiness,
     completion,
     stop,
   };

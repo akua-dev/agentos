@@ -7,6 +7,8 @@ import type {
   TaskTerminalResult,
 } from "./types.ts";
 
+const DEFAULT_READY_TIMEOUT_MS = 30_000;
+
 export const startBackgroundCommand: StartBackgroundCommand = async (
   request,
   context,
@@ -22,6 +24,7 @@ export const startBackgroundCommand: StartBackgroundCommand = async (
       cwd: request.cwd,
       env: globalThis.process.env,
       terminateGraceMs: context.terminateGraceMs,
+      readyOutput: request.readyOutput,
     });
   } catch (error) {
     await output.close();
@@ -106,6 +109,34 @@ export const startBackgroundCommand: StartBackgroundCommand = async (
     timeout = setTimeout(() => void stop("timed_out"), request.timeout);
   }
 
+  if (request.readyOutput !== undefined) {
+    const readyTimeout = request.readyTimeout ?? DEFAULT_READY_TIMEOUT_MS;
+    let readinessTimer: ReturnType<typeof setTimeout> | undefined;
+    const readiness = await Promise.race([
+      child.readiness.then<"ready" | "exited">((ready) =>
+        ready ? "ready" : "exited",
+      ),
+      new Promise<"timed_out">((resolve) => {
+        readinessTimer = setTimeout(() => resolve("timed_out"), readyTimeout);
+      }),
+    ]);
+    if (readinessTimer) clearTimeout(readinessTimer);
+
+    if (readiness === "timed_out") {
+      await child.stop();
+      await completion;
+      throw new Error(
+        `Background command did not produce readiness output ${JSON.stringify(request.readyOutput)} within ${readyTimeout}ms`,
+      );
+    }
+    if (readiness === "exited") {
+      await completion;
+      throw new Error(
+        `Background command exited before producing readiness output ${JSON.stringify(request.readyOutput)}`,
+      );
+    }
+  }
+
   return {
     completion,
     stop: () => stop("cancelled"),
@@ -116,5 +147,14 @@ export function assertSafeBackgroundRequest(request: BackgroundCommandRequest) {
   if (!request.command.trim()) throw new Error("command must be a non-empty string");
   if (!request.description.trim()) {
     throw new Error("description must be a non-empty string");
+  }
+  if (request.readyOutput !== undefined && request.readyOutput.length === 0) {
+    throw new Error("ready_output must be a non-empty string");
+  }
+  if (
+    request.readyTimeout !== undefined &&
+    request.readyOutput === undefined
+  ) {
+    throw new Error("ready_timeout requires ready_output");
   }
 }

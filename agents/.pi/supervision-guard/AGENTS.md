@@ -14,11 +14,15 @@ with the released supervision marker in its useful description.
   static and do not inspect the command text.
 - Remember tagged task IDs from successful start and status results, remove them
   on terminal or kill evidence, and let an explicit background-command list
-  reconcile uncertain state. Never require a list merely as turn-end ceremony.
+  reconcile uncertain state. A complete `running` or `all` list may replace
+  known running state; a filtered terminal page may only update the tasks it
+  contains. Never require a list merely as turn-end ceremony.
 - Force at most one follow-up per settled run. A broken check must not make Pi
   impossible to idle or block bootstrap and local development.
 - At session startup, trigger at most one generic recovery turn because local
-  background commands are session-bound. The Mate still chooses every command.
+  background processes are session-bound. Point the Mate to persisted
+  `interrupted` task metadata, but never replay it; the Mate still reconciles
+  current authority and chooses every command.
 - `AGENTOS_DISABLE_SUPERVISION_GUARD=true` is a break-glass operator override
   that disables both startup recovery and the turn-end reminder. Never set it
   automatically or use it merely to avoid following the supervision Skill.
