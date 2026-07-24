@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 type Resource = {
   apiVersion: string;
@@ -20,10 +20,13 @@ type Resource = {
 const runtime = new URL("..", import.meta.url).pathname;
 
 async function render(directory: string): Promise<Resource[]> {
-  const child = Bun.spawn(["kubectl", "kustomize", directory], {
-    stderr: "pipe",
-    stdout: "pipe",
-  });
+  const child = Bun.spawn(
+    ["kubectl", "kustomize", "--load-restrictor", "LoadRestrictionsNone", directory],
+    {
+      stderr: "pipe",
+      stdout: "pipe",
+    },
+  );
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited,
     new Response(child.stdout).text(),
@@ -31,6 +34,39 @@ async function render(directory: string): Promise<Resource[]> {
   ]);
   expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
   return Bun.YAML.parse(stdout) as Resource[];
+}
+
+async function renderWithPatch(
+  resourceDirectory: string,
+  patchFile: string,
+): Promise<Resource[]> {
+  const directory = await mkdtemp(join(runtime, "tests", ".kustomize-"));
+  await writeFile(
+    join(directory, "kustomization.yaml"),
+    Bun.YAML.stringify({
+      apiVersion: "kustomize.config.k8s.io/v1beta1",
+      kind: "Kustomization",
+      resources: [relative(directory, resourceDirectory)],
+      patches: [
+        {
+          path: relative(directory, patchFile),
+          target: {
+            group: "apps",
+            version: "v1",
+            kind: "StatefulSet",
+            name: "agentos-firstmate",
+          },
+        },
+      ],
+    }),
+    "utf8",
+  );
+
+  try {
+    return await render(directory);
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
 }
 
 function resource(resources: Resource[], kind: string, name: string) {
@@ -339,6 +375,20 @@ describe("First Mate Kubernetes resources", () => {
       name: "existing-runtime",
       configMap: { name: "existing-runtime" },
     });
+  });
+
+  test("keeps tool installation ahead of home preparation when CNPG is composed with Kustomize", async () => {
+    const resources = await renderWithPatch(
+      join(runtime, "base"),
+      join(runtime, "patches", "cloudnative-pg.yaml"),
+    );
+    const statefulSet = resource(resources, "StatefulSet", "agentos-firstmate");
+
+    expect(
+      statefulSet.spec!.template.spec.initContainers.map(
+        ({ name }: { name: string }) => name,
+      ),
+    ).toEqual(["install-tools", "prepare-home"]);
   });
 
   test("mounts GitHub App identity only into the First Mate runtime", async () => {
