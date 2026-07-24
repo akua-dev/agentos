@@ -295,19 +295,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = agentos, pg_temp
 AS $$
-DECLARE
-  v_dispatch_repair boolean;
 BEGIN
-  v_dispatch_repair :=
-    coalesce(
-      current_setting(
-        'agentos.task_assignment_dispatch_repair',
-        true
-      ) = OLD.id::text,
-      false
-    )
-    AND agentos.current_agent_role() = 'first_mate';
-
   IF OLD.started_at IS NOT NULL
      AND NEW.started_at IS DISTINCT FROM OLD.started_at THEN
     RAISE EXCEPTION
@@ -318,8 +306,7 @@ BEGIN
      AND (
        NEW.brief IS DISTINCT FROM OLD.brief
        OR NEW.dispatch_profile IS DISTINCT FROM OLD.dispatch_profile
-     )
-     AND NOT v_dispatch_repair THEN
+     ) THEN
     RAISE EXCEPTION
       'started Task Assignment brief and composition are immutable; hand off or replace the Assignment';
   END IF;
@@ -405,6 +392,8 @@ BEGIN
       'Task Assignment dispatch repair requires a valid composition';
   END IF;
 
+  LOCK TABLE agentos.task_assignments IN ACCESS EXCLUSIVE MODE;
+
   SELECT assignment.*
     INTO v_assignment
     FROM agentos.task_assignments AS assignment
@@ -441,11 +430,8 @@ BEGIN
     'g'
   );
 
-  PERFORM set_config(
-    'agentos.task_assignment_dispatch_repair',
-    p_assignment_id::text,
-    true
-  );
+  ALTER TABLE agentos.task_assignments
+    DISABLE TRIGGER task_assignments_protect_completed;
 
   UPDATE agentos.task_assignments AS assignment
      SET brief = p_brief,
@@ -463,11 +449,8 @@ BEGIN
          )
    WHERE assignment.id = p_assignment_id;
 
-  PERFORM set_config(
-    'agentos.task_assignment_dispatch_repair',
-    '',
-    true
-  );
+  ALTER TABLE agentos.task_assignments
+    ENABLE TRIGGER task_assignments_protect_completed;
 END;
 $$;
 

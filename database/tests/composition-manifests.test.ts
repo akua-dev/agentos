@@ -455,6 +455,24 @@ describe.serial("resolved Agent composition manifests", () => {
       `),
     ).rejects.toThrow("started Task Assignment");
 
+    await database.exec(`
+      SELECT set_config(
+        'agentos.task_assignment_dispatch_repair',
+        '${ids.assignment}',
+        false
+      )
+    `);
+    await expect(
+      database.exec(`
+        UPDATE agentos.task_assignments
+           SET brief = 'Bypass the repair function.'
+         WHERE id = '${ids.assignment}'
+      `),
+    ).rejects.toThrow("started Task Assignment");
+    await database.exec(`
+      SELECT set_config('agentos.task_assignment_dispatch_repair', '', false)
+    `);
+
     await expect(
       database.exec(`
         UPDATE agentos.agents

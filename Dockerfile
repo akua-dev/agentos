@@ -137,6 +137,9 @@ COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/node_modules/ \
   /opt/agentos/node_modules/
 COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/clis/composition-verify/node_modules/ \
+  /opt/agentos/clis/composition-verify/node_modules/
+COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/clis/pg-listen/node_modules/ \
   /opt/agentos/clis/pg-listen/node_modules/
 COPY --from=agentos-runtime-dependencies \

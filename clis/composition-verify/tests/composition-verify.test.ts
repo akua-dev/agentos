@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { digestMaterialDirectory } from "../../../runtime/composition/digest.ts";
@@ -79,6 +86,27 @@ describe("composition-verify", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("unselected material");
+  });
+
+  test("rejects a materials directory that points outside the bundle", async () => {
+    const { bundle } = await createBundle();
+    const externalDirectory = await mkdtemp(
+      join(tmpdir(), "composition-materials-")
+    );
+    temporaryDirectories.push(externalDirectory);
+    await rename(
+      join(bundle, "materials", "delivery"),
+      join(externalDirectory, "delivery"),
+    );
+    await rm(join(bundle, "materials"), { recursive: true });
+    await symlink(externalDirectory, join(bundle, "materials"), "dir");
+
+    const result = await run(bundle);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "composition materials directory must be a non-symlink directory",
+    );
   });
 
   test("rejects malformed UTF-8 instead of hashing replacement characters", async () => {

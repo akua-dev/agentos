@@ -56,6 +56,12 @@ export async function verifyCompositionBundle(
   }
 
   if (manifest.materials.length > 0) {
+    const materialsMetadata = await lstat(materialsDirectory);
+    if (materialsMetadata.isSymbolicLink() || !materialsMetadata.isDirectory()) {
+      throw new Error(
+        "composition materials directory must be a non-symlink directory",
+      );
+    }
     const entries = await readdir(materialsDirectory, { withFileTypes: true });
     for (const entry of entries) {
       if (!selected.has(entry.name)) {
@@ -216,10 +222,27 @@ async function readManifest(path: string): Promise<CompositionManifest> {
       );
     }
 
-    const bytes = await file.readFile();
+    const bytes = Buffer.allocUnsafe(maximumManifestBytes + 1);
+    let bytesRead = 0;
+    while (bytesRead < bytes.byteLength) {
+      const result = await file.read(
+        bytes,
+        bytesRead,
+        bytes.byteLength - bytesRead,
+        null,
+      );
+      if (result.bytesRead === 0) break;
+      bytesRead += result.bytesRead;
+    }
+    if (bytesRead > maximumManifestBytes) {
+      throw new Error(
+        `composition manifest exceeds ${maximumManifestBytes} bytes`,
+      );
+    }
+
     const after = await file.stat({ bigint: true });
     if (
-      BigInt(bytes.byteLength) !== before.size ||
+      BigInt(bytesRead) !== before.size ||
       changedDuringRead(before, after)
     ) {
       throw new Error("composition manifest changed while reading");
@@ -227,7 +250,9 @@ async function readManifest(path: string): Promise<CompositionManifest> {
 
     let contents: string;
     try {
-      contents = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      contents = new TextDecoder("utf-8", { fatal: true }).decode(
+        bytes.subarray(0, bytesRead),
+      );
     } catch {
       throw new Error("composition manifest is not valid UTF-8");
     }
