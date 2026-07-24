@@ -501,6 +501,30 @@ describe.serial("resolved Agent composition manifests", () => {
       ).rejects.toThrow();
     });
 
+    await database.exec("BEGIN");
+    try {
+      await database.exec(`
+        SELECT agentos.repair_task_assignment_dispatch(
+          '${ids.assignment}',
+          '${repairedBrief}',
+          ${json(repairedComposition)},
+          'Prove one repair does not lock unrelated Fleet assignments.'
+        )
+      `);
+      const locks = await database.query<{ mode: string }>(`
+        SELECT mode
+          FROM pg_locks
+         WHERE pid = pg_backend_pid()
+           AND relation = 'agentos.task_assignments'::regclass
+           AND granted
+      `);
+      expect(locks.rows.map((lock) => lock.mode)).not.toContain(
+        "AccessExclusiveLock",
+      );
+    } finally {
+      await database.exec("ROLLBACK");
+    }
+
     await database.exec(`
       SELECT agentos.repair_task_assignment_dispatch(
         '${ids.assignment}',

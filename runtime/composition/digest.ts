@@ -1,20 +1,40 @@
 import { createHash } from "node:crypto";
-import { constants, type BigIntStats } from "node:fs";
-import { lstat, open, readdir } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, readdir, realpath } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
+import {
+  assertOpenedFileStillAtPath,
+  metadataChanged,
+} from "./filesystem.ts";
 
 export async function digestMaterialDirectory(
   directory: string,
 ): Promise<string> {
-  const root = await lstat(directory);
+  return (await inspectMaterialDirectory(directory)).digest;
+}
+
+export async function inspectMaterialDirectory(
+  directory: string,
+  observedFile?: {
+    path: string;
+    maximumPrefixBytes?: number;
+    requireUtf8?: boolean;
+  },
+): Promise<{
+  digest: string;
+  observedPrefix?: Uint8Array;
+}> {
+  const root = await lstat(directory, { bigint: true });
   if (root.isSymbolicLink()) {
     throw new Error(`Composition material root is a symlink: ${directory}`);
   }
   if (!root.isDirectory()) {
     throw new Error(`Composition material root is not a directory: ${directory}`);
   }
+  const rootRealPath = await realpath(directory);
 
   const hash = createHash("sha256");
+  let observedPrefix: Uint8Array | undefined;
 
   for await (const path of regularFiles(directory)) {
     const file = await open(
@@ -35,6 +55,14 @@ export async function digestMaterialDirectory(
       }
 
       const relativePath = relative(directory, path).split(sep).join("/");
+      const observesThisFile = observedFile?.path === relativePath;
+      const maximumPrefixBytes = observedFile?.maximumPrefixBytes ?? 0;
+      const prefixChunks: Uint8Array[] = [];
+      let prefixBytes = 0;
+      const decoder =
+        observesThisFile && observedFile?.requireUtf8
+          ? new TextDecoder("utf-8", { fatal: true })
+          : undefined;
       hash.update("file\0");
       hash.update(relativePath, "utf8");
       hash.update("\0");
@@ -44,14 +72,42 @@ export async function digestMaterialDirectory(
       hash.update("\0");
 
       let bytesRead = 0n;
-      for await (const chunk of file.createReadStream({ autoClose: false })) {
-        bytesRead += BigInt(chunk.byteLength);
-        hash.update(chunk);
+      try {
+        for await (const chunk of file.createReadStream({ autoClose: false })) {
+          bytesRead += BigInt(chunk.byteLength);
+          hash.update(chunk);
+          decoder?.decode(chunk, { stream: true });
+          if (observesThisFile && prefixBytes < maximumPrefixBytes) {
+            const retained = chunk.subarray(
+              0,
+              maximumPrefixBytes - prefixBytes,
+            );
+            prefixChunks.push(Uint8Array.from(retained));
+            prefixBytes += retained.byteLength;
+          }
+        }
+        decoder?.decode();
+      } catch (error) {
+        if (error instanceof TypeError && decoder) {
+          throw new Error(
+            `Composition material observed file is not valid UTF-8: ${path}`,
+          );
+        }
+        throw error;
       }
 
       const after = await file.stat({ bigint: true });
-      if (bytesRead !== before.size || changedDuringRead(before, after)) {
+      if (bytesRead !== before.size || metadataChanged(before, after)) {
         throw new Error(`Composition material changed while hashing: ${path}`);
+      }
+      await assertOpenedFileStillAtPath(
+        path,
+        rootRealPath,
+        after,
+        "Composition material",
+      );
+      if (observesThisFile) {
+        observedPrefix = Buffer.concat(prefixChunks);
       }
       hash.update("\0");
     } finally {
@@ -59,7 +115,28 @@ export async function digestMaterialDirectory(
     }
   }
 
-  return `sha256:${hash.digest("hex")}`;
+  const rootAfter = await lstat(directory, { bigint: true });
+  if (
+    rootAfter.isSymbolicLink() ||
+    !rootAfter.isDirectory() ||
+    metadataChanged(root, rootAfter) ||
+    (await realpath(directory)) !== rootRealPath
+  ) {
+    throw new Error(
+      `Composition material root changed while hashing: ${directory}`,
+    );
+  }
+
+  if (observedFile !== undefined && observedPrefix === undefined) {
+    throw new Error(
+      `Composition material observed file is not a regular file: ${observedFile.path}`,
+    );
+  }
+
+  return {
+    digest: `sha256:${hash.digest("hex")}`,
+    observedPrefix,
+  };
 }
 
 async function* regularFiles(directory: string): AsyncGenerator<string> {
@@ -82,19 +159,4 @@ async function* regularFiles(directory: string): AsyncGenerator<string> {
     }
     yield path;
   }
-}
-
-function changedDuringRead(
-  before: BigIntStats,
-  after: BigIntStats,
-) {
-  return (
-    before.dev !== after.dev ||
-    before.ino !== after.ino ||
-    before.mode !== after.mode ||
-    before.nlink !== after.nlink ||
-    before.size !== after.size ||
-    before.mtimeNs !== after.mtimeNs ||
-    before.ctimeNs !== after.ctimeNs
-  );
 }

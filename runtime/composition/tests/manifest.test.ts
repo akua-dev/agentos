@@ -5,6 +5,7 @@ import {
   mkdir,
   mkdtemp,
   open,
+  rename,
   rm,
   symlink,
   truncate,
@@ -303,6 +304,30 @@ describe("composition material digest", () => {
       keepChanging = false;
       await changing;
     }
+  });
+
+  test("rejects a material root replaced while its files are being hashed", async () => {
+    const parent = await temporaryDirectory("agentos-composition-root-race-");
+    const directory = join(parent, "material");
+    const movedDirectory = join(parent, "material-before-replacement");
+    const replacement = join(parent, "replacement");
+    await mkdir(directory);
+    await mkdir(replacement);
+
+    for (const root of [directory, replacement]) {
+      await writeFile(join(root, "000-large.bin"), "");
+      await truncate(join(root, "000-large.bin"), 128 * 1024 * 1024);
+      await writeFile(join(root, "SKILL.md"), "same bytes\n", "utf8");
+    }
+
+    const digesting = digestMaterialDirectory(directory);
+    await Bun.sleep(5);
+    await rename(directory, movedDirectory);
+    await symlink(replacement, directory, "dir");
+
+    await expect(digesting).rejects.toThrow(
+      /changed while hashing|changed path identity|resolves outside/,
+    );
   });
 });
 

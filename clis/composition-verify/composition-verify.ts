@@ -1,10 +1,14 @@
 #!/usr/bin/env bun
 
-import { constants, type BigIntStats } from "node:fs";
-import { lstat, open, readdir } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, readdir, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseDocument } from "yaml";
-import { digestMaterialDirectory } from "../../runtime/composition/digest.ts";
+import { inspectMaterialDirectory } from "../../runtime/composition/digest.ts";
+import {
+  assertOpenedFileStillAtPath,
+  metadataChanged,
+} from "../../runtime/composition/filesystem.ts";
 import {
   digestCompositionManifest,
   parseCompositionManifest,
@@ -32,8 +36,12 @@ export async function verifyCompositionBundle(
   if (root.isSymbolicLink() || !root.isDirectory()) {
     throw new Error("composition bundle must be a non-symlink directory");
   }
+  const bundleRealPath = await realpath(bundle);
 
-  const manifest = await readManifest(join(bundle, "manifest.json"));
+  const manifest = await readManifest(
+    join(bundle, "manifest.json"),
+    bundleRealPath,
+  );
   const manifestDigest = digestCompositionManifest(manifest);
   if (
     expectedManifestDigest !== undefined &&
@@ -79,24 +87,23 @@ export async function verifyCompositionBundle(
 
   for (const material of manifest.materials) {
     const materialDirectory = join(materialsDirectory, material.id);
-    const observedDigest = await digestMaterialDirectory(materialDirectory);
-    if (observedDigest !== material.digest) {
-      throw new Error(
-        `material digest mismatch for ${material.id}: expected ${material.digest}, observed ${observedDigest}`,
-      );
-    }
-
-    const entrypoint = await lstat(
-      join(materialDirectory, material.entrypoint),
+    const inspection = await inspectMaterialDirectory(
+      materialDirectory,
+      {
+        path: material.entrypoint,
+        maximumPrefixBytes:
+          material.kind === "skill" ? maximumSkillFrontmatterBytes : 0,
+        requireUtf8: material.kind === "skill",
+      },
     );
-    if (entrypoint.isSymbolicLink() || !entrypoint.isFile()) {
+    if (inspection.digest !== material.digest) {
       throw new Error(
-        `composition material entrypoint is not a regular file: ${material.id}`,
+        `material digest mismatch for ${material.id}: expected ${material.digest}, observed ${inspection.digest}`,
       );
     }
     if (material.kind === "skill") {
-      await verifySkillEntrypoint(
-        join(materialDirectory, material.entrypoint),
+      verifySkillEntrypoint(
+        inspection.observedPrefix!,
         material,
       );
     }
@@ -108,11 +115,19 @@ export async function verifyCompositionBundle(
   };
 }
 
-async function verifySkillEntrypoint(
-  path: string,
+function verifySkillEntrypoint(
+  prefixBytes: Uint8Array,
   material: CompositionMaterial,
 ) {
-  const frontmatter = await readSkillFrontmatter(path);
+  const prefix = new TextDecoder("utf-8").decode(prefixBytes);
+  const normalized = prefix.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const match = normalized.match(/^---\n([\s\S]*?)\n---(?:\n|$)/);
+  if (!match) {
+    throw new Error(
+      `Skill entrypoint requires YAML frontmatter within ${maximumSkillFrontmatterBytes} bytes`,
+    );
+  }
+  const frontmatter = match[1]!;
   const document = parseDocument(frontmatter, {
     schema: "core",
   });
@@ -148,65 +163,14 @@ async function verifySkillEntrypoint(
   }
 }
 
-async function readSkillFrontmatter(path: string): Promise<string> {
-  const file = await open(
-    path,
-    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
-  );
-  try {
-    const before = await file.stat({ bigint: true });
-    if (!before.isFile() || before.nlink > 1n) {
-      throw new Error("Skill entrypoint must be one regular file");
-    }
-
-    const decoder = new TextDecoder("utf-8", { fatal: true });
-    const prefixChunks: Uint8Array[] = [];
-    let prefixBytes = 0;
-    let bytesRead = 0n;
-    try {
-      for await (const chunk of file.createReadStream({ autoClose: false })) {
-        bytesRead += BigInt(chunk.byteLength);
-        decoder.decode(chunk, { stream: true });
-        if (prefixBytes < maximumSkillFrontmatterBytes) {
-          const retained = chunk.subarray(
-            0,
-            maximumSkillFrontmatterBytes - prefixBytes,
-          );
-          prefixChunks.push(Uint8Array.from(retained));
-          prefixBytes += retained.byteLength;
-        }
-      }
-      decoder.decode();
-    } catch (error) {
-      if (error instanceof TypeError) {
-        throw new Error("Skill entrypoint is not valid UTF-8");
-      }
-      throw error;
-    }
-
-    const after = await file.stat({ bigint: true });
-    if (bytesRead !== before.size || changedDuringRead(before, after)) {
-      throw new Error("Skill entrypoint changed while reading");
-    }
-    const prefix = new TextDecoder("utf-8").decode(Buffer.concat(prefixChunks));
-    const normalized = prefix.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    const match = normalized.match(/^---\n([\s\S]*?)\n---(?:\n|$)/);
-    if (!match) {
-      throw new Error(
-        `Skill entrypoint requires YAML frontmatter within ${maximumSkillFrontmatterBytes} bytes`,
-      );
-    }
-    return match[1]!;
-  } finally {
-    await file.close();
-  }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-async function readManifest(path: string): Promise<CompositionManifest> {
+async function readManifest(
+  path: string,
+  bundleRealPath: string,
+): Promise<CompositionManifest> {
   const file = await open(
     path,
     constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
@@ -243,10 +207,16 @@ async function readManifest(path: string): Promise<CompositionManifest> {
     const after = await file.stat({ bigint: true });
     if (
       BigInt(bytesRead) !== before.size ||
-      changedDuringRead(before, after)
+      metadataChanged(before, after)
     ) {
       throw new Error("composition manifest changed while reading");
     }
+    await assertOpenedFileStillAtPath(
+      path,
+      bundleRealPath,
+      after,
+      "composition manifest",
+    );
 
     let contents: string;
     try {
@@ -267,18 +237,6 @@ async function readManifest(path: string): Promise<CompositionManifest> {
   } finally {
     await file.close();
   }
-}
-
-function changedDuringRead(before: BigIntStats, after: BigIntStats) {
-  return (
-    before.dev !== after.dev ||
-    before.ino !== after.ino ||
-    before.mode !== after.mode ||
-    before.nlink !== after.nlink ||
-    before.size !== after.size ||
-    before.mtimeNs !== after.mtimeNs ||
-    before.ctimeNs !== after.ctimeNs
-  );
 }
 
 function parseArguments(arguments_: string[]) {

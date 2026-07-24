@@ -295,6 +295,9 @@ RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = agentos, pg_temp
 AS $$
+DECLARE
+  v_dispatch_repair jsonb;
+  v_dispatch_repair_valid boolean := false;
 BEGIN
   IF OLD.started_at IS NOT NULL
      AND NEW.started_at IS DISTINCT FROM OLD.started_at THEN
@@ -307,8 +310,23 @@ BEGIN
        NEW.brief IS DISTINCT FROM OLD.brief
        OR NEW.dispatch_profile IS DISTINCT FROM OLD.dispatch_profile
      ) THEN
-    RAISE EXCEPTION
-      'started Task Assignment brief and composition are immutable; hand off or replace the Assignment';
+    v_dispatch_repair := NEW.metadata -> 'dispatch_repair';
+    v_dispatch_repair_valid :=
+      agentos.current_agent_role() = 'first_mate'
+      AND v_dispatch_repair IS DISTINCT FROM
+        OLD.metadata -> 'dispatch_repair'
+      AND v_dispatch_repair -> 'changed_by_agent_id'
+        IS NOT DISTINCT FROM to_jsonb(agentos.current_agent_id())
+      AND v_dispatch_repair -> 'previous_brief'
+        IS NOT DISTINCT FROM to_jsonb(OLD.brief)
+      AND v_dispatch_repair -> 'previous_composition'
+        IS NOT DISTINCT FROM OLD.dispatch_profile
+      AND coalesce(v_dispatch_repair ->> 'reason', '') ~ '[^[:space:]]';
+
+    IF NOT v_dispatch_repair_valid THEN
+      RAISE EXCEPTION
+        'started Task Assignment brief and composition are immutable; hand off or replace the Assignment';
+    END IF;
   END IF;
 
   IF OLD.ended_at IS NOT NULL AND ROW(
@@ -392,8 +410,6 @@ BEGIN
       'Task Assignment dispatch repair requires a valid composition';
   END IF;
 
-  LOCK TABLE agentos.task_assignments IN ACCESS EXCLUSIVE MODE;
-
   SELECT assignment.*
     INTO v_assignment
     FROM agentos.task_assignments AS assignment
@@ -430,9 +446,6 @@ BEGIN
     'g'
   );
 
-  ALTER TABLE agentos.task_assignments
-    DISABLE TRIGGER task_assignments_protect_completed;
-
   UPDATE agentos.task_assignments AS assignment
      SET brief = p_brief,
          dispatch_profile = p_composition,
@@ -448,9 +461,6 @@ BEGIN
            true
          )
    WHERE assignment.id = p_assignment_id;
-
-  ALTER TABLE agentos.task_assignments
-    ENABLE TRIGGER task_assignments_protect_completed;
 END;
 $$;
 
