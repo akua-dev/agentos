@@ -19,6 +19,7 @@ const REQUEST_HEADERS_TO_REMOVE = new Set([
 ]);
 const RESPONSE_HEADERS_TO_REMOVE = new Set([
   "connection",
+  "content-encoding",
   "content-length",
   "proxy-authenticate",
   "te",
