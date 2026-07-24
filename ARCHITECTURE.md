@@ -254,6 +254,14 @@ environment, credentials, provider access and Kubernetes RBAC remain native
 runtime capabilities. Selected Skills may teach a Mate how to arrange them
 under existing authority, but the composition contract neither installs them
 nor adds a material kind for their current implementation.
+One capability requirement never implies a workload-image change. An image
+inside opaque harness settings is an intentional whole-workload selection with
+its own authority, immutable digest and rollout evidence. A persistent Mate may
+instead retain an exact reviewed integration program on its home PVC and expose
+its ordinary entrypoint through the agent-owned native command path. Its source,
+installation, activation and process remain owned by that integration; AgentOS
+does not turn this option into a plugin manager or claim it is active from the
+manifest.
 
 For a persistent Mate, First Mate records Captain-authorized desired
 composition before applying it at a safe native harness boundary. The
@@ -320,6 +328,10 @@ Agents invoke tools by their ordinary names without a `mise exec` prefix.
 Resolution follows the current working directory, including after a Crewmate enters an isolated worktree.
 Pinned operating-system transport and database-client utilities in the reviewed
 Mate image remain ordinary commands but are not duplicated into the PVC by Mise.
+The existing agent-owned `$HOME/.local/bin` path may expose exact reviewed
+integration entrypoints retained on the home PVC. Those entrypoints do not
+become part of the immutable AgentOS tool baseline, and their integration must
+verify provenance, activation and rollback through its own native boundary.
 
 Mise configuration is deliberately layered:
 
