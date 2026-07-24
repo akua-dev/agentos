@@ -113,6 +113,7 @@ COPY clis/composition-verify/composition-verify.ts clis/composition-verify/compo
 COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
 COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
 COPY runtime/composition/digest.ts runtime/composition/digest.ts
+COPY runtime/composition/filesystem.ts runtime/composition/filesystem.ts
 COPY runtime/composition/manifest-v1.schema.json runtime/composition/manifest-v1.schema.json
 COPY runtime/composition/manifest.ts runtime/composition/manifest.ts
 

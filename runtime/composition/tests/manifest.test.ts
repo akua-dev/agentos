@@ -172,6 +172,12 @@ describe("composition manifest preflight", () => {
       {
         ...manifest(),
         materials: [
+          { ...material("nested", "skill"), entrypoint: "nested/SKILL.md" },
+        ],
+      },
+      {
+        ...manifest(),
+        materials: [
           {
             ...material("blank-origin", "skill"),
             origin: { kind: "git", locator: "   " },

@@ -49,7 +49,7 @@
               "properties": {
                 "entrypoint": {
                   "type": "string",
-                  "pattern": "(^|/)SKILL\\.md$"
+                  "const": "SKILL.md"
                 }
               }
             }

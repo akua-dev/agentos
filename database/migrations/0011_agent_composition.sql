@@ -141,7 +141,7 @@ BEGIN
        OR NOT agentos.valid_composition_path(v_material ->> 'entrypoint')
        OR (
          v_material ->> 'kind' = 'skill'
-         AND v_material ->> 'entrypoint' !~ '(^|/)SKILL\.md$'
+         AND v_material ->> 'entrypoint' <> 'SKILL.md'
        ) THEN
       RETURN false;
     END IF;
@@ -199,6 +199,109 @@ ALTER TABLE agentos.agents
 
 COMMENT ON COLUMN agentos.agents.resolved_composition IS
   'Resolved versioned persistent composition; observed activation remains in the native harness and runtime.';
+
+-- Install the final guard before the backfill. Its one legacy exception changes
+-- only the representation of dispatch_profile, including on completed history.
+CREATE OR REPLACE FUNCTION agentos.protect_completed_task_assignment()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = agentos, pg_temp
+AS $$
+DECLARE
+  v_dispatch_repair jsonb;
+  v_dispatch_repair_valid boolean := false;
+  v_legacy_dispatch_upgrade boolean;
+BEGIN
+  v_legacy_dispatch_upgrade :=
+    jsonb_typeof(OLD.dispatch_profile) = 'object'
+    AND OLD.dispatch_profile ? 'harness'
+    AND NOT OLD.dispatch_profile ? 'version'
+    AND NEW.dispatch_profile IS NOT DISTINCT FROM jsonb_build_object(
+      'version', 1,
+      'harness', OLD.dispatch_profile ->> 'harness',
+      'materials', '[]'::jsonb,
+      'settings', OLD.dispatch_profile - 'harness'
+    );
+
+  IF OLD.started_at IS NOT NULL
+     AND NEW.started_at IS DISTINCT FROM OLD.started_at THEN
+    RAISE EXCEPTION
+      'started Task Assignment start time is immutable';
+  END IF;
+
+  IF (OLD.started_at IS NOT NULL OR NEW.started_at IS NOT NULL)
+     AND (
+       NEW.brief IS DISTINCT FROM OLD.brief
+       OR (
+         NEW.dispatch_profile IS DISTINCT FROM OLD.dispatch_profile
+         AND NOT v_legacy_dispatch_upgrade
+       )
+     ) THEN
+    v_dispatch_repair := NEW.metadata -> 'dispatch_repair';
+    v_dispatch_repair_valid :=
+      agentos.current_agent_role() = 'first_mate'
+      AND v_dispatch_repair IS DISTINCT FROM
+        OLD.metadata -> 'dispatch_repair'
+      AND v_dispatch_repair -> 'changed_by_agent_id'
+        IS NOT DISTINCT FROM to_jsonb(agentos.current_agent_id())
+      AND v_dispatch_repair -> 'previous_brief'
+        IS NOT DISTINCT FROM to_jsonb(OLD.brief)
+      AND v_dispatch_repair -> 'previous_composition'
+        IS NOT DISTINCT FROM OLD.dispatch_profile
+      AND coalesce(v_dispatch_repair ->> 'reason', '') ~ '[^[:space:]]';
+
+    IF NOT v_dispatch_repair_valid THEN
+      RAISE EXCEPTION
+        'started Task Assignment brief and composition are immutable; hand off or replace the Assignment';
+    END IF;
+  END IF;
+
+  IF OLD.ended_at IS NOT NULL AND (
+    ROW(
+      NEW.task_id,
+      NEW.agent_id,
+      NEW.assigned_by_agent_id,
+      NEW.assignment_role,
+      NEW.status,
+      NEW.status_text,
+      NEW.metadata,
+      NEW.started_at,
+      NEW.ended_at,
+      NEW.brief,
+      NEW.report,
+      NEW.supersedes_assignment_id,
+      NEW.decision_keys,
+      NEW.decisions_attested_at,
+      NEW.decisions_attested_by_agent_id
+    ) IS DISTINCT FROM ROW(
+      OLD.task_id,
+      OLD.agent_id,
+      OLD.assigned_by_agent_id,
+      OLD.assignment_role,
+      OLD.status,
+      OLD.status_text,
+      OLD.metadata,
+      OLD.started_at,
+      OLD.ended_at,
+      OLD.brief,
+      OLD.report,
+      OLD.supersedes_assignment_id,
+      OLD.decision_keys,
+      OLD.decisions_attested_at,
+      OLD.decisions_attested_by_agent_id
+    )
+    OR (
+      NEW.dispatch_profile IS DISTINCT FROM OLD.dispatch_profile
+      AND NOT v_legacy_dispatch_upgrade
+    )
+  ) THEN
+    RAISE EXCEPTION
+      'completed Task assignment is immutable; create a new assignment';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
 
 UPDATE agentos.task_assignments AS assignment
    SET dispatch_profile =
@@ -289,88 +392,6 @@ CREATE TRIGGER task_assignments_composition_contract
 BEFORE INSERT OR UPDATE OF agent_id, dispatch_profile
 ON agentos.task_assignments
 FOR EACH ROW EXECUTE FUNCTION agentos.enforce_assignment_composition();
-
-CREATE OR REPLACE FUNCTION agentos.protect_completed_task_assignment()
-RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = agentos, pg_temp
-AS $$
-DECLARE
-  v_dispatch_repair jsonb;
-  v_dispatch_repair_valid boolean := false;
-BEGIN
-  IF OLD.started_at IS NOT NULL
-     AND NEW.started_at IS DISTINCT FROM OLD.started_at THEN
-    RAISE EXCEPTION
-      'started Task Assignment start time is immutable';
-  END IF;
-
-  IF (OLD.started_at IS NOT NULL OR NEW.started_at IS NOT NULL)
-     AND (
-       NEW.brief IS DISTINCT FROM OLD.brief
-       OR NEW.dispatch_profile IS DISTINCT FROM OLD.dispatch_profile
-     ) THEN
-    v_dispatch_repair := NEW.metadata -> 'dispatch_repair';
-    v_dispatch_repair_valid :=
-      agentos.current_agent_role() = 'first_mate'
-      AND v_dispatch_repair IS DISTINCT FROM
-        OLD.metadata -> 'dispatch_repair'
-      AND v_dispatch_repair -> 'changed_by_agent_id'
-        IS NOT DISTINCT FROM to_jsonb(agentos.current_agent_id())
-      AND v_dispatch_repair -> 'previous_brief'
-        IS NOT DISTINCT FROM to_jsonb(OLD.brief)
-      AND v_dispatch_repair -> 'previous_composition'
-        IS NOT DISTINCT FROM OLD.dispatch_profile
-      AND coalesce(v_dispatch_repair ->> 'reason', '') ~ '[^[:space:]]';
-
-    IF NOT v_dispatch_repair_valid THEN
-      RAISE EXCEPTION
-        'started Task Assignment brief and composition are immutable; hand off or replace the Assignment';
-    END IF;
-  END IF;
-
-  IF OLD.ended_at IS NOT NULL AND ROW(
-    NEW.task_id,
-    NEW.agent_id,
-    NEW.assigned_by_agent_id,
-    NEW.assignment_role,
-    NEW.status,
-    NEW.status_text,
-    NEW.metadata,
-    NEW.started_at,
-    NEW.ended_at,
-    NEW.brief,
-    NEW.report,
-    NEW.dispatch_profile,
-    NEW.supersedes_assignment_id,
-    NEW.decision_keys,
-    NEW.decisions_attested_at,
-    NEW.decisions_attested_by_agent_id
-  ) IS DISTINCT FROM ROW(
-    OLD.task_id,
-    OLD.agent_id,
-    OLD.assigned_by_agent_id,
-    OLD.assignment_role,
-    OLD.status,
-    OLD.status_text,
-    OLD.metadata,
-    OLD.started_at,
-    OLD.ended_at,
-    OLD.brief,
-    OLD.report,
-    OLD.dispatch_profile,
-    OLD.supersedes_assignment_id,
-    OLD.decision_keys,
-    OLD.decisions_attested_at,
-    OLD.decisions_attested_by_agent_id
-  ) THEN
-    RAISE EXCEPTION
-      'completed Task assignment is immutable; create a new assignment';
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
 
 CREATE FUNCTION agentos.repair_task_assignment_dispatch(
   p_assignment_id uuid,
@@ -500,7 +521,8 @@ BEGIN
     INTO v_target
     FROM agentos.agents AS agent
    WHERE agent.id = p_agent_id
-     AND agent.retired_at IS NULL;
+     AND agent.retired_at IS NULL
+   FOR UPDATE;
 
   IF NOT FOUND OR v_target.role NOT IN ('first_mate', 'second_mate') THEN
     RAISE EXCEPTION

@@ -133,12 +133,15 @@ beforeAll(async () => {
 
     INSERT INTO agentos.task_assignments (
       id, task_id, agent_id, assigned_by_agent_id, assignment_role, status,
-      status_text, brief, dispatch_profile
+      status_text, brief, report, dispatch_profile, started_at, ended_at
     ) VALUES (
       '${ids.legacyAssignment}', '${ids.legacyTask}', '${ids.legacyCrewmate}',
-      '${ids.firstMate}', 'worker', 'assigned', 'Legacy profile selected',
+      '${ids.firstMate}', 'worker', 'completed', 'Legacy work completed',
       'Prove the migration preserves every native knob.',
-      '{"harness":"codex","model":"gpt-5.6-sol","effort":"medium","fast_mode":true,"compaction":{"strategy":"server"},"context_limit":200000}'::jsonb
+      'Legacy work remains immutable after its representation upgrade.',
+      '{"harness":"codex","model":"gpt-5.6-sol","effort":"medium","fast_mode":true,"compaction":{"strategy":"server"},"context_limit":200000}'::jsonb,
+      transaction_timestamp() - interval '1 minute',
+      transaction_timestamp()
     );
   `);
 
@@ -204,6 +207,14 @@ describe.serial("resolved Agent composition manifests", () => {
         context_limit: 200_000,
       },
     });
+
+    await expect(
+      database.exec(`
+        UPDATE agentos.task_assignments
+           SET status_text = 'Rewrite completed history after upgrade.'
+         WHERE id = '${ids.legacyAssignment}'
+      `),
+    ).rejects.toThrow("completed Task assignment is immutable");
   });
 
   test("stores the same versioned contract at Agent and Assignment scope", async () => {
