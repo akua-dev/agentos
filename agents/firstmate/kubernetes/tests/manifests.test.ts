@@ -20,10 +20,10 @@ type Resource = {
 const runtime = new URL("..", import.meta.url).pathname;
 
 async function render(directory: string): Promise<Resource[]> {
-  const child = Bun.spawn(["kubectl", "kustomize", directory], {
-    stderr: "pipe",
-    stdout: "pipe",
-  });
+  const child = Bun.spawn(
+    ["kubectl", "kustomize", "--load-restrictor", "LoadRestrictionsNone", directory],
+    { stderr: "pipe", stdout: "pipe" },
+  );
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited,
     new Response(child.stdout).text(),
@@ -339,6 +339,19 @@ describe("First Mate Kubernetes resources", () => {
       name: "existing-runtime",
       configMap: { name: "existing-runtime" },
     });
+  });
+
+  test("keeps tool installation ahead of home preparation when CNPG is composed with Kustomize", async () => {
+    const resources = await render(
+      join(runtime, "tests", "fixtures", "cloudnative-pg"),
+    );
+    const statefulSet = resource(resources, "StatefulSet", "agentos-firstmate");
+
+    expect(
+      statefulSet.spec!.template.spec.initContainers.map(
+        ({ name }: { name: string }) => name,
+      ),
+    ).toEqual(["install-tools", "prepare-home"]);
   });
 
   test("mounts GitHub App identity only into the First Mate runtime", async () => {

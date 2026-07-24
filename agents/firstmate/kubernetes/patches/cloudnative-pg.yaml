@@ -6,6 +6,7 @@ spec:
   template:
     spec:
       initContainers:
+        - name: install-tools
         - name: prepare-home
           env:
             - name: AGENTOS_PGPASS_SOURCE
