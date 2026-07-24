@@ -130,13 +130,14 @@ files, Pi packages and the Herdr-visible session remain observed state.
 An Agent harness cannot change while an active Assignment pins a different
 harness. Change or hand off accountable work first.
 
-An external Captain surface such as Discord is composed the same way: select
-only its reviewed instruction and Skill material into the persistent Mate,
-arrange its CLI, Pi extension, receiver and credential through their own native
-runtime authorities, reload at a safe boundary, and verify the existing Mate
-session. Adding that surface does not imply a derived Mate image. The
-integration process remains integration-owned; it does not become an AgentOS
-daemon or manifest material.
+An external Captain surface is composed the same way: select only its reviewed
+instruction and Skill material into the persistent Mate, arrange its client,
+receiver and credential through the integration's native runtime authorities,
+reload at a safe boundary, and verify the existing Mate session. Adding that
+surface does not imply a derived Mate image. Provider-specific installation and
+lifecycle remain in the integration's private repository; they do not become an
+AgentOS plugin manager, installer, daemon, controller, schema or shadow
+activation state, nor manifest material.
 
 ## Apply an Assignment composition
 
