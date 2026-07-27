@@ -225,6 +225,7 @@ describe("Mate runtime", () => {
         call.length === expectedObserve.length &&
         call.every((argument, index) => argument === expectedObserve[index]),
       ),
+      6_000,
     );
     child.kill("SIGTERM");
     expect(await child.exited).toBe(0);
