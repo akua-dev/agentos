@@ -165,6 +165,32 @@ async function execute(
   );
 }
 
+async function waitForTaskState(
+  pi: FakePi,
+  taskId: string,
+  state: string,
+) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const observed = pi.entries.some(({ data }) => {
+      const task = (data as { task?: { id?: string; state?: string } }).task;
+      return task?.id === taskId && task.state === state;
+    });
+    if (observed) return;
+    await Bun.sleep(1);
+  }
+  throw new Error(`Timed out waiting for ${taskId} to become ${state}`);
+}
+
+async function waitForMessageCount(pi: FakePi, count: number) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    if (pi.messages.length >= count) return;
+    await Bun.sleep(1);
+  }
+  throw new Error(`Timed out waiting for ${count} background command messages`);
+}
+
 describe("AgentOS Pi background commands", () => {
   test("registers the Grok-shaped command, output, list, and kill surface", async () => {
     const commands = controlledCommands();
@@ -314,7 +340,11 @@ describe("AgentOS Pi background commands", () => {
         exitCode: 0,
       });
     }
-    await Bun.sleep(10);
+    await Promise.all(
+      Array.from({ length: 22 }, (_, index) =>
+        waitForTaskState(pi, `bg-${index + 1}`, "succeeded"),
+      ),
+    );
 
     const running = await execute(pi.tools.get("list_background_commands"), {});
     const runningText = (running.content[0] as { text: string }).text;
@@ -394,13 +424,14 @@ describe("AgentOS Pi background commands", () => {
       summary: "Second completed",
       exitCode: 0,
     });
+    await waitForTaskState(pi, "bg-finished-2", "succeeded");
     await Bun.sleep(2);
     commands.controls[0]!.resolve({
       state: "succeeded",
       summary: "First completed",
       exitCode: 0,
     });
-    await Bun.sleep(10);
+    await waitForTaskState(pi, "bg-finished-1", "succeeded");
 
     const history = await execute(
       pi.tools.get("list_background_commands"),
@@ -602,7 +633,7 @@ describe("AgentOS Pi background commands", () => {
       summary: "Background command failed to start",
       error: "Bun is not defined",
     });
-    await Bun.sleep(20);
+    await waitForTaskState(pi, "bg-error", "failed");
 
     const inspected = await execute(pi.tools.get("get_background_command_output"), {
       task_id: "bg-error",
@@ -629,7 +660,7 @@ describe("AgentOS Pi background commands", () => {
       summary: "Command stopped",
       signal: "SIGTERM",
     });
-    await Bun.sleep(10);
+    await waitForTaskState(pi, "bg-signalled", "cancelled");
 
     const listed = await execute(
       pi.tools.get("list_background_commands"),
@@ -661,7 +692,7 @@ describe("AgentOS Pi background commands", () => {
       summary: "Command completed",
       exitCode: 0,
     });
-    await Bun.sleep(20);
+    await waitForMessageCount(pi, 1);
 
     expect(pi.messages).toHaveLength(1);
     const content = pi.messages[0]!.message.content as string;
@@ -697,7 +728,7 @@ describe("AgentOS Pi background commands", () => {
       summary: "Command completed",
       exitCode: 0,
     });
-    await Bun.sleep(20);
+    await waitForMessageCount(pi, 1);
 
     expect(pi.messages).toHaveLength(1);
     expect(pi.messages[0]).toMatchObject({
@@ -733,7 +764,7 @@ describe("AgentOS Pi background commands", () => {
         exitCode: 0,
       });
     }
-    await Bun.sleep(20);
+    await waitForMessageCount(pi, 2);
 
     expect(pi.messages).toHaveLength(2);
     expect(pi.messages).toEqual(
@@ -779,7 +810,6 @@ describe("AgentOS Pi background commands", () => {
     });
 
     expect((await waiting).details).toMatchObject({ completionObserved: true });
-    await Bun.sleep(20);
     expect(pi.messages).toHaveLength(0);
   });
 
@@ -802,7 +832,7 @@ describe("AgentOS Pi background commands", () => {
       summary: "Command completed",
       exitCode: 0,
     });
-    await Bun.sleep(1);
+    await waitForTaskState(pi, "bg-observed", "succeeded");
     expect(
       (
         await execute(pi.tools.get("get_background_command_output"), {
@@ -834,7 +864,6 @@ describe("AgentOS Pi background commands", () => {
 
     await execute(pi.tools.get("kill_background_command"), { task_id: "bg-1" });
     await pi.emit("session_shutdown");
-    await Bun.sleep(20);
 
     expect(commands.stops).toEqual([1, 1]);
     expect(pi.messages).toHaveLength(0);
