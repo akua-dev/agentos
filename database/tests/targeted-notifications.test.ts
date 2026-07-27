@@ -19,6 +19,8 @@ const ids = {
   secondA: "23000000-0000-4000-8000-000000000002",
   secondB: "23000000-0000-4000-8000-000000000004",
   retiredCrew: "23000000-0000-4000-8000-000000000005",
+  provisioningSecond: "23000000-0000-4000-8000-000000000006",
+  provisioningCrew: "23000000-0000-4000-8000-000000000007",
 };
 
 beforeAll(async () => {
@@ -380,6 +382,61 @@ describe.serial("targeted Mate notifications", () => {
     expect(fallbackTargets.rows[0]).toEqual({
       retired_mate_targets: [ids.firstMate],
       retired_parent_targets: [ids.firstMate],
+    });
+  });
+
+  test("falls back from unregistered provisioning Mates", async () => {
+    clearNotifications();
+    await database.exec(`
+      INSERT INTO agentos.agents (
+        id, handle, role, parent_agent_id, harness, lifecycle_status, status_text
+      ) VALUES
+        (
+          '${ids.provisioningSecond}', 'provisioning-second', 'second_mate',
+          '${ids.firstMate}', 'pi', 'provisioning', 'Awaiting principal'
+        ),
+        (
+          '${ids.provisioningCrew}', 'provisioning-crew', 'crewmate',
+          '${ids.provisioningSecond}', 'codex', 'provisioning', 'Awaiting runtime'
+        )
+    `);
+
+    const targets = await database.query<{
+      direct_target: string | null;
+      parent_target: string | null;
+      direct_targets: string[] | null;
+      parent_targets: string[] | null;
+    }>(`
+      SELECT
+        agentos.notification_mate_for_agent('${ids.provisioningSecond}')::text
+          AS direct_target,
+        agentos.notification_mate_for_agent('${ids.provisioningCrew}')::text
+          AS parent_target,
+        (
+          SELECT array_agg(target::text ORDER BY target)
+            FROM agentos.notification_targets(
+              'inbox', 'INSERT', NULL,
+              jsonb_build_object(
+                'recipient_agent_id', '${ids.provisioningSecond}'::uuid
+              )
+            ) AS target
+        ) AS direct_targets,
+        (
+          SELECT array_agg(target::text ORDER BY target)
+            FROM agentos.notification_targets(
+              'inbox', 'INSERT', NULL,
+              jsonb_build_object(
+                'recipient_agent_id', '${ids.provisioningCrew}'::uuid
+              )
+            ) AS target
+        ) AS parent_targets
+    `);
+
+    expect(targets.rows[0]).toEqual({
+      direct_target: ids.firstMate,
+      parent_target: null,
+      direct_targets: [ids.firstMate],
+      parent_targets: [ids.firstMate],
     });
   });
 

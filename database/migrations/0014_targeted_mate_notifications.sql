@@ -20,9 +20,11 @@ SET search_path = agentos, pg_temp
 AS $$
   SELECT CASE
     WHEN agent.role IN ('first_mate', 'second_mate')
-     AND agent.retired_at IS NULL THEN agent.id
+     AND agent.retired_at IS NULL
+     AND agent.database_role IS NOT NULL THEN agent.id
     WHEN parent.role IN ('first_mate', 'second_mate')
-     AND parent.retired_at IS NULL THEN parent.id
+     AND parent.retired_at IS NULL
+     AND parent.database_role IS NOT NULL THEN parent.id
     ELSE NULL
   END
     FROM agentos.agents AS agent
@@ -52,7 +54,8 @@ BEGIN
     INTO v_first_mate_id
     FROM agentos.agents AS agent
    WHERE agent.role = 'first_mate'
-     AND agent.retired_at IS NULL;
+     AND agent.retired_at IS NULL
+     AND agent.database_role IS NOT NULL;
 
   IF p_table = 'inbox'
      AND p_operation = 'UPDATE'
