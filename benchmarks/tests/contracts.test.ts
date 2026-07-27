@@ -43,6 +43,12 @@ describe("public benchmark contracts", () => {
       expect(validate(scenario)).toBe(true);
       expect(validate.errors).toBeNull();
       expect(validateContract("scenario", scenario).valid).toBe(true);
+      if (path.includes("hierarchy-reporting-after-background-wake")) {
+        expect(scenario).toMatchObject({
+          rubric: { version: "0.2.0" },
+          version: "0.2.0",
+        });
+      }
     }
   });
 

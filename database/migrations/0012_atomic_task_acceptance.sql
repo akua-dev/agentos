@@ -1,3 +1,41 @@
+DO $$
+DECLARE
+  v_conflicts text;
+BEGIN
+  SELECT string_agg(
+           format(
+             'Task %s has active Assignments: %s',
+             conflict.task_id,
+             conflict.assignment_details
+           ),
+           '; ' ORDER BY conflict.task_id
+         )
+    INTO v_conflicts
+    FROM (
+      SELECT assignment.task_id,
+             string_agg(
+               format(
+                 '%s (Agent %s, status %s)',
+                 assignment.id,
+                 assignment.agent_id,
+                 assignment.status
+               ),
+               ', ' ORDER BY assignment.id
+             ) AS assignment_details
+        FROM agentos.task_assignments AS assignment
+       WHERE assignment.ended_at IS NULL
+       GROUP BY assignment.task_id
+      HAVING count(*) > 1
+    ) AS conflict;
+
+  IF v_conflicts IS NOT NULL THEN
+    RAISE EXCEPTION
+      'Migration 0012 cannot enforce one active Assignment per Task; reconcile the listed active Assignments by ending or handing off ownership without deleting work, then retry. Conflicts: %',
+      v_conflicts;
+  END IF;
+END;
+$$;
+
 ALTER TABLE agentos.task_assignments
   ADD COLUMN acceptance_request jsonb
     CHECK (

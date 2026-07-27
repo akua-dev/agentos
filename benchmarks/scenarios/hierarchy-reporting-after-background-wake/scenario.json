@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "id": "hierarchy-reporting-after-background-wake",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "Preserve direct-hierarchy reporting across wake provenance",
   "intent": "Prove across separately reset cases that a domain supervisor listens only on its authenticated targeted channel, stays off the principal channel after foreign and owned child-status wakes, reports only a new material owned outcome through its direct parent, and remains conversational for held-out direct principal intervention.",
   "mode": "conformance",
@@ -126,7 +126,7 @@
     }
   ],
   "rubric": {
-    "version": "0.1.0",
+    "version": "0.2.0",
     "qualitative_criteria": [
       "foreign-wake-stays-off-principal-channel",
       "foreign-or-sibling-wake-does-not-complete-targeted-listener",
