@@ -24,14 +24,22 @@ Use released PostgreSQL schema for durable coordination and native tools against
    merge authority before accepting ship work.
 3. Distinguish conversation from accepted work.
    An Inbox request, provider comment or idea does not become accepted work
-   until a Task exists. Keep raw reasoning and harness transcripts out of Inbox;
-   persist only durable speech acts whose meaning Task or Assignment state
-   cannot express. Use the released `inbox.kind` vocabulary; never invent a
-   synonym. Record blockers, phase changes and completion in work state first.
+   until the Task's first accountable Assignment exists. An unassigned Task is
+   deliberate backlog only. Keep raw reasoning and harness transcripts out of
+   Inbox; persist only durable speech acts whose meaning Task or Assignment
+   state cannot express. Use the released `inbox.kind` vocabulary; never invent
+   a synonym. Record blockers, phase changes and completion in work state first.
 4. Query active Tasks and Assignments before creating another row.
-   Reuse the existing Task for the same accepted outcome; use `parent_task_id` for a genuinely distinct child outcome.
+   Reuse the existing Task for the same outcome. Accept an unassigned backlog
+   Task through the released Function; preserve Assignment history for work
+   that was already accepted. Use `parent_task_id` for a genuinely distinct
+   child outcome.
 5. Keep dependency judgment coarse.
-   Serialize overlapping writes or explicit dependencies; allow independent work to proceed concurrently.
+   Serialize overlapping writes or explicit outcome dependencies; allow
+   independent work to proceed concurrently. A degraded shared model-capacity
+   path does not itself make otherwise independent Tasks depend on its repair.
+   Resolve the viable approved capacity path for each Assignment and block only
+   the work that actually lacks one.
 
 ## Choose the delegate
 
@@ -54,8 +62,24 @@ Use released PostgreSQL schema for durable coordination and native tools against
   multiple repositories quickly enough to justify a separate FUSE-enabled
   image and reviewed Pod profile. Native Git remains the default.
 - Never retain project work on the Mate because it appears small, urgent or easier than delegation.
-- Only First Mate may use the narrow AgentOS self-maintenance exception in its `AGENTS.md`, and only while it has no active direct report.
-  Second Mate has no equivalent exception.
+- Only First Mate may use the AgentOS self-maintenance exceptions in its
+  `AGENTS.md`. The ordinary exception requires no active direct report. With
+  direct reports present, use the narrower delegation-capacity recovery path
+  only when all of these are true:
+  1. a shared AgentOS runtime, authentication or model-capacity failure prevents
+     a capable delegate from starting or continuing the exact AgentOS repair;
+  2. the Captain explicitly authorizes First Mate to perform that bounded
+     repair;
+  3. every direct report and its unfinished work remains preserved;
+  4. each active report is quiescent or blocked and every still-required
+     supervision wait is armed; and
+  5. the direct change is limited to restoring the failed capacity through the
+     normal reviewed AgentOS delivery path.
+  Stop hands-on work for a supervision event, a new Captain decision or a
+  boundary outside the approved repair. Never copy Mate credentials into a
+  child and never infer merge authority. If any condition is absent, delegate
+  the repair or block only the affected work. Second Mate has no equivalent
+  exception.
 
 ## Prepare the work
 
@@ -78,20 +102,28 @@ Use released PostgreSQL schema for durable coordination and native tools against
    Load `$agentos-harnesses`; consult scoped natural-language dispatch policy
    on every intake and record the concrete resolution on the Assignment.
    Resolve the durable model-capacity posture at the same time. Select the
-   recommended AI Gateway path when recorded, or direct authentication owned
-   by this worker; never create an Assignment whose harness is expected to stop
-   at an unresolved login prompt.
+   recommended AI Gateway path when recorded and healthy, or direct
+   authentication owned by this worker. Direct per-Agent authentication remains
+   the recovery path when shared capacity is degraded. After the exact login is
+   authorized, deliver provider-supported device instructions through the
+   authenticated Captain surface according to `$agentos-auth` and
+   `$agentos-ai-gateway`; do not copy another Agent's auth state. Never create an
+   Assignment whose harness is expected to stop at an unresolved login prompt,
+   and do not hold an unrelated Assignment behind a capacity repair when its
+   own approved path is viable.
 3. Ensure the target Agent identity is active and inside the caller's managed hierarchy.
    If the selected release lacks an authorized Agent-provisioning primitive, request the parent Mate to provision it; never bypass grants or invent SQL.
-4. Create the Task and Assignment before starting asynchronous work.
-   Set `created_by_agent_id` and `assigned_by_agent_id` to the authenticated
-   Mate, store the complete brief in `task_assignments.brief`, store the complete
-   versioned resolved composition in `dispatch_profile`, and
-   set `assignment_role` to `ship` or `scout` with concise explanatory status
-   text. The brief must name the selected delivery workflow, delivery target,
-   authorized outward effects, merge authority and achievable Definition of
-   Done. Keep provider-specific workflow details as durable prose rather than an
-   AgentOS delivery-mode enum.
+4. Atomically create the Task and first Assignment before starting asynchronous
+   work. Call `agentos.create_task_with_assignment` for a new outcome or
+   `agentos.accept_backlog_task` for a deliberately recorded unassigned Task.
+   Supply stable caller-selected Task and Assignment UUIDs and read back the
+   returned pair; do not emulate acceptance with separate INSERTs. Store the
+   complete brief in `task_assignments.brief`, the complete versioned resolved
+   composition in `dispatch_profile`, and set `assignment_role` to `ship` or
+   `scout` with concise explanatory status text. The brief must name the
+   selected delivery workflow, delivery target, authorized outward effects,
+   merge authority and achievable Definition of Done. Keep provider-specific
+   workflow details as durable prose rather than an AgentOS delivery-mode enum.
 5. Render the worker's harness view from the authoritative Assignment brief
    using `../crewmate/BRIEF.md`. Fill every
    marker with the owning Mate, Agent, Task, Assignment, work kind, project,

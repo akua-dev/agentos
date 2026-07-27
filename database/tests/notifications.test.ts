@@ -6,6 +6,7 @@ const database = await PGlite.create();
 const migrationsDirectory = new URL("../migrations/", import.meta.url);
 const notifications: string[] = [];
 let unlisten: (() => Promise<void>) | undefined;
+let firstMateId = "";
 
 beforeAll(async () => {
   const files = (await readdir(migrationsDirectory))
@@ -17,7 +18,14 @@ beforeAll(async () => {
     });
     await database.exec(migration.default);
   }
-  unlisten = await database.listen("agentos_events", (payload) => {
+  const root = await database.query<{ id: string }>(`
+    SELECT id::text AS id
+      FROM agentos.agents
+     WHERE role = 'first_mate'
+       AND retired_at IS NULL
+  `);
+  firstMateId = root.rows[0]!.id;
+  unlisten = await database.listen(expectedChannel(firstMateId), (payload) => {
     notifications.push(payload);
   });
 });
@@ -44,7 +52,7 @@ describe.serial("Fleet notifications", () => {
     await waitFor(() => notifications.length === 1);
 
     expect(JSON.parse(notifications[0]!)).toEqual({
-      version: 1,
+      version: 2,
       table: "agents",
       operation: "update",
     });
@@ -95,4 +103,8 @@ async function waitFor(predicate: () => boolean) {
   const deadline = Date.now() + 500;
   while (!predicate() && Date.now() < deadline) await Bun.sleep(5);
   expect(predicate()).toBe(true);
+}
+
+function expectedChannel(agentId: string) {
+  return `agentos_mate_${agentId.replaceAll("-", "").toLowerCase()}`;
 }

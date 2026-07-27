@@ -147,6 +147,7 @@ export class BackgroundTaskBroker {
           command: restored.command,
           description: restored.description,
           ...(restored.cwd === undefined ? {} : { cwd: restored.cwd }),
+          completionDelivery: restored.completionDelivery,
         },
         snapshot: restored,
         controller,
@@ -218,6 +219,7 @@ export class BackgroundTaskBroker {
       outputTail: "",
       outputTruncated: false,
       outputBytes: 0,
+      completionDelivery: request.completionDelivery ?? "followUp",
       completionObserved: false,
       explicitlyKilled: false,
     };

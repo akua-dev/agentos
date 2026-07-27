@@ -147,6 +147,17 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   `resolved_at` means handled. Recover both unread and read-but-unresolved rows.
   The sender never marks the recipient's row read merely because it submitted a
   Crewmate doorbell.
+- A First or Second Mate calls `agentos.current_mate_bearings()` for one
+  read-only typed projection of its durable reconciliation references. The
+  Function does not return Inbox bodies or external payloads, mark a row read,
+  claim an event, inspect a runtime, classify health or choose a route. Load
+  full rows and native evidence separately only when the supervising judgment
+  needs them.
+- A persistent Mate derives its non-secret wake channel through
+  `agentos.mate_notification_channel(agentos.current_agent_id())`. Targeted v2
+  hints contain only table and operation. A current Mate listens only to its
+  targeted channel, readiness-gates registration and catches up from durable
+  rows. The channel grants no authority and never replaces Fleet state.
 - Captain state uses one table with explicit Fleet or Mate-domain scope. All
   active registered Agents retain the unfiltered read view; scope guides use and
   mutation, not row secrecy. First Mate owns Fleet scope. A Second Mate may
@@ -158,10 +169,18 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   Mate requires `metadata.charter.summary` and `metadata.charter.scope`.
   Principal creation and credential delivery remain separate, approved
   platform operations followed by `agentos.register_agent_principal`.
-- First Mate administers all Fleet work. A Second Mate may create Tasks and
-  Assignments only for its managed Agent subtree. A Crewmate may update the
-  state of an active own Assignment and its Task, but may not rewrite Task
-  scope. Treat a completed Assignment as immutable history.
+- First Mate administers all Fleet work. A Second Mate may accept work only for
+  its managed Agent subtree. A Task without Assignment history is deliberate
+  backlog, not accepted execution. For a new accepted outcome call
+  `agentos.create_task_with_assignment`; for a recorded backlog Task call
+  `agentos.accept_backlog_task`. Supply stable caller-selected Task and
+  Assignment UUIDs and treat the returned pair as the exact idempotent result.
+  A Second Mate may directly record an unassigned backlog Task but has no raw
+  Assignment INSERT authority; use the released acceptance or handoff Function.
+  First Mate retains visible owner-level repair. Each accepted Task has one
+  active accountable Assignment. A Crewmate may update the state of an active
+  own Assignment and its Task, but may not rewrite Task scope. Treat a completed
+  Assignment as immutable history.
 - First Mate's Fleet-owner authority includes deliberate repair of incorrect,
   incomplete or stale Fleet rows within the released schema. Before repair,
   read the authoritative row and its coupled state, decide whether the change

@@ -13,8 +13,12 @@ Supervise only direct children; every Second Mate owns its own subtree.
 
 1. Resolve `agentos.current_agent_id()`, role and handle from the authenticated PostgreSQL `session_user`.
    Stop on missing, retired or ambiguous identity.
-2. Read the Mate's unresolved Inbox deliveries, including rows already read but
-   not resolved, active Task Assignments, managed Tasks and active direct Agent children.
+2. Call `agentos.current_mate_bearings()` once, then load only the durable rows
+   named by its typed references that the current reconciliation requires. The
+   projection covers unresolved Inbox deliveries, including rows already read
+   but not resolved, active own and direct-child Assignments, managed Tasks,
+   ready backlog, Captain decisions and actionable external events. It does not
+   load an Inbox body, mark it read, claim work or report runtime health.
    Read the full Fleet view when useful, but mutate only the authenticated hierarchy.
    Read Fleet-scoped Captain state plus this Mate's domain-scoped entries; do
    not copy preferences between homes or infer them from chat memory.
@@ -65,13 +69,16 @@ also require Inbox, Task, runtime or delivery evidence. The query is neither a
 canonical definition of work nor logic inside the Pi guard.
 
 1. Keep one verified Fleet-coordination continuity wait owned by the current
-   Mate session even when its queue is empty. `pg-listen agentos_events` is the
-   normal baseline. Its useful description must contain
-   `[agentos-supervision]` and identify it as a broad durable Fleet-event wake,
-   for example `[agentos-supervision] wait for a durable Fleet event; reconcile
-   current Inbox, Tasks, Assignments and external events`. It may name current
-   reconciliation priorities after that boundary, but must not present them as
-   predicates filtered by the channel-wide listener. While at least one direct
+   Mate session even when its queue is empty. Resolve the non-secret channel
+   once with
+   `agentos.mate_notification_channel(agentos.current_agent_id())`, then use
+   `pg-listen <returned-channel>` as the normal baseline. Do not arm the
+   global `agentos_events` channel. Its useful description must
+   contain `[agentos-supervision]` and identify it as a durable current-Mate
+   wake, for example `[agentos-supervision] wait for a durable current-Mate
+   event; reconcile current bearings`. It may name current reconciliation
+   priorities after that boundary, but must not present them as predicates
+   filtered by the listener. While at least one direct
    report is active, add native waits only for concrete live risks that
    PostgreSQL cannot signal, such as a selected Pod losing readiness, a
    specific Herdr Agent changing status or a bounded pane match needed for a
@@ -86,19 +93,20 @@ canonical definition of work nor logic inside the Pi guard.
    protocol. In Pi, use `run_background_command`, give every wait a concise
    condition-specific `description`, and retain its task ID. Useful native
    primitives include:
-   - Use `pg-listen agentos_events` for one channel-wide notification. On every
-     arm or re-arm, pass `ready_output: '"state":"listening"'` to
-     `run_background_command`. The readiness wait defaults to 30 seconds;
-     override `ready_timeout` only when the selected native command has a
-     reviewed different startup bound. The tool returns only after PostgreSQL
-     has registered `LISTEN`; immediately after that result, query and drain
-     durable Inbox, Tasks, Assignments and external events with `psql`. This
-     ready-then-catch-up order closes the notification gap without putting
-     Fleet policy in `pg-listen`. The CLI never reconciles Inbox itself. If the
-     one-shot listener completes during catch-up, reconcile the durable rows,
-     re-arm with the same readiness gate and catch up again before yielding.
-     Its small table-and-operation hint routes reconciliation but does not
-     identify which current business priority changed.
+   - Use `pg-listen <returned-channel>` for one targeted notification. On every
+     arm or re-arm, pass `ready_output: '"state":"listening"'` and
+     `completion_delivery: "steer"` to `run_background_command`. The readiness
+     wait defaults to 30 seconds; override `ready_timeout` only when the
+     selected native command has a reviewed different startup bound. The tool
+     returns only after PostgreSQL has registered `LISTEN`; immediately after
+     that result, call `agentos.current_mate_bearings()` and drain the durable
+     rows it references with `psql`. This ready-then-catch-up order closes the
+     notification gap without putting Fleet policy in `pg-listen`. The CLI never
+     reconciles Inbox itself. If the one-shot listener completes during catch-up,
+     reconcile the durable rows, directly re-arm it with the same readiness
+     gate and catch up again before yielding. Its small table-and-operation hint
+     routes reconciliation but does not identify which current business
+     priority changed or grant authority.
    - Use `herdr agent wait <handle> --status <idle|working|blocked|unknown>
      [--timeout <ms>] --session <session>` or `herdr wait agent-status
      <pane_id> --status <idle|working|blocked|done|unknown> [--timeout <ms>]
@@ -129,7 +137,9 @@ canonical definition of work nor logic inside the Pi guard.
    Prefer several individually named native waits over an opaque shell race so
    each completion retains its target and exit status. Do not append shell `&`
    merely to background a command, wrap an existing CLI, synthesize a user
-   message, or start a polling loop.
+   message, or start a polling loop. Select `completion_delivery: "steer"` only
+   for a wait whose completion can invalidate the Mate's current next action;
+   leave routine background work on the default `followUp` path.
 4. If no supported wake mechanism exists, report the capability gap and do not claim unattended supervision.
 5. On wake, read durable Inbox, Task and Assignment changes before inspecting terminal output.
    A PostgreSQL notification contains routing metadata only. If an external
@@ -152,9 +162,12 @@ canonical definition of work nor logic inside the Pi guard.
    old task ID remains visible. A predicate already true, or a `working` wait
    after launch has been verified, cannot wake the next completion, blocker or
    loss and does not count. Arm the missing path before ending the turn or
-   report the unsupported boundary. Pi batches near-simultaneous completions;
-   query the authorities once instead of reacting repeatedly to the same state
-   change.
+   report the unsupported boundary. For a still-useful one-shot continuity
+   listener, reconcile its named durable authority, directly start the
+   replacement with its readiness proof, catch up again after readiness, and
+   yield only after continuity is restored. Pi batches near-simultaneous
+   completions by delivery mode; query the authorities once instead of reacting
+   repeatedly to the same state change.
    Pi's turn-end guard is only a backstop: it remembers observed running task
    IDs whose description includes `[agentos-supervision]` and reminds the Mate
    when none remain known. It never chooses, validates or launches a wait.
@@ -171,7 +184,10 @@ for a coordination signal, query the named authority instead. A completed
 blocking read and an explicit `kill_background_command` consume the completion
 and must not produce a second wake. Killing a wait stops only its local process
 and never mutates the Herdr Agent, PostgreSQL rows or Kubernetes resource it
-observes.
+observes. Steering queues the completion at Pi's next safe model boundary; it
+does not interrupt an already emitted tool call, authenticate the wake as
+Captain input, mark any Inbox row read or resolved, select a replacement wait,
+or re-arm a command.
 
 Treat lifecycle, custom, background-completion and recovery wakes—including
 `agentos-background-command-completion`—as non-human provenance, never as
@@ -237,7 +253,9 @@ changes. Dispatch only when blockers and explicit time gates are actually clear.
 Load `$agentos-runtime` for attach, Herdr, pod and session recovery.
 Load `$agentos-auth` for provider or quota failure.
 Load `$agentos-database` for Inbox, Task, Assignment and transaction rules.
-Load `$agentos-delegation` before reassigning, closing or retiring work.
+Return a required reassign, close or retire decision to the role's intake
+workflow; supervision classifies the evidence but does not restart or own that
+delivery decision.
 
 ## Distinguish terminal prompt provenance
 
@@ -278,7 +296,9 @@ and Assignments, direct-report evidence, recent Scout reports, unresolved Inbox
 decisions and credentials only from structured durable state. Derive a Second
 Mate's condition from its reported subtree evidence rather than registration
 alone. Never scrape old reports, terminal output or chat to reconstruct open
-Captain choices.
+Captain choices. Start with `agentos.current_mate_bearings()` for bounded
+durable references, then apply the model's judgment and inspect native runtime
+authorities only when a listed fact requires them.
 
 ## Captain-facing reporting
 

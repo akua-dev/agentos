@@ -32,6 +32,7 @@ describe("public benchmark contracts", () => {
       "scenarios/interrupted-worker-recovery/scenario.json",
       "scenarios/composition-integrity-recovery/scenario.json",
       "scenarios/hierarchy-reporting-after-background-wake/scenario.json",
+      "scenarios/captain-authorized-capacity-recovery/scenario.json",
     ];
 
     for (const path of paths) {
@@ -42,6 +43,12 @@ describe("public benchmark contracts", () => {
       expect(validate(scenario)).toBe(true);
       expect(validate.errors).toBeNull();
       expect(validateContract("scenario", scenario).valid).toBe(true);
+      if (path.includes("hierarchy-reporting-after-background-wake")) {
+        expect(scenario).toMatchObject({
+          rubric: { version: "0.2.0" },
+          version: "0.2.0",
+        });
+      }
     }
   });
 

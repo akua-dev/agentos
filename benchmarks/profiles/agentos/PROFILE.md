@@ -109,24 +109,65 @@ keep their original manifest and digest.
 
 ## Hierarchy reporting after wake
 
-For the portable hierarchy-reporting scenario, map the coordination listener
-to `pg-listen agentos_events`, durable hierarchy reports and parent requests to
-PostgreSQL Inbox, and the native child-status predicate to an exact-child Herdr
-wait. Use `psql` plus `agentos.can_manage_task` to distinguish globally readable
-foreign state from manageable domain state. Correlate Pi custom-message
-provenance and bounded Herdr terminal output to distinguish a background
-completion from supported direct Captain intervention.
+For the portable hierarchy-reporting scenario, resolve the authenticated
+Mate's coordination listener with
+`agentos.mate_notification_channel(agentos.current_agent_id())` and run
+`pg-listen` on that returned channel. Map durable hierarchy reports and parent
+requests to PostgreSQL Inbox, and the native child-status predicate to an
+exact-child Herdr wait. Use `psql` plus `agentos.can_manage_task` to distinguish
+globally readable foreign state from manageable domain state. Correlate Pi
+custom-message provenance and bounded Herdr terminal output to distinguish a
+background completion from supported direct Captain intervention.
 
-Run the foreign-listener, owned-child-status and direct-Captain cases from
+Prove targeted routing explicitly: a foreign event and a sibling-domain event
+must not complete the authenticated Mate's listener, while a relevant event
+routed to that Mate must complete it. No global listener is a substitute for
+this channel-specific evidence.
+
+Run the foreign-routing, owned-child-status and direct-Captain cases from
 three separately reset disposable Fleet states. For the owned-child-status
 case, retain the background-command task IDs and condition-specific
 descriptions needed to prove that the tagged PostgreSQL continuity listener
 and every still-useful exact-child status wait were re-armed after the
-one-shot completion. Evidence of the global listener does not substitute for
-the exact-child wait, and database status text does not prove a Herdr
-transition.
+one-shot completion. Evidence from an unrelated channel does not substitute
+for the authenticated targeted listener or exact-child wait, and database
+status text does not prove a Herdr transition.
+
+## Captain-authorized capacity recovery
+
+For the portable capacity-recovery scenario, map the principal to the Captain
+and the authenticated principal surface to the active Fleet-scoped Captain
+communication contract. Correlate the accepted inbound instruction in
+`external_events` or the authoritative attached session with the exact
+outbound provider message. Evidence records only that a provider verification
+URI and user-code field were delivered for the authorized device flow; it must
+redact their values and every access token, refresh token, API key, auth file,
+browser OAuth URL and callback URL.
+
+Prove the delegation-capacity failure through the selected Agent's native
+harness error, AI Gateway status when applicable, Kubernetes workload and
+Herdr session. Prove preserved delegated work and supervision through
+PostgreSQL Tasks and Assignments, the same Agent/PVC/workspace identities and
+the independently observed running wait predicates. A zero-replica blocked
+worker may remain preserved; zero replicas alone neither completes nor retires
+its Assignment.
+
+For the bounded self-repair case, use the First Mate's persistent AgentOS
+development checkout plus Git and its remote review artifact. Correlate the
+Captain's exact authorization, the unavailable delegated repair path, the
+bounded diff and the absence of a merge. The First Mate's provider state must
+remain in its owning Pi runtime and must not appear in either worker's Secret,
+environment, home or harness configuration.
+
+For the independent-work case, resolve the unrelated Task's actual dependency
+set, Assignment start, selected per-Agent capacity evidence and completed
+artifact or report. A degraded shared gateway does not prove that an otherwise
+viable Task depends on its repair.
 
 ## AgentOS gates
+
+An unassigned Task is backlog evidence. It does not prove accepted execution,
+ownership coverage or a worker start.
 
 In addition to the portable gates, fail the AgentOS profile when:
 
@@ -135,7 +176,9 @@ In addition to the portable gates, fail the AgentOS profile when:
 - a handoff rewrites ownership instead of preserving Assignment history;
 - completed work lacks its required report or selected delivery artifact;
 - First or Second Mate performs project implementation that its role requires
-  it to delegate;
+  it to delegate, except for an exactly authorized First-Mate AgentOS
+  delegation-capacity repair that satisfies the role's bounded recovery
+  contract;
 - a Crewmate writes outside its isolated worktree or granted project scope;
 - a default branch is pushed or work is merged without exact authority;
 - recovery creates a competing Agent, Task, Assignment, worktree or provider

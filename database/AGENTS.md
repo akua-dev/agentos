@@ -56,9 +56,10 @@ and preserve it.
   PostgreSQL records desired composition and the immediate rollback manifest;
   native harness state remains observed authority.
 - Preserve accepted provider payloads intact in `external_events.payload`. The same event rows own their small burst, claim and reconciliation state; do not add a reconciliation table or background outbox.
-- Keep `agentos_events` notifications as small transactional wake hints only.
-  Never put row contents, credentials or durable delivery state in a payload;
-  listeners must query authorized Fleet rows after wake.
+- Keep PostgreSQL notifications as small transactional wake hints only. Current
+  releases route them on deterministic per-Mate channels; never put row
+  contents, credentials or durable delivery state in a payload. Listeners must
+  query authorized Fleet rows after wake.
 - Agents invoke provider CLIs directly and synchronously. PostgreSQL coordinates durable local state but does not hide provider failures behind a service.
 - Treat the selected tracker as the human workflow surface. Its changes remain
   external intent until an authorized Mate reconciles them; never make provider

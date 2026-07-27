@@ -15,6 +15,7 @@ import {
 } from "./lifecycle.ts";
 import type {
   BackgroundCommandRequest,
+  CompletionDelivery,
   StartBackgroundCommand,
   TaskEvent,
   TaskSnapshot,
@@ -42,6 +43,12 @@ const RunBackgroundCommandParameters = Type.Object({
       maximum: 600_000,
       description:
         "Maximum milliseconds to wait for ready_output; defaults to 30000.",
+    }),
+  ),
+  completion_delivery: Type.Optional(
+    Type.Union([Type.Literal("steer"), Type.Literal("followUp")], {
+      description:
+        "How natural completion is queued while Pi is streaming; defaults to followUp.",
     }),
   ),
 });
@@ -146,21 +153,31 @@ export function registerAgentosBackgroundTasks(
       taskNeedsWake,
     );
     if (tasks.length === 0) return;
-    try {
-      await pi.sendMessage(
-        {
-          customType: MESSAGE_TYPE,
-          content: completionMessage(tasks),
-          display: true,
-          details: { taskIds: tasks.map(({ id }) => id) },
-        },
-        { deliverAs: "followUp", triggerTurn: true },
-      );
-    } catch {
-      if (!active) return;
-      for (const task of tasks) pending.add(task.id);
-      scheduleFlush(Math.max(1_000, batchDelayMs));
+
+    const groups = new Map<CompletionDelivery, TaskSnapshot[]>([
+      ["steer", []],
+      ["followUp", []],
+    ]);
+    for (const task of tasks) groups.get(task.completionDelivery)!.push(task);
+
+    for (const [deliverAs, group] of groups) {
+      if (group.length === 0) continue;
+      try {
+        await pi.sendMessage(
+          {
+            customType: MESSAGE_TYPE,
+            content: completionMessage(group),
+            display: true,
+            details: { taskIds: group.map(({ id }) => id) },
+          },
+          { deliverAs, triggerTurn: true },
+        );
+      } catch {
+        if (!active) return;
+        for (const task of group) pending.add(task.id);
+      }
     }
+    if (pending.size > 0) scheduleFlush(Math.max(1_000, batchDelayMs));
   }
 
   pi.registerTool({
@@ -174,6 +191,7 @@ export function registerAgentosBackgroundTasks(
       "Use native CLI commands directly; do not append shell & or add an AgentOS domain wrapper.",
       "You are notified on natural completion, so do not poll or sleep-wait.",
       "Use ready_output when later work must not race a native command's explicit readiness signal. Startup proof defaults to a 30-second bound; override ready_timeout only for a reviewed different bound.",
+      "Select completion_delivery=steer only when completion can invalidate the next model action; routine work stays on the default followUp path.",
       "Never put credentials in the command string; use approved environment or native config.",
     ],
     parameters: RunBackgroundCommandParameters,
@@ -302,8 +320,8 @@ function formatCompletion(task: TaskSnapshot) {
   return [
     `Background command "${task.id}" completed (${status}).`,
     `Description: ${task.description}`,
-    `Command: ${task.command} | Duration: ${duration}s`,
-    `Use get_background_command_output with task_id "${task.id}" to inspect output.`,
+    `Duration: ${duration}s`,
+    `Use get_background_command_output with task_id "${task.id}" only if the command output itself is useful.`,
   ].join("\n");
 }
 
@@ -409,9 +427,19 @@ function parseRequest(params: Record<string, unknown>): BackgroundCommandRequest
             600_000,
           )!,
         }),
+    ...(params.completion_delivery === undefined
+      ? {}
+      : {
+          completionDelivery: completionDelivery(params.completion_delivery),
+        }),
   };
   assertSafeBackgroundRequest(request);
   return request;
+}
+
+function completionDelivery(value: unknown): CompletionDelivery {
+  if (value === "steer" || value === "followUp") return value;
+  throw new Error("completion_delivery must be steer or followUp");
 }
 
 function parseTaskListQuery(

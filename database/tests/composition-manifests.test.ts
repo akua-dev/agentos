@@ -387,24 +387,29 @@ describe.serial("resolved Agent composition manifests", () => {
       `);
       expect(visible.rows[0]?.resolved_composition).toEqual(manifest());
 
-      await database.exec(`
-        INSERT INTO agentos.tasks (
-          id, project_id, created_by_agent_id, title, status, status_text
-        ) VALUES (
-          '${ids.childTask}', '${ids.project}', '${ids.secondMate}',
-          'Dispatch a validated composition', 'active',
-          'Ready for the direct Crewmate'
-        );
-
-        INSERT INTO agentos.task_assignments (
-          id, task_id, agent_id, assigned_by_agent_id, assignment_role, status,
-          status_text, brief, dispatch_profile
-        ) VALUES (
-          '${ids.childAssignment}', '${ids.childTask}', '${ids.crewmate}',
-          '${ids.secondMate}', 'worker', 'assigned',
-          'Composition validated', 'Use the exact selected material.',
-          ${json(manifest("codex"))}
-        );
+      await database.query(`
+        SELECT *
+          FROM agentos.create_task_with_assignment(
+            '${ids.childTask}',
+            '${ids.childAssignment}',
+            '${ids.crewmate}',
+            '${ids.project}',
+            NULL,
+            'Dispatch a validated composition',
+            'Verify Fleet-wide readability with scoped mutation.',
+            'active',
+            'Ready for the direct Crewmate',
+            NULL,
+            '[]'::jsonb,
+            '[]'::jsonb,
+            '{}'::jsonb,
+            'worker',
+            'assigned',
+            'Composition validated',
+            'Use the exact selected material.',
+            ${json(manifest("codex"))},
+            '{}'::jsonb
+          )
       `);
 
       await expect(
