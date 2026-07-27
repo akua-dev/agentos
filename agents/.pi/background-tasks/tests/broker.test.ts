@@ -76,6 +76,18 @@ async function broker() {
 }
 
 describe("BackgroundTaskBroker", () => {
+  test("records the caller-selected completion delivery", async () => {
+    const { instance } = await broker();
+    const started = await instance.start({
+      command: "native-wait",
+      description: "Wait",
+      completionDelivery: "steer",
+    });
+
+    expect(started.completionDelivery).toBe("steer");
+    await instance.shutdown();
+  });
+
   test("assigns stable IDs and records one terminal transition", async () => {
     const { instance, commands, events } = await broker();
     const started = await instance.start({

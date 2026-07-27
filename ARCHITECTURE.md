@@ -32,11 +32,11 @@ Terminal output stays in the runtime unless a deliberate workflow archives a spe
 AgentOS connects these authorities without turning any one of them into a
 universal ledger. A provider issue, board change or comment records human
 planning and external workflow state. A responsible Mate reconciles that intent;
-accepted work receives one PostgreSQL Task and at least one accountable
-Assignment. Raw model reasoning, harness transcripts and terminal output remain
-in their runtime authorities. Delivered changes become durable only in Git and
-its remote, after which the responsible Agent reconciles the human tracker
-through its native provider tool.
+a PostgreSQL Task may preserve deliberate backlog, while accepted execution
+begins with its first accountable Assignment. Raw model reasoning, harness
+transcripts and terminal output remain in their runtime authorities. Delivered
+changes become durable only in Git and its remote, after which the responsible
+Agent reconciles the human tracker through its native provider tool.
 
 Stable references join the chain: a Task may carry external tracker links, its
 Assignment history records ownership and handoff, and its report identifies the
@@ -122,21 +122,32 @@ This is only a user-facing view; the remote pod-local sessions remain authoritat
 The Captain has one regular fleet interface: First Mate.
 First Mate does not perform project-specific coding, investigation, planning, bug reproduction or audits itself.
 It may inspect projects read-only to understand and route work, and it may mutate reviewed Fleet operational state, but it delegates project work to a charter-matched Second Mate or a bounded Crewmate.
-A persistent writable AgentOS development checkout is First Mate's narrow self-maintenance exception: it may change shared AgentOS source directly only with Captain approval, no active direct report and the normal reviewed delivery path.
+A persistent writable AgentOS development checkout is First Mate's narrow
+self-maintenance exception. Its role contract and delegation Skill own the
+exact authority and procedure, including the bounded Captain-authorized
+capacity-recovery path while direct reports remain preserved and supervised.
+The exception restores shared AgentOS capacity through the normal reviewed
+path; it transfers no Mate credential and grants no merge authority.
 The root-owned `/opt/agentos` tree is the immutable image Git seed, not the
 active checkout. The harness reads AgentOS instructions, Skills and Mise files
 from `$HOME/projects/agentos`; unfinished changes and its worktrees therefore
 survive Pod replacement. Reviewed Markdown and Skill updates can be loaded from
 that Git checkout at a safe Pi turn boundary, while OS, runtime and Kubernetes
 changes still reach a running Mate through a tested immutable image digest.
-If any direct report is active, First Mate delegates AgentOS source changes too because hands-on work competes with supervision.
+Outside that bounded recovery, or whenever a report actively needs attention,
+First Mate delegates AgentOS source changes too because hands-on work competes
+with supervision.
 
 A Second Mate uses the same architecture inside one persistent charter.
 It delegates project work to its own Crewmates, manages only its direct subtree and returns Captain-relevant outcomes to First Mate.
 An empty Second-Mate queue is a healthy idle state, not permission to invent work.
 Second Mates never create further Second Mates.
 
-Every accepted work item has one durable Task and at least one explicit Assignment before an asynchronous worker begins.
+Every accepted work item has one durable Task and exactly one active
+accountable Assignment before an asynchronous worker begins. Creating a new
+accepted outcome or accepting a recorded backlog Task creates that first
+Assignment atomically through the released PostgreSQL Function; an unassigned
+Task remains backlog.
 A Task keeps one stable identity across handoff. Each Assignment stores its
 complete authoritative brief, resolved composition and final or handoff report;
 its PVC copy is only the harness view. A handoff ends the prior
@@ -152,6 +163,10 @@ forbids every selected delivery path is rejected or reclassified before
 dispatch; an uncommitted worktree is not review-ready.
 A scout's durable output is its report; its scratch worktree or ArtifactFS mount may then be discarded.
 No Mate merges without the Captain's explicit approval or a previously recorded standing authorization, and no agent or workspace with active or unlanded work is retired by implication.
+Loss of one shared model-capacity path is resolved per Assignment and does not
+create a dependency between otherwise independent accepted outcomes. A worker's
+approved direct authentication remains a complete recovery path; only work with
+no viable authorized capacity is blocked.
 
 Task and Assignment state is the primary channel for delegated work. Inbox is
 reserved for durable speech acts that state cannot express, and Agent-authored
@@ -178,10 +193,10 @@ its coupled state effect—is the template for any future Inbox act that changes
 durable state.
 Each Mate supervises only its direct reports and keeps status changes sparse: decisions, blockers, material phase changes, completion and failure.
 While direct reports are active, their Mate keeps the smallest verified set of
-situation-appropriate waits: normally one durable Fleet notification wait plus
-native Kubernetes, Herdr-status or bounded terminal waits for concrete live
-risks. Waits are deduplicated by authority, target and predicate and re-armed
-only while their condition remains useful.
+situation-appropriate waits: normally one targeted durable Fleet notification
+wait for the current Mate plus native Kubernetes, Herdr-status or bounded
+terminal waits for concrete live risks. Waits are deduplicated by authority,
+target and predicate and re-armed only while their condition remains useful.
 If the selected release lacks that wake capability, the Mate reports the unsupported boundary instead of claiming unattended supervision.
 
 Project checkouts and provider repositories are operated through native Git and
@@ -475,8 +490,9 @@ Agent-authored Inbox delivery requires an authentic sender and a direct
 parent-child recipient, then content follows sender, recipient and immutability
 rules. Fleet tables
 without a reviewed runtime write policy remain mutable only by First Mate as
-owner. The runtime mutation migration lets Mates create and assign Tasks inside
-their managed hierarchy and lets assigned Crewmates update only work state.
+owner. Released acceptance Functions let Mates atomically create the first
+Assignment inside their managed hierarchy; assigned Crewmates update only work
+state.
 Completed Assignments are immutable. Retiring an Agent is an explicit function
 that refuses active Assignments or active child Agents, so handoff is never an
 automatic cascade. Recording hierarchy alone is not authorization, and
@@ -489,12 +505,15 @@ retains owner-level administrative repair. `read_at` means the delivery entered
 the recipient's model context, while `resolved_at` means its requested action or
 disposition was durably handled. A read but unresolved row therefore remains
 recoverable work after a crash.
-Transactional Fleet triggers publish small table-and-operation hints on the
-`agentos_events` channel. A running Pi Mate readiness-gates its native
-`pg-listen agentos_events` wait, then catches up by querying its authorized
-durable rows before relying on the one-shot listener. The detailed re-arm and
-catch-up judgment belongs to `$agentos-supervision`; the wake contains no Fleet
-row data and
+Transactional Fleet triggers publish small table-and-operation hints on a
+deterministic non-secret channel for each responsible persistent Mate. A
+current Pi Mate readiness-gates only its targeted native `pg-listen` wait, then
+catches up through the read-only durable bearings
+projection before relying on the one-shot listener. Deterministic SQL maps
+Inbox recipients, Assignment owners, hierarchy edges, Captain scope and
+external-event claims; an unowned or unresolved edge falls back to First Mate
+instead of waking every current Mate. The detailed re-arm and catch-up judgment
+belongs to `$agentos-supervision`; the wake contains no Fleet row data and
 `LISTEN/NOTIFY` never starts a pod or replaces Inbox, Task or external-event
 truth. The same generic tool may own additional native blocking commands for
 selected Kubernetes resources, Herdr state transitions or bounded pane output;
@@ -508,11 +527,13 @@ The initial durable model stays deliberately small:
 - `captain` stores multiple captain preferences and context entries, never a synthetic singleton Fleet row;
 - `agents` stores hierarchy, role and runtime locators, but not Kubernetes or Herdr health;
 - `projects` stores non-exclusive work scopes without assigning one permanent owner;
-- `tasks` stores accepted durable work, dependencies and its small array of external tracker links;
+- `tasks` stores durable backlog and accepted outcomes, dependencies and its
+  small array of external tracker links;
 - `task_assignments` protects active Agent-to-Task relationships and makes completed assignment history immutable;
 - `inbox` stores durable delivery to an Agent under the closed speech-act
   vocabulary defined by released SQL. It is not a raw model or terminal
-  transcript. A request is not accepted work until a Task exists;
+  transcript. A request becomes accepted execution only when the Task's first
+  accountable Assignment exists;
 - `learnings` stores curated, evidence-backed Fleet knowledge;
 - `external_events` stores external deliveries and their reconciliation state.
 

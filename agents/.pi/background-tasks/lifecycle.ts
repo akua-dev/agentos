@@ -1,4 +1,8 @@
-import type { TaskSnapshot, TaskState } from "./types.ts";
+import type {
+  CompletionDelivery,
+  TaskSnapshot,
+  TaskState,
+} from "./types.ts";
 
 export const TASK_LIFECYCLE_ENTRY =
   "agentos-background-command-lifecycle";
@@ -17,6 +21,7 @@ type PersistedTask = {
   signal?: NodeJS.Signals | null;
   error?: string;
   summary?: string;
+  completionDelivery?: CompletionDelivery;
   completionObserved: boolean;
   explicitlyKilled: boolean;
 };
@@ -47,6 +52,7 @@ export function taskLifecycleEntry(task: TaskSnapshot): TaskLifecycleEntry {
       ...(task.signal === undefined ? {} : { signal: task.signal }),
       ...(task.error === undefined ? {} : { error: task.error }),
       ...(task.summary === undefined ? {} : { summary: task.summary }),
+      completionDelivery: task.completionDelivery,
       completionObserved: task.completionObserved,
       explicitlyKilled: task.explicitlyKilled,
     },
@@ -133,6 +139,12 @@ function parseLifecycleData(value: unknown): TaskSnapshot | undefined {
   if (task.summary !== undefined && typeof task.summary !== "string") {
     return undefined;
   }
+  if (
+    task.completionDelivery !== undefined &&
+    !completionDelivery(task.completionDelivery)
+  ) {
+    return undefined;
+  }
 
   return {
     id: task.id,
@@ -158,6 +170,7 @@ function parseLifecycleData(value: unknown): TaskSnapshot | undefined {
       : { signal: task.signal as NodeJS.Signals | null }),
     ...(task.error === undefined ? {} : { error: task.error }),
     ...(task.summary === undefined ? {} : { summary: task.summary }),
+    completionDelivery: task.completionDelivery ?? "followUp",
     completionObserved: task.completionObserved,
     explicitlyKilled: task.explicitlyKilled,
   };
@@ -182,6 +195,10 @@ function taskState(value: unknown): value is TaskState {
     value === "interrupted" ||
     value === "cancelled"
   );
+}
+
+function completionDelivery(value: unknown): value is CompletionDelivery {
+  return value === "steer" || value === "followUp";
 }
 
 function timestamp(value: unknown): value is string {

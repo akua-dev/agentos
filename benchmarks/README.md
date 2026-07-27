@@ -49,6 +49,7 @@ portable validator and hard gates do not invoke or require it.
    - [`interrupted-worker-recovery`](./scenarios/interrupted-worker-recovery/scenario.json)
    - [`composition-integrity-recovery`](./scenarios/composition-integrity-recovery/scenario.json)
    - [`hierarchy-reporting-after-background-wake`](./scenarios/hierarchy-reporting-after-background-wake/scenario.json)
+   - [`captain-authorized-capacity-recovery`](./scenarios/captain-authorized-capacity-recovery/scenario.json)
 3. Record the exact subject, model, harness, tool, environment and permission
    versions.
 4. Operate the subject through its own public interfaces. Do not install an

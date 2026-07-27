@@ -20,8 +20,8 @@ bounded output when useful, list it, or kill it.
   it for reconciliation without emitting a completion wake or replaying its
   command. Checkpoint running metadata onto Pi's selected branch after session
   tree navigation so later restoration follows native branch semantics.
-- A natural completion wakes Pi with task ID, command, description, exit or
-  signal, and duration only. Never inject command output into the wake.
+- A natural completion wakes Pi with task ID, description, exit or signal, and
+  duration only. Never inject the command text or its output into the wake.
 - When a caller supplies a literal readiness marker, report a successful start
   only after bounded observation of that marker on stdout or stderr. Early exit
   or readiness timeout is a failed start; never infer readiness from command

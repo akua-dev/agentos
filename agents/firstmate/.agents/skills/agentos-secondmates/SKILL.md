@@ -106,7 +106,9 @@ The Second Mate supervises its Crewmates; First Mate does not reconstruct the de
 1. Resolve the project and request first, then compare the nature of the work with active charters.
 2. Route to one clear match.
    If charters overlap or no charter fits, keep routing authority with First Mate and resolve the ambiguity before dispatch.
-3. Create or associate the durable Task and Assignment before sending the request.
+3. Create or associate the durable Task and first Assignment through the atomic
+   acceptance path in `$agentos-delegation` before sending the request. Never
+   accept work with separate Task and Assignment inserts.
 4. Use Inbox for the chartered request and upward answer.
    Do not rely on terminal injection as the handoff record.
 5. Let the Second Mate own its internal Crewmate lifecycle and report only decisions, blockers, material phase changes, completion and failure upward.
