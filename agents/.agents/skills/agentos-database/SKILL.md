@@ -155,10 +155,9 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   needs them.
 - A persistent Mate derives its non-secret wake channel through
   `agentos.mate_notification_channel(agentos.current_agent_id())`. Targeted v2
-  hints contain only table and operation; the global v1 channel remains a
-  release-transition fallback for older Mates. A current Mate listens only to
-  its targeted channel, readiness-gates registration and catches up from
-  durable rows. Neither channel grants authority or replaces Fleet state.
+  hints contain only table and operation. A current Mate listens only to its
+  targeted channel, readiness-gates registration and catches up from durable
+  rows. The channel grants no authority and never replaces Fleet state.
 - Captain state uses one table with explicit Fleet or Mate-domain scope. All
   active registered Agents retain the unfiltered read view; scope guides use and
   mutation, not row secrecy. First Mate owns Fleet scope. A Second Mate may

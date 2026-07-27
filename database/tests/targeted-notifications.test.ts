@@ -18,6 +18,7 @@ const ids = {
   project: "33000000-0000-4000-8000-000000000001",
   secondA: "23000000-0000-4000-8000-000000000002",
   secondB: "23000000-0000-4000-8000-000000000004",
+  retiredCrew: "23000000-0000-4000-8000-000000000005",
 };
 
 beforeAll(async () => {
@@ -151,7 +152,7 @@ describe.serial("targeted Mate notifications", () => {
         'Load the durable request before acting.', 'unread', 'Awaiting receipt'
       )
     `);
-    await waitForNotificationCount(2);
+    await waitForNotificationCount(1);
 
     expectTargetSet([ids.secondA]);
     expect(targetPayloads(ids.secondA)).toEqual([
@@ -177,7 +178,7 @@ describe.serial("targeted Mate notifications", () => {
         'Load this exact durable row.', 'unread', 'Awaiting receipt'
       )
     `);
-    await waitForNotificationCount(2);
+    await waitForNotificationCount(1);
     clearNotifications();
     await asRole("targeted_second_a", () =>
       database.query(`
@@ -187,7 +188,7 @@ describe.serial("targeted Mate notifications", () => {
           )
       `),
     );
-    await waitForNotificationCount(1);
+    await Bun.sleep(25);
 
     expectTargetSet([]);
     const inbox = await database.query<{ read_at: Date | null }>(`
@@ -208,7 +209,7 @@ describe.serial("targeted Mate notifications", () => {
          WHERE id = '${ids.crewAssignment}'
       `),
     );
-    await waitForNotificationCount(2);
+    await waitForNotificationCount(1);
 
     expectTargetSet([ids.secondA]);
     expect(targetPayloads(ids.secondA)).toEqual([
@@ -223,7 +224,7 @@ describe.serial("targeted Mate notifications", () => {
          SET status_text = 'Second Mate A changed durable phase'
        WHERE id = '${ids.secondA}'
     `);
-    await waitForNotificationCount(3);
+    await waitForNotificationCount(2);
 
     expectTargetSet([ids.firstMate, ids.secondA]);
   });
@@ -237,7 +238,7 @@ describe.serial("targeted Mate notifications", () => {
         'targeted-fleet', 'Fleet policy changed', '${ids.firstMate}', 'fleet'
       )
     `);
-    await waitForNotificationCount(2);
+    await waitForNotificationCount(1);
     expectTargetSet([ids.firstMate]);
 
     clearNotifications();
@@ -251,7 +252,7 @@ describe.serial("targeted Mate notifications", () => {
         )
       `),
     );
-    await waitForNotificationCount(2);
+    await waitForNotificationCount(1);
     expectTargetSet([ids.secondA]);
   });
 
@@ -267,7 +268,7 @@ describe.serial("targeted Mate notifications", () => {
         transaction_timestamp() - interval '1 minute'
       )
     `);
-    await waitForNotificationCount(2);
+    await waitForNotificationCount(1);
     expectTargetSet([ids.firstMate]);
 
     clearNotifications();
@@ -279,7 +280,7 @@ describe.serial("targeted Mate notifications", () => {
           )
       `),
     );
-    await waitForNotificationCount(3);
+    await waitForNotificationCount(2);
     expectTargetSet([ids.firstMate, ids.secondA]);
   });
 
@@ -309,13 +310,77 @@ describe.serial("targeted Mate notifications", () => {
           '{}'::jsonb
         )
     `);
-    await waitForNotificationCount(4);
+    await waitForNotificationCount(2);
 
     expectTargetSet([ids.secondA]);
     expect(targetPayloads(ids.secondA)).toEqual([
       { operation: "insert", table: "task_assignments", version: 2 },
       { operation: "insert", table: "tasks", version: 2 },
     ]);
+  });
+
+  test("falls back to the active First Mate for retired routing", async () => {
+    clearNotifications();
+    await database.exec(`
+      INSERT INTO agentos.agents (
+        id, handle, role, parent_agent_id, harness, lifecycle_status,
+        status_text, retired_at
+      ) VALUES (
+        '${ids.retiredCrew}', 'retired-routing-crew', 'crewmate',
+        '${ids.secondB}', 'codex', 'retired', 'Retired routing child',
+        transaction_timestamp()
+      )
+    `);
+    clearNotifications();
+    await database.exec(`
+      UPDATE agentos.agents
+         SET retired_at = transaction_timestamp(),
+             lifecycle_status = 'retired',
+             status_text = 'Retired for notification routing test'
+       WHERE id = '${ids.secondB}'
+    `);
+    await waitForNotificationCount(1);
+    expectTargetSet([ids.firstMate]);
+
+    const targets = await database.query<{
+      retired_mate_target: string | null;
+      retired_parent_target: string | null;
+    }>(`
+      SELECT
+        agentos.notification_mate_for_agent('${ids.secondB}')::text
+          AS retired_mate_target,
+        agentos.notification_mate_for_agent('${ids.retiredCrew}')::text
+          AS retired_parent_target
+    `);
+    expect(targets.rows[0]).toEqual({
+      retired_mate_target: ids.firstMate,
+      retired_parent_target: null,
+    });
+
+    const fallbackTargets = await database.query<{
+      retired_mate_targets: string[] | null;
+      retired_parent_targets: string[] | null;
+    }>(`
+      SELECT
+        (
+          SELECT array_agg(target::text ORDER BY target)
+            FROM agentos.notification_targets(
+              'inbox', 'INSERT', NULL,
+              jsonb_build_object('recipient_agent_id', '${ids.secondB}'::uuid)
+            ) AS target
+        ) AS retired_mate_targets,
+        (
+          SELECT array_agg(target::text ORDER BY target)
+            FROM agentos.notification_targets(
+              'inbox', 'INSERT', NULL,
+              jsonb_build_object('recipient_agent_id', '${ids.retiredCrew}'::uuid)
+            ) AS target
+        ) AS retired_parent_targets
+    `);
+    expect(fallbackTargets.rows[0]).toEqual({
+      retired_mate_targets: [ids.firstMate],
+      retired_parent_targets: [ids.firstMate],
+    });
   });
 
   test("emits no global or targeted wake for rollback", async () => {
@@ -361,7 +426,7 @@ function expectTargetSet(expectedAgentIds: string[]) {
     .filter((agentId) => received.get(expectedChannel(agentId))!.length > 0)
     .sort();
   expect(actual).toEqual([...expectedAgentIds].sort());
-  expect(received.get("agentos_events")!.length).toBeGreaterThan(0);
+  expect(received.get("agentos_events")!.length).toBe(0);
 }
 
 function targetPayloads(agentId: string) {

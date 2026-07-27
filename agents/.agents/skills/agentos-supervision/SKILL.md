@@ -72,8 +72,8 @@ canonical definition of work nor logic inside the Pi guard.
    Mate session even when its queue is empty. Resolve the non-secret channel
    once with
    `agentos.mate_notification_channel(agentos.current_agent_id())`, then use
-   `pg-listen <returned-channel>` as the normal baseline. Do not also arm the
-   release-transition `agentos_events` channel. Its useful description must
+   `pg-listen <returned-channel>` as the normal baseline. Do not arm the
+   global `agentos_events` channel. Its useful description must
    contain `[agentos-supervision]` and identify it as a durable current-Mate
    wake, for example `[agentos-supervision] wait for a durable current-Mate
    event; reconcile current bearings`. It may name current reconciliation

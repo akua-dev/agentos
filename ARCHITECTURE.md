@@ -506,10 +506,9 @@ the recipient's model context, while `resolved_at` means its requested action or
 disposition was durably handled. A read but unresolved row therefore remains
 recoverable work after a crash.
 Transactional Fleet triggers publish small table-and-operation hints on a
-deterministic non-secret channel for each responsible persistent Mate. During
-release transition they also publish the same v1 shape on `agentos_events` for
-older Mates. A current Pi Mate readiness-gates only its targeted native
-`pg-listen` wait, then catches up through the read-only durable bearings
+deterministic non-secret channel for each responsible persistent Mate. A
+current Pi Mate readiness-gates only its targeted native `pg-listen` wait, then
+catches up through the read-only durable bearings
 projection before relying on the one-shot listener. Deterministic SQL maps
 Inbox recipients, Assignment owners, hierarchy edges, Captain scope and
 external-event claims; an unowned or unresolved edge falls back to First Mate

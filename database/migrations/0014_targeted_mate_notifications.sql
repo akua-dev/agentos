@@ -19,8 +19,10 @@ SECURITY DEFINER
 SET search_path = agentos, pg_temp
 AS $$
   SELECT CASE
-    WHEN agent.role IN ('first_mate', 'second_mate') THEN agent.id
-    WHEN parent.role IN ('first_mate', 'second_mate') THEN parent.id
+    WHEN agent.role IN ('first_mate', 'second_mate')
+     AND agent.retired_at IS NULL THEN agent.id
+    WHEN parent.role IN ('first_mate', 'second_mate')
+     AND parent.retired_at IS NULL THEN parent.id
     ELSE NULL
   END
     FROM agentos.agents AS agent
@@ -131,7 +133,7 @@ BEGIN
         IF p_old ->> 'role' IN ('first_mate', 'second_mate') THEN
           v_targets := array_append(
             v_targets,
-            (p_old ->> 'id')::uuid
+            agentos.notification_mate_for_agent((p_old ->> 'id')::uuid)
           );
         END IF;
         IF p_old ->> 'parent_agent_id' IS NOT NULL THEN
@@ -147,7 +149,7 @@ BEGIN
         IF p_new ->> 'role' IN ('first_mate', 'second_mate') THEN
           v_targets := array_append(
             v_targets,
-            (p_new ->> 'id')::uuid
+            agentos.notification_mate_for_agent((p_new ->> 'id')::uuid)
           );
         END IF;
         IF p_new ->> 'parent_agent_id' IS NOT NULL THEN
@@ -238,11 +240,6 @@ SECURITY DEFINER
 SET search_path = pg_catalog
 AS $$
 DECLARE
-  v_global_payload text := jsonb_build_object(
-    'version', 1,
-    'table', TG_TABLE_NAME,
-    'operation', lower(TG_OP)
-  )::text;
   v_old jsonb;
   v_target_id uuid;
   v_target_payload text := jsonb_build_object(
@@ -254,8 +251,6 @@ BEGIN
   IF TG_OP <> 'INSERT' THEN
     v_old := to_jsonb(OLD);
   END IF;
-
-  PERFORM pg_notify('agentos_events', v_global_payload);
 
   FOR v_target_id IN
     SELECT target
@@ -284,4 +279,4 @@ DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION agentos.notify_fleet_change();
 
 COMMENT ON FUNCTION agentos.notify_fleet_change() IS
-  'Emits the release-transition global hint plus deterministic targeted Mate hints after commit; durable Fleet rows remain authoritative.';
+  'Emits deterministic targeted Mate hints after commit; durable Fleet rows remain authoritative.';
