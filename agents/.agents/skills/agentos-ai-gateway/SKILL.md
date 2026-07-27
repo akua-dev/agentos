@@ -96,10 +96,13 @@ kubectl --context <context> --namespace agentos exec statefulset/ai-gateway \
   --container ai-gateway -- ai-gateway status
 ```
 
-Show the device verification URI and one-time user code to the Captain, but no
+Show the device verification URI and one-time user code through the
+authenticated Captain surface after the exact login is authorized; do not
+force a terminal attachment merely to read those two interactive instructions.
+Keep them out of durable work records and generated artifacts, and show no
 access or refresh token. OAuth chains rotate on refresh; never copy a local Pi
-or Codex auth file into the gateway. Readiness becomes healthy after at least one
-eligible OAuth account or an explicitly enabled API-key fallback exists.
+or Codex auth file into the gateway. Readiness becomes healthy after at least
+one eligible OAuth account or an explicitly enabled API-key fallback exists.
 
 Keep `OPENAI_API_KEY` in a separate Kubernetes Secret. Enable
 `AI_GATEWAY_ALLOW_API_KEY_FALLBACK=true` only through an approved workload

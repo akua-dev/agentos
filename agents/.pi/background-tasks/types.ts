@@ -1,3 +1,5 @@
+export type CompletionDelivery = "steer" | "followUp";
+
 export type BackgroundCommandRequest = {
   command: string;
   description: string;
@@ -5,6 +7,7 @@ export type BackgroundCommandRequest = {
   timeout?: number;
   readyOutput?: string;
   readyTimeout?: number;
+  completionDelivery?: CompletionDelivery;
 };
 
 export type TaskState =
@@ -40,6 +43,7 @@ export type TaskSnapshot = {
   signal?: NodeJS.Signals | null;
   error?: string;
   summary?: string;
+  completionDelivery: CompletionDelivery;
   completionObserved: boolean;
   explicitlyKilled: boolean;
 };

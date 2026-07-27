@@ -24,6 +24,16 @@ for copying Agent auth.
    every harness, modify a harness-managed trust store implicitly or treat a
    credential as broader authority than its documented reversible operations.
 
+Provider-issued device verification URIs and one-time user codes are
+interactive login instructions, not access tokens, refresh tokens, API keys,
+browser OAuth URLs, callback URLs or auth files. After the exact device login
+is authorized, relay its verification URI and user code through the
+authenticated Captain surface. Keep both out of Git, prompts, Task and
+Assignment records, generated artifacts and reusable guidance, and retain all
+bearer credentials only inside the owning runtime. This classification applies
+only to a provider-supported device flow; it does not weaken the browser-login
+URL rule below.
+
 ## Pi with a Codex subscription
 
 1. Resolve the target Agent and its Kubernetes context, namespace, Pod,

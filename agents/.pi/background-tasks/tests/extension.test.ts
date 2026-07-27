@@ -667,12 +667,91 @@ describe("AgentOS Pi background commands", () => {
     const content = pi.messages[0]!.message.content as string;
     expect(content).toContain('Background command "bg-result" completed');
     expect(content).toContain("exit code 0");
-    expect(content).toContain("bun test");
+    expect(content).not.toContain("bun test");
     expect(content).toContain("get_background_command_output");
     expect(content).not.toContain("SECRET OUTPUT");
     expect(pi.messages[0]).toMatchObject({
       options: { deliverAs: "followUp", triggerTurn: true },
     });
+  });
+
+  test("an explicit completion delivery steers the next model boundary", async () => {
+    const commands = controlledCommands();
+    const pi = new FakePi();
+    registerAgentosBackgroundTasks(pi.extensionApi(), {
+      startCommand: commands.start,
+      rootDirectory: await root(),
+      createId: () => "bg-steer",
+      batchDelayMs: 5,
+    });
+
+    const started = await execute(pi.tools.get("run_background_command"), {
+      command: "native-wait",
+      description: "Wait for one actionable event",
+      completion_delivery: "steer",
+    });
+    expect(started.details).toMatchObject({ completionDelivery: "steer" });
+
+    commands.controls[0]!.resolve({
+      state: "succeeded",
+      summary: "Command completed",
+      exitCode: 0,
+    });
+    await Bun.sleep(20);
+
+    expect(pi.messages).toHaveLength(1);
+    expect(pi.messages[0]).toMatchObject({
+      options: { deliverAs: "steer", triggerTurn: true },
+    });
+  });
+
+  test("batches simultaneous completions without promoting follow-ups", async () => {
+    const commands = controlledCommands();
+    const pi = new FakePi();
+    let sequence = 0;
+    registerAgentosBackgroundTasks(pi.extensionApi(), {
+      startCommand: commands.start,
+      rootDirectory: await root(),
+      createId: () => `bg-mixed-${++sequence}`,
+      batchDelayMs: 5,
+    });
+
+    await execute(pi.tools.get("run_background_command"), {
+      command: "routine-work",
+      description: "Routine completion",
+    });
+    await execute(pi.tools.get("run_background_command"), {
+      command: "actionable-wait",
+      description: "Actionable completion",
+      completion_delivery: "steer",
+    });
+
+    for (const control of commands.controls) {
+      control.resolve({
+        state: "succeeded",
+        summary: "Command completed",
+        exitCode: 0,
+      });
+    }
+    await Bun.sleep(20);
+
+    expect(pi.messages).toHaveLength(2);
+    expect(pi.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.objectContaining({
+            details: { taskIds: ["bg-mixed-1"] },
+          }),
+          options: { deliverAs: "followUp", triggerTurn: true },
+        }),
+        expect.objectContaining({
+          message: expect.objectContaining({
+            details: { taskIds: ["bg-mixed-2"] },
+          }),
+          options: { deliverAs: "steer", triggerTurn: true },
+        }),
+      ]),
+    );
   });
 
   test("a blocking output read consumes completion without a duplicate wake", async () => {

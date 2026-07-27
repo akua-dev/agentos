@@ -46,9 +46,9 @@ caused by forgetting where the caller already runs.
   enters `working`, or that the exact Agent produced fresh completion evidence
   before the observation. Do not call a process healthy
   merely because the Herdr server or Pod is ready.
-- Treat a live terminal send as an immediate hint only. Use
-  `$agentos-supervision`'s provenance marker for a supervisor-origin hint and
-  keep durable inter-agent communication in PostgreSQL.
+- Treat a live terminal send as an immediate hint only. Require the caller to
+  supply the canonical supervisor-origin marker from its coordination
+  procedure and keep durable inter-agent communication in PostgreSQL.
 - Ask before interrupting, restarting, closing, taking over, or rearranging an existing user session.
 - Attach to the existing named Mate session. Never launch a second independent
   Pi writer for the same home. If Pod, Herdr and native session identity do not
@@ -99,11 +99,16 @@ wrapper CLI for this sequence.
   pod-local Herdr sessions when requested. The remote sessions remain
   authoritative.
 
-## Create a child workload
+## Create a prepared child workload
 
-1. Load `$agentos-delegation`, `$agentos-database` and `$agentos-harnesses`.
-   Provision the Agent, Task, Assignment, database login and approved pgpass
-   Secret before Kubernetes mutation.
+This section consumes, but does not select or create, a provisioned Agent,
+accepted Task and Assignment, database principal and approved pgpass Secret,
+complete brief, resolved composition and native harness argv. Return any
+missing input to the owning workflow before Kubernetes mutation; do not restart
+delegation or database intake from this Skill.
+
+1. Verify the supplied Agent, Task, Assignment, database login, Secret
+   reference, brief and composition agree on one child identity.
 2. Resolve the owning Mate's namespace, Pod and `serviceAccountName` from
    Kubernetes. Require its standard projected ServiceAccount token, CA and
    namespace mounts and native in-cluster `kubectl`; never create, copy or
