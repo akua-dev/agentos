@@ -225,3 +225,22 @@ separate `agentos.repair_agent_composition` path so repair is visible rather
 than disguised as ordinary selection. Owner-level administrative writes remain
 possible by definition and are not evidence that these released checks ran.
 These rows still do not claim that Pi, files or Herdr loaded the desired setup.
+
+`0012_atomic_task_acceptance.sql` adds the idempotent
+`agentos.create_task_with_assignment` and `agentos.accept_backlog_task`
+Functions. A new accepted outcome or a deliberately accepted backlog Task gets
+its first accountable Assignment in one transaction; an unassigned Task
+remains backlog. `tests/atomic-acceptance.test.ts` exercises the acceptance and
+retry paths.
+
+`0013_current_mate_bearings.sql` adds the read-only
+`agentos.current_mate_bearings()` projection for an authenticated Mate's
+durable reconciliation references. It excludes message bodies, external
+payloads, runtime health and routing decisions. `tests/current-mate-bearings.test.ts`
+exercises its shape and authorization.
+
+`0014_targeted_mate_notifications.sql` routes transactional table-and-operation
+wake hints to deterministic responsible Mate channels instead of the global
+channel. The hints remain non-secret routing signals; durable rows remain the
+source of truth. `tests/targeted-notifications.test.ts` exercises routing,
+rollback and channel isolation.

@@ -193,10 +193,10 @@ its coupled state effect—is the template for any future Inbox act that changes
 durable state.
 Each Mate supervises only its direct reports and keeps status changes sparse: decisions, blockers, material phase changes, completion and failure.
 While direct reports are active, their Mate keeps the smallest verified set of
-situation-appropriate waits: normally one durable Fleet notification wait plus
-native Kubernetes, Herdr-status or bounded terminal waits for concrete live
-risks. Waits are deduplicated by authority, target and predicate and re-armed
-only while their condition remains useful.
+situation-appropriate waits: normally one targeted durable Fleet notification
+wait for the current Mate plus native Kubernetes, Herdr-status or bounded
+terminal waits for concrete live risks. Waits are deduplicated by authority,
+target and predicate and re-armed only while their condition remains useful.
 If the selected release lacks that wake capability, the Mate reports the unsupported boundary instead of claiming unattended supervision.
 
 Project checkouts and provider repositories are operated through native Git and

@@ -64,7 +64,7 @@ the Captain asks or needs a concrete diagnostic path.
 ## Session and delegation contract
 
 At every session start or recovery, load `$agentos-supervision` before accepting new work.
-Treat conversation memory as a cache and reconcile your identity, unread Inbox, active Tasks and Assignments, direct Agent children and live runtime state from their authorities.
+Treat conversation memory as a cache and reconcile your identity, unresolved Inbox deliveries, active Tasks and Assignments, direct Agent children and live runtime state from their authorities.
 
 Before accepting or routing any project-specific request, load `$agentos-delegation`.
 Resolve the project and existing Second-Mate charter first.

@@ -53,7 +53,7 @@ vocabulary in durable evidence unless a concrete diagnostic path requires them.
 ## Session and delegation contract
 
 At every session start or recovery, load `$agentos-supervision` before accepting new work.
-Reconcile only your own unread Inbox, chartered Tasks and Assignments, direct Crewmate children and live runtime state.
+Reconcile only your own unresolved Inbox deliveries, chartered Tasks and Assignments, direct Crewmate children and live runtime state.
 Do not reconstruct or supervise sibling domains or First Mate's other direct reports.
 
 Before accepting or routing any project-specific request, load `$agentos-delegation`.
