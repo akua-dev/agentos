@@ -3,6 +3,7 @@ import {
   mkdtemp,
   mkdir,
   readFile,
+  readdir,
   rm,
   symlink,
   writeFile,
@@ -91,6 +92,26 @@ describe("Mate memory activity projection", () => {
     expect(projection).toContain("界");
   });
 
+  test("does not commit activity when the final commit guard rejects", async () => {
+    const home = await temporaryHome();
+    const activity = createMemoryActivityStore(home, {
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
+    });
+
+    await expect(
+      activity.append(
+        "paused",
+        { kind: "human", text: "must not persist" },
+        {
+          beforeCommit: () => {
+            throw new Error("paused");
+          },
+        },
+      ),
+    ).rejects.toThrow("paused");
+    expect(await activity.readRecent(3)).toBe("");
+  });
+
   test("redacts quoted credential values", () => {
     const projection = redact(
       '{"password":"hunter2", "api_key": "api-secret-value"}',
@@ -98,6 +119,35 @@ describe("Mate memory activity projection", () => {
 
     expect(projection).not.toContain("hunter2");
     expect(projection).not.toContain("api-secret-value");
+  });
+
+  test("rejects nested symbolic-link activity paths", async () => {
+    const home = await temporaryHome();
+    const outside = join(home, "outside");
+    await mkdir(outside);
+    const activity = createMemoryActivityStore(home, {
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
+    });
+    await activity.ensureLayout();
+    await symlink(outside, join(activity.logsRoot, "2026"));
+
+    await expect(
+      activity.append("escape", { kind: "human", text: "do not write" }),
+    ).rejects.toThrow("symbolic link");
+    expect(await readdir(outside)).toEqual([]);
+  });
+
+  test("rejects malformed UTF-8 activity before returning it", async () => {
+    const home = await temporaryHome();
+    const activity = createMemoryActivityStore(home, {
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
+    });
+    await activity.ensureLayout();
+    const day = join(activity.logsRoot, "2026", "07", "28");
+    await mkdir(day, { recursive: true });
+    await writeFile(join(day, "corrupt.md"), new Uint8Array([0xff]));
+
+    await expect(activity.readRecent(3)).rejects.toThrow("not valid UTF-8");
   });
 
   test("tracks distinct completed prior sessions and requires both Dream thresholds", async () => {

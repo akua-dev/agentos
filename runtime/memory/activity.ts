@@ -5,11 +5,12 @@ import {
   open,
   readFile,
   readdir,
+  realpath,
   rename,
   rm,
   unlink,
 } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 
 export type MemoryActivityProjection =
   | { kind: "human" | "assistant"; text: string }
@@ -52,6 +53,10 @@ export interface MemoryActivityOptions {
   retentionDays?: number;
 }
 
+export interface MemoryActivityMutationOptions {
+  beforeCommit?: () => void | Promise<void>;
+}
+
 export interface MemoryActivityStore {
   readonly logsRoot: string;
   readonly statePath: string;
@@ -59,6 +64,7 @@ export interface MemoryActivityStore {
   append(
     sessionId: string,
     projection: MemoryActivityProjection,
+    options?: MemoryActivityMutationOptions,
   ): Promise<void>;
   readRecent(days?: number): Promise<string>;
   ensureState(at?: Date): Promise<MemoryActivityState>;
@@ -118,20 +124,30 @@ export function createMemoryActivityStore(
   async function append(
     sessionId: string,
     projection: MemoryActivityProjection,
+    options: MemoryActivityMutationOptions = {},
   ) {
     await ensureLayout();
     const at = now();
     const path = projectionPath(logsRoot, sessionId, at);
-    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+    await ensureSafeActivityPath(logsRoot, path);
     let current = "";
     try {
-      current = await readFile(path, "utf8");
+      current = await readUtf8(path);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
     const line = projectionLine(projection);
     if (!line) return;
-    await atomicWrite(path, truncateUtf8(`${current}${line}\n`, maxFileBytes));
+    await atomicWrite(
+      path,
+      truncateUtf8(`${current}${line}\n`, maxFileBytes),
+      {
+        beforeCommit: async () => {
+          await ensureSafeActivityPath(logsRoot, path);
+          await options?.beforeCommit?.();
+        },
+      },
+    );
     await pruneLogs(at);
   }
 
@@ -148,7 +164,7 @@ export function createMemoryActivityStore(
     let result = "";
     let bytes = 0;
     for (const file of files) {
-      const content = await readFile(file.path, "utf8");
+      const content = await readUtf8(file.path);
       const framing = `${result ? "\n" : ""}## ${file.label}\n`;
       const remaining = aggregateLimit - bytes;
       const framingBytes = Buffer.byteLength(framing);
@@ -312,6 +328,48 @@ async function ensureSafeDirectory(path: string) {
   }
 }
 
+async function ensureSafeActivityPath(root: string, target: string) {
+  const rootReal = await realpath(root);
+  const fromRoot = relative(root, target);
+  const segments = fromRoot.split(sep);
+  if (
+    !fromRoot ||
+    fromRoot === ".." ||
+    fromRoot.startsWith(`..${sep}`) ||
+    fromRoot.startsWith(sep)
+  ) {
+    throw new Error("activity path escapes the Mate memory logs root");
+  }
+  let cursor = root;
+  for (const [index, segment] of segments.entries()) {
+    const isLeaf = index === segments.length - 1;
+    cursor = join(cursor, segment);
+    try {
+      const entry = await lstat(cursor);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`activity path crosses symbolic link ${cursor}`);
+      }
+      if (!isLeaf && !entry.isDirectory()) {
+        throw new Error(`activity path parent is not a directory: ${cursor}`);
+      }
+      if (isLeaf && !entry.isFile()) {
+        throw new Error(`activity path must be a regular file: ${cursor}`);
+      }
+      const actual = await realpath(cursor);
+      if (
+        actual !== rootReal &&
+        !actual.startsWith(`${rootReal}${sep}`)
+      ) {
+        throw new Error("activity path escapes through a symbolic link");
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      if (isLeaf) break;
+      await mkdir(cursor, { mode: 0o700 });
+    }
+  }
+}
+
 export function shouldDream(
   state: MemoryActivityState,
   decision: DreamDecision,
@@ -396,8 +454,10 @@ async function activityFiles(root: string): Promise<
       throw error;
     }
     for (const entry of entries) {
-      if (entry.isSymbolicLink()) continue;
       const path = join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`activity path crosses symbolic link ${path}`);
+      }
       const next = [...segments, entry.name];
       if (entry.isDirectory()) await walk(path, next);
       else if (entry.isFile() && next.length === 4 && entry.name.endsWith(".md")) {
@@ -423,17 +483,44 @@ function startOfUtcDay(value: Date): number {
   );
 }
 
-async function atomicWrite(path: string, content: string) {
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+async function atomicWrite(
+  path: string,
+  content: string,
+  options: MemoryActivityMutationOptions = {},
+) {
   const next = `${path}.agentos-next-${crypto.randomUUID()}`;
-  const handle = await open(next, "wx", 0o600);
   try {
-    await handle.writeFile(content, "utf8");
-    await handle.sync();
-  } finally {
-    await handle.close();
+    const handle = await open(next, "wx", 0o600);
+    try {
+      await handle.writeFile(content, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await options.beforeCommit?.();
+    await rename(next, path);
+  } catch (error) {
+    try {
+      await unlink(next);
+    } catch (cleanupError) {
+      if ((cleanupError as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw new AggregateError(
+          [error, cleanupError],
+          `Could not clean up failed activity write for ${path}`,
+        );
+      }
+    }
+    throw error;
   }
-  await rename(next, path);
+}
+
+async function readUtf8(path: string): Promise<string> {
+  const contents = await readFile(path);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(contents);
+  } catch {
+    throw new Error(`${path} is not valid UTF-8`);
+  }
 }
 
 async function writeExclusive(path: string, value: object) {

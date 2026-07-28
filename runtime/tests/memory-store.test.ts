@@ -251,4 +251,22 @@ describe("Mate memory storage", () => {
     expect(startup.index).toBe("");
     expect(startup.degraded).toContain("MEMORY.md is not valid UTF-8");
   });
+
+  test("enforces the topic limit when stamping a newly created native topic", async () => {
+    const home = await temporaryHome();
+    const store = createMateMemoryStore(home, { maxTopicFiles: 1 });
+    await store.ensureLayout();
+    await store.writeTopic(topic({ relativePath: "topics/one.md" }));
+    await writeFile(
+      join(home, "memory", "topics", "two.md"),
+      await readFile(join(home, "memory", "topics", "one.md"), "utf8"),
+      "utf8",
+    );
+
+    await expect(
+      store.validateAndStamp("topics/two.md", {
+        enforceTopicLimit: true,
+      }),
+    ).rejects.toThrow("exceeds its 1-topic limit");
+  });
 });

@@ -1,3 +1,4 @@
+import { lstat } from "node:fs/promises";
 import { relative, resolve, sep } from "node:path";
 
 import { Type } from "@earendil-works/pi-ai";
@@ -15,7 +16,10 @@ import {
   type StoredTopic,
 } from "../../../runtime/memory/store.ts";
 import type { MateMemoryPolicy } from "../../../runtime/memory/policy.ts";
-import { createMemoryActivityStore } from "../../../runtime/memory/activity.ts";
+import {
+  createMemoryActivityStore,
+  type MemoryActivityStore,
+} from "../../../runtime/memory/activity.ts";
 import {
   relevantMemoryMessage,
   startupSystemPrompt,
@@ -42,7 +46,13 @@ export interface MateMemoryExtensionDependencies {
   now?: () => Date;
   onDirectMemoryWrite?: (relativePath: string) => void;
   store?: MateMemoryStore;
+  activity?: MemoryActivityStore;
   maintenanceRunner?: MaintenanceAgentRunner;
+}
+
+interface PendingNativeWrite {
+  relativePath: string;
+  existedBeforeCall: boolean;
 }
 
 export function registerMateMemoryExtension(
@@ -58,12 +68,15 @@ export function registerMateMemoryExtension(
     dependencies.store ?? createMateMemoryStore(home, dependencies.policy);
   const selector = dependencies.selectRelevant ?? selectRelevantTopics;
   const now = dependencies.now ?? (() => new Date());
-  const activity = createMemoryActivityStore(home, { now });
+  const activity =
+    dependencies.activity ?? createMemoryActivityStore(home, { now });
   const attached = new Set<string>();
-  const pendingWrites = new Map<string, string>();
+  const pendingWrites = new Map<string, PendingNativeWrite>();
+  const pendingTopicCreations = new Set<string>();
   const observedToolNames = new Set<string>();
   let attachedBytes = 0;
   let paused = false;
+  let pauseGeneration = 0;
   const maintenance = new MateMemoryMaintenance({
     store,
     runner: dependencies.maintenanceRunner,
@@ -77,7 +90,9 @@ export function registerMateMemoryExtension(
     attached.clear();
     attachedBytes = 0;
     pendingWrites.clear();
+    pendingTopicCreations.clear();
     observedToolNames.clear();
+    pauseGeneration += 1;
     paused = restoredPauseState(context);
     try {
       await activity.ensureState(now());
@@ -88,12 +103,14 @@ export function registerMateMemoryExtension(
 
   pi.on("input", async (event, context) => {
     maintenance.captureHumanInput(event.text, event.source);
+    const generation = pauseGeneration;
     if (!paused && event.source !== "extension") {
       try {
-        await activity.append(context.sessionManager.getSessionId(), {
-          kind: "human",
-          text: event.text,
-        });
+        await activity.append(
+          context.sessionManager.getSessionId(),
+          { kind: "human", text: event.text },
+          { beforeCommit: () => assertActivityGeneration(generation) },
+        );
       } catch (error) {
         recordFailure(`activity projection failed: ${errorMessage(error)}`);
       }
@@ -117,13 +134,18 @@ export function registerMateMemoryExtension(
 
   pi.on("agent_end", async (event, context) => {
     const sessionId = context.sessionManager.getSessionId();
+    const generation = pauseGeneration;
     try {
-      if (paused) return;
+      if (!isActiveGeneration(generation)) return;
       for (const toolName of [...observedToolNames].sort()) {
-        if (paused) return;
-        await activity.append(sessionId, { kind: "tool", toolName });
+        if (!isActiveGeneration(generation)) return;
+        await activity.append(
+          sessionId,
+          { kind: "tool", toolName },
+          { beforeCommit: () => assertActivityGeneration(generation) },
+        );
       }
-      if (paused) return;
+      if (!isActiveGeneration(generation)) return;
       const assistant = [...event.messages]
         .reverse()
         .find((message) => message.role === "assistant");
@@ -136,7 +158,13 @@ export function registerMateMemoryExtension(
         .map((part) => part.text)
         .join("")
         .trim();
-      if (text) await activity.append(sessionId, { kind: "assistant", text });
+      if (text) {
+        await activity.append(
+          sessionId,
+          { kind: "assistant", text },
+          { beforeCommit: () => assertActivityGeneration(generation) },
+        );
+      }
     } catch (error) {
       recordFailure(`activity projection failed: ${errorMessage(error)}`);
     } finally {
@@ -157,7 +185,8 @@ export function registerMateMemoryExtension(
   });
 
   pi.on("before_agent_start", async (event, context) => {
-    if (paused || !store.policy.enabled) {
+    const generation = pauseGeneration;
+    if (!isActiveGeneration(generation) || !store.policy.enabled) {
       return { systemPrompt: event.systemPrompt };
     }
     let startup: StartupMemoryContext;
@@ -172,6 +201,9 @@ export function registerMateMemoryExtension(
           `Mate memory is unavailable: ${errorMessage(error)}`,
         ],
       };
+    }
+    if (!isActiveGeneration(generation)) {
+      return { systemPrompt: event.systemPrompt };
     }
     const boundedPinned: StoredTopic[] = [];
     let pinnedBytes = 0;
@@ -206,6 +238,9 @@ export function registerMateMemoryExtension(
           .map(({ relativePath }) => relativePath),
       );
       for (const path of paths) {
+        if (!isActiveGeneration(generation)) {
+          return { systemPrompt: event.systemPrompt };
+        }
         if (
           selected.length >= store.policy.maxRelevantTopics ||
           !allowed.has(path) ||
@@ -214,6 +249,9 @@ export function registerMateMemoryExtension(
           continue;
         }
         const topic = await store.readTopic(path);
+        if (!isActiveGeneration(generation)) {
+          return { systemPrompt: event.systemPrompt };
+        }
         const candidate = relevantMemoryMessage([...selected, topic]);
         if (
           attachedBytes + Buffer.byteLength(candidate) >
@@ -229,6 +267,9 @@ export function registerMateMemoryExtension(
       );
     }
 
+    if (!isActiveGeneration(generation)) {
+      return { systemPrompt: event.systemPrompt };
+    }
     const systemPrompt = startupSystemPrompt(event.systemPrompt, startup);
     if (selected.length === 0) return { systemPrompt };
     const content = relevantMemoryMessage(selected);
@@ -248,6 +289,7 @@ export function registerMateMemoryExtension(
   });
 
   pi.on("tool_call", async (event, context) => {
+    const generation = pauseGeneration;
     if (!paused) observedToolNames.add(event.toolName);
     if (!nativeFileTools.has(event.toolName)) return;
     const target = nativeToolPath(event, context);
@@ -268,19 +310,50 @@ export function registerMateMemoryExtension(
         reason: `Unsafe Mate memory path: ${errorMessage(error)}`,
       };
     }
+    if (!isActiveGeneration(generation) && nativeWriteTools.has(event.toolName)) {
+      return {
+        block: true,
+        reason: "Mate memory is paused for this Pi session.",
+      };
+    }
     if (nativeWriteTools.has(event.toolName)) {
-      pendingWrites.set(event.toolCallId, relativePath);
+      const existedBeforeCall = await nativePathExists(target);
+      if (!isActiveGeneration(generation)) return;
+      if (!existedBeforeCall && relativePath.startsWith("topics/")) {
+        const topicCount = (await store.listTopics()).length;
+        if (!isActiveGeneration(generation)) return;
+        if (
+          topicCount + pendingTopicCreations.size >=
+          store.policy.maxTopicFiles
+        ) {
+          return {
+            block: true,
+            reason: `Mate memory has reached its ${store.policy.maxTopicFiles}-topic limit.`,
+          };
+        }
+        pendingTopicCreations.add(event.toolCallId);
+      }
+      pendingWrites.set(event.toolCallId, {
+        relativePath,
+        existedBeforeCall,
+      });
     }
   });
 
   pi.on("tool_result", async (event) => {
-    const relativePath = pendingWrites.get(event.toolCallId);
-    if (!relativePath) return;
+    const generation = pauseGeneration;
+    const pending = pendingWrites.get(event.toolCallId);
+    if (!pending) return;
     pendingWrites.delete(event.toolCallId);
+    if (!pending.existedBeforeCall) {
+      pendingTopicCreations.delete(event.toolCallId);
+    }
     if (event.isError) return;
+    if (!isActiveGeneration(generation)) return;
     try {
-      if (relativePath === "MEMORY.md") {
+      if (pending.relativePath === "MEMORY.md") {
         const startup = await store.readStartupContext();
+        if (!isActiveGeneration(generation)) return;
         const indexWarnings = startup.degraded.filter((warning) =>
           warning.startsWith("MEMORY.md"),
         );
@@ -288,9 +361,14 @@ export function registerMateMemoryExtension(
           throw new Error(indexWarnings.join("; "));
         }
       } else {
-        await store.validateAndStamp(relativePath, { now: now() });
+        await store.validateAndStamp(pending.relativePath, {
+          now: now(),
+          enforceTopicLimit: !pending.existedBeforeCall,
+          beforeCommit: () => assertMemoryGeneration(generation),
+        });
       }
-      dependencies.onDirectMemoryWrite?.(relativePath);
+      if (!isActiveGeneration(generation)) return;
+      dependencies.onDirectMemoryWrite?.(pending.relativePath);
       maintenance.noteDirectMemoryWrite();
     } catch (error) {
       return failedToolResult(event, error);
@@ -353,10 +431,12 @@ export function registerMateMemoryExtension(
   };
 
   function setPaused(value: boolean) {
+    pauseGeneration += 1;
     paused = value;
     if (value) {
       observedToolNames.clear();
       pendingWrites.clear();
+      pendingTopicCreations.clear();
     }
     pi.appendEntry(STATE_ENTRY, { paused });
   }
@@ -366,6 +446,20 @@ export function registerMateMemoryExtension(
       status: "failed",
       summary,
     });
+  }
+
+  function isActiveGeneration(generation: number): boolean {
+    return !paused && generation === pauseGeneration;
+  }
+
+  function assertActivityGeneration(generation: number) {
+    assertMemoryGeneration(generation);
+  }
+
+  function assertMemoryGeneration(generation: number) {
+    if (!isActiveGeneration(generation)) {
+      throw new Error("Mate memory is paused for this Pi session.");
+    }
   }
 }
 
@@ -417,6 +511,19 @@ function memoryRelativePath(root: string, target: string): string {
   const fromRoot = relative(root, target).split(sep).join("/");
   if (!fromRoot) throw new Error("memory root itself is not a file");
   return fromRoot;
+}
+
+async function nativePathExists(path: string): Promise<boolean> {
+  try {
+    const entry = await lstat(path);
+    if (entry.isSymbolicLink()) {
+      throw new Error(`memory path crosses symbolic link ${path}`);
+    }
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
 }
 
 function formattedTopicBytes(topic: StoredTopic): number {

@@ -19,6 +19,10 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 
 import { createMateMemoryStore } from "../../../../runtime/memory/store.ts";
+import {
+  createMemoryActivityStore,
+  type MemoryActivityStore,
+} from "../../../../runtime/memory/activity.ts";
 import { registerMateMemoryExtension } from "../extension.ts";
 import type { MaintenanceRunRequest } from "../maintenance.ts";
 
@@ -384,6 +388,138 @@ describe("Pi Mate memory extension", () => {
       systemPromptOptions: {},
     });
     expect(restored.results[0]).toEqual({ systemPrompt: "ROLE" });
+  });
+
+  test("does not return recall that crosses a pause transition", async () => {
+    const { home } = await fixture();
+    const pi = new FakePi();
+    let releaseSelection!: () => void;
+    let selectionStarted!: () => void;
+    const selectionReleased = new Promise<void>((resolve) => {
+      releaseSelection = resolve;
+    });
+    const selectionStartedPromise = new Promise<void>((resolve) => {
+      selectionStarted = resolve;
+    });
+    registerMateMemoryExtension(pi.extensionApi(), {
+      home,
+      selectRelevant: async () => {
+        selectionStarted();
+        await selectionReleased;
+        return ["topics/agentos.md"];
+      },
+    });
+
+    const recall = pi.emit("before_agent_start", {
+      prompt: "Recall memory",
+      systemPrompt: "ROLE",
+      systemPromptOptions: {},
+    });
+    await selectionStartedPromise;
+    await pi.commands.get("memory")!.handler("pause", {
+      ui: { notify: () => undefined },
+    } as unknown as ExtensionCommandContext);
+    releaseSelection();
+
+    expect((await recall).results[0]).toEqual({ systemPrompt: "ROLE" });
+  });
+
+  test("does not commit activity that pauses while appending", async () => {
+    const { home } = await fixture();
+    const realActivity = createMemoryActivityStore(home, {
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
+    });
+    let releaseAppend!: () => void;
+    let appendStarted!: () => void;
+    const appendReleased = new Promise<void>((resolve) => {
+      releaseAppend = resolve;
+    });
+    const appendStartedPromise = new Promise<void>((resolve) => {
+      appendStarted = resolve;
+    });
+    const delayedActivity: MemoryActivityStore = {
+      ...realActivity,
+      async append(sessionId, projection, options) {
+        appendStarted();
+        await appendReleased;
+        await options?.beforeCommit?.();
+        await realActivity.append(sessionId, projection);
+      },
+    };
+    const pi = new FakePi();
+    const controller = registerMateMemoryExtension(pi.extensionApi(), {
+      home,
+      activity: delayedActivity,
+    });
+    const sessionManager = {
+      getBranch: () => [],
+      getSessionId: () => "pause-race",
+    } as never;
+
+    const input = pi.emit(
+      "input",
+      { text: "This must not survive pause", source: "interactive" },
+      { sessionManager },
+    );
+    await appendStartedPromise;
+    await pi.commands.get("memory")!.handler("pause", {
+      ui: { notify: () => undefined },
+    } as unknown as ExtensionCommandContext);
+    releaseAppend();
+    await input;
+
+    expect(await controller!.activity.readRecent(3)).toBe("");
+  });
+
+  test("reserves native topic capacity across pending writes", async () => {
+    const home = await mkdtemp(join(tmpdir(), "agentos-pi-memory-limit-"));
+    temporaryDirectories.push(home);
+    const store = createMateMemoryStore(home, { maxTopicFiles: 2 });
+    await store.ensureLayout();
+    await store.writeTopic({
+      relativePath: "topics/existing.md",
+      metadata: {
+        node_type: "memory",
+        type: "reference",
+        scope: "fleet",
+        source_principal: "captain",
+        observed_at: "2026-07-28T08:00:00.000Z",
+        modified: "2026-07-28T08:00:00.000Z",
+        pinned: false,
+      },
+      body: "Existing topic.",
+    });
+    const pi = new FakePi();
+    registerMateMemoryExtension(pi.extensionApi(), { home, store });
+    const first = await pi.emit("tool_call", {
+      toolCallId: "new-a",
+      toolName: "write",
+      input: { path: join(home, "memory", "topics", "new-a.md") },
+    });
+    expect(first.results[0]).toBeUndefined();
+    const second = await pi.emit("tool_call", {
+      toolCallId: "new-b",
+      toolName: "write",
+      input: { path: join(home, "memory", "topics", "new-b.md") },
+    });
+    expect(second.results[0]).toEqual({
+      block: true,
+      reason: "Mate memory has reached its 2-topic limit.",
+    });
+    await pi.emit("tool_result", {
+      toolCallId: "new-a",
+      toolName: "write",
+      input: {},
+      content: [],
+      details: {},
+      isError: true,
+    });
+    const third = await pi.emit("tool_call", {
+      toolCallId: "new-c",
+      toolName: "write",
+      input: { path: join(home, "memory", "topics", "new-c.md") },
+    });
+    expect(third.results[0]).toBeUndefined();
   });
 
   test("validates and stamps successful native topic edits", async () => {

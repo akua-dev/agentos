@@ -48,6 +48,8 @@ export interface StartupMemoryContext {
 
 export interface StampOptions {
   now?: Date;
+  enforceTopicLimit?: boolean;
+  beforeCommit?: () => void;
 }
 
 export interface MemoryMutationOptions {
@@ -238,7 +240,9 @@ export function createMateMemoryStore(
         modified: (options.now ?? new Date()).toISOString(),
       },
     };
-    return writeTopicInternal(next, true);
+    return writeTopicInternal(next, !options.enforceTopicLimit, {
+      beforeCommit: options.beforeCommit,
+    });
   }
 
   async function writeTopic(
@@ -257,11 +261,18 @@ export function createMateMemoryStore(
     const relativePath = canonicalTopicPath(topic.relativePath);
     const path = await resolveMemoryPath(relativePath);
     const exists = await pathExists(path);
-    if (!exists || !existingAllowedOverLimit) {
+    if (!exists) {
       const current = await topicPaths(root);
-      if (!exists && current.length >= policy.maxTopicFiles) {
+      if (current.length >= policy.maxTopicFiles) {
         throw new Error(
           `Mate memory has reached its ${policy.maxTopicFiles}-topic limit`,
+        );
+      }
+    } else if (!existingAllowedOverLimit) {
+      const current = await topicPaths(root);
+      if (current.length > policy.maxTopicFiles) {
+        throw new Error(
+          `Mate memory exceeds its ${policy.maxTopicFiles}-topic limit`,
         );
       }
     }
