@@ -1,11 +1,17 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   BeforeAgentStartEvent,
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 
-import { createAgentosMemoryContextExtension } from "../extension.ts";
+import {
+  createAgentosMemoryContextExtension,
+  readBoundedMemoryFile,
+} from "../extension.ts";
 
 type Handler = (
   event: BeforeAgentStartEvent,
@@ -146,5 +152,19 @@ describe("AgentOS Mate memory context", () => {
       "$HOME/MEMORY.md exceeds the 32 KiB context limit",
     );
     expect(result.systemPrompt).not.toContain("aaaaaaaa");
+  });
+
+  test("bounds the file read at one byte over the context limit", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "agentos-memory-context-"));
+    const path = join(directory, "MEMORY.md");
+    try {
+      await writeFile(path, Buffer.alloc(32 * 1024 + 1024, "a"));
+
+      const bytes = await readBoundedMemoryFile(path);
+
+      expect(bytes.byteLength).toBe(32 * 1024 + 1);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

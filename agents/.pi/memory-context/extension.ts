@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readFile } from "node:fs/promises";
+import { open } from "node:fs/promises";
 import { join } from "node:path";
 
 const MAX_MEMORY_BYTES = 32 * 1024;
@@ -29,11 +29,32 @@ const registerAgentosMemoryContext = createAgentosMemoryContextExtension({
   readMemory: async () => {
     const home = process.env.HOME;
     if (!home) throw new Error("HOME is unavailable");
-    return await readFile(join(home, "MEMORY.md"));
+    return await readBoundedMemoryFile(join(home, "MEMORY.md"));
   },
 });
 
 export default registerAgentosMemoryContext;
+
+export async function readBoundedMemoryFile(path: string): Promise<Buffer> {
+  const file = await open(path, "r");
+  try {
+    const bytes = Buffer.allocUnsafe(MAX_MEMORY_BYTES + 1);
+    let bytesRead = 0;
+    while (bytesRead < bytes.byteLength) {
+      const result = await file.read(
+        bytes,
+        bytesRead,
+        bytes.byteLength - bytesRead,
+        null,
+      );
+      if (result.bytesRead === 0) break;
+      bytesRead += result.bytesRead;
+    }
+    return bytes.subarray(0, bytesRead);
+  } finally {
+    await file.close();
+  }
+}
 
 async function loadMemory(readMemory: () => Promise<Buffer>): Promise<string> {
   let bytes: Buffer;
