@@ -346,11 +346,17 @@ export function redact(value: string): string {
       /\b(authorization\s*:\s*)bearer\s+\S+/gi,
       "$1[REDACTED]",
     )
+    .replace(/\bbearer\s+\S+/gi, "Bearer [REDACTED]")
     .replace(
       /\b(api[_-]?key|token|password|passwd|secret)\s*[:=]\s*\S+/gi,
       "$1=[REDACTED]",
     )
-    .replace(/\b(?:sk|ghp|github_pat)_[A-Za-z0-9_-]{8,}\b/g, "[REDACTED]")
+    .replace(
+      /\b(?:sk|ghp|github_pat|sk-proj|sk-ant|xox[baprs])[-_][A-Za-z0-9_-]{8,}\b/gi,
+      "[REDACTED]",
+    )
+    .replace(/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, "[REDACTED]")
+    .replace(/\bAIza[0-9A-Za-z_-]{20,}\b/g, "[REDACTED]")
     .replace(
       /(https?:\/\/)[^/\s:@]+:[^/\s@]+@/gi,
       "$1[REDACTED]@",

@@ -474,7 +474,7 @@ PostgreSQL is the durable fleet authority for at least:
 - tasks and backlog;
 - inbox requests, questions, decisions, replies and read state;
 - durable status, handoff and coordination history;
-- captain notes and learnings;
+- curated, evidence-backed Fleet learnings;
 - pod and PVC locators;
 - schema and release metadata required for safe recovery.
 
@@ -529,7 +529,7 @@ One PostgreSQL database is one Fleet. Core tables therefore carry no `fleet_id`;
 
 The initial durable model stays deliberately small:
 
-- `captain` stores multiple captain preferences and context entries, never a synthetic singleton Fleet row;
+- each persistent Mate's PVC stores its own private, typed memory; it is fallible context, not PostgreSQL authority;
 - `agents` stores hierarchy, role and runtime locators, but not Kubernetes or Herdr health;
 - `projects` stores non-exclusive work scopes without assigning one permanent owner;
 - `tasks` stores durable backlog and accepted outcomes, dependencies and its

@@ -3,7 +3,10 @@ import type { Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 
 import type { StartupMemoryContext } from "../../../runtime/memory/store.ts";
-import { RELEVANT_SELECTION_SYSTEM_PROMPT } from "./prompts.ts";
+import {
+  redactAuxiliaryInput,
+  RELEVANT_SELECTION_SYSTEM_PROMPT,
+} from "./prompts.ts";
 
 export interface RelevantSelectionInput {
   prompt: string;
@@ -17,6 +20,16 @@ export type RelevantTopicSelector = (
   input: RelevantSelectionInput,
 ) => Promise<string[]>;
 
+export function relevantSelectionMessage(
+  input: RelevantSelectionInput,
+): string {
+  return JSON.stringify({
+    request: redactAuxiliaryInput(input.prompt),
+    index: input.startup.index,
+    inventory: input.startup.inventory,
+  });
+}
+
 export const selectRelevantTopics: RelevantTopicSelector = async (input) => {
   if (!input.model || input.startup.inventory.length === 0) return [];
   const auth = await input.modelRegistry.getApiKeyAndHeaders(input.model);
@@ -28,11 +41,7 @@ export const selectRelevantTopics: RelevantTopicSelector = async (input) => {
       messages: [
         {
           role: "user",
-          content: JSON.stringify({
-            request: input.prompt,
-            index: input.startup.index,
-            inventory: input.startup.inventory,
-          }),
+          content: relevantSelectionMessage(input),
           timestamp: Date.now(),
         },
       ],

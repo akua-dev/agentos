@@ -149,6 +149,33 @@ describe("Mate memory automatic maintenance", () => {
     expect(requests[1]!.tools.map(({ name }) => name)).not.toContain("bash");
   });
 
+  test("redacts credentials before sending direct input to extraction", async () => {
+    const { store } = await fixture();
+    const requests: MaintenanceRunRequest[] = [];
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      runner: async (request) => {
+        requests.push(request);
+        return { summary: "nothing to save", touchedPaths: [] };
+      },
+      isPaused: () => false,
+    });
+
+    maintenance.captureHumanInput(
+      "Remember this preference, password: hunter2, sk-proj-secret-value, AKIA1234567890ABCDEF, and xoxb-secret-value.",
+      "interactive",
+    );
+    maintenance.afterAgentSettled(baseContext());
+    await maintenance.drain(1_000);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.prompt).toContain("Remember this preference");
+    expect(requests[0]!.prompt).not.toContain("hunter2");
+    expect(requests[0]!.prompt).not.toContain("sk-proj-secret-value");
+    expect(requests[0]!.prompt).not.toContain("AKIA1234567890ABCDEF");
+    expect(requests[0]!.prompt).not.toContain("xoxb-secret-value");
+  });
+
   test("suppresses extraction after a direct memory edit and while paused", async () => {
     const { store } = await fixture();
     const requests: MaintenanceRunRequest[] = [];

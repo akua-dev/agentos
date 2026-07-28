@@ -13,7 +13,7 @@ import {
   shouldDream,
   type MemoryActivityStore,
 } from "../../../runtime/memory/activity.ts";
-import { formatTopic } from "./prompts.ts";
+import { formatTopic, redactAuxiliaryInput } from "./prompts.ts";
 
 export type HumanInputSource = "interactive" | "rpc" | "extension";
 
@@ -113,7 +113,10 @@ export class MateMemoryMaintenance {
       Math.floor(this.store.policy.extractionStride),
     );
     if (this.eligibleInputs % stride !== 0) return;
-    this.pendingInput = tail(text.trim(), this.maxInputCharacters);
+    this.pendingInput = redactAuxiliaryInput(
+      text.trim(),
+      this.maxInputCharacters,
+    );
   }
 
   noteDirectMemoryWrite() {
@@ -544,12 +547,6 @@ function textResult(text: string) {
     content: [{ type: "text" as const, text }],
     details: {},
   };
-}
-
-function tail(value: string, maxCharacters: number): string {
-  return value.length <= maxCharacters
-    ? value
-    : value.slice(value.length - maxCharacters);
 }
 
 function boundedSummary(value: string): string {
