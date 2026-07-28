@@ -294,12 +294,7 @@ export function registerMateMemoryExtension(
     if (!nativeFileTools.has(event.toolName)) return;
     const target = nativeToolPath(event, context);
     if (!target || !isWithin(store.root, target)) return;
-    if (paused && nativeWriteTools.has(event.toolName)) {
-      return {
-        block: true,
-        reason: "Mate memory is paused for this Pi session.",
-      };
-    }
+    if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
     let relativePath: string;
     try {
       relativePath = memoryRelativePath(store.root, target);
@@ -310,18 +305,13 @@ export function registerMateMemoryExtension(
         reason: `Unsafe Mate memory path: ${errorMessage(error)}`,
       };
     }
-    if (!isActiveGeneration(generation) && nativeWriteTools.has(event.toolName)) {
-      return {
-        block: true,
-        reason: "Mate memory is paused for this Pi session.",
-      };
-    }
+    if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
     if (nativeWriteTools.has(event.toolName)) {
       const existedBeforeCall = await nativePathExists(target);
-      if (!isActiveGeneration(generation)) return;
+      if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
       if (!existedBeforeCall && relativePath.startsWith("topics/")) {
         const topicCount = (await store.listTopics()).length;
-        if (!isActiveGeneration(generation)) return;
+        if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
         if (
           topicCount + pendingTopicCreations.size >=
           store.policy.maxTopicFiles
@@ -511,6 +501,13 @@ function memoryRelativePath(root: string, target: string): string {
   const fromRoot = relative(root, target).split(sep).join("/");
   if (!fromRoot) throw new Error("memory root itself is not a file");
   return fromRoot;
+}
+
+function pausedMemoryToolResult() {
+  return {
+    block: true as const,
+    reason: "Mate memory is paused for this Pi session.",
+  };
 }
 
 async function nativePathExists(path: string): Promise<boolean> {

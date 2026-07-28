@@ -18,7 +18,10 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
-import { createMateMemoryStore } from "../../../../runtime/memory/store.ts";
+import {
+  createMateMemoryStore,
+  type MateMemoryStore,
+} from "../../../../runtime/memory/store.ts";
 import {
   createMemoryActivityStore,
   type MemoryActivityStore,
@@ -312,6 +315,15 @@ describe("Pi Mate memory extension", () => {
       block: true,
       reason: "Mate memory is paused for this Pi session.",
     });
+    const blockedRead = await pi.emit("tool_call", {
+      toolCallId: "read-1",
+      toolName: "read",
+      input: { path: join(home, "memory", "MEMORY.md") },
+    });
+    expect(blockedRead.results[0]).toEqual({
+      block: true,
+      reason: "Mate memory is paused for this Pi session.",
+    });
 
     await pi.emit(
       "input",
@@ -520,6 +532,63 @@ describe("Pi Mate memory extension", () => {
       input: { path: join(home, "memory", "topics", "new-c.md") },
     });
     expect(third.results[0]).toBeUndefined();
+  });
+
+  test("blocks a native topic write when pause races its capacity check", async () => {
+    const home = await mkdtemp(join(tmpdir(), "agentos-pi-memory-pause-limit-"));
+    temporaryDirectories.push(home);
+    const store = createMateMemoryStore(home, { maxTopicFiles: 2 });
+    await store.ensureLayout();
+    await store.writeTopic({
+      relativePath: "topics/existing.md",
+      metadata: {
+        node_type: "memory",
+        type: "project",
+        scope: "fleet",
+        source_principal: "captain",
+        observed_at: "2026-07-28T08:00:00.000Z",
+        modified: "2026-07-28T08:00:00.000Z",
+        pinned: false,
+      },
+      body: "Existing topic.",
+    });
+    let releaseList!: () => void;
+    let listStarted!: () => void;
+    const listReleased = new Promise<void>((resolve) => {
+      releaseList = resolve;
+    });
+    const listStartedPromise = new Promise<void>((resolve) => {
+      listStarted = resolve;
+    });
+    const delayedStore: MateMemoryStore = {
+      ...store,
+      async listTopics() {
+        listStarted();
+        await listReleased;
+        return store.listTopics();
+      },
+    };
+    const pi = new FakePi();
+    registerMateMemoryExtension(pi.extensionApi(), {
+      home,
+      store: delayedStore,
+    });
+
+    const call = pi.emit("tool_call", {
+      toolCallId: "pause-race-write",
+      toolName: "write",
+      input: { path: join(home, "memory", "topics", "new.md") },
+    });
+    await listStartedPromise;
+    await pi.commands.get("memory")!.handler("pause", {
+      ui: { notify: () => undefined },
+    } as unknown as ExtensionCommandContext);
+    releaseList();
+
+    expect((await call).results[0]).toEqual({
+      block: true,
+      reason: "Mate memory is paused for this Pi session.",
+    });
   });
 
   test("validates and stamps successful native topic edits", async () => {
