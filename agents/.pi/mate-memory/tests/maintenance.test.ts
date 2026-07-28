@@ -1,0 +1,275 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { createMateMemoryStore } from "../../../../runtime/memory/store.ts";
+import { createMemoryActivityStore } from "../../../../runtime/memory/activity.ts";
+import {
+  createMaintenanceTools,
+  isEligibleHumanInput,
+  MateMemoryMaintenance,
+  type MaintenanceAgentRunner,
+  type MaintenanceRunRequest,
+} from "../maintenance.ts";
+
+const temporaryDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map((directory) =>
+      rm(directory, { force: true, recursive: true }),
+    ),
+  );
+});
+
+async function fixture() {
+  const home = await mkdtemp(join(tmpdir(), "agentos-maintenance-"));
+  temporaryDirectories.push(home);
+  const store = createMateMemoryStore(home);
+  await store.ensureLayout();
+  return { home, store };
+}
+
+describe("Mate memory automatic maintenance", () => {
+  test("accepts only substantive direct human input", () => {
+    expect(isEligibleHumanInput("remember this please", "interactive")).toBe(
+      true,
+    );
+    expect(isEligibleHumanInput("correct that preference", "rpc")).toBe(true);
+    expect(isEligibleHumanInput("two words", "interactive")).toBe(false);
+    expect(isEligibleHumanInput("internal maintenance message", "extension")).toBe(
+      false,
+    );
+    expect(isEligibleHumanInput("  \n ", "interactive")).toBe(false);
+  });
+
+  test("exposes only memory-scoped tools and validates every mutation", async () => {
+    const { store } = await fixture();
+    const tools = createMaintenanceTools(store, {
+      now: () => new Date("2026-07-28T12:00:00.000Z"),
+    });
+    expect(tools.map(({ name }) => name).sort()).toEqual([
+      "memory_delete_topic",
+      "memory_list_topics",
+      "memory_read_index",
+      "memory_read_topic",
+      "memory_write_index",
+      "memory_write_topic",
+    ]);
+    expect(
+      tools.some(({ name }) =>
+        ["bash", "read", "write", "edit", "grep", "find", "ls"].includes(name),
+      ),
+    ).toBe(false);
+
+    const write = tools.find(({ name }) => name === "memory_write_topic")!;
+    const written = await write.execute(
+      "write-1",
+      {
+        path: "topics/reporting.md",
+        type: "feedback",
+        scope: "captain",
+        source_principal: "captain",
+        observed_at: "2026-07-28T08:00:00.000Z",
+        pinned: false,
+        body: "Lead with outcomes.",
+      } as never,
+      undefined,
+      undefined,
+      {} as never,
+    );
+    expect(written.content[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining("topics/reporting.md"),
+    });
+    expect((await store.readTopic("topics/reporting.md")).metadata.modified).toBe(
+      "2026-07-28T12:00:00.000Z",
+    );
+    await expect(
+      write.execute(
+        "write-2",
+        {
+          path: "../escape.md",
+          type: "feedback",
+          scope: "captain",
+          source_principal: "captain",
+          observed_at: "2026-07-28T08:00:00.000Z",
+          pinned: false,
+          body: "Escape.",
+        } as never,
+        undefined,
+        undefined,
+        {} as never,
+      ),
+    ).rejects.toThrow("topics/");
+  });
+
+  test("coalesces bursts to the newest bounded extraction window", async () => {
+    const { store } = await fixture();
+    const requests: MaintenanceRunRequest[] = [];
+    let releaseFirst!: () => void;
+    const firstRunning = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const runner: MaintenanceAgentRunner = async (request) => {
+      requests.push(request);
+      if (requests.length === 1) await firstRunning;
+      return { summary: "nothing to save", touchedPaths: [] };
+    };
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      runner,
+      isPaused: () => false,
+      maxInputCharacters: 80,
+    });
+
+    maintenance.captureHumanInput(
+      "First substantive human request",
+      "interactive",
+    );
+    maintenance.afterAgentSettled(baseContext());
+    await Promise.resolve();
+    maintenance.captureHumanInput(
+      "Second substantive human request",
+      "interactive",
+    );
+    maintenance.captureHumanInput(
+      "Newest substantive human request",
+      "interactive",
+    );
+    maintenance.afterAgentSettled(baseContext());
+    releaseFirst();
+    await maintenance.drain(1_000);
+
+    expect(requests).toHaveLength(2);
+    expect(requests[0]!.prompt).toContain("First substantive");
+    expect(requests[1]!.prompt).toContain("Newest substantive");
+    expect(requests[1]!.prompt).not.toContain("Second substantive");
+    expect(requests[1]!.tools.map(({ name }) => name)).not.toContain("bash");
+  });
+
+  test("suppresses extraction after a direct memory edit and while paused", async () => {
+    const { store } = await fixture();
+    const requests: MaintenanceRunRequest[] = [];
+    let paused = false;
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      runner: async (request) => {
+        requests.push(request);
+        return { summary: "nothing to save", touchedPaths: [] };
+      },
+      isPaused: () => paused,
+    });
+
+    maintenance.captureHumanInput("Remember this direct change", "interactive");
+    maintenance.noteDirectMemoryWrite();
+    maintenance.afterAgentSettled(baseContext());
+    await maintenance.drain(1_000);
+    expect(requests).toEqual([]);
+
+    paused = true;
+    maintenance.captureHumanInput("Remember this while paused", "rpc");
+    maintenance.afterAgentSettled(baseContext());
+    await maintenance.drain(1_000);
+    expect(requests).toEqual([]);
+  });
+
+  test("reports failures without failing the main run and drains shutdown work", async () => {
+    const { store } = await fixture();
+    const events: Array<{ status: string; summary: string }> = [];
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      runner: async () => {
+        throw new Error("provider unavailable");
+      },
+      isPaused: () => false,
+      onEvent: (event) => events.push(event),
+    });
+    maintenance.captureHumanInput(
+      "Persist this useful preference",
+      "interactive",
+    );
+    maintenance.afterAgentSettled(baseContext());
+
+    await expect(maintenance.drain(1_000)).resolves.toBeUndefined();
+    expect(events).toEqual([
+      {
+        status: "failed",
+        summary: "automatic extraction failed: provider unavailable",
+      },
+    ]);
+  });
+
+  test("runs Dream only after both thresholds and marks success after completion", async () => {
+    const { home, store } = await fixture();
+    const activity = createMemoryActivityStore(home);
+    await activity.ensureState(new Date("2026-07-26T08:00:00.000Z"));
+    for (let index = 0; index < 5; index += 1) {
+      await activity.completeSession(
+        `prior-${index}`,
+        new Date(`2026-07-27T0${index}:00:00.000Z`),
+      );
+    }
+    const requests: MaintenanceRunRequest[] = [];
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      runner: async (request) => {
+        requests.push(request);
+        return {
+          summary: "merged duplicate reporting topics",
+          touchedPaths: ["topics/reporting.md"],
+        };
+      },
+      isPaused: () => false,
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
+    });
+
+    await maintenance.maybeDream(baseContext(), activity, "current");
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.kind).toBe("dream");
+    expect(requests[0]!.tools.map(({ name }) => name)).toContain(
+      "memory_read_activity",
+    );
+    expect((await activity.readState()).lastSuccessfulDreamAt).toBe(
+      "2026-07-28T08:00:00.000Z",
+    );
+  });
+
+  test("releases the Dream lock and preserves the prior schedule marker on failure", async () => {
+    const { home, store } = await fixture();
+    const activity = createMemoryActivityStore(home);
+    await activity.ensureState(new Date("2026-07-26T08:00:00.000Z"));
+    for (let index = 0; index < 5; index += 1) {
+      await activity.completeSession(
+        `prior-${index}`,
+        new Date(`2026-07-27T0${index}:00:00.000Z`),
+      );
+    }
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      runner: async () => {
+        throw new Error("Dream failed");
+      },
+      isPaused: () => false,
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
+    });
+
+    await maintenance.maybeDream(baseContext(), activity, "current");
+
+    expect((await activity.readState()).lastSuccessfulDreamAt).toBeUndefined();
+    await expect(
+      readFile(join(home, "memory", ".consolidate-lock"), "utf8"),
+    ).rejects.toThrow();
+  });
+});
+
+function baseContext() {
+  return {
+    agentDir: "/mate/.pi/agent",
+    cwd: "/workspace",
+    model: { provider: "test", id: "model" },
+    signal: undefined,
+  } as never;
+}

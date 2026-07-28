@@ -14,6 +14,7 @@ import {
   type StoredTopic,
 } from "../../../runtime/memory/store.ts";
 import type { MateMemoryPolicy } from "../../../runtime/memory/policy.ts";
+import { createMemoryActivityStore } from "../../../runtime/memory/activity.ts";
 import {
   relevantMemoryMessage,
   startupSystemPrompt,
@@ -22,6 +23,10 @@ import {
   selectRelevantTopics,
   type RelevantTopicSelector,
 } from "./model.ts";
+import {
+  MateMemoryMaintenance,
+  type MaintenanceAgentRunner,
+} from "./maintenance.ts";
 
 const STATE_ENTRY = "agentos-mate-memory-state";
 const CONTEXT_MESSAGE = "agentos-mate-memory-context";
@@ -36,6 +41,7 @@ export interface MateMemoryExtensionDependencies {
   now?: () => Date;
   onDirectMemoryWrite?: (relativePath: string) => void;
   store?: MateMemoryStore;
+  maintenanceRunner?: MaintenanceAgentRunner;
 }
 
 export function registerMateMemoryExtension(
@@ -51,13 +57,75 @@ export function registerMateMemoryExtension(
     dependencies.store ?? createMateMemoryStore(home, dependencies.policy);
   const selector = dependencies.selectRelevant ?? selectRelevantTopics;
   const now = dependencies.now ?? (() => new Date());
+  const activity = createMemoryActivityStore(home, { now });
   const attached = new Set<string>();
   const pendingWrites = new Map<string, string>();
+  const observedToolNames = new Set<string>();
   let attachedBytes = 0;
   let paused = false;
+  const maintenance = new MateMemoryMaintenance({
+    store,
+    runner: dependencies.maintenanceRunner,
+    isPaused: () => paused,
+    now,
+    onEvent: (event) =>
+      pi.appendEntry("agentos-mate-memory-maintenance", event),
+  });
 
-  pi.on("session_start", (_event, context) => {
+  pi.on("session_start", async (_event, context) => {
     paused = restoredPauseState(context);
+    await activity.ensureState(now());
+  });
+
+  pi.on("input", async (event, context) => {
+    maintenance.captureHumanInput(event.text, event.source);
+    if (event.source !== "extension") {
+      await activity.append(context.sessionManager.getSessionId(), {
+        kind: "human",
+        text: event.text,
+      });
+    }
+  });
+
+  pi.on("agent_settled", (_event, context) => {
+    const maintenanceContext = {
+      agentDir: joinAgentDirectory(home),
+      cwd: context.cwd,
+      model: context.model,
+      signal: context.signal,
+    };
+    maintenance.afterAgentSettled(maintenanceContext);
+    void maintenance.maybeDream(
+      maintenanceContext,
+      activity,
+      context.sessionManager.getSessionId(),
+    );
+  });
+
+  pi.on("agent_end", async (event, context) => {
+    const sessionId = context.sessionManager.getSessionId();
+    for (const toolName of [...observedToolNames].sort()) {
+      await activity.append(sessionId, { kind: "tool", toolName });
+    }
+    observedToolNames.clear();
+    const assistant = [...event.messages]
+      .reverse()
+      .find((message) => message.role === "assistant");
+    if (!assistant || assistant.role !== "assistant") return;
+    const text = assistant.content
+      .filter(
+        (part): part is Extract<typeof part, { type: "text" }> =>
+          part.type === "text",
+      )
+      .map((part) => part.text)
+      .join("")
+      .trim();
+    if (text) await activity.append(sessionId, { kind: "assistant", text });
+  });
+
+  pi.on("session_shutdown", async (_event, context) => {
+    await activity.completeSession(context.sessionManager.getSessionId(), now());
+    await maintenance.shutdown(60_000);
   });
 
   pi.on("before_agent_start", async (event, context) => {
@@ -127,6 +195,7 @@ export function registerMateMemoryExtension(
   });
 
   pi.on("tool_call", async (event, context) => {
+    observedToolNames.add(event.toolName);
     if (!nativeFileTools.has(event.toolName)) return;
     const target = nativeToolPath(event, context);
     if (!target || !isWithin(store.root, target)) return;
@@ -169,6 +238,7 @@ export function registerMateMemoryExtension(
         await store.validateAndStamp(relativePath, { now: now() });
       }
       dependencies.onDirectMemoryWrite?.(relativePath);
+      maintenance.noteDirectMemoryWrite();
     } catch (error) {
       return failedToolResult(event, error);
     }
@@ -225,6 +295,8 @@ export function registerMateMemoryExtension(
   return {
     isPaused: () => paused,
     store,
+    maintenance,
+    activity,
   };
 
   function setPaused(value: boolean) {
@@ -302,4 +374,8 @@ function failedToolResult(event: ToolResultEvent, error: unknown) {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function joinAgentDirectory(home: string): string {
+  return resolve(home, ".pi", "agent");
 }
