@@ -61,6 +61,7 @@ const args = process.argv.slice(2);
 await appendFile(join(state, "calls.jsonl"), JSON.stringify(args) + "\\n");
 const command = args.slice(0, 2).join(" ");
 if (args[0] === "server") {
+  await writeFile(join(state, "server-node-path"), process.env.NODE_PATH ?? "");
   await writeFile(join(state, "server-ready"), "ready\\n");
   process.on("SIGTERM", () => process.exit(0));
   process.on("SIGINT", () => process.exit(0));
@@ -182,6 +183,27 @@ describe("Mate runtime", () => {
     expect((await readCalls(state)).filter((call) => call[0] === "agent" && call[1] === "start")).toEqual([
       expectedStart,
     ]);
+  });
+
+  test("gives a persistent checkout access to release-installed dependencies", async () => {
+    const releaseRoot = "/opt/agentos-test";
+    const { env, state } = await createHarness([], {
+      AGENTOS_AGENT_CWD: "/home/agent/projects/agentos/agents/firstmate",
+      AGENTOS_RELEASE_ROOT: releaseRoot,
+      NODE_PATH: "",
+    });
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    await waitFor(async () => Bun.file(join(state, "server-ready")).exists());
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
+    expect(await readFile(join(state, "server-node-path"), "utf8")).toBe(
+      join(releaseRoot, "node_modules"),
+    );
   });
 
   test("triggers native restore instead of creating a second First Mate", async () => {
