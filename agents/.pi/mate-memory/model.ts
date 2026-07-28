@@ -25,8 +25,14 @@ export function relevantSelectionMessage(
 ): string {
   return JSON.stringify({
     request: redactAuxiliaryInput(input.prompt),
-    index: input.startup.index,
-    inventory: input.startup.inventory,
+    index: redactAuxiliaryInput(input.startup.index),
+    inventory: input.startup.inventory.map((topic) => ({
+      relativePath: redactAuxiliaryInput(topic.relativePath),
+      type: redactAuxiliaryInput(topic.type),
+      scope: redactAuxiliaryInput(topic.scope),
+      modified: redactAuxiliaryInput(topic.modified),
+      pinned: topic.pinned,
+    })),
   });
 }
 
