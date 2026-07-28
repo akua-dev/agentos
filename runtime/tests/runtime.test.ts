@@ -81,6 +81,21 @@ if (args[0] === "server") {
     pane_id: "w-started:p1",
   });
   await writeFile(join(state, "agents.json"), JSON.stringify(agents));
+  if (process.env.FAKE_PI_EXTENSION) {
+    const child = Bun.spawn(["node", process.env.FAKE_PI_EXTENSION], {
+      env: process.env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    await writeFile(join(state, "child-stdout"), stdout, "utf8");
+    await writeFile(join(state, "child-stderr"), stderr, "utf8");
+    if (exitCode !== 0) process.exit(exitCode);
+  }
   console.log(JSON.stringify({ result: { type: "agent_started", name: args[2] } }));
 } else if (command === "agent get") {
   const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
@@ -203,6 +218,70 @@ describe("Mate runtime", () => {
     expect(await child.exited).toBe(0);
     expect(await readFile(join(state, "server-node-path"), "utf8")).toBe(
       join(releaseRoot, "node_modules"),
+    );
+  });
+
+  test("resolves a release dependency from a persistent Pi extension child", async () => {
+    const releaseRoot = await mkdtemp(join(tmpdir(), "agentos-release-"));
+    temporaryDirectories.push(releaseRoot);
+    const dependencyRoot = join(
+      releaseRoot,
+      "node_modules",
+      "release-only-dependency",
+    );
+    await mkdir(dependencyRoot, { recursive: true });
+    await writeFile(
+      join(dependencyRoot, "package.json"),
+      JSON.stringify({ name: "release-only-dependency", main: "index.cjs" }),
+      "utf8",
+    );
+    await writeFile(
+      join(dependencyRoot, "index.cjs"),
+      "module.exports = { value: 'loaded from release image' };\n",
+      "utf8",
+    );
+    const persistentCheckout = join(releaseRoot, "persistent-checkout");
+    const extension = join(
+      persistentCheckout,
+      "agents",
+      "firstmate",
+      ".pi",
+      "extensions",
+      "agentos-mate-memory.mjs",
+    );
+    await mkdir(join(persistentCheckout, "agents", "firstmate", ".pi", "extensions"), {
+      recursive: true,
+    });
+    await writeFile(
+      extension,
+      [
+        'import { createRequire } from "node:module";',
+        'import { writeFile } from "node:fs/promises";',
+        'import { join } from "node:path";',
+        "const require = createRequire(import.meta.url);",
+        "const dependency = require(\"release-only-dependency\");",
+        'await writeFile(join(process.env.FAKE_HERDR_STATE, "child-result"), dependency.value, "utf8");',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const { env, state } = await createHarness([], {
+      AGENTOS_AGENT_CWD: join(persistentCheckout, "agents", "firstmate"),
+      AGENTOS_RELEASE_ROOT: releaseRoot,
+      FAKE_PI_EXTENSION: extension,
+      NODE_PATH: "",
+    });
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    await waitFor(async () => Bun.file(join(state, "child-result")).exists());
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
+    expect(await readFile(join(state, "child-result"), "utf8")).toBe(
+      "loaded from release image",
     );
   });
 

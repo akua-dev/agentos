@@ -253,6 +253,28 @@ describe("Mate memory storage", () => {
     expect(startup.degraded).toContain("MEMORY.md is not valid UTF-8");
   });
 
+  test("bounds startup inventory when native files exceed the topic limit", async () => {
+    const home = await temporaryHome();
+    const store = createMateMemoryStore(home, { maxTopicFiles: 2 });
+    await store.ensureLayout();
+    await store.writeTopic(topic({ relativePath: "topics/one.md" }));
+    const content = await readFile(
+      join(home, "memory", "topics", "one.md"),
+      "utf8",
+    );
+    await writeFile(join(home, "memory", "topics", "two.md"), content, "utf8");
+    await writeFile(
+      join(home, "memory", "topics", "three.md"),
+      content,
+      "utf8",
+    );
+
+    const startup = await store.readStartupContext();
+
+    expect(startup.inventory).toHaveLength(2);
+    expect(startup.degraded).toContain("3 topics exceed the 2-topic limit");
+  });
+
   test("enforces the topic limit when stamping a newly created native topic", async () => {
     const home = await temporaryHome();
     const store = createMateMemoryStore(home, { maxTopicFiles: 1 });

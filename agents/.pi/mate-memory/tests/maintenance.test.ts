@@ -464,9 +464,53 @@ describe("Mate memory automatic maintenance", () => {
     expect(events).toEqual([
       {
         status: "failed",
-        summary: "automatic extraction failed: provider unavailable",
+        summary: "automatic extraction failed",
       },
     ]);
+  });
+
+  test("does not persist model output, error details, or paths in maintenance events", async () => {
+    const { store } = await fixture();
+    const events: Array<{ status: string; summary: string }> = [];
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      runner: async () => ({
+        summary: "secret memory body from the model",
+        touchedPaths: ["topics/api-key-secret.md"],
+      }),
+      isPaused: () => false,
+      onEvent: (event) => events.push(event),
+    });
+
+    maintenance.captureHumanInput("Persist this useful preference", "interactive");
+    maintenance.afterAgentSettled(baseContext());
+    await maintenance.drain(1_000);
+
+    expect(events).toEqual([
+      {
+        status: "succeeded",
+        summary: "automatic extraction completed",
+      },
+    ]);
+    expect(JSON.stringify(events)).not.toContain("secret");
+
+    const failed = new MateMemoryMaintenance({
+      store,
+      runner: async () => {
+        throw new Error("secret provider response");
+      },
+      isPaused: () => false,
+      onEvent: (event) => events.push(event),
+    });
+    failed.captureHumanInput("Persist another useful preference", "interactive");
+    failed.afterAgentSettled(baseContext());
+    await failed.drain(1_000);
+
+    expect(events.at(-1)).toEqual({
+      status: "failed",
+      summary: "automatic extraction failed",
+    });
+    expect(JSON.stringify(events)).not.toContain("provider response");
   });
 
   test("runs Dream only after both thresholds and marks success after completion", async () => {

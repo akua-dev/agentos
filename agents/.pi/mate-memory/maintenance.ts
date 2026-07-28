@@ -1,11 +1,9 @@
+import { complete } from "@earendil-works/pi-ai/compat";
 import { Type } from "@earendil-works/pi-ai";
 import type { Model } from "@earendil-works/pi-ai";
-import {
-  createAgentSession,
-  DefaultResourceLoader,
-  SessionManager,
-  SettingsManager,
-  type ToolDefinition,
+import type {
+  ModelRegistry,
+  ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
 import type { MateMemoryStore } from "../../../runtime/memory/store.ts";
@@ -21,6 +19,7 @@ export interface MaintenanceRunContext {
   agentDir: string;
   cwd: string;
   model: Model<any> | undefined;
+  modelRegistry: ModelRegistry | undefined;
   signal?: AbortSignal;
 }
 
@@ -45,7 +44,6 @@ export type MaintenanceAgentRunner = (
 export interface MaintenanceEvent {
   status: "succeeded" | "failed";
   summary: string;
-  touchedPaths?: string[];
 }
 
 export interface MateMemoryMaintenanceOptions {
@@ -203,7 +201,7 @@ export class MateMemoryMaintenance {
       .catch((error) => {
         this.onEvent?.({
           status: "failed",
-          summary: `Dream discovery failed: ${errorMessage(error)}`,
+          summary: "Dream discovery failed",
         });
       })
       .finally(() => {
@@ -253,7 +251,6 @@ export class MateMemoryMaintenance {
       !this.isPaused() && this.getPauseGeneration() === pauseGeneration;
     const isCurrentMutation = () =>
       isActive() && this.mutationEpoch === mutationEpoch;
-    const touchedPaths = new Set<string>();
     const request: MaintenanceRunRequest = {
       ...this.lastContext,
       kind: "extraction",
@@ -267,7 +264,6 @@ export class MateMemoryMaintenance {
       ].join("\n"),
       tools: createMaintenanceTools(this.store, {
         now: this.now,
-        onMutation: (path) => touchedPaths.add(path),
         isPaused: this.isPaused,
         isActive,
         mutationEpoch,
@@ -275,19 +271,17 @@ export class MateMemoryMaintenance {
       }),
     };
     this.active = this.runner(request)
-      .then((result) => {
+      .then(() => {
         if (!isCurrentMutation()) return;
-        for (const path of result.touchedPaths) touchedPaths.add(path);
         this.onEvent?.({
           status: "succeeded",
-          summary: boundedSummary(result.summary),
-          touchedPaths: [...touchedPaths].sort(),
+          summary: "automatic extraction completed",
         });
       })
       .catch((error) => {
         this.onEvent?.({
           status: "failed",
-          summary: `automatic extraction failed: ${errorMessage(error)}`,
+          summary: "automatic extraction failed",
         });
       })
       .finally(() => {
@@ -348,9 +342,8 @@ export class MateMemoryMaintenance {
       await activity.releaseDreamLock(claim);
       return;
     }
-    const touchedPaths = new Set<string>();
     try {
-      const result = await this.runner({
+      await this.runner({
         ...context,
         kind: "dream",
         pauseGeneration,
@@ -361,7 +354,6 @@ export class MateMemoryMaintenance {
         tools: [
           ...createMaintenanceTools(this.store, {
             now: this.now,
-            onMutation: (path) => touchedPaths.add(path),
             isPaused: this.isPaused,
             isActive,
             mutationEpoch,
@@ -371,20 +363,18 @@ export class MateMemoryMaintenance {
         ],
       });
       if (!isCurrentMutation()) return;
-      for (const path of result.touchedPaths) touchedPaths.add(path);
       if (!isCurrentMutation()) return;
       await activity.markDreamSuccess(current, {
         beforeCommit: assertCurrentMutation,
       });
       this.onEvent?.({
         status: "succeeded",
-        summary: `Dream completed: ${boundedSummary(result.summary)}`,
-        touchedPaths: [...touchedPaths].sort(),
+        summary: "Dream completed",
       });
     } catch (error) {
       this.onEvent?.({
         status: "failed",
-        summary: `Dream failed: ${errorMessage(error)}`,
+        summary: "Dream failed",
       });
     } finally {
       await activity.releaseDreamLock(claim);
@@ -630,52 +620,48 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = async (
   request,
 ) => {
   if (!request.model) throw new Error("no active model is available");
-  const settingsManager = SettingsManager.inMemory({
-    compaction: { enabled: false },
-    retry: { enabled: false },
-  });
-  const resourceLoader = new DefaultResourceLoader({
-    cwd: request.cwd,
-    agentDir: request.agentDir,
-    settingsManager,
-    noExtensions: true,
-    noSkills: true,
-    noPromptTemplates: true,
-    noThemes: true,
-    noContextFiles: true,
-    systemPrompt: request.systemPrompt,
-  });
-  await resourceLoader.reload();
-  const { session } = await createAgentSession({
-    cwd: request.cwd,
-    agentDir: request.agentDir,
-    model: request.model,
-    thinkingLevel: "low",
-    noTools: "all",
-    tools: request.tools.map(({ name }) => name),
-    customTools: request.tools,
-    resourceLoader,
-    sessionManager: SessionManager.inMemory(request.cwd),
-    settingsManager,
-  });
-  try {
-    await session.prompt(request.prompt, { expandPromptTemplates: false });
-    const assistant = [...session.messages]
-      .reverse()
-      .find(
-        (message): message is Extract<typeof message, { role: "assistant" }> =>
-          message.role === "assistant",
-      );
-    if (!assistant) throw new Error("maintenance agent returned no response");
-    if (
-      assistant.stopReason === "error" ||
-      assistant.stopReason === "aborted"
-    ) {
-      throw new Error(
-        assistant.errorMessage ?? "maintenance agent did not complete",
-      );
+  if (!request.modelRegistry) {
+    throw new Error("no model registry is available");
+  }
+  const auth = await request.modelRegistry.getApiKeyAndHeaders(request.model);
+  if (!auth.ok) throw new Error("maintenance model authentication unavailable");
+  const transcript = [
+    request.prompt,
+    "Return exactly one JSON object for each turn. Use {\"action\":\"call\",\"tool\":\"...\",\"arguments\":{...}} to invoke one available memory tool, or {\"action\":\"done\"} when maintenance is complete.",
+    `Available tools: ${JSON.stringify(
+      request.tools.map(({ name, description, parameters }) => ({
+        name,
+        description,
+        parameters,
+      })),
+    )}`,
+  ];
+  for (let step = 0; step < MAX_MAINTENANCE_STEPS; step += 1) {
+    const response = await complete(
+      request.model,
+      {
+        systemPrompt: request.systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: transcript.join("\n\n"),
+            timestamp: Date.now(),
+          },
+        ],
+      },
+      {
+        apiKey: auth.apiKey,
+        headers: auth.headers,
+        env: auth.env,
+        signal: request.signal,
+        temperature: 0,
+        maxTokens: 2_048,
+      },
+    );
+    if (response.stopReason === "error" || response.stopReason === "aborted") {
+      throw new Error("maintenance model did not complete");
     }
-    const summary = assistant.content
+    const text = response.content
       .filter(
         (part): part is Extract<typeof part, { type: "text" }> =>
           part.type === "text",
@@ -683,13 +669,24 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = async (
       .map(({ text }) => text)
       .join("")
       .trim();
-    return {
-      summary: summary || "maintenance completed",
-      touchedPaths: [],
-    };
-  } finally {
-    session.dispose();
+    const action = parseMaintenanceAction(text);
+    if (action.action === "done") {
+      return { summary: "maintenance completed", touchedPaths: [] };
+    }
+    const tool = request.tools.find(({ name }) => name === action.tool);
+    if (!tool) throw new Error("maintenance model selected an unavailable tool");
+    const result = await tool.execute(
+      `maintenance-${step}`,
+      action.arguments as never,
+      undefined,
+      undefined,
+      {} as never,
+    );
+    transcript.push(
+      `Tool ${tool.name} result:\n${boundedToolResult(toolResultText(result))}`,
+    );
   }
+  throw new Error("maintenance reached its operation limit");
 };
 
 function textResult(text: string) {
@@ -699,10 +696,74 @@ function textResult(text: string) {
   };
 }
 
-function boundedSummary(value: string): string {
-  return value.replace(/\s+/g, " ").trim().slice(0, 2_048) || "nothing to save";
+const MAX_MAINTENANCE_STEPS = 16;
+const MAX_TOOL_RESULT_CHARACTERS = 32_768;
+
+function parseMaintenanceAction(value: string):
+  | { action: "call"; tool: string; arguments: Record<string, unknown> }
+  | { action: "done" } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("maintenance model returned invalid JSON");
+  }
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    Array.isArray(parsed) ||
+    typeof (parsed as { action?: unknown }).action !== "string"
+  ) {
+    throw new Error("maintenance model returned an invalid action");
+  }
+  if ((parsed as { action: string }).action === "done") {
+    return { action: "done" };
+  }
+  const action = parsed as {
+    action: string;
+    tool?: unknown;
+    arguments?: unknown;
+  };
+  if (
+    action.action !== "call" ||
+    typeof action.tool !== "string" ||
+    typeof action.arguments !== "object" ||
+    action.arguments === null ||
+    Array.isArray(action.arguments)
+  ) {
+    throw new Error("maintenance model returned an invalid tool action");
+  }
+  return {
+    action: "call",
+    tool: action.tool,
+    arguments: action.arguments as Record<string, unknown>,
+  };
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function toolResultText(result: unknown): string {
+  if (
+    typeof result !== "object" ||
+    result === null ||
+    !("content" in result) ||
+    !Array.isArray(result.content)
+  ) {
+    return "tool completed without a text result";
+  }
+  return result.content
+    .filter(
+      (part): part is { type: "text"; text: string } =>
+        typeof part === "object" &&
+        part !== null &&
+        "type" in part &&
+        part.type === "text" &&
+        "text" in part &&
+        typeof part.text === "string",
+    )
+    .map(({ text }) => text)
+    .join("\n");
+}
+
+function boundedToolResult(value: string): string {
+  if (value.length <= MAX_TOOL_RESULT_CHARACTERS) return value;
+  return `${value.slice(0, MAX_TOOL_RESULT_CHARACTERS)}\n[tool result truncated]`;
 }

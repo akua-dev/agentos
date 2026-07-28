@@ -125,6 +125,7 @@ export function registerMateMemoryExtension(
       agentDir: joinAgentDirectory(home),
       cwd: context.cwd,
       model: context.model,
+      modelRegistry: context.modelRegistry,
       signal: context.signal,
     };
     maintenance.afterAgentSettled(maintenanceContext);

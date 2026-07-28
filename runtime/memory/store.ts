@@ -183,8 +183,18 @@ export function createMateMemoryStore(
       degraded.push(memoryReadError(INDEX_NAME, error));
     }
 
+    const discoveredTopicPaths = await topicPaths(
+      root,
+      options.beforeRead,
+      policy.maxTopicFiles + 1,
+    );
+    const topicLimitExceeded =
+      discoveredTopicPaths.length > policy.maxTopicFiles;
     const topics: StoredTopic[] = [];
-    for (const relativePath of await topicPaths(root, options.beforeRead)) {
+    for (const relativePath of discoveredTopicPaths.slice(
+      0,
+      policy.maxTopicFiles,
+    )) {
       try {
         topics.push(await readTopic(relativePath, options));
       } catch (error) {
@@ -192,9 +202,9 @@ export function createMateMemoryStore(
         degraded.push(memoryReadError(relativePath, error));
       }
     }
-    if (topics.length > policy.maxTopicFiles) {
+    if (topicLimitExceeded) {
       degraded.push(
-        `${topics.length} topics exceed the ${policy.maxTopicFiles}-topic limit`,
+        `${discoveredTopicPaths.length} topics exceed the ${policy.maxTopicFiles}-topic limit`,
       );
     }
     const pinned = topics
@@ -425,6 +435,7 @@ function canonicalTopicPath(value: string): string {
 async function topicPaths(
   root: string,
   beforeRead?: () => void | Promise<void>,
+  maxResults = Number.POSITIVE_INFINITY,
 ): Promise<string[]> {
   const base = join(root, "topics");
   const results: string[] = [];
@@ -433,7 +444,10 @@ async function topicPaths(
 
   async function walk(directory: string, prefix: string): Promise<void> {
     await runReadGuard(beforeRead);
+    if (results.length >= maxResults) return;
     for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (results.length >= maxResults) return;
+      await runReadGuard(beforeRead);
       const path = join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
       const relativePath = `${prefix}/${entry.name}`;
