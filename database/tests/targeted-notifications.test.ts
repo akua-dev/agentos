@@ -454,7 +454,6 @@ describe.serial("targeted Mate notifications", () => {
 function expectedChannel(agentId: string) {
   return `agentos_mate_${agentId.replaceAll("-", "").toLowerCase()}`;
 }
-
 function clearNotifications() {
   for (const payloads of received.values()) payloads.length = 0;
 }
@@ -497,4 +496,3 @@ async function asRole<T>(role: string, operation: () => Promise<T>): Promise<T> 
     await database.exec("SET SESSION AUTHORIZATION postgres");
   }
 }
-

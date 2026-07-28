@@ -103,8 +103,6 @@ async function waitFor(predicate: () => boolean) {
   while (!predicate() && Date.now() < deadline) await Bun.sleep(5);
   expect(predicate()).toBe(true);
 }
-
 function expectedChannel(agentId: string) {
   return `agentos_mate_${agentId.replaceAll("-", "").toLowerCase()}`;
 }
-

@@ -378,4 +378,3 @@ async function asRole<T>(role: string, operation: () => Promise<T>): Promise<T> 
     await database.exec("SET SESSION AUTHORIZATION postgres");
   }
 }
-

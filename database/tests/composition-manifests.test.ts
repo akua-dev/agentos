@@ -44,7 +44,6 @@ function material(
         : "instructions.md",
   };
 }
-
 function manifest(harness = "pi") {
   return {
     version: 1,
@@ -958,4 +957,3 @@ async function asRole<T>(role: string, operation: () => Promise<T>): Promise<T> 
     await database.exec("SET SESSION AUTHORIZATION postgres");
   }
 }
-
