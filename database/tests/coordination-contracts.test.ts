@@ -80,25 +80,21 @@ afterAll(async () => {
 });
 
 describe.serial("durable Fleet coordination contracts", () => {
-  test("stores scoped Captain state and explicit Assignment artifacts", async () => {
+  test("stores explicit Assignment artifacts without shared preference state", async () => {
     const columns = await database.query<{ column_name: string }>(`
       SELECT column_name
         FROM information_schema.columns
        WHERE table_schema = 'agentos'
-         AND (
-           (table_name = 'captain' AND column_name IN ('scope', 'scope_agent_id'))
-           OR
-           (table_name = 'task_assignments' AND column_name IN (
-             'brief', 'report', 'dispatch_profile', 'supersedes_assignment_id',
-             'decision_keys', 'decisions_attested_at', 'decisions_attested_by_agent_id'
-           ))
+         AND table_name = 'task_assignments'
+         AND column_name IN (
+           'brief', 'report', 'dispatch_profile', 'supersedes_assignment_id',
+           'decision_keys', 'decisions_attested_at',
+           'decisions_attested_by_agent_id'
          )
-       ORDER BY table_name, ordinal_position
+       ORDER BY ordinal_position
     `);
 
     expect(columns.rows.map(({ column_name }) => column_name)).toEqual([
-      "scope",
-      "scope_agent_id",
       "brief",
       "report",
       "dispatch_profile",
@@ -108,65 +104,12 @@ describe.serial("durable Fleet coordination contracts", () => {
       "decisions_attested_by_agent_id",
     ]);
 
-    await expect(
-      database.exec(`
-        INSERT INTO agentos.captain (topic, content, scope, scope_agent_id)
-        VALUES ('invalid scope', 'Must be rejected', 'fleet', '${ids.scout}')
-      `),
-    ).rejects.toThrow();
-  });
-
-  test("keeps Captain rows fully readable while Second Mate writes only its domain", async () => {
-    await database.exec(`
-      INSERT INTO agentos.captain (topic, content, scope)
-      VALUES ('fleet-policy', 'Use the reviewed project workflow', 'fleet')
+    const legacyPreferenceTable = await database.query<{
+      table_name: string | null;
+    }>(`
+      SELECT to_regclass('agentos.captain')::text AS table_name
     `);
-
-    await asRole("coordination_second", async () => {
-      await database.exec(`
-        INSERT INTO agentos.captain (
-          topic, content, recorded_by_agent_id, scope, scope_agent_id
-        ) VALUES (
-          'domain-policy', 'Prefer focused delivery reports', '${ids.secondMate}',
-          'agent', '${ids.secondMate}'
-        )
-      `);
-
-      const visible = await database.query<{ topic: string }>(`
-        SELECT topic FROM agentos.captain ORDER BY topic
-      `);
-      expect(visible.rows.map(({ topic }) => topic)).toEqual([
-        "domain-policy",
-        "fleet-policy",
-      ]);
-
-      await expect(
-        database.exec(`
-          INSERT INTO agentos.captain (
-            topic, content, recorded_by_agent_id, scope
-          ) VALUES (
-            'unauthorized-fleet-policy', 'Must fail', '${ids.secondMate}', 'fleet'
-          )
-        `),
-      ).rejects.toThrow();
-    });
-
-    await asRole("coordination_crew", async () => {
-      const visible = await database.query<{ count: number }>(`
-        SELECT count(*)::int AS count FROM agentos.captain
-      `);
-      expect(visible.rows[0]!.count).toBe(2);
-
-      await expect(
-        database.exec(`
-          INSERT INTO agentos.captain (
-            topic, content, recorded_by_agent_id, scope, scope_agent_id
-          ) VALUES (
-            'crew-policy', 'Must fail', '${ids.crew}', 'agent', '${ids.crew}'
-          )
-        `),
-      ).rejects.toThrow();
-    });
+    expect(legacyPreferenceTable.rows[0]!.table_name).toBeNull();
   });
 
   test("requires a complete brief before dispatch and a report before ending", async () => {
@@ -435,3 +378,4 @@ async function asRole<T>(role: string, operation: () => Promise<T>): Promise<T> 
     await database.exec("SET SESSION AUTHORIZATION postgres");
   }
 }
+
