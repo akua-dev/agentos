@@ -663,8 +663,11 @@ Direct First-Mate authentication remains the fastest initial handoff and a
 verified recovery path. After Fleet identity exists, First Mate presents two
 worker-capacity postures: the recommended Fleet AI Gateway for a delegation-ready
 Fleet, or direct authentication owned separately by every worker harness. The
-Captain's selection is durable Fleet policy. Installing the gateway, starting
-provider login and distributing its client Secret remain explicit or standing
+Captain's stable capacity preference lives in First Mate's private
+`$HOME/MEMORY.md`; exact approved client classes and consequential actions stay
+in Inbox or the owning provider/configuration workflow. Memory guides later
+dispatch but grants no authority. Installing the gateway, starting provider
+login and distributing its client Secret remain explicit or standing
 authorizations; recommendation never makes them implicit. Bootstrap may finish
 in minimal single-Mate mode without the gateway, but AgentOS does not call the
 Fleet delegation-ready until one approved worker or trusted harness automation

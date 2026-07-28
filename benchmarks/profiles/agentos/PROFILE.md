@@ -79,10 +79,12 @@ portable core:
 
 For a persistent First or Second Mate,
 `agents.resolved_composition` is desired state, not activation evidence.
-Successful replacement or repair also requires the Captain authority row,
-change reason, retained prior manifest, native private-home state, safe harness
-reload or resume evidence, and the Herdr-observed session. A row update or file
-copy alone cannot pass.
+Successful replacement or repair also requires the exact approving Inbox answer
+returned by the typed composition-decision Functions, bound to one accepted
+Task, the target Agent and a structurally equal manifest, plus the change reason,
+retained prior manifest, native private-home state, safe harness reload or resume
+evidence, and the Herdr-observed session. A row update or file copy alone cannot
+pass.
 
 The evaluator fails the AgentOS composition claim when selected material is
 copied into the project worktree or persistent global discovery state; an
