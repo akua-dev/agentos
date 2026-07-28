@@ -12,8 +12,8 @@ export const MATE_MEMORY_SYSTEM_POLICY = [
 
 export const RELEVANT_SELECTION_SYSTEM_PROMPT = [
   "Select only Mate memory topics that materially help answer the current human request.",
-  "Return one JSON object with exactly one field named paths whose value is an array of topic paths from the supplied inventory.",
-  "Do not invent paths. Do not select pinned topics. Prefer no selection when memory is not relevant.",
+  "Return one JSON object with exactly one field named ids whose value is an array of topic IDs from the supplied inventory.",
+  "Do not invent IDs. Do not select pinned topics. Prefer no selection when memory is not relevant.",
 ].join("\n");
 
 export function redactAuxiliaryInput(

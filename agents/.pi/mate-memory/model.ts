@@ -20,19 +20,36 @@ export type RelevantTopicSelector = (
   input: RelevantSelectionInput,
 ) => Promise<string[]>;
 
+function relevantTopicId(index: number): string {
+  return `topic-${index}`;
+}
+
 export function relevantSelectionMessage(
   input: RelevantSelectionInput,
 ): string {
   return JSON.stringify({
     request: redactAuxiliaryInput(input.prompt),
     index: redactAuxiliaryInput(input.startup.index),
-    inventory: input.startup.inventory.map((topic) => ({
-      relativePath: redactAuxiliaryInput(topic.relativePath),
+    inventory: input.startup.inventory.map((topic, index) => ({
+      id: relevantTopicId(index),
       type: redactAuxiliaryInput(topic.type),
       scope: redactAuxiliaryInput(topic.scope),
       modified: redactAuxiliaryInput(topic.modified),
       pinned: topic.pinned,
     })),
+  });
+}
+
+export function resolveRelevantTopicIds(
+  ids: string[],
+  inventory: RelevantSelectionInput["startup"]["inventory"],
+): string[] {
+  const pathsById = new Map(
+    inventory.map((topic, index) => [relevantTopicId(index), topic.relativePath]),
+  );
+  return ids.flatMap((id) => {
+    const path = pathsById.get(id);
+    return path ? [path] : [];
   });
 }
 
@@ -77,11 +94,11 @@ export const selectRelevantTopics: RelevantTopicSelector = async (input) => {
     parsed === null ||
     Array.isArray(parsed) ||
     Object.keys(parsed).length !== 1 ||
-    !("paths" in parsed) ||
-    !Array.isArray(parsed.paths) ||
-    !parsed.paths.every((path) => typeof path === "string")
+    !("ids" in parsed) ||
+    !Array.isArray(parsed.ids) ||
+    !parsed.ids.every((id) => typeof id === "string")
   ) {
-    throw new Error("memory selector returned an invalid path response");
+    throw new Error("memory selector returned an invalid ID response");
   }
-  return parsed.paths;
+  return resolveRelevantTopicIds(parsed.ids, input.startup.inventory);
 };

@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { relevantSelectionMessage } from "../model.ts";
+import {
+  relevantSelectionMessage,
+  resolveRelevantTopicIds,
+} from "../model.ts";
 
 describe("Mate memory relevance selection", () => {
   test("redacts the human request before building the selector message", () => {
@@ -46,5 +49,24 @@ describe("Mate memory relevance selection", () => {
     expect(message).not.toContain("sk-proj-index-secret");
     expect(message).not.toContain("inventory-secret");
     expect(message).not.toContain("AKIA1234567890ABCDEF");
+    expect(message).toContain('"id":"topic-0"');
+    expect(message).not.toContain('"relativePath"');
+  });
+
+  test("maps opaque selector IDs back to exact topic paths", () => {
+    expect(
+      resolveRelevantTopicIds(
+        ["topic-0"],
+        [
+          {
+            relativePath: "topics/sk-abcdefgh.md",
+            type: "reference",
+            scope: "reporting",
+            modified: "2026-07-28T12:00:00.000Z",
+            pinned: false,
+          },
+        ],
+      ),
+    ).toEqual(["topics/sk-abcdefgh.md"]);
   });
 });
