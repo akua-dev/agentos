@@ -40,8 +40,7 @@ reviewed CLI for repositories. Do not add an AgentOS project wrapper.
   operation synchronously and preserve its exit status and URL.
 - Do not encode Kun's `no-mistakes`, `direct-PR` and `local-only` names as an
   AgentOS enum. Record the project's real reviewed workflow in durable prose;
-  no-mistakes is the default for Agent-authored pull requests, not a database
-  mode. An explicit reviewed project workflow may select another path.
+  the default and exception above are workflow guidance, not a database mode.
 - For no-mistakes delivery, use the installed version's own Skill and live
   `no-mistakes axi --help` output. Verify `no-mistakes doctor`, the actual
   `origin`, the configured provider or fork push target and Assignment-scoped

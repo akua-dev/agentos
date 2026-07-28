@@ -353,6 +353,8 @@ export class MateMemoryMaintenance {
       const result = await this.runner({
         ...context,
         kind: "dream",
+        pauseGeneration,
+        mutationEpoch,
         systemPrompt: DREAM_SYSTEM_PROMPT,
         prompt:
           "Consolidate the Mate memory now using only the supplied memory tools.",
@@ -609,7 +611,13 @@ function createActivityReadTool(
       if (!isActive()) {
         throw new Error("Mate memory maintenance run is no longer active");
       }
-      const recent = await activity.readRecent(3, { beforeRead: isActive });
+      const recent = await activity.readRecent(3, {
+        beforeRead: () => {
+          if (!isActive()) {
+            throw new Error("Mate memory maintenance run is no longer active");
+          }
+        },
+      });
       if (!isActive()) {
         throw new Error("Mate memory maintenance run is no longer active");
       }
