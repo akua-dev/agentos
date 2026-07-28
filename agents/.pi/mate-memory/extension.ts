@@ -95,10 +95,12 @@ export function registerMateMemoryExtension(
     observedToolNames.clear();
     pauseGeneration += 1;
     paused = restoredPauseState(context);
-    try {
-      await activity.ensureState(now());
-    } catch (error) {
-      recordFailure(`activity state is unavailable: ${errorMessage(error)}`);
+    if (!paused) {
+      try {
+        await activity.ensureState(now());
+      } catch (error) {
+        recordFailure(`activity state is unavailable: ${errorMessage(error)}`);
+      }
     }
   });
 
@@ -174,13 +176,15 @@ export function registerMateMemoryExtension(
   });
 
   pi.on("session_shutdown", async (_event, context) => {
-    try {
-      await activity.completeSession(
-        context.sessionManager.getSessionId(),
-        now(),
-      );
-    } catch (error) {
-      recordFailure(`session activity completion failed: ${errorMessage(error)}`);
+    if (!paused) {
+      try {
+        await activity.completeSession(
+          context.sessionManager.getSessionId(),
+          now(),
+        );
+      } catch (error) {
+        recordFailure(`session activity completion failed: ${errorMessage(error)}`);
+      }
     }
     await maintenance.shutdown(60_000);
   });

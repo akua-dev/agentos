@@ -402,6 +402,41 @@ describe("Pi Mate memory extension", () => {
     expect(restored.results[0]).toEqual({ systemPrompt: "ROLE" });
   });
 
+  test("does not touch activity for a restored paused session", async () => {
+    const home = await mkdtemp(join(tmpdir(), "agentos-pi-memory-restored-pause-"));
+    temporaryDirectories.push(home);
+    const realActivity = createMemoryActivityStore(home);
+    const calls: string[] = [];
+    const activity: MemoryActivityStore = {
+      ...realActivity,
+      async ensureState(at) {
+        calls.push("ensureState");
+        return realActivity.ensureState(at);
+      },
+      async completeSession(sessionId, at) {
+        calls.push("completeSession");
+        return realActivity.completeSession(sessionId, at);
+      },
+    };
+    const pi = new FakePi();
+    registerMateMemoryExtension(pi.extensionApi(), { home, activity });
+    const sessionManager = {
+      getBranch: () => [
+        {
+          type: "custom",
+          customType: "agentos-mate-memory-state",
+          data: { paused: true },
+        },
+      ],
+      getSessionId: () => "restored-paused",
+    } as never;
+
+    await pi.emit("session_start", {}, { sessionManager });
+    await pi.emit("session_shutdown", {}, { sessionManager });
+
+    expect(calls).toEqual([]);
+  });
+
   test("does not return recall that crosses a pause transition", async () => {
     const { home } = await fixture();
     const pi = new FakePi();
