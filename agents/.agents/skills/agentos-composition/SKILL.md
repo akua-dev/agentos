@@ -21,10 +21,10 @@ provider authority always outrank selected model context.
    A charter selects the responsible persistent supervisor; composition selects
    the setup for one Agent or accepted outcome.
 2. Select exactly one composition policy for this intake:
-   an explicit Captain choice, then an approved domain policy, then an approved
-   Fleet policy, then this built-in policy. This Skill remains the mechanism and
-   safety owner when it loads an external composer. Record that composer's exact
-   non-secret origin, revision and digest. Do not recursively compose policies,
+   an explicit Captain choice, then relevant private Mate guidance, then this
+   built-in policy. This Skill remains the mechanism and safety owner when it
+   loads an external composer. Record that composer's exact non-secret origin,
+   revision and digest. Do not recursively compose policies,
    shadow this Skill's name or let a policy replace itself during its current
    intake. Load an external composer by its exact selected entrypoint, never by
    putting a second `agentos-composition` Skill on an auto-discovery path.
@@ -311,10 +311,11 @@ Assignments retain their pinned composition.
 The Captain may authorize learning only, opening proposals, or bounded
 low-risk adoption. Credentials, RBAC, structural roles, security boundaries,
 destructive changes and broader authority remain separately gated.
-Record the chosen level and scope as Captain prose. When authority permits only
-observation, stop with evidence; when it permits proposals, stop with a native
-review artifact; when it permits bounded adoption, still apply the target's
-review, future-only and rollback boundaries.
+Record reusable guidance in the owning Mate's private memory and exact
+adoption authority through Inbox. When authority permits only observation,
+stop with evidence; when it permits proposals, stop with a native review
+artifact; when it permits bounded adoption, still apply the target's review,
+future-only and rollback boundaries.
 
 ## Fail closed
 

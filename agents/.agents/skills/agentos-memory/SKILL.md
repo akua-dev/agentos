@@ -33,13 +33,15 @@ creating or changing a topic.
   topic's retrieval hook. Do not wait for automatic extraction.
 - For ordinary conversation, let the restricted post-turn extractor decide
   whether stable signal qualifies. Do not duplicate its work manually.
-- Automatic extraction runs after eligible human turns in an isolated
-  memory-only Pi agent with bounded, redacted input and only memory tools;
-  an extraction failure preserves the completed main response.
+- Automatic extraction runs after eligible human turns in a bounded,
+  memory-only maintenance model run with redacted input and only memory tools;
+  it does not start a subagent, and an extraction failure preserves the
+  completed main response.
 - Dream is eligible only after at least 24 hours and five prior completed
   sessions since first seeing the memory or the last successful Dream. It
   reads only the bounded, redacted activity projection from the last three
-  days before consolidating private memory.
+  days before consolidating private memory, using the same direct
+  memory-only maintenance run rather than a subagent.
 - For a stale or contradictory memory, verify the current authority, then
   correct or remove the memory and its index hook. Topic removal uses the
   guarded `memory_delete_topic` tool; index-hook removal remains a native

@@ -332,6 +332,11 @@ AgentOS images install that pair as `/etc/mise/config.toml` and
 not require a first-start download. The persistent AgentOS Git checkout
 provides the current repository and role Mise configuration; agent-owned
 additions live separately under `~/.config/mise/conf.d/`.
+Release-owned Node dependencies are installed in the immutable image at
+`/opt/agentos/node_modules`. `runtime/run-mate.ts` passes that release path
+through `NODE_PATH` to Herdr and its Pi child, so Pi extensions loaded from the
+persistent checkout can resolve release dependencies without installing them
+into the checkout or PVC.
 Before starting a Mate, a direct Mise init step installs the remaining small
 startup-critical set: Node, kubectl, Herdr and Pi. A second init step uses
 Mise to run the typed home-reconciliation program. Both init containers and the
@@ -655,12 +660,14 @@ Direct First-Mate authentication remains the fastest initial handoff and a
 verified recovery path. After Fleet identity exists, First Mate presents two
 worker-capacity postures: the recommended Fleet AI Gateway for a delegation-ready
 Fleet, or direct authentication owned separately by every worker harness. The
-Captain's selection is durable Fleet policy. Installing the gateway, starting
-provider login and distributing its client Secret remain explicit or standing
-authorizations; recommendation never makes them implicit. Bootstrap may finish
-in minimal single-Mate mode without the gateway, but AgentOS does not call the
-Fleet delegation-ready until one approved worker or trusted harness automation
-has completed a harmless real model request through the selected capacity path.
+Captain's selection is fallible guidance in the owning Mate's private
+context; exact approval and coupled state changes remain durable Inbox
+decisions. Installing the gateway, starting provider login and distributing
+its client Secret remain explicit or standing authorizations; recommendation
+never makes them implicit. Bootstrap may finish in minimal single-Mate mode
+without the gateway, but AgentOS does not call the Fleet delegation-ready
+until one approved worker or trusted harness automation has completed a
+harmless real model request through the selected capacity path.
 
 For a stable install, the seed resolves the latest published GitHub release,
 verifies that release is immutable, and applies only its fixed-name assets
