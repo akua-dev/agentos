@@ -178,6 +178,9 @@ if (args.join(" ") === "integration install pi") {
         "utf8",
       ),
     ).toBe("installed\n");
+    expect(await readFile(join(home, "memory", "MEMORY.md"), "utf8")).toBe(
+      "# Memory index\n",
+    );
     await expect(
       stat(join(home, ".pi", "agent", "extensions", "agentos-pi-defaults.ts")),
     ).rejects.toThrow();
@@ -191,6 +194,11 @@ if (args.join(" ") === "integration install pi") {
     ]);
 
     const customHerdrConfig = '[theme]\nname = "agent-owned"\n';
+    await writeFile(
+      join(home, "memory", "MEMORY.md"),
+      "# Memory index\n- Preserve this\n",
+      "utf8",
+    );
     await writeFile(herdrConfig, customHerdrConfig, "utf8");
     await writeFile(
       piSettings,
@@ -210,6 +218,9 @@ if (args.join(" ") === "integration install pi") {
 
     expect(warm).toEqual({ exitCode: 0, stderr: "", stdout: "" });
     expect(await readFile(herdrConfig, "utf8")).toBe(customHerdrConfig);
+    expect(await readFile(join(home, "memory", "MEMORY.md"), "utf8")).toBe(
+      "# Memory index\n- Preserve this\n",
+    );
     expect(await readFile(customFragment, "utf8")).toBe(
       '[tools]\npython = "3.13"\n',
     );
