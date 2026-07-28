@@ -3,7 +3,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createMateMemoryStore } from "../../../../runtime/memory/store.ts";
+import {
+  createMateMemoryStore,
+  type MateMemoryStore,
+} from "../../../../runtime/memory/store.ts";
 import { createMemoryActivityStore } from "../../../../runtime/memory/activity.ts";
 import {
   createMaintenanceTools,
@@ -200,6 +203,84 @@ describe("Mate memory automatic maintenance", () => {
     maintenance.afterAgentSettled(baseContext());
     await maintenance.drain(1_000);
     expect(requests).toEqual([]);
+  });
+
+  test("blocks an in-flight extraction from mutating memory after pause", async () => {
+    const { store } = await fixture();
+    let paused = false;
+    let releaseRunner!: () => void;
+    let markStarted!: () => void;
+    let releaseWrite!: () => void;
+    let markWriteStarted!: () => void;
+    let mutationOutcome = "not attempted";
+    const runnerReleased = new Promise<void>((resolve) => {
+      releaseRunner = resolve;
+    });
+    const runnerStarted = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const writeReleased = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const writeStarted = new Promise<void>((resolve) => {
+      markWriteStarted = resolve;
+    });
+    const delayedStore: MateMemoryStore = {
+      ...store,
+      async writeTopic(topic, options) {
+        markWriteStarted();
+        await writeReleased;
+        return store.writeTopic(topic, options);
+      },
+    };
+    const maintenance = new MateMemoryMaintenance({
+      store: delayedStore,
+      isPaused: () => paused,
+      runner: async (request) => {
+        markStarted();
+        await runnerReleased;
+        const write = request.tools.find(
+          ({ name }) => name === "memory_write_topic",
+        )!;
+        try {
+          await write.execute(
+            "late-write",
+            {
+              path: "topics/late.md",
+              type: "feedback",
+              scope: "captain",
+              source_principal: "captain",
+              observed_at: "2026-07-28T08:00:00.000Z",
+              pinned: false,
+              body: "This write must be blocked after pause.",
+            } as never,
+            undefined,
+            undefined,
+            {} as never,
+          );
+          mutationOutcome = "wrote";
+        } catch (error) {
+          mutationOutcome =
+            error instanceof Error ? error.message : String(error);
+        }
+        return { summary: "finished after pause", touchedPaths: [] };
+      },
+    });
+
+    maintenance.captureHumanInput(
+      "Remember this only if memory stays active",
+      "interactive",
+    );
+    maintenance.afterAgentSettled(baseContext());
+    await runnerStarted;
+    releaseRunner();
+    await writeStarted;
+    paused = true;
+    releaseWrite();
+    await maintenance.drain(1_000);
+
+    expect(mutationOutcome).toContain("paused");
+    await expect(store.readTopic("topics/late.md")).rejects.toThrow();
   });
 
   test("honors the released extraction stride", async () => {

@@ -209,6 +209,31 @@ describe("Mate memory storage", () => {
     );
   });
 
+  test("stops reading MEMORY.md at the released byte boundary", async () => {
+    const home = await temporaryHome();
+    const prefix = "# Memory index\nsafe prefix\n";
+    const store = createMateMemoryStore(home, {
+      maxIndexBytes: Buffer.byteLength(prefix),
+    });
+    await store.ensureLayout();
+    await writeFile(
+      join(home, "memory", "MEMORY.md"),
+      Buffer.concat([
+        Buffer.from(prefix),
+        Buffer.from([0xff]),
+        Buffer.alloc(1_000_000, 0x61),
+      ]),
+    );
+
+    const startup = await store.readStartupContext();
+
+    expect(startup.index).toBe(prefix);
+    expect(startup.degraded).toContain(
+      `MEMORY.md exceeds the ${Buffer.byteLength(prefix)}-byte loading limit`,
+    );
+    expect(startup.degraded).not.toContain("MEMORY.md is not valid UTF-8");
+  });
+
   test("fails visibly on invalid UTF-8 and enforces the topic-file limit", async () => {
     const home = await temporaryHome();
     const store = createMateMemoryStore(home, { maxTopicFiles: 1 });

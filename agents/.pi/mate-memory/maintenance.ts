@@ -58,6 +58,7 @@ export interface MateMemoryMaintenanceOptions {
 export interface MaintenanceToolOptions {
   now?: () => Date;
   onMutation?: (relativePath: string) => void;
+  isPaused?: () => boolean;
 }
 
 const EXTRACTION_SYSTEM_PROMPT = [
@@ -106,6 +107,7 @@ export class MateMemoryMaintenance {
   }
 
   captureHumanInput(text: string, source: HumanInputSource) {
+    if (this.isPaused()) return;
     if (!isEligibleHumanInput(text, source)) return;
     this.eligibleInputs += 1;
     const stride = Math.max(
@@ -222,6 +224,10 @@ export class MateMemoryMaintenance {
 
   private startNext() {
     if (this.active || !this.pendingInput || !this.lastContext) return;
+    if (this.isPaused()) {
+      this.pendingInput = undefined;
+      return;
+    }
     const prompt = this.pendingInput;
     this.pendingInput = undefined;
     const touchedPaths = new Set<string>();
@@ -237,10 +243,12 @@ export class MateMemoryMaintenance {
       tools: createMaintenanceTools(this.store, {
         now: this.now,
         onMutation: (path) => touchedPaths.add(path),
+        isPaused: this.isPaused,
       }),
     };
     this.active = this.runner(request)
       .then((result) => {
+        if (this.isPaused()) return;
         for (const path of result.touchedPaths) touchedPaths.add(path);
         this.onEvent?.({
           status: "succeeded",
@@ -266,6 +274,7 @@ export class MateMemoryMaintenance {
     currentSessionId: string,
   ) {
     await this.drain(60_000);
+    if (this.isPaused()) return;
     const current = this.now();
     const state = await activity.ensureState(current);
     if (
@@ -303,10 +312,12 @@ export class MateMemoryMaintenance {
           ...createMaintenanceTools(this.store, {
             now: this.now,
             onMutation: (path) => touchedPaths.add(path),
+            isPaused: this.isPaused,
           }),
-          createActivityReadTool(activity),
+          createActivityReadTool(activity, this.isPaused),
         ],
       });
+      if (this.isPaused()) return;
       for (const path of result.touchedPaths) touchedPaths.add(path);
       await activity.markDreamSuccess(current);
       this.onEvent?.({
@@ -340,6 +351,11 @@ export function createMaintenanceTools(
 ): ToolDefinition[] {
   const now = options.now ?? (() => new Date());
   const mutation = (path: string) => options.onMutation?.(path);
+  const assertActive = () => {
+    if (options.isPaused?.()) {
+      throw new Error("Mate memory maintenance is paused for this Pi session");
+    }
+  };
   const Empty = Type.Object({});
   const TopicPath = Type.String({
     minLength: 1,
@@ -353,6 +369,7 @@ export function createMaintenanceTools(
       description: "List validated private Mate memory topic metadata.",
       parameters: Empty,
       async execute() {
+        assertActive();
         const topics = await store.listTopics();
         return textResult(
           JSON.stringify(
@@ -370,6 +387,7 @@ export function createMaintenanceTools(
       description: "Read the bounded private Mate MEMORY.md index.",
       parameters: Empty,
       async execute() {
+        assertActive();
         return textResult((await store.readStartupContext()).index);
       },
     },
@@ -379,6 +397,7 @@ export function createMaintenanceTools(
       description: "Read one validated private Mate memory topic.",
       parameters: Type.Object({ path: TopicPath }),
       async execute(_toolCallId, { path }) {
+        assertActive();
         return textResult(formatTopic(await store.readTopic(path)));
       },
     },
@@ -413,19 +432,23 @@ export function createMaintenanceTools(
           body,
         },
       ) {
-        const topic = await store.writeTopic({
-          relativePath: path,
-          metadata: {
-            node_type: "memory",
-            type,
-            scope,
-            source_principal,
-            observed_at,
-            modified: now().toISOString(),
-            pinned,
+        assertActive();
+        const topic = await store.writeTopic(
+          {
+            relativePath: path,
+            metadata: {
+              node_type: "memory",
+              type,
+              scope,
+              source_principal,
+              observed_at,
+              modified: now().toISOString(),
+              pinned,
+            },
+            body,
           },
-          body,
-        });
+          { beforeCommit: assertActive },
+        );
         mutation(path);
         return textResult(`Wrote ${topic.relativePath}.`);
       },
@@ -437,7 +460,8 @@ export function createMaintenanceTools(
         "Delete one private Mate memory topic after determining it is wrong, obsolete, or explicitly forgotten.",
       parameters: Type.Object({ path: TopicPath }),
       async execute(_toolCallId, { path }) {
-        await store.deleteTopic(path);
+        assertActive();
+        await store.deleteTopic(path, { beforeCommit: assertActive });
         mutation(path);
         return textResult(`Deleted ${path}.`);
       },
@@ -451,7 +475,8 @@ export function createMaintenanceTools(
         content: Type.String({ minLength: 1, maxLength: 25_000 }),
       }),
       async execute(_toolCallId, { content }) {
-        await store.writeIndex(content);
+        assertActive();
+        await store.writeIndex(content, { beforeCommit: assertActive });
         const warnings = (await store.readStartupContext()).degraded.filter(
           (warning) => warning.startsWith("MEMORY.md"),
         );
@@ -463,7 +488,10 @@ export function createMaintenanceTools(
   ];
 }
 
-function createActivityReadTool(activity: MemoryActivityStore): ToolDefinition {
+function createActivityReadTool(
+  activity: MemoryActivityStore,
+  isPaused: () => boolean,
+): ToolDefinition {
   return {
     name: "memory_read_activity",
     label: "Read recent memory activity",
@@ -471,6 +499,9 @@ function createActivityReadTool(activity: MemoryActivityStore): ToolDefinition {
       "Read the bounded, redacted, derivative activity projection from the last three days.",
     parameters: Type.Object({}),
     async execute() {
+      if (isPaused()) {
+        throw new Error("Mate memory maintenance is paused for this Pi session");
+      }
       return textResult(await activity.readRecent(3));
     },
   };

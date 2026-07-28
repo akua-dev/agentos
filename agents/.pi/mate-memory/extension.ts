@@ -74,6 +74,10 @@ export function registerMateMemoryExtension(
   });
 
   pi.on("session_start", async (_event, context) => {
+    attached.clear();
+    attachedBytes = 0;
+    pendingWrites.clear();
+    observedToolNames.clear();
     paused = restoredPauseState(context);
     try {
       await activity.ensureState(now());

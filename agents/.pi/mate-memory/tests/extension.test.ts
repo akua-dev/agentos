@@ -179,7 +179,15 @@ describe("Pi Mate memory extension", () => {
       systemPromptOptions: {},
     });
     expect(second.results[0]).not.toHaveProperty("message");
-    expect(selections).toHaveLength(2);
+
+    await pi.emit("session_start");
+    const nextSession = await pi.emit("before_agent_start", {
+      prompt: "Start a new Pi session",
+      systemPrompt: "ROLE",
+      systemPromptOptions: {},
+    });
+    expect(nextSession.results[0]).toHaveProperty("message");
+    expect(selections).toHaveLength(3);
   });
 
   test("caps selected paths and total attachment bytes", async () => {

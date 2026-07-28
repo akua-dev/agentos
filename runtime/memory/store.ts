@@ -50,6 +50,10 @@ export interface StampOptions {
   now?: Date;
 }
 
+export interface MemoryMutationOptions {
+  beforeCommit?: () => void;
+}
+
 export interface MateMemoryStore {
   readonly root: string;
   readonly policy: MateMemoryPolicy;
@@ -61,9 +65,18 @@ export interface MateMemoryStore {
     relativePath: string,
     options?: StampOptions,
   ): Promise<StoredTopic>;
-  writeTopic(topic: TopicWrite): Promise<StoredTopic>;
-  deleteTopic(relativePath: string): Promise<void>;
-  writeIndex(content: string): Promise<void>;
+  writeTopic(
+    topic: TopicWrite,
+    options?: MemoryMutationOptions,
+  ): Promise<StoredTopic>;
+  deleteTopic(
+    relativePath: string,
+    options?: MemoryMutationOptions,
+  ): Promise<void>;
+  writeIndex(
+    content: string,
+    options?: MemoryMutationOptions,
+  ): Promise<void>;
   resolveMemoryPath(relativePath: string): Promise<string>;
 }
 
@@ -112,7 +125,16 @@ export function createMateMemoryStore(
     const degraded: string[] = [];
     let index = "";
     try {
-      const rawIndex = await readUtf8(join(root, INDEX_NAME));
+      const boundedIndex = await readUtf8Prefix(
+        join(root, INDEX_NAME),
+        policy.maxIndexBytes,
+      );
+      const rawIndex = boundedIndex.text;
+      if (boundedIndex.truncated) {
+        degraded.push(
+          `MEMORY.md exceeds the ${policy.maxIndexBytes}-byte loading limit`,
+        );
+      }
       const lines = rawIndex.endsWith("\n")
         ? rawIndex.slice(0, -1).split("\n")
         : rawIndex.split("\n");
@@ -127,9 +149,11 @@ export function createMateMemoryStore(
         index += "\n";
       }
       if (Buffer.byteLength(index) > policy.maxIndexBytes) {
-        degraded.push(
-          `MEMORY.md exceeds the ${policy.maxIndexBytes}-byte loading limit`,
-        );
+        if (!boundedIndex.truncated) {
+          degraded.push(
+            `MEMORY.md exceeds the ${policy.maxIndexBytes}-byte loading limit`,
+          );
+        }
         index = truncateUtf8(index, policy.maxIndexBytes);
       }
     } catch (error) {
@@ -217,13 +241,17 @@ export function createMateMemoryStore(
     return writeTopicInternal(next, true);
   }
 
-  async function writeTopic(topic: TopicWrite): Promise<StoredTopic> {
-    return writeTopicInternal(topic, false);
+  async function writeTopic(
+    topic: TopicWrite,
+    options: MemoryMutationOptions = {},
+  ): Promise<StoredTopic> {
+    return writeTopicInternal(topic, false, options);
   }
 
   async function writeTopicInternal(
     topic: TopicWrite,
     existingAllowedOverLimit: boolean,
+    options: MemoryMutationOptions = {},
   ): Promise<StoredTopic> {
     await ensureLayout();
     const relativePath = canonicalTopicPath(topic.relativePath);
@@ -241,7 +269,7 @@ export function createMateMemoryStore(
       metadata: topic.metadata,
       body: topic.body,
     });
-    await atomicWrite(path, content);
+    await atomicWrite(path, content, options);
     return {
       ...parseTopicFile(content),
       relativePath,
@@ -249,17 +277,24 @@ export function createMateMemoryStore(
     };
   }
 
-  async function deleteTopic(relativePath: string) {
+  async function deleteTopic(
+    relativePath: string,
+    options: MemoryMutationOptions = {},
+  ) {
     const path = await resolveMemoryPath(relativePath);
+    options.beforeCommit?.();
     await unlink(path);
   }
 
-  async function writeIndex(content: string) {
+  async function writeIndex(
+    content: string,
+    options: MemoryMutationOptions = {},
+  ) {
     await ensureLayout();
     if (typeof content !== "string") {
       throw new Error("MEMORY.md content must be text");
     }
-    await atomicWrite(join(root, INDEX_NAME), content);
+    await atomicWrite(join(root, INDEX_NAME), content, options);
   }
 
   async function resolveMemoryPath(relativePath: string): Promise<string> {
@@ -380,17 +415,36 @@ async function ensureSafeDirectory(path: string) {
   }
 }
 
-async function atomicWrite(path: string, content: string) {
+async function atomicWrite(
+  path: string,
+  content: string,
+  options: MemoryMutationOptions = {},
+) {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   const next = `${path}.agentos-next-${crypto.randomUUID()}`;
-  const handle = await open(next, "wx", 0o600);
   try {
-    await handle.writeFile(content, "utf8");
-    await handle.sync();
-  } finally {
-    await handle.close();
+    const handle = await open(next, "wx", 0o600);
+    try {
+      await handle.writeFile(content, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    options.beforeCommit?.();
+    await rename(next, path);
+  } catch (error) {
+    try {
+      await unlink(next);
+    } catch (cleanupError) {
+      if ((cleanupError as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw new AggregateError(
+          [error, cleanupError],
+          `Could not clean up failed atomic write for ${path}`,
+        );
+      }
+    }
+    throw error;
   }
-  await rename(next, path);
 }
 
 async function readUtf8(path: string): Promise<string> {
@@ -399,6 +453,44 @@ async function readUtf8(path: string): Promise<string> {
     return new TextDecoder("utf-8", { fatal: true }).decode(contents);
   } catch {
     throw new Error(`${path} is not valid UTF-8`);
+  }
+}
+
+async function readUtf8Prefix(
+  path: string,
+  maxBytes: number,
+): Promise<{ text: string; truncated: boolean }> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+    throw new Error("memory byte limit must be a positive safe integer");
+  }
+  const handle = await open(path, "r");
+  try {
+    const contents = Buffer.allocUnsafe(maxBytes + 1);
+    let bytesRead = 0;
+    while (bytesRead < contents.length) {
+      const result = await handle.read(
+        contents,
+        bytesRead,
+        contents.length - bytesRead,
+        bytesRead,
+      );
+      if (result.bytesRead === 0) break;
+      bytesRead += result.bytesRead;
+    }
+    const truncated = bytesRead > maxBytes;
+    const prefix = contents.subarray(0, Math.min(bytesRead, maxBytes));
+    try {
+      return {
+        text: new TextDecoder("utf-8", { fatal: true }).decode(prefix, {
+          stream: truncated,
+        }),
+        truncated,
+      };
+    } catch {
+      throw new Error(`${path} is not valid UTF-8`);
+    }
+  } finally {
+    await handle.close();
   }
 }
 
