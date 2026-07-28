@@ -48,9 +48,15 @@ is correct remains Mate judgment. PostgreSQL, not Pi, enforces Task authority.
   append shell `&`, add a polling loop, or hide a daemon, controller or CLI
   wrapper in an extension. The Mate chooses native commands through the generic
   capability documented by its Skills.
-- Treat extension memory and child processes as session-bound. PostgreSQL,
+- Treat extension caches and child processes as session-bound. PostgreSQL,
   Kubernetes, Herdr, PVCs and Git remain the durable authorities described by
   AgentOS architecture; do not create shadow state here.
+- A Mate-memory adapter may read `$HOME/MEMORY.md` afresh in
+  `before_agent_start` and append a clearly delimited non-authoritative context
+  block without requiring reload. It must not write, cache, log or interpret
+  the file. Reject invalid UTF-8 or content over 32 KiB without partial
+  injection, and present a bounded degraded warning for missing, unreadable or
+  invalid content.
 - A lifecycle hook may request a bounded follow-up for a concrete completion or
   recovery backstop. Prevent recursive or unendable follow-up loops, keep
   injected context minimal, and leave semantic verification to the Agent.

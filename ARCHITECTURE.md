@@ -19,7 +19,7 @@ Each kind of state has one authority:
 | Durable fleet data | PostgreSQL |
 | Live workload state | Kubernetes |
 | Terminal and harness runtime | Herdr inside each runtime pod |
-| Agent home and unfinished work | Agent-owned PVC |
+| Agent home, Mate working memory and unfinished work | Agent-owned PVC |
 | Delivered code | Git and its remote |
 | Optional pooled AI credentials and routing state | Fleet AI Gateway PVC and process |
 
@@ -80,6 +80,13 @@ Bun and the locked AgentOS
 tool definitions. First start clones that seed to the home PVC and Pi runs from
 the persistent role directory; an init container
 installs Node and the remaining startup-critical Fleet tools onto the Mate's persistent home.
+The same home owns a private `$HOME/MEMORY.md` for concise, revisable Captain
+preferences and recurring Mate-local context. Preparation creates only a
+headings-only file when absent and never rewrites an existing one. Pi rereads
+it before every agent run and appends a bounded, delimited system-context block,
+so an exact file edit affects the next run without reload. This working memory
+cannot grant authority, override role or Skill instructions, prove live state
+or replace Task, Inbox or curated Learning records.
 Ordinary tool additions remain in that Mise-managed home. Crewmates instead
 receive a task-suited image selected by the responsible Mate. The judgment-based
 dispatch profile records the concrete harness and may preserve its other
@@ -162,7 +169,10 @@ never includes a default-branch push or merge. A contradictory brief that
 forbids every selected delivery path is rejected or reclassified before
 dispatch; an uncommitted worktree is not review-ready.
 A scout's durable output is its report; its scratch worktree or ArtifactFS mount may then be discarded.
-No Mate merges without the Captain's explicit approval or a previously recorded standing authorization, and no agent or workspace with active or unlanded work is retired by implication.
+No Mate merges without the Captain's explicit approval or a verified native
+durable authorization that covers the exact routine action. Working memory is
+never that authority, and no agent or workspace with active or unlanded work is
+retired by implication.
 Loss of one shared model-capacity path is resolved per Assignment and does not
 create a dependency between otherwise independent accepted outcomes. A worker's
 approved direct authentication remains a complete recovery path; only work with
@@ -183,11 +193,15 @@ ephemeral routing hint from likely direct human input, but never authenticates
 it or grants authority. Direct terminal delivery to another Mate is an
 exceptional recovery path for a broken listener, not ordinary communication.
 Direct Captain intervention in any attached terminal remains authoritative and is reconciled into Fleet state.
-Fleet-wide and Mate-domain Captain preferences are scoped rows in one readable
-table rather than synchronized files. Genuine unresolved Captain choices live
-in Inbox under stable keys. Investigations attest their complete choice set,
-including none, before completion; the exact answer later releases linked Task
-dependencies atomically without a separate decisions service.
+Each persistent Mate self-maintains its own private working memory. First Mate
+routes stable relevant guidance to the owning Second Mate through Inbox; the
+recipient reconciles and edits its own file, so humans never tag a child Agent
+or coordinate around First Mate. The durable Inbox row and targeted
+notification provide delivery and attention, while the file remains the active
+working-memory source. Genuine unresolved Captain choices live in Inbox under
+stable keys. Investigations attest their complete choice set, including none,
+before completion; the exact answer later releases linked Task dependencies
+atomically without a separate decisions service.
 That idempotent transaction—record the response, close the speech act and apply
 its coupled state effect—is the template for any future Inbox act that changes
 durable state.
@@ -278,10 +292,13 @@ installation, activation and process remain owned by that integration; AgentOS
 does not turn this option into a plugin manager or claim it is active from the
 manifest.
 
-For a persistent Mate, First Mate records Captain-authorized desired
-composition before applying it at a safe native harness boundary. The
-immediately prior manifest and change reason remain available for explicit
-repair, while native files and Herdr remain observed state. For an Assignment,
+For a persistent Mate, First Mate creates an Inbox decision bound to the exact
+target Agent and validated desired composition. Only its explicit approving
+Captain answer authorizes replacement or repair; generic, rejected,
+wrong-Agent and wrong-manifest answers fail. First Mate then applies it at a
+safe native harness boundary. The immediately prior manifest and change reason
+remain available for explicit repair, while native files and Herdr remain
+observed state. For an Assignment,
 the supervising Mate stages exact material outside project and auto-discovery
 paths, pins the manifest with the authoritative brief, verifies the scoped
 bundle in the child home and only then starts the harness. Once execution
@@ -469,7 +486,7 @@ PostgreSQL is the durable fleet authority for at least:
 - tasks and backlog;
 - inbox requests, questions, decisions, replies and read state;
 - durable status, handoff and coordination history;
-- captain notes and learnings;
+- Captain decisions and curated learnings;
 - pod and PVC locators;
 - schema and release metadata required for safe recovery.
 
@@ -510,8 +527,8 @@ deterministic non-secret channel for each responsible persistent Mate. A
 current Pi Mate readiness-gates only its targeted native `pg-listen` wait, then
 catches up through the read-only durable bearings
 projection before relying on the one-shot listener. Deterministic SQL maps
-Inbox recipients, Assignment owners, hierarchy edges, Captain scope and
-external-event claims; an unowned or unresolved edge falls back to First Mate
+Inbox recipients, Assignment owners, hierarchy edges and external-event
+claims; an unowned or unresolved edge falls back to First Mate
 instead of waking every current Mate. The detailed re-arm and catch-up judgment
 belongs to `$agentos-supervision`; the wake contains no Fleet row data and
 `LISTEN/NOTIFY` never starts a pod or replaces Inbox, Task or external-event
@@ -522,9 +539,8 @@ is never a generic wake path.
 
 One PostgreSQL database is one Fleet. Core tables therefore carry no `fleet_id`; a developer who intentionally needs an isolated second Fleet creates another database. Released objects live in the `agentos` schema. The `local` schema is an approved First-Mate playground whose objects are never treated as released AgentOS behavior until they return through a reviewed migration.
 
-The initial durable model stays deliberately small:
+The current durable model stays deliberately small:
 
-- `captain` stores multiple captain preferences and context entries, never a synthetic singleton Fleet row;
 - `agents` stores hierarchy, role and runtime locators, but not Kubernetes or Herdr health;
 - `projects` stores non-exclusive work scopes without assigning one permanent owner;
 - `tasks` stores durable backlog and accepted outcomes, dependencies and its

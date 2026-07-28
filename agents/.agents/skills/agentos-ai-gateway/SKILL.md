@@ -45,10 +45,11 @@ then install and authenticate this gateway fresh.
    third-party policy forbids subscription proxying. Do not claim that pooled
    personal subscription use is provider-endorsed; treat it as an explicit
    experimental Captain choice.
-5. After the Captain chooses, record the capacity posture plus exact approved
-   client classes in Fleet-scoped Captain state. Reuse that policy for later
-   dispatch and trusted harness automation. Ask again when a client, credential
-   source, cost or blast radius falls outside the recorded authority.
+5. After the Captain chooses, remember the stable capacity preference in First
+   Mate's `$HOME/MEMORY.md` and preserve exact approved client classes in Inbox
+   or the owning reviewed provider/configuration workflow. Memory may guide
+   later dispatch but grants no authority. Ask again when a client, credential
+   source, cost or blast radius falls outside the verified approval.
 6. A Second Mate may inspect and report gateway state but must route Fleet-wide
    installation, account changes and shared Secret changes through First Mate
    unless its exact charter and standing authorization cover them.

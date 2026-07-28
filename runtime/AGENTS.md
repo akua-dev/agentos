@@ -28,5 +28,9 @@ boundary in `../ARCHITECTURE.md` before changing its ownership.
 - Do not copy AgentOS Skills or repository Mise files into parallel home mirrors.
   Preserve existing agent-owned settings, checkout state and files during
   preparation.
+- Create a private `$HOME/MEMORY.md` headings-only template for persistent First
+  and Second Mates only when the file is absent. Use exclusive creation with
+  mode `0600`; never read, merge, replace, chmod or reseed an existing
+  Agent-owned file during preparation or upgrade.
 - Test observable runtime behavior against temporary homes and process
   boundaries; never test source-code strings.

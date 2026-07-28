@@ -1,6 +1,6 @@
 ---
 name: agentos-supervision
-description: Reconcile and supervise an AgentOS Mate's direct reports across PostgreSQL, Kubernetes, Herdr, PVCs, and Git. Use at every First- or Second-Mate session start, after restart or compaction, while delegated work is active, when Inbox or runtime state changes, and for blocked, stale, stuck, failed, interrupted, or recovering agents.
+description: Reconcile and supervise an AgentOS Mate's direct reports across PostgreSQL, Kubernetes, Herdr, PVCs, and Git. Use at every First- or Second-Mate session start, after restart or compaction, while delegated work is active, when Inbox or runtime state changes, for blocked, stale, stuck, failed, interrupted, or recovering agents, and when stable recurring guidance should be remembered or propagated.
 ---
 
 # Supervise AgentOS work
@@ -20,8 +20,6 @@ Supervise only direct children; every Second Mate owns its own subtree.
    ready backlog, Captain decisions and actionable external events. It does not
    load an Inbox body, mark it read, claim work or report runtime health.
    Read the full Fleet view when useful, but mutate only the authenticated hierarchy.
-   Read Fleet-scoped Captain state plus this Mate's domain-scoped entries; do
-   not copy preferences between homes or infer them from chat memory.
 3. Treat status rows as durable history, not proof of current process state.
    Inspect Kubernetes only when workload state matters and Herdr only when terminal or harness state matters.
 4. Reconcile each active direct report against its recorded pod, PVC and exact
@@ -45,7 +43,44 @@ session. Ambiguous ownership or an attempted second independent harness session
 fails closed to read-only diagnosis; do not use an expiring model lease.
 
 Conversation memory is a cache.
-PostgreSQL owns durable coordination, Kubernetes owns workload state, Herdr owns terminal state, the PVC owns unfinished home state and Git owns delivered code.
+PostgreSQL owns durable coordination, Kubernetes owns workload state, Herdr
+owns terminal state, the PVC owns Mate working memory and unfinished home state,
+and Git owns delivered code.
+
+## Maintain Mate working memory
+
+Treat `$HOME/MEMORY.md` as private, non-authoritative working memory for this
+Mate. Remember a preference or correction during the turn that establishes it
+only when it will remain useful beyond the current Task. Explicit Captain
+correction is sufficient; an inferred preference requires a repeated,
+unambiguous pattern. Put evidence-backed reusable company or project knowledge
+in `agentos.learnings` or the project authority instead.
+
+1. Read the current file and edit only the smallest relevant section.
+   Replace stale wording and remove duplicates instead of appending history.
+   Use the harness's exact edit operation for an existing file, never a
+   whole-file write. If the match is stale or ambiguous, reread and reconcile;
+   do not add a lock service or memory wrapper.
+2. Keep memory concise and below the 32 KiB injection limit. Never store
+   credentials, active Task or Assignment state, approvals, authority claims,
+   transcripts, raw tool output, copied role or Skill instructions, or volatile
+   facts available from a native authority.
+3. Scope a preference to its authorized human principal, team or domain when
+   needed. Ask rather than flattening conflicting or uncertain guidance into a
+   last-write-wins rule.
+4. First Mate updates its own memory when relevant and sends any stable guidance
+   for a Second Mate as one direct Inbox request with the intended correction,
+   scope and reason. Do not edit the child's PVC or make the Captain tag or
+   select the child.
+5. Second Mate reconciles that request with its current file, exact-edits its
+   own memory, then answers or resolves the Inbox request. Report a conflict
+   upward instead of silently choosing one claim. The durable Inbox row proves
+   delivery, not file application; a missed notification is recovered from the
+   unresolved row during bearings reconciliation.
+
+Memory may guide judgment but never grants credentials, merge permission,
+composition authority or any other action authority. Preserve consequential
+Captain choices through Inbox or the owning native provider workflow.
 
 ## Maintain the supervision cycle
 

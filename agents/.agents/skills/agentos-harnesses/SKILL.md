@@ -13,10 +13,12 @@ native harness.
 Use this precedence:
 
 1. an explicit Captain choice for this Agent or Task;
-2. durable Captain dispatch policy whose natural-language condition fits the
-   task, selected by the Mate's judgment rather than first-match code;
+2. an applicable working preference from the current Mate's dynamically loaded
+   `$HOME/MEMORY.md`, selected by judgment rather than first-match code;
 3. the selected harness's own persisted or built-in defaults.
 
+Memory guides selection but never authorizes credentials, cost, provider
+access or another consequential action.
 An omitted model or effort is meaningful. Omit its launch flag and let the
 harness decide for persistent Mates. Never replace omission with a release-wide
 AgentOS default.
@@ -33,7 +35,7 @@ failures remain native harness failures; do not hide them behind a prompt queue
 or wrapper.
 
 For a new Crewmate only, when neither an explicit Captain instruction nor the
-matching durable dispatch policy selects effort, choose a native level
+matching working preference selects effort, choose a native level
 proportionally: low for a well-understood bounded path, xhigh for ambiguous
 investigation or design, and intermediate levels as uncertainty, complexity or
 blast radius grows. Never choose `max` from this fallback; it requires explicit
@@ -41,8 +43,8 @@ Captain preference. If the selected harness lacks the intended level, cap it at
 its highest verified non-`max` value. This fallback is an Assignment decision,
 not a Pi setting or persistent Agent default.
 
-Read durable natural-language dispatch policy from scoped Captain state at
-every Crewmate intake. Record the resolved harness and every selected
+Read the current Mate's injected working memory at every Crewmate intake.
+Record the resolved harness and every selected
 harness-native choice in the versioned composition manifest, with those native
 choices under its opaque `settings` object. Keep natural-language policy out of
 scripts and TypeScript unions.

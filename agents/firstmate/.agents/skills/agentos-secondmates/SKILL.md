@@ -45,11 +45,11 @@ Require one durable charter with:
 
 Store the charter only through the released schema or provisioning primitive that owns its exact format.
 Do not improvise a second registry in Markdown, terminal state or an unreviewed JSON shape.
-Fleet-wide Captain state remains in `captain.scope = 'fleet'`; domain-local
-Second-Mate state uses `scope = 'agent'` with that Mate's UUID. Every Agent may
-read both for context, but no file copy or inherited Pi configuration becomes a
-second authority. Learnings remain domain-local unless promoted through a
-reviewed shared AgentOS or project instruction change.
+Each Mate maintains its own non-authoritative `$HOME/MEMORY.md`; load
+`$agentos-supervision` to route stable relevant guidance through Inbox so the
+Second Mate can reconcile and edit its own file. Learnings remain domain-local
+unless promoted through a reviewed shared AgentOS or project instruction
+change.
 
 ## Provision and hand off
 
@@ -82,11 +82,13 @@ reviewed shared AgentOS or project instruction change.
 7. Attach to the Second Mate Pod and load `$agentos-auth` for Pi's browser login.
    Login happens in the persistent Pi home; never copy First Mate's or the local bootstrap agent's token directory.
 8. Verify the PostgreSQL session resolves the expected Agent identity, parent and charter through the password-free URL and persisted mode-`0600` pgpass file.
-   Verify the PVC is Bound, exactly one named Herdr Agent is Ready, the selected
-   model can answer a harmless request, and Pi's live model and thinking level
-   match every explicitly selected axis. A matching `settings.json` alone is
-   not runtime evidence. Verify that a Pod replacement restores the same PVC,
-   native Pi session and effective selected profile.
+   Verify the PVC is Bound, the private `$HOME/MEMORY.md` is dynamically
+   presented as non-authoritative context, exactly one named Herdr Agent is
+   Ready, the selected model can answer a harmless request, and Pi's live model
+   and thinking level match every explicitly selected axis. A matching
+   `settings.json` alone is not runtime evidence. Verify that a Pod replacement
+   restores the same PVC, byte-for-byte memory file, native Pi session and
+   effective selected profile.
 9. In one short database transaction, record the verified Kubernetes and Herdr locators, set useful status text and change lifecycle state from `provisioning` to `active`.
    On partial failure, preserve the row and runtime evidence in `provisioning` state for reconciliation; do not create a replacement identity or destructively roll back the PVC.
 10. Move accepted in-scope Tasks with

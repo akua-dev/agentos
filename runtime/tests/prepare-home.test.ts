@@ -57,6 +57,7 @@ describe("Mate home preparation", () => {
     const customFragment = join(home, ".config", "mise", "conf.d", "custom.toml");
     const customTool = join(home, ".local", "share", "mise", "installs", "custom", "marker");
     const herdrConfig = join(home, ".config", "herdr", "config.toml");
+    const memoryFile = join(home, "MEMORY.md");
     const piSettings = join(home, ".pi", "agent", "settings.json");
     const pgpassSource = join(sandbox, "secrets", "pgpass");
     await Promise.all([
@@ -165,6 +166,21 @@ if (args.join(" ") === "integration install pi") {
       "postgres.example.internal:5432:agentos:runtime_second:secret\n",
     );
     expect((await stat(join(home, ".pgpass"))).mode & 0o777).toBe(0o600);
+    expect(await readFile(memoryFile, "utf8")).toBe(
+      [
+        "# Memory",
+        "",
+        "## Captain preferences",
+        "",
+        "## FirstMate guidance",
+        "",
+        "## Local operating context",
+        "",
+        "## Corrections",
+        "",
+      ].join("\n"),
+    );
+    expect((await stat(memoryFile)).mode & 0o777).toBe(0o600);
     expect(Bun.TOML.parse(await readFile(herdrConfig, "utf8"))).toEqual({
       onboarding: false,
       version_check: false,
@@ -206,9 +222,19 @@ if (args.join(" ") === "integration install pi") {
       )}\n`,
       "utf8",
     );
+    const customMemory = [
+      "# Memory",
+      "",
+      "## Captain preferences",
+      "",
+      "- Lead with the outcome.",
+      "",
+    ].join("\n");
+    await writeFile(memoryFile, customMemory, "utf8");
     const warm = await run(prepareHome, environment);
 
     expect(warm).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+    expect(await readFile(memoryFile, "utf8")).toBe(customMemory);
     expect(await readFile(herdrConfig, "utf8")).toBe(customHerdrConfig);
     expect(await readFile(customFragment, "utf8")).toBe(
       '[tools]\npython = "3.13"\n',
@@ -226,6 +252,7 @@ if (args.join(" ") === "integration install pi") {
     const restarted = await run(prepareHome, environment);
 
     expect(restarted).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+    expect(await readFile(memoryFile, "utf8")).toBe(customMemory);
     expect(await readFile(persistentMarker, "utf8")).toBe("unfinished work\n");
   });
 });

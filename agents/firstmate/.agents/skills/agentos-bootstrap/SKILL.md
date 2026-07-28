@@ -39,7 +39,10 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
 1. Establish the chosen target before installing AgentOS. For vCluster, create it in a dedicated host namespace with explicit host-cluster approval, enable reviewed Pod Security, resource, and network policies supported by that host, and keep a separate explicit kubeconfig or context for its API. Verify that cluster-admin inside the vCluster cannot administer the host API. Do not claim hard isolation when workloads still share host nodes or when the host CNI cannot enforce the selected NetworkPolicy.
 2. Explain the namespace-scoped `agentos-firstmate.yaml` and the dedicated-target `agentos-firstmate-cluster-admin.yaml`, including the recovery operations unavailable in scoped mode. A dedicated real cluster or isolated vCluster normally uses cluster-admin inside that target; a direct shared host installation requires a separate explicit decision. Ask for the selected RBAC and installation approval.
 3. Load [AgentOS Runtime](../../../../.agents/skills/agentos-runtime/SKILL.md). Apply the selected stable release URL or reviewed local preview manifest with `kubectl --context <target-context> apply -f <source>`. Never apply the AgentOS manifest through the host context when vCluster was selected.
-4. Wait for the StatefulSet and verify a bound retained PVC, two successful sequential init containers, one running First Mate container, exactly one Herdr agent named `firstmate`, and the selected image digest on all three containers.
+4. Wait for the StatefulSet and verify a bound retained PVC, a private
+   headings-only `$HOME/MEMORY.md`, two successful sequential init containers,
+   one running First Mate container, exactly one Herdr agent named `firstmate`,
+   and the selected image digest on all three containers.
 5. Load [AgentOS Authentication](../../../../.agents/skills/agentos-auth/SKILL.md). Authenticate Pi inside the persistent pod and verify a harmless real model request.
    When the Captain selects a concrete First-Mate model or thinking level after
    the initial Pi session already exists, apply it through Pi's native live
@@ -48,7 +51,12 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
    Present personal GitHub login and the organization-owned GitHub App path
    separately; GitHub is optional until a selected project workflow requires
    it, and either path needs its own approval.
-6. Replace the Pod once. Verify the same PVC identity, an Agent-home marker, exactly one First Mate pane, the same native Pi session and ordinary Mise tool resolution from a foreign worktree. If a GitHub App was selected, verify that only First Mate received its Secret mount and prove one harmless short-lived-token read after replacement.
+6. Replace the Pod once. Verify the same PVC identity, byte-for-byte preserved
+   `$HOME/MEMORY.md`, an Agent-home marker, exactly one First Mate pane, the
+   same native Pi session and ordinary Mise tool resolution from a foreign
+   worktree. If a GitHub App was selected, verify that only First Mate received
+   its Secret mount and prove one harmless short-lived-token read after
+   replacement.
 7. Attach the developer to the persistent First Mate, hand it authority and stop the local seed from performing competing Fleet work.
 8. From the cluster First Mate, load [AgentOS Database](../../../../.agents/skills/agentos-database/SKILL.md). Present external PostgreSQL and self-hosted CloudNativePG without an implicit preference. After the developer chooses, use the released AgentOS database shape and apply its SQL assets as the selected Fleet-owner login; the migrations create or adopt the root First-Mate row and bind it to that same login. Do not create a separate migrator or manually map First Mate. For self-hosting, discover and verify the current compatible official CNPG and PostgreSQL releases before requesting installation approval.
 9. After Fleet identity exists, present the model-capacity posture for workers
@@ -59,10 +67,12 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
    Explain the gateway's additional service, retained credential authority,
    selected-client Secret and NetworkPolicy boundary, and that pooled personal
    subscription use is experimental rather than provider-endorsed. Record the
-   Captain's choice in Fleet-scoped Captain state. Ask separately before gateway
-   installation, each provider login, initial client-Secret distribution and
-   any required Pod restart unless exact standing authorization already covers
-   the action. Verify one harmless real no-tool request from an approved worker
+   stable capacity preference in First Mate's `$HOME/MEMORY.md`, but preserve
+   exact approval through Inbox or the owning provider workflow because memory
+   grants no authority. Ask separately before gateway installation, each
+   provider login, initial client-Secret distribution and any required Pod
+   restart unless verified native durable authorization already covers the
+   action. Verify one harmless real no-tool request from an approved worker
    or trusted harness automation through the selected path. If the Captain
    defers this step, report minimal single-Mate mode plainly and require a
    verified direct login before each future worker launch; do not call the Fleet
@@ -105,8 +115,9 @@ For an upgrade:
    manifest. Preserve the existing StatefulSet identity and home claim; never
    recreate the namespace or PVC as an upgrade shortcut.
 5. Verify the observed target digest on every init and runtime container, the
-   same PVC and native Pi session, the exact release checkout, Herdr attach,
-   provider authentication, database identity and released security checks.
+   same PVC, preserved `$HOME/MEMORY.md` and native Pi session, the exact
+   release checkout, Herdr attach, provider authentication, database identity
+   and released security checks.
    Reapply an approved installation-specific database client patch only when
    inspection proves the manifest update removed it.
 

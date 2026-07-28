@@ -31,6 +31,19 @@ const piAgentDirectory =
   process.env.PI_CODING_AGENT_DIR ?? join(home, ".pi", "agent");
 const piExtensionDirectory = join(piAgentDirectory, "extensions");
 const piSettings = join(piAgentDirectory, "settings.json");
+const memoryFile = join(home, "MEMORY.md");
+const initialMemory = [
+  "# Memory",
+  "",
+  "## Captain preferences",
+  "",
+  "## FirstMate guidance",
+  "",
+  "## Local operating context",
+  "",
+  "## Corrections",
+  "",
+].join("\n");
 
 await Promise.all(
   [
@@ -45,6 +58,7 @@ await Promise.all(
   ].map((directory) => mkdir(directory, { recursive: true, mode: 0o700 })),
 );
 
+if (usesPi) await createPrivateFileIfAbsent(memoryFile, initialMemory);
 if (usesPi) await ensureAgentosCheckout();
 
 const pgpassSource = process.env.AGENTOS_PGPASS_SOURCE;
@@ -125,6 +139,15 @@ async function copyPrivateFileAtomic(source: string, destination: string) {
   const next = `${destination}.agentos-next`;
   await copyPrivateFile(source, next);
   await rename(next, destination);
+}
+
+async function createPrivateFileIfAbsent(path: string, contents: string) {
+  try {
+    await writeFile(path, contents, { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return;
+    throw error;
+  }
 }
 
 async function reconcileSelectedPiDefaults() {

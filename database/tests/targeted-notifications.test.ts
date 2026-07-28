@@ -231,31 +231,27 @@ describe.serial("targeted Mate notifications", () => {
     expectTargetSet([ids.firstMate, ids.secondA]);
   });
 
-  test("routes Fleet and domain Captain state without waking a sibling", async () => {
-    clearNotifications();
-    await database.exec(`
-      INSERT INTO agentos.captain (
-        topic, content, recorded_by_agent_id, scope
-      ) VALUES (
-        'targeted-fleet', 'Fleet policy changed', '${ids.firstMate}', 'fleet'
-      )
-    `);
-    await waitForNotificationCount(1);
-    expectTargetSet([ids.firstMate]);
-
+  test("routes Mate guidance through its explicit Inbox recipient only", async () => {
     clearNotifications();
     await asRole("targeted_second_a", () =>
       database.exec(`
-        INSERT INTO agentos.captain (
-          topic, content, recorded_by_agent_id, scope, scope_agent_id
+        INSERT INTO agentos.inbox (
+          id, sender_agent_id, sender_label, recipient_agent_id, task_id, kind,
+          subject, body, status, status_text
         ) VALUES (
-          'targeted-domain', 'Domain policy changed', '${ids.secondA}',
-          'agent', '${ids.secondA}'
+          '63000000-0000-4000-8000-000000000003',
+          '${ids.secondA}', 'targeted-second-a', '${ids.firstMate}',
+          '${ids.mateTask}', 'notification', 'Guidance learned',
+          'Review this durable guidance and propagate it deliberately.',
+          'unread', 'Awaiting First Mate receipt'
         )
       `),
     );
     await waitForNotificationCount(1);
-    expectTargetSet([ids.secondA]);
+    expectTargetSet([ids.firstMate]);
+    expect(targetPayloads(ids.firstMate)).toEqual([
+      { operation: "insert", table: "inbox", version: 2 },
+    ]);
   });
 
   test("routes unowned external intent to First Mate and claim transition to both owners", async () => {

@@ -10,6 +10,8 @@ runtime is online, but that bootstrap stage is not a database-free operating
 mode. The schema stores accepted work, accountable ownership, handoffs,
 Captain-gated decisions and durable coordination—not raw model reasoning,
 harness transcripts, terminal output or a mirror of the selected issue tracker.
+Recurring Mate preferences and working context live in that Mate's private
+`$HOME/MEMORY.md`, not in PostgreSQL, and never grant authority.
 
 Create a journaled empty migration, then write the approved SQL into it:
 
@@ -134,8 +136,9 @@ Second Mate requires a non-empty charter summary and scope in metadata. The
 Function creates neither PostgreSQL roles nor Kubernetes resources.
 
 `0005_durable_coordination_contracts.sql` makes core Mate artifacts explicit.
-Captain rows carry Fleet or Mate-domain scope while every registered Agent
-keeps the complete read view. Assignments store their authoritative brief,
+At this historical migration stage, Captain rows gained Fleet or Mate-domain
+scope while every registered Agent kept the complete read view. Assignments
+store their authoritative brief,
 resolved dispatch profile, final or handoff report and append-only handoff
 link. `agentos.handoff_task_assignment` preserves one Task identity across an
 atomic, idempotent transfer. Captain choices remain Inbox deliveries under a
@@ -178,9 +181,10 @@ lets a Crewmate receive a durable row after only a concise Herdr doorbell.
 
 `0010_preserve_runtime_privileges.sql` carries the cumulative runtime-grant
 configuration forward while retaining `receive_inbox` execution. In particular,
-adding the receipt primitive must not erase Second Mate's later Captain-domain,
-Assignment-artifact or durable-coordination privileges. The full authorization
-and coordination suites exercise the preserved grants with real roles.
+adding the receipt primitive could not erase Second Mate's then-existing
+Captain-domain, Assignment-artifact or durable-coordination privileges. The
+full authorization and coordination suites exercise the preserved grants with
+real roles.
 
 `0011_agent_composition.sql` defines one versioned composition-manifest
 contract for persistent Agents and bounded Assignments. A nullable
@@ -214,17 +218,13 @@ authority that PostgreSQL cannot meaningfully deny to its owner; such a direct
 repair is outside the released Function contract and must not be represented as
 Function-authorized. Completed Assignment history cannot be repaired in place.
 
-The released persistent-composition path goes through
-`agentos.replace_agent_composition` with an active Fleet- or Agent-scoped
-Captain row under the exact `agent-composition-authority` topic and a durable
-reason. An unrelated Captain preference is not mutation authority. Only First
-Mate can change its own or a direct Second Mate's desired composition; the
-immediately prior manifest is retained
-in Agent metadata for one explicit rollback. Incorrect durable state uses the
-separate `agentos.repair_agent_composition` path so repair is visible rather
-than disguised as ordinary selection. Owner-level administrative writes remain
-possible by definition and are not evidence that these released checks ran.
-These rows still do not claim that Pi, files or Herdr loaded the desired setup.
+At the `0011` stage, persistent composition used a scoped Captain row. Migration
+`0015` replaces that broad authority while retaining
+`agentos.replace_agent_composition` and
+`agentos.repair_agent_composition` as the mutation entry points. Owner-level
+administrative writes remain possible by definition and are not evidence that
+these released checks ran. Desired rows still do not claim that Pi, files or
+Herdr loaded the setup.
 
 `0012_atomic_task_acceptance.sql` adds the idempotent
 `agentos.create_task_with_assignment` and `agentos.accept_backlog_task`
@@ -244,3 +244,21 @@ wake hints to deterministic responsible Mate channels instead of the global
 channel. The hints remain non-secret routing signals; durable rows remain the
 source of truth. `tests/targeted-notifications.test.ts` exercises routing,
 rollback and channel isolation.
+
+`0015_mate_memory.sql` removes the overloaded `agentos.captain` preference
+table. It aborts before any change while an active legacy row remains, requiring
+the owning Mate to preserve relevant current context in its private
+`$HOME/MEMORY.md`, verify dynamic injection and explicitly archive the row.
+After that fail-closed boundary, it removes the table, policies, triggers,
+notification routing and principal grants without `CASCADE`; Tasks,
+Assignments, Inbox, Learnings and external events remain intact.
+
+Persistent composition now requires a typed Inbox decision created by
+`agentos.hold_agent_composition_decision` for one accepted Task, target Agent
+and structurally exact validated manifest. The corresponding
+`agentos.resolve_agent_composition_decision` records an explicit approve or
+reject answer. Only the exact approving answer ID authorizes replacement or
+repair; generic, unresolved, rejected, wrong-Agent and wrong-manifest answers
+fail. `tests/captain-table-removal-migration.test.ts` and
+`tests/composition-manifests.test.ts` exercise the migration guard, final table
+absence, provisioning compatibility and exact authority boundary.

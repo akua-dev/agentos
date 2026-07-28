@@ -49,8 +49,11 @@ and preserve it.
   manifest contract. Freeze the Assignment brief and composition at execution
   start, block active harness drift, and expose the released reasoned
   First-Mate repair for corrupt active dispatch data; completed history remains
-  immutable. Use the Captain-authorized Functions as the released persistent
-  replacement or repair path. First Mate remains the PostgreSQL owner: its
+  immutable. Persistent replacement or repair requires the exact approving
+  answer produced by the typed composition-decision Functions, bound to the
+  target Agent and structurally equal manifest. Reject generic, unresolved,
+  rejected, wrong-Agent and wrong-manifest answers. First Mate remains the
+  PostgreSQL owner: its
   explicit administrative writes are outside this subordinate authorization
   boundary and must never be described as proof that a released Function ran.
   PostgreSQL records desired composition and the immediate rollback manifest;
@@ -67,9 +70,9 @@ and preserve it.
 - Never hold a transaction open while a model reasons or a provider command runs. In the final short transaction, mutate coupled Tasks and Inbox rows and call the released claim-completion Function so stale work rolls back atomically.
 - Apply migrations as the login that owns the released AgentOS tables. The migration chain creates or adopts the single active root First-Mate row and binds it to that same Fleet owner; do not introduce a separate migrator or manual First-Mate mapping. Bind every other Agent only to an already-created, non-privileged login. Migrations never create login roles or contain credentials.
 - Give every active registered Agent the same unfiltered `SELECT` view across released Fleet tables; never hide rows by role or hierarchy. Keep mutations deny-by-default. Mates may create and assign Tasks inside their managed hierarchy; assigned Crewmates may change only work-state columns. Any additional table or column needs a reviewed write policy first.
-- Scope Captain rows as Fleet-wide or Mate-domain context without hiding them
-  from the shared read view. First Mate administers Fleet scope; a Second Mate
-  may mutate only its own domain scope.
+- Keep working preferences and recurring Mate context out of PostgreSQL.
+  `agentos.captain` is removed by the forward migration; do not recreate a
+  generic preference table or treat prose memory as authorization.
 - Preserve completed Assignment history. Retirement must reject active Assignments and active child Agents; never cascade or invent a handoff.
 - Bind external reconciliation to the authenticated `session_user`. Only First and Second Mates receive the claim Functions, and direct runtime updates to external-event coordination columns stay forbidden.
 - Preserve First Mate's owner-level administration of the Fleet. Do not grant `SUPERUSER`, `CREATEDB`, `CREATEROLE` or `BYPASSRLS` merely to administer AgentOS.
@@ -87,6 +90,9 @@ and preserve it.
 - Let Drizzle Kit maintain migration filenames, ordering metadata and the applied-migration journal.
 - Never use `drizzle-kit push`, `pull`, or non-custom `generate` in this package.
 - Treat released migrations as immutable. Fix later behavior with a new forward migration; do not rewrite applied history or improvise destructive down-migrations.
+- A migration that removes legacy human intent must fail closed until its
+  active rows have been preserved in their owning current authority and
+  explicitly retired; SQL must not claim it copied PVC state it cannot inspect.
 
 ## Safety and verification
 
