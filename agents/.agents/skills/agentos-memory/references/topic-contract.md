@@ -28,6 +28,8 @@ Rules:
 - `pinned` is a boolean. At most four pinned topics load.
 - Paths are lowercase safe relative paths under `topics/` and end in `.md`.
 - The runtime supports at most 200 topic files.
+- Each topic file is bounded to 100,000 bytes; oversized native files are
+  skipped with a degradation notice during startup recall.
 - Normal recall selects at most five relevant topics, and all topic
   attachments together stay within 61,440 bytes per Pi session.
 - `MEMORY.md` is an index, not a growing memory body. Keep one concise link and

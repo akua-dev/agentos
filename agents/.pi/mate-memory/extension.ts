@@ -81,6 +81,7 @@ export function registerMateMemoryExtension(
     store,
     runner: dependencies.maintenanceRunner,
     isPaused: () => paused,
+    getPauseGeneration: () => pauseGeneration,
     now,
     onEvent: (event) =>
       pi.appendEntry("agentos-mate-memory-maintenance", event),
@@ -191,7 +192,9 @@ export function registerMateMemoryExtension(
     }
     let startup: StartupMemoryContext;
     try {
-      startup = await store.readStartupContext();
+      startup = await store.readStartupContext({
+        beforeRead: () => assertMemoryGeneration(generation),
+      });
     } catch (error) {
       startup = {
         index: "",
@@ -248,7 +251,9 @@ export function registerMateMemoryExtension(
         ) {
           continue;
         }
-        const topic = await store.readTopic(path);
+        const topic = await store.readTopic(path, {
+          beforeRead: () => assertMemoryGeneration(generation),
+        });
         if (!isActiveGeneration(generation)) {
           return { systemPrompt: event.systemPrompt };
         }
@@ -307,6 +312,7 @@ export function registerMateMemoryExtension(
     }
     if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
     if (nativeWriteTools.has(event.toolName)) {
+      maintenance.beginDirectMemoryWrite();
       const existedBeforeCall = await nativePathExists(target);
       if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
       if (!existedBeforeCall && relativePath.startsWith("topics/")) {
@@ -342,7 +348,9 @@ export function registerMateMemoryExtension(
     if (!isActiveGeneration(generation)) return;
     try {
       if (pending.relativePath === "MEMORY.md") {
-        const startup = await store.readStartupContext();
+        const startup = await store.readStartupContext({
+          beforeRead: () => assertMemoryGeneration(generation),
+        });
         if (!isActiveGeneration(generation)) return;
         const indexWarnings = startup.degraded.filter((warning) =>
           warning.startsWith("MEMORY.md"),
@@ -354,12 +362,12 @@ export function registerMateMemoryExtension(
         await store.validateAndStamp(pending.relativePath, {
           now: now(),
           enforceTopicLimit: !pending.existedBeforeCall,
+          beforeRead: () => assertMemoryGeneration(generation),
           beforeCommit: () => assertMemoryGeneration(generation),
         });
       }
       if (!isActiveGeneration(generation)) return;
       dependencies.onDirectMemoryWrite?.(pending.relativePath);
-      maintenance.noteDirectMemoryWrite();
     } catch (error) {
       return failedToolResult(event, error);
     }
@@ -409,6 +417,38 @@ export function registerMateMemoryExtension(
           },
         ],
         details: { paused },
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "memory_delete_topic",
+    label: "Forget a memory topic",
+    description:
+      "Forget one private Mate memory topic. This safe topic-scoped delete does not edit MEMORY.md; use Pi's native exact edit on MEMORY.md to remove its retrieval hook afterward.",
+    parameters: Type.Object({
+      path: Type.String({
+        minLength: 1,
+        maxLength: 512,
+        pattern: "^topics/[a-z0-9][a-z0-9._/-]*\\.md$",
+      }),
+    }),
+    async execute(_toolCallId, { path }) {
+      const generation = pauseGeneration;
+      assertMemoryGeneration(generation);
+      const relativePath = canonicalTopicPath(path);
+      await store.resolveMemoryPath(relativePath);
+      assertMemoryGeneration(generation);
+      maintenance.beginDirectMemoryWrite();
+      await store.deleteTopic(relativePath, {
+        beforeRead: () => assertMemoryGeneration(generation),
+        beforeCommit: () => assertMemoryGeneration(generation),
+      });
+      assertMemoryGeneration(generation);
+      dependencies.onDirectMemoryWrite?.(relativePath);
+      return {
+        content: [{ type: "text" as const, text: `Deleted ${relativePath}.` }],
+        details: { relativePath },
       };
     },
   });
@@ -501,6 +541,32 @@ function memoryRelativePath(root: string, target: string): string {
   const fromRoot = relative(root, target).split(sep).join("/");
   if (!fromRoot) throw new Error("memory root itself is not a file");
   return fromRoot;
+}
+
+function canonicalTopicPath(value: string): string {
+  const normalized = value.replaceAll("\\", "/");
+  if (
+    !normalized.startsWith("topics/") ||
+    normalized.includes("/../") ||
+    normalized.includes("/./") ||
+    normalized.endsWith("/") ||
+    !normalized.endsWith(".md")
+  ) {
+    throw new Error("memory delete path must be a relative topics/*.md path");
+  }
+  const segments = normalized.split("/");
+  if (
+    segments.some(
+      (segment) =>
+        !segment ||
+        segment === "." ||
+        segment === ".." ||
+        !/^[a-z0-9][a-z0-9._-]*$/.test(segment),
+    )
+  ) {
+    throw new Error("memory delete path must use lowercase safe topic segments");
+  }
+  return normalized;
 }
 
 function pausedMemoryToolResult() {

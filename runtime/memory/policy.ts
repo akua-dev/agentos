@@ -7,6 +7,7 @@ export interface MateMemoryPolicy {
   dreamMinPriorSessions: number;
   maxIndexLines: number;
   maxIndexBytes: number;
+  maxTopicBytes: number;
   maxTopicFiles: number;
   maxRelevantTopics: number;
   maxPinnedTopics: number;
@@ -22,6 +23,7 @@ export const mateMemoryPolicy = {
   dreamMinPriorSessions: 5,
   maxIndexLines: 200,
   maxIndexBytes: 25_000,
+  maxTopicBytes: 100_000,
   maxTopicFiles: 200,
   maxRelevantTopics: 5,
   maxPinnedTopics: 4,

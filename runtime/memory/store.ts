@@ -46,13 +46,19 @@ export interface StartupMemoryContext {
   degraded: string[];
 }
 
+export interface MemoryReadOptions {
+  beforeRead?: () => void | Promise<void>;
+}
+
 export interface StampOptions {
   now?: Date;
   enforceTopicLimit?: boolean;
+  beforeRead?: () => void | Promise<void>;
   beforeCommit?: () => void;
 }
 
 export interface MemoryMutationOptions {
+  beforeRead?: () => void | Promise<void>;
   beforeCommit?: () => void;
 }
 
@@ -60,9 +66,12 @@ export interface MateMemoryStore {
   readonly root: string;
   readonly policy: MateMemoryPolicy;
   ensureLayout(): Promise<void>;
-  readStartupContext(): Promise<StartupMemoryContext>;
-  listTopics(): Promise<StoredTopic[]>;
-  readTopic(relativePath: string): Promise<StoredTopic>;
+  readStartupContext(options?: MemoryReadOptions): Promise<StartupMemoryContext>;
+  listTopics(options?: MemoryReadOptions): Promise<StoredTopic[]>;
+  readTopic(
+    relativePath: string,
+    options?: MemoryReadOptions,
+  ): Promise<StoredTopic>;
   validateAndStamp(
     relativePath: string,
     options?: StampOptions,
@@ -122,11 +131,16 @@ export function createMateMemoryStore(
     }
   }
 
-  async function readStartupContext(): Promise<StartupMemoryContext> {
+  async function readStartupContext(
+    options: MemoryReadOptions = {},
+  ): Promise<StartupMemoryContext> {
+    await runReadGuard(options.beforeRead);
     await ensureLayout();
+    await runReadGuard(options.beforeRead);
     const degraded: string[] = [];
     let index = "";
     try {
+      await runReadGuard(options.beforeRead);
       const boundedIndex = await readUtf8Prefix(
         join(root, INDEX_NAME),
         policy.maxIndexBytes,
@@ -159,14 +173,16 @@ export function createMateMemoryStore(
         index = truncateUtf8(index, policy.maxIndexBytes);
       }
     } catch (error) {
+      if (error instanceof MemoryReadGuardError) throw error;
       degraded.push(memoryReadError(INDEX_NAME, error));
     }
 
     const topics: StoredTopic[] = [];
-    for (const relativePath of await topicPaths(root)) {
+    for (const relativePath of await topicPaths(root, options.beforeRead)) {
       try {
-        topics.push(await readTopic(relativePath));
+        topics.push(await readTopic(relativePath, options));
       } catch (error) {
+        if (error instanceof MemoryReadGuardError) throw error;
         degraded.push(memoryReadError(relativePath, error));
       }
     }
@@ -206,19 +222,35 @@ export function createMateMemoryStore(
     };
   }
 
-  async function listTopics(): Promise<StoredTopic[]> {
+  async function listTopics(
+    options: MemoryReadOptions = {},
+  ): Promise<StoredTopic[]> {
+    await runReadGuard(options.beforeRead);
     await ensureLayout();
-    const topics = await Promise.all(
-      (await topicPaths(root)).map((relativePath) => readTopic(relativePath)),
-    );
+    await runReadGuard(options.beforeRead);
+    const topics: StoredTopic[] = [];
+    for (const relativePath of await topicPaths(root, options.beforeRead)) {
+      topics.push(await readTopic(relativePath, options));
+    }
     return topics.sort((left, right) =>
       left.relativePath.localeCompare(right.relativePath),
     );
   }
 
-  async function readTopic(relativePath: string): Promise<StoredTopic> {
+  async function readTopic(
+    relativePath: string,
+    options: MemoryReadOptions = {},
+  ): Promise<StoredTopic> {
+    await runReadGuard(options.beforeRead);
     const path = await resolveMemoryPath(relativePath);
-    const content = await readUtf8(path);
+    await runReadGuard(options.beforeRead);
+    const bounded = await readUtf8Prefix(path, policy.maxTopicBytes);
+    if (bounded.truncated) {
+      throw new Error(
+        `${canonicalTopicPath(relativePath)} exceeds the ${policy.maxTopicBytes}-byte topic limit`,
+      );
+    }
+    const content = bounded.text;
     const parsed = parseTopicFile(content);
     return {
       ...parsed,
@@ -231,7 +263,9 @@ export function createMateMemoryStore(
     relativePath: string,
     options: StampOptions = {},
   ): Promise<StoredTopic> {
-    const current = await readTopic(relativePath);
+    const current = await readTopic(relativePath, {
+      beforeRead: options.beforeRead,
+    });
     const next: TopicWrite = {
       relativePath: current.relativePath,
       body: current.body,
@@ -241,6 +275,7 @@ export function createMateMemoryStore(
       },
     };
     return writeTopicInternal(next, !options.enforceTopicLimit, {
+      beforeRead: options.beforeRead,
       beforeCommit: options.beforeCommit,
     });
   }
@@ -257,19 +292,24 @@ export function createMateMemoryStore(
     existingAllowedOverLimit: boolean,
     options: MemoryMutationOptions = {},
   ): Promise<StoredTopic> {
+    await runReadGuard(options.beforeRead);
     await ensureLayout();
+    await runReadGuard(options.beforeRead);
     const relativePath = canonicalTopicPath(topic.relativePath);
+    await runReadGuard(options.beforeRead);
     const path = await resolveMemoryPath(relativePath);
+    await runReadGuard(options.beforeRead);
     const exists = await pathExists(path);
+    await runReadGuard(options.beforeRead);
     if (!exists) {
-      const current = await topicPaths(root);
+      const current = await topicPaths(root, options.beforeRead);
       if (current.length >= policy.maxTopicFiles) {
         throw new Error(
           `Mate memory has reached its ${policy.maxTopicFiles}-topic limit`,
         );
       }
     } else if (!existingAllowedOverLimit) {
-      const current = await topicPaths(root);
+      const current = await topicPaths(root, options.beforeRead);
       if (current.length > policy.maxTopicFiles) {
         throw new Error(
           `Mate memory exceeds its ${policy.maxTopicFiles}-topic limit`,
@@ -280,6 +320,14 @@ export function createMateMemoryStore(
       metadata: topic.metadata,
       body: topic.body,
     });
+    if (
+      !existingAllowedOverLimit &&
+      Buffer.byteLength(content) > policy.maxTopicBytes
+    ) {
+      throw new Error(
+        `${relativePath} exceeds the ${policy.maxTopicBytes}-byte topic limit`,
+      );
+    }
     await atomicWrite(path, content, options);
     return {
       ...parseTopicFile(content),
@@ -292,7 +340,9 @@ export function createMateMemoryStore(
     relativePath: string,
     options: MemoryMutationOptions = {},
   ) {
+    await runReadGuard(options.beforeRead);
     const path = await resolveMemoryPath(relativePath);
+    await runReadGuard(options.beforeRead);
     options.beforeCommit?.();
     await unlink(path);
   }
@@ -301,7 +351,9 @@ export function createMateMemoryStore(
     content: string,
     options: MemoryMutationOptions = {},
   ) {
+    await runReadGuard(options.beforeRead);
     await ensureLayout();
+    await runReadGuard(options.beforeRead);
     if (typeof content !== "string") {
       throw new Error("MEMORY.md content must be text");
     }
@@ -355,13 +407,17 @@ function canonicalTopicPath(value: string): string {
   return normalized;
 }
 
-async function topicPaths(root: string): Promise<string[]> {
+async function topicPaths(
+  root: string,
+  beforeRead?: () => void | Promise<void>,
+): Promise<string[]> {
   const base = join(root, "topics");
   const results: string[] = [];
   await walk(base, "topics");
   return results.sort();
 
   async function walk(directory: string, prefix: string): Promise<void> {
+    await runReadGuard(beforeRead);
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
@@ -372,6 +428,23 @@ async function topicPaths(root: string): Promise<string[]> {
         results.push(relativePath);
       }
     }
+  }
+}
+
+class MemoryReadGuardError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "MemoryReadGuardError";
+  }
+}
+
+async function runReadGuard(
+  guard?: () => void | Promise<void>,
+): Promise<void> {
+  try {
+    await guard?.();
+  } catch (error) {
+    throw new MemoryReadGuardError(error);
   }
 }
 

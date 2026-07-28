@@ -259,4 +259,36 @@ describe("Mate memory activity projection", () => {
     const activity = createMemoryActivityStore(home);
     await expect(activity.ensureLayout()).rejects.toThrow("symbolic link");
   });
+
+  test("refuses a symbolic-link coordination state file", async () => {
+    const home = await temporaryHome();
+    const outside = join(home, "outside-state.json");
+    const activity = createMemoryActivityStore(home);
+    await activity.ensureLayout();
+    await writeFile(
+      outside,
+      JSON.stringify({ version: 1, firstSeenAt: "2026-07-28T08:00:00.000Z", completedSessions: [] }),
+      "utf8",
+    );
+    await symlink(outside, activity.statePath);
+
+    await expect(activity.readState()).rejects.toThrow("symbolic link");
+  });
+
+  test("preserves concurrent session and Dream state updates", async () => {
+    const home = await temporaryHome();
+    const activity = createMemoryActivityStore(home);
+    await activity.ensureState(new Date("2026-07-28T08:00:00.000Z"));
+
+    await Promise.all([
+      activity.completeSession("session-1", new Date("2026-07-28T09:00:00.000Z")),
+      activity.markDreamDiscovery(new Date("2026-07-28T10:00:00.000Z")),
+    ]);
+
+    const state = await activity.readState();
+    expect(state.completedSessions).toEqual([
+      { sessionId: "session-1", completedAt: "2026-07-28T09:00:00.000Z" },
+    ]);
+    expect(state.lastDreamDiscoveryAt).toBe("2026-07-28T10:00:00.000Z");
+  });
 });

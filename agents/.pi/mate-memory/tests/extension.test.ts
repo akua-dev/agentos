@@ -629,6 +629,60 @@ describe("Pi Mate memory extension", () => {
     expect(directWrites).toBe(1);
   });
 
+  test("exposes guarded direct topic forgetting without editing MEMORY.md", async () => {
+    const { home, store } = await fixture();
+    const pi = new FakePi();
+    const controller = registerMateMemoryExtension(pi.extensionApi(), { home });
+    const forget = pi.tools.get("memory_delete_topic")!;
+
+    expect(forget).toBeDefined();
+    await forget.execute(
+      "forget-1",
+      { path: "topics/reporting.md" } as never,
+      undefined,
+      undefined,
+      {} as never,
+    );
+
+    await expect(store.readTopic("topics/reporting.md")).rejects.toThrow();
+    expect(await readFile(join(home, "memory", "MEMORY.md"), "utf8")).toContain(
+      "reporting",
+    );
+    expect(controller!.isPaused()).toBe(false);
+  });
+
+  test("passes the pause-generation read guard into startup recall", async () => {
+    const { home, store } = await fixture();
+    const pi = new FakePi();
+    let reads = 0;
+    const guardedStore: MateMemoryStore = {
+      ...store,
+      async readStartupContext(options) {
+        return store.readStartupContext({
+          beforeRead: async () => {
+            reads += 1;
+            if (reads === 2) {
+              await pi.commands.get("memory")!.handler("pause", {
+                ui: { notify: () => undefined },
+              } as unknown as ExtensionCommandContext);
+            }
+            await options?.beforeRead?.();
+          },
+        });
+      },
+    };
+    registerMateMemoryExtension(pi.extensionApi(), { home, store: guardedStore });
+
+    const result = await pi.emit("before_agent_start", {
+      prompt: "Recall memory",
+      systemPrompt: "ROLE",
+      systemPromptOptions: {},
+    });
+
+    expect(result.results[0]).toEqual({ systemPrompt: "ROLE" });
+    expect(reads).toBe(2);
+  });
+
   test("connects only direct human input to restricted post-turn extraction", async () => {
     const { home } = await fixture();
     const pi = new FakePi();

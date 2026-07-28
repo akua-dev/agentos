@@ -10,7 +10,7 @@ import {
   rm,
   unlink,
 } from "node:fs/promises";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 export type MemoryActivityProjection =
   | { kind: "human" | "assistant"; text: string }
@@ -86,15 +86,23 @@ export function createMemoryActivityStore(
   home: string,
   options: MemoryActivityOptions = {},
 ): MemoryActivityStore {
-  const memoryRoot = join(home, "memory");
+  const homeRoot = resolve(home);
+  const memoryRoot = join(homeRoot, "memory");
   const logsRoot = join(memoryRoot, "logs");
-  const statePath = join(home, ".local", "state", "agentos", "memory.json");
+  const statePath = join(
+    homeRoot,
+    ".local",
+    "state",
+    "agentos",
+    "memory.json",
+  );
   const lockPath = join(memoryRoot, ".consolidate-lock");
   const now = options.now ?? (() => new Date());
   const maxFileBytes = options.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES;
   const maxSessionFiles =
     options.maxSessionFiles ?? DEFAULT_MAX_SESSION_FILES;
   const retentionDays = options.retentionDays ?? DEFAULT_RETENTION_DAYS;
+  let stateMutationTail = Promise.resolve();
 
   return {
     logsRoot,
@@ -114,11 +122,21 @@ export function createMemoryActivityStore(
   async function ensureLayout() {
     await ensureSafeDirectory(memoryRoot);
     await ensureSafeDirectory(logsRoot);
-    const local = join(home, ".local");
-    const state = join(local, "state");
-    await ensureSafeDirectory(local);
-    await ensureSafeDirectory(state);
-    await ensureSafeDirectory(dirname(statePath));
+    await ensureSafeContainedDirectory(homeRoot, dirname(statePath));
+    await ensureSafeStateFile();
+  }
+
+  async function ensureSafeStateFile() {
+    await ensureSafeContainedDirectory(homeRoot, dirname(statePath));
+    try {
+      const entry = await lstat(statePath);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`${statePath} must not be a symbolic link`);
+      }
+      if (!entry.isFile()) throw new Error(`${statePath} must be a regular file`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
   }
 
   async function append(
@@ -180,9 +198,13 @@ export function createMemoryActivityStore(
   }
 
   async function ensureState(at = now()): Promise<MemoryActivityState> {
+    return withStateMutation(() => ensureStateUnlocked(at));
+  }
+
+  async function ensureStateUnlocked(at: Date): Promise<MemoryActivityState> {
     await ensureLayout();
     try {
-      return await readState();
+      return await readStateUnlocked();
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       const state: MemoryActivityState = {
@@ -190,12 +212,22 @@ export function createMemoryActivityStore(
         firstSeenAt: at.toISOString(),
         completedSessions: [],
       };
-      await atomicWrite(statePath, `${JSON.stringify(state, null, 2)}\n`);
+      await atomicWrite(
+        statePath,
+        `${JSON.stringify(state, null, 2)}\n`,
+        { beforeCommit: () => ensureSafeStateFile() },
+      );
       return state;
     }
   }
 
   async function readState(): Promise<MemoryActivityState> {
+    await ensureLayout();
+    return readStateUnlocked();
+  }
+
+  async function readStateUnlocked(): Promise<MemoryActivityState> {
+    await ensureSafeStateFile();
     const parsed = JSON.parse(await readFile(statePath, "utf8")) as unknown;
     if (!validState(parsed)) {
       throw new Error(`${statePath} contains invalid memory coordination state`);
@@ -204,37 +236,43 @@ export function createMemoryActivityStore(
   }
 
   async function completeSession(sessionId: string, at = now()) {
-    const state = await ensureState(at);
-    const completed = new Map(
-      state.completedSessions.map((session) => [
-        session.sessionId,
-        session,
-      ]),
-    );
-    const existing = completed.get(sessionId);
-    const next = { sessionId, completedAt: at.toISOString() };
-    if (!existing || existing.completedAt < next.completedAt) {
-      completed.set(sessionId, next);
-    }
-    state.completedSessions = [...completed.values()]
-      .sort((left, right) =>
-        left.completedAt.localeCompare(right.completedAt),
-      )
-      .slice(-maxSessionFiles);
-    await writeState(state);
+    await withStateMutation(async () => {
+      const state = await ensureStateUnlocked(at);
+      const completed = new Map(
+        state.completedSessions.map((session) => [
+          session.sessionId,
+          session,
+        ]),
+      );
+      const existing = completed.get(sessionId);
+      const next = { sessionId, completedAt: at.toISOString() };
+      if (!existing || existing.completedAt < next.completedAt) {
+        completed.set(sessionId, next);
+      }
+      state.completedSessions = [...completed.values()]
+        .sort((left, right) =>
+          left.completedAt.localeCompare(right.completedAt),
+        )
+        .slice(-maxSessionFiles);
+      await writeState(state);
+    });
   }
 
   async function markDreamDiscovery(at = now()) {
-    const state = await ensureState(at);
-    state.lastDreamDiscoveryAt = at.toISOString();
-    await writeState(state);
+    await withStateMutation(async () => {
+      const state = await ensureStateUnlocked(at);
+      state.lastDreamDiscoveryAt = at.toISOString();
+      await writeState(state);
+    });
   }
 
   async function markDreamSuccess(at = now()) {
-    const state = await ensureState(at);
-    state.lastSuccessfulDreamAt = at.toISOString();
-    state.lastDreamDiscoveryAt = at.toISOString();
-    await writeState(state);
+    await withStateMutation(async () => {
+      const state = await ensureStateUnlocked(at);
+      state.lastSuccessfulDreamAt = at.toISOString();
+      state.lastDreamDiscoveryAt = at.toISOString();
+      await writeState(state);
+    });
   }
 
   async function claimDreamLock(owner: string): Promise<DreamLockClaim> {
@@ -296,7 +334,21 @@ export function createMemoryActivityStore(
   }
 
   async function writeState(state: MemoryActivityState) {
-    await atomicWrite(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    await ensureSafeStateFile();
+    await atomicWrite(
+      statePath,
+      `${JSON.stringify(state, null, 2)}\n`,
+      { beforeCommit: () => ensureSafeStateFile() },
+    );
+  }
+
+  function withStateMutation<T>(operation: () => Promise<T>): Promise<T> {
+    const next = stateMutationTail.then(operation, operation);
+    stateMutationTail = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    return next;
   }
 
   async function pruneLogs(at: Date) {
@@ -325,6 +377,36 @@ async function ensureSafeDirectory(path: string) {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     await mkdir(path, { mode: 0o700 });
+  }
+}
+
+async function ensureSafeContainedDirectory(root: string, target: string) {
+  const absoluteRoot = resolve(root);
+  const absoluteTarget = resolve(target);
+  const fromRoot = relative(absoluteRoot, absoluteTarget);
+  if (
+    fromRoot === ".." ||
+    fromRoot.startsWith(`..${sep}`) ||
+    fromRoot.startsWith(sep)
+  ) {
+    throw new Error("activity state path escapes the Mate home");
+  }
+  await ensureSafeDirectory(absoluteRoot);
+  let cursor = absoluteRoot;
+  for (const segment of fromRoot ? fromRoot.split(sep) : []) {
+    cursor = join(cursor, segment);
+    try {
+      const entry = await lstat(cursor);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`activity state path crosses symbolic link ${cursor}`);
+      }
+      if (!entry.isDirectory()) {
+        throw new Error(`activity state path parent is not a directory: ${cursor}`);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      await mkdir(cursor, { mode: 0o700 });
+    }
   }
 }
 

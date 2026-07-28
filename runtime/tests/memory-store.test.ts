@@ -269,4 +269,59 @@ describe("Mate memory storage", () => {
       }),
     ).rejects.toThrow("exceeds its 1-topic limit");
   });
+
+  test("rejects automatic topic writes above the released byte ceiling", async () => {
+    const home = await temporaryHome();
+    const store = createMateMemoryStore(home);
+    await store.ensureLayout();
+
+    await expect(
+      store.writeTopic(topic({ relativePath: "topics/large.md", body: "x".repeat(100_001) })),
+    ).rejects.toThrow("100000-byte topic limit");
+    await expect(store.readTopic("topics/large.md")).rejects.toThrow();
+  });
+
+  test("degrades and skips oversized native topics during startup recall", async () => {
+    const home = await temporaryHome();
+    const store = createMateMemoryStore(home);
+    await store.ensureLayout();
+    const largeTopic = topic({
+      relativePath: "topics/large.md",
+      body: "x".repeat(100_001),
+    });
+    await writeFile(
+      join(home, "memory", largeTopic.relativePath),
+      `---\nnode_type: memory\ntype: feedback\nscope: captain\nsource_principal: captain\nobserved_at: 2026-07-28T08:00:00.000Z\nmodified: 2026-07-28T08:00:00.000Z\npinned: false\n---\n${largeTopic.body}\n`,
+      "utf8",
+    );
+
+    const startup = await store.readStartupContext();
+
+    expect(startup.inventory).toEqual([]);
+    expect(startup.pinned).toEqual([]);
+    expect(
+      startup.degraded.some((warning) =>
+        warning.includes("topics/large.md exceeds the 100000-byte topic limit"),
+      ),
+    ).toBe(true);
+  });
+
+  test("stops startup topic reads when the shared read guard rejects", async () => {
+    const home = await temporaryHome();
+    const store = createMateMemoryStore(home);
+    await store.ensureLayout();
+    await store.writeTopic(topic({ relativePath: "topics/first.md" }));
+    await store.writeTopic(topic({ relativePath: "topics/second.md" }));
+    let reads = 0;
+
+    await expect(
+      store.readStartupContext({
+        beforeRead: () => {
+          reads += 1;
+          if (reads === 4) throw new Error("pause generation changed");
+        },
+      }),
+    ).rejects.toThrow("pause generation changed");
+    expect(reads).toBe(4);
+  });
 });

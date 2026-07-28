@@ -26,6 +26,8 @@ export interface MaintenanceRunContext {
 
 export interface MaintenanceRunRequest extends MaintenanceRunContext {
   kind: "extraction" | "dream";
+  pauseGeneration: number;
+  mutationEpoch: number;
   systemPrompt: string;
   prompt: string;
   tools: ToolDefinition[];
@@ -50,6 +52,7 @@ export interface MateMemoryMaintenanceOptions {
   store: MateMemoryStore;
   runner?: MaintenanceAgentRunner;
   isPaused: () => boolean;
+  getPauseGeneration?: () => number;
   onEvent?: (event: MaintenanceEvent) => void;
   now?: () => Date;
   maxInputCharacters?: number;
@@ -59,6 +62,9 @@ export interface MaintenanceToolOptions {
   now?: () => Date;
   onMutation?: (relativePath: string) => void;
   isPaused?: () => boolean;
+  isActive?: () => boolean;
+  mutationEpoch?: number;
+  getMutationEpoch?: () => number;
 }
 
 const EXTRACTION_SYSTEM_PROMPT = [
@@ -86,6 +92,7 @@ export class MateMemoryMaintenance {
   readonly store: MateMemoryStore;
   private readonly runner: MaintenanceAgentRunner;
   private readonly isPaused: () => boolean;
+  private readonly getPauseGeneration: () => number;
   private readonly onEvent?: (event: MaintenanceEvent) => void;
   private readonly now: () => Date;
   private readonly maxInputCharacters: number;
@@ -93,6 +100,7 @@ export class MateMemoryMaintenance {
   private active: Promise<void> | undefined;
   private lastContext: MaintenanceRunContext | undefined;
   private suppressNext = false;
+  private mutationEpoch = 0;
   private dreamDiscovery: Promise<void> | undefined;
   private eligibleInputs = 0;
 
@@ -100,6 +108,7 @@ export class MateMemoryMaintenance {
     this.store = options.store;
     this.runner = options.runner ?? runIsolatedMaintenanceAgent;
     this.isPaused = options.isPaused;
+    this.getPauseGeneration = options.getPauseGeneration ?? (() => 0);
     this.onEvent = options.onEvent;
     this.now = options.now ?? (() => new Date());
     this.maxInputCharacters =
@@ -122,6 +131,12 @@ export class MateMemoryMaintenance {
   }
 
   noteDirectMemoryWrite() {
+    this.beginDirectMemoryWrite();
+    this.suppressNext = true;
+  }
+
+  beginDirectMemoryWrite() {
+    this.mutationEpoch += 1;
     this.suppressNext = true;
   }
 
@@ -178,10 +193,12 @@ export class MateMemoryMaintenance {
       return;
     }
     if (this.dreamDiscovery) return this.dreamDiscovery;
+    const pauseGeneration = this.getPauseGeneration();
     this.dreamDiscovery = this.runDreamDiscovery(
       context,
       activity,
       currentSessionId,
+      pauseGeneration,
     )
       .catch((error) => {
         this.onEvent?.({
@@ -230,10 +247,18 @@ export class MateMemoryMaintenance {
     }
     const prompt = this.pendingInput;
     this.pendingInput = undefined;
+    const pauseGeneration = this.getPauseGeneration();
+    const mutationEpoch = this.mutationEpoch;
+    const isActive = () =>
+      !this.isPaused() && this.getPauseGeneration() === pauseGeneration;
+    const isCurrentMutation = () =>
+      isActive() && this.mutationEpoch === mutationEpoch;
     const touchedPaths = new Set<string>();
     const request: MaintenanceRunRequest = {
       ...this.lastContext,
       kind: "extraction",
+      pauseGeneration,
+      mutationEpoch,
       systemPrompt: EXTRACTION_SYSTEM_PROMPT,
       prompt: [
         "Review this direct human input after the main Mate run:",
@@ -244,11 +269,14 @@ export class MateMemoryMaintenance {
         now: this.now,
         onMutation: (path) => touchedPaths.add(path),
         isPaused: this.isPaused,
+        isActive,
+        mutationEpoch,
+        getMutationEpoch: () => this.mutationEpoch,
       }),
     };
     this.active = this.runner(request)
       .then((result) => {
-        if (this.isPaused()) return;
+        if (!isCurrentMutation()) return;
         for (const path of result.touchedPaths) touchedPaths.add(path);
         this.onEvent?.({
           status: "succeeded",
@@ -272,11 +300,18 @@ export class MateMemoryMaintenance {
     context: MaintenanceRunContext,
     activity: MemoryActivityStore,
     currentSessionId: string,
+    pauseGeneration: number,
   ) {
+    const mutationEpoch = this.mutationEpoch;
+    const isActive = () =>
+      !this.isPaused() && this.getPauseGeneration() === pauseGeneration;
+    const isCurrentMutation = () =>
+      isActive() && this.mutationEpoch === mutationEpoch;
     await this.drain(60_000);
-    if (this.isPaused()) return;
+    if (!isCurrentMutation()) return;
     const current = this.now();
     const state = await activity.ensureState(current);
+    if (!isCurrentMutation()) return;
     if (
       state.lastDreamDiscoveryAt &&
       current.getTime() -
@@ -285,7 +320,9 @@ export class MateMemoryMaintenance {
     ) {
       return;
     }
+    if (!isCurrentMutation()) return;
     await activity.markDreamDiscovery(current);
+    if (!isCurrentMutation()) return;
     if (
       !shouldDream(state, {
         currentSessionId,
@@ -300,6 +337,10 @@ export class MateMemoryMaintenance {
       `${process.pid}:${currentSessionId}`,
     );
     if (!claim.acquired) return;
+    if (!isCurrentMutation()) {
+      await activity.releaseDreamLock(claim);
+      return;
+    }
     const touchedPaths = new Set<string>();
     try {
       const result = await this.runner({
@@ -313,12 +354,16 @@ export class MateMemoryMaintenance {
             now: this.now,
             onMutation: (path) => touchedPaths.add(path),
             isPaused: this.isPaused,
+            isActive,
+            mutationEpoch,
+            getMutationEpoch: () => this.mutationEpoch,
           }),
-          createActivityReadTool(activity, this.isPaused),
+          createActivityReadTool(activity, isActive),
         ],
       });
-      if (this.isPaused()) return;
+      if (!isCurrentMutation()) return;
       for (const path of result.touchedPaths) touchedPaths.add(path);
+      if (!isCurrentMutation()) return;
       await activity.markDreamSuccess(current);
       this.onEvent?.({
         status: "succeeded",
@@ -355,6 +400,24 @@ export function createMaintenanceTools(
     if (options.isPaused?.()) {
       throw new Error("Mate memory maintenance is paused for this Pi session");
     }
+    if (options.isActive && !options.isActive()) {
+      throw new Error(
+        "Mate memory maintenance pause generation changed or run is no longer active",
+      );
+    }
+  };
+  const assertMutationEpoch = () => {
+    if (
+      options.mutationEpoch !== undefined &&
+      options.getMutationEpoch &&
+      options.mutationEpoch !== options.getMutationEpoch()
+    ) {
+      throw new Error("Mate memory maintenance mutation epoch changed");
+    }
+  };
+  const assertReadyToMutate = () => {
+    assertActive();
+    assertMutationEpoch();
   };
   const Empty = Type.Object({});
   const TopicPath = Type.String({
@@ -370,7 +433,8 @@ export function createMaintenanceTools(
       parameters: Empty,
       async execute() {
         assertActive();
-        const topics = await store.listTopics();
+        const topics = await store.listTopics({ beforeRead: assertActive });
+        assertActive();
         return textResult(
           JSON.stringify(
             topics.map(({ relativePath, metadata }) => ({
@@ -388,7 +452,11 @@ export function createMaintenanceTools(
       parameters: Empty,
       async execute() {
         assertActive();
-        return textResult((await store.readStartupContext()).index);
+        const startup = await store.readStartupContext({
+          beforeRead: assertActive,
+        });
+        assertActive();
+        return textResult(startup.index);
       },
     },
     {
@@ -398,7 +466,9 @@ export function createMaintenanceTools(
       parameters: Type.Object({ path: TopicPath }),
       async execute(_toolCallId, { path }) {
         assertActive();
-        return textResult(formatTopic(await store.readTopic(path)));
+        const topic = await store.readTopic(path, { beforeRead: assertActive });
+        assertActive();
+        return textResult(formatTopic(topic));
       },
     },
     {
@@ -432,7 +502,7 @@ export function createMaintenanceTools(
           body,
         },
       ) {
-        assertActive();
+        assertReadyToMutate();
         const topic = await store.writeTopic(
           {
             relativePath: path,
@@ -447,8 +517,14 @@ export function createMaintenanceTools(
             },
             body,
           },
-          { beforeCommit: assertActive },
+          {
+            beforeRead: assertActive,
+            beforeCommit: () => {
+              assertReadyToMutate();
+            },
+          },
         );
+        assertReadyToMutate();
         mutation(path);
         return textResult(`Wrote ${topic.relativePath}.`);
       },
@@ -460,8 +536,14 @@ export function createMaintenanceTools(
         "Delete one private Mate memory topic after determining it is wrong, obsolete, or explicitly forgotten.",
       parameters: Type.Object({ path: TopicPath }),
       async execute(_toolCallId, { path }) {
-        assertActive();
-        await store.deleteTopic(path, { beforeCommit: assertActive });
+        assertReadyToMutate();
+        await store.deleteTopic(path, {
+          beforeRead: assertActive,
+          beforeCommit: () => {
+            assertReadyToMutate();
+          },
+        });
+        assertReadyToMutate();
         mutation(path);
         return textResult(`Deleted ${path}.`);
       },
@@ -475,11 +557,20 @@ export function createMaintenanceTools(
         content: Type.String({ minLength: 1, maxLength: 25_000 }),
       }),
       async execute(_toolCallId, { content }) {
-        assertActive();
-        await store.writeIndex(content, { beforeCommit: assertActive });
-        const warnings = (await store.readStartupContext()).degraded.filter(
+        assertReadyToMutate();
+        await store.writeIndex(content, {
+          beforeRead: assertActive,
+          beforeCommit: () => {
+            assertReadyToMutate();
+          },
+        });
+        assertReadyToMutate();
+        const warnings = (
+          await store.readStartupContext({ beforeRead: assertActive })
+        ).degraded.filter(
           (warning) => warning.startsWith("MEMORY.md"),
         );
+        assertReadyToMutate();
         if (warnings.length > 0) throw new Error(warnings.join("; "));
         mutation("MEMORY.md");
         return textResult("Wrote MEMORY.md.");
@@ -490,7 +581,7 @@ export function createMaintenanceTools(
 
 function createActivityReadTool(
   activity: MemoryActivityStore,
-  isPaused: () => boolean,
+  isActive: () => boolean,
 ): ToolDefinition {
   return {
     name: "memory_read_activity",
@@ -499,10 +590,14 @@ function createActivityReadTool(
       "Read the bounded, redacted, derivative activity projection from the last three days.",
     parameters: Type.Object({}),
     async execute() {
-      if (isPaused()) {
-        throw new Error("Mate memory maintenance is paused for this Pi session");
+      if (!isActive()) {
+        throw new Error("Mate memory maintenance run is no longer active");
       }
-      return textResult(await activity.readRecent(3));
+      const recent = await activity.readRecent(3);
+      if (!isActive()) {
+        throw new Error("Mate memory maintenance run is no longer active");
+      }
+      return textResult(recent);
     },
   };
 }

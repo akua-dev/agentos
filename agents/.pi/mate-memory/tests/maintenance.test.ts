@@ -304,6 +304,118 @@ describe("Mate memory automatic maintenance", () => {
     await expect(store.readTopic("topics/late.md")).rejects.toThrow();
   });
 
+  test("blocks an in-flight extraction after pause and resume", async () => {
+    const { store } = await fixture();
+    let paused = false;
+    let generation = 1;
+    let releaseRunner!: () => void;
+    let markStarted!: () => void;
+    const runnerStarted = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const runnerReleased = new Promise<void>((resolve) => {
+      releaseRunner = resolve;
+    });
+    let mutationOutcome = "not attempted";
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      isPaused: () => paused,
+      getPauseGeneration: () => generation,
+      runner: async (request) => {
+        markStarted();
+        await runnerReleased;
+        const write = request.tools.find(({ name }) => name === "memory_write_topic")!;
+        try {
+          await write.execute(
+            "late-write",
+            {
+              path: "topics/late.md",
+              type: "feedback",
+              scope: "captain",
+              source_principal: "captain",
+              observed_at: "2026-07-28T08:00:00.000Z",
+              pinned: false,
+              body: "This write must be blocked after resume.",
+            } as never,
+            undefined,
+            undefined,
+            {} as never,
+          );
+          mutationOutcome = "wrote";
+        } catch (error) {
+          mutationOutcome = error instanceof Error ? error.message : String(error);
+        }
+        return { summary: "finished after resume", touchedPaths: [] };
+      },
+    });
+
+    maintenance.captureHumanInput("Remember this only in the original generation", "interactive");
+    maintenance.afterAgentSettled(baseContext());
+    await runnerStarted;
+    paused = true;
+    generation += 1;
+    paused = false;
+    generation += 1;
+    releaseRunner();
+    await maintenance.drain(1_000);
+
+    expect(mutationOutcome).toContain("generation");
+    await expect(store.readTopic("topics/late.md")).rejects.toThrow();
+  });
+
+  test("invalidates an active extraction when direct memory writing begins", async () => {
+    const { store } = await fixture();
+    let releaseRunner!: () => void;
+    let markStarted!: () => void;
+    const runnerStarted = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const runnerReleased = new Promise<void>((resolve) => {
+      releaseRunner = resolve;
+    });
+    let mutationOutcome = "not attempted";
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      isPaused: () => false,
+      runner: async (request) => {
+        markStarted();
+        await runnerReleased;
+        const write = request.tools.find(({ name }) => name === "memory_write_topic")!;
+        try {
+          await write.execute(
+            "late-write",
+            {
+              path: "topics/late.md",
+              type: "feedback",
+              scope: "captain",
+              source_principal: "captain",
+              observed_at: "2026-07-28T08:00:00.000Z",
+              pinned: false,
+              body: "This write must be invalidated.",
+            } as never,
+            undefined,
+            undefined,
+            {} as never,
+          );
+          mutationOutcome = "wrote";
+        } catch (error) {
+          mutationOutcome = error instanceof Error ? error.message : String(error);
+        }
+        return { summary: "finished after direct write", touchedPaths: [] };
+      },
+    });
+
+    maintenance.captureHumanInput("Remember this while extraction is active", "interactive");
+    maintenance.afterAgentSettled(baseContext());
+    await runnerStarted;
+    maintenance.beginDirectMemoryWrite();
+    releaseRunner();
+    await maintenance.drain(1_000);
+
+    expect(mutationOutcome).toContain("changed");
+    await expect(store.readTopic("topics/late.md")).rejects.toThrow();
+  });
+
   test("honors the released extraction stride", async () => {
     const { home } = await fixture();
     const store = createMateMemoryStore(home, { extractionStride: 2 });

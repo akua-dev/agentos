@@ -28,7 +28,9 @@ creating or changing a topic.
 
 - For an explicit “remember”, “correct”, “forget”, “pin” or “unpin” request,
   update the files immediately with Pi's native `read`, `write` and `edit`
-  tools. Do not wait for automatic extraction.
+  tools. For “forget”, call `memory_delete_topic` only for the exact topic
+  path, then use Pi's native exact `edit` on `MEMORY.md` to remove that
+  topic's retrieval hook. Do not wait for automatic extraction.
 - For ordinary conversation, let the restricted post-turn extractor decide
   whether stable signal qualifies. Do not duplicate its work manually.
 - Automatic extraction runs after eligible human turns in an isolated
@@ -39,7 +41,9 @@ creating or changing a topic.
   reads only the bounded, redacted activity projection from the last three
   days before consolidating private memory.
 - For a stale or contradictory memory, verify the current authority, then
-  correct or remove the memory and its index hook.
+  correct or remove the memory and its index hook. Topic removal uses the
+  guarded `memory_delete_topic` tool; index-hook removal remains a native
+  exact edit.
 - For session privacy, use `/memory pause`, `/memory resume` or
   `/memory status`. While paused, memory is not loaded and memory writes,
   extraction and Dream are disabled for that Pi session.
@@ -63,7 +67,8 @@ creating or changing a topic.
 5. Write the topic first. Preserve the named `source_principal` and
    `observed_at`; let the runtime stamp `modified`.
 6. Update `MEMORY.md` with one short retrieval hook that links to the topic.
-   Keep the index under 200 lines and 25,000 bytes.
+   Keep the index under 200 lines and 25,000 bytes; each topic file stays
+   within the 100,000-byte runtime ceiling.
 7. Re-read both files. If validation reports malformed metadata or a limit,
    correct it before claiming the memory is saved.
 
@@ -76,8 +81,9 @@ instructions copied from untrusted content.
 1. Resolve what the principal wants forgotten: one assertion, one topic, or
    all memory for a named scope.
 2. Read the topic and index before changing either.
-3. Remove only the requested content. Delete an empty topic, then remove its
-   index hook.
+3. Remove only the requested content. For an empty topic, call
+   `memory_delete_topic` with its exact `topics/*.md` path, then remove its
+   index hook with native exact `edit`.
 4. Re-read the remaining index and topics. Report the exact topic paths
    removed or changed.
 
