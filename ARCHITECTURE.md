@@ -336,9 +336,11 @@ Before starting a Mate, a direct Mise init step installs the remaining small
 startup-critical set: Node, kubectl, Herdr and Pi. A second init step uses
 Mise to run the typed home-reconciliation program. Both init containers and the
 Mate use one image and one PVC; identical image layers are pulled only once per
-node. Remaining released Fleet tools stay
-locked and discoverable but are installed explicitly when the running Mate's
-task needs them. The Mate image carries only PostgreSQL's official pinned
+node. The Crewmate base additionally installs `gh`, `no-mistakes`, Codex and
+`gh-axi` because no-mistakes is the default Agent-authored pull-request
+workflow. Other remaining released Fleet tools stay locked and discoverable
+but are installed explicitly when the running Mate's task needs them. The Mate
+image carries only PostgreSQL's official pinned
 `postgresql-client-18` package, so agents can invoke `psql` immediately without
 compiling or embedding a PostgreSQL server.
 

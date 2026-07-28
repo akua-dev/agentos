@@ -14,9 +14,9 @@ reviewed CLI for repositories. Do not add an AgentOS project wrapper.
    reviewed delivery workflow, concrete review artifact, merge authority and
    autonomy posture. Record them as durable project prose, not an AgentOS mode
    enum. Agent-authored pull-request delivery defaults to no-mistakes when no
-   exact recorded project workflow or Captain decision selects another reviewed
-   path. An absent, unknown or incomplete posture never silently falls back to
-   a direct branch push and hand-opened pull request.
+   exact reviewed project workflow selects another reviewed path. An absent,
+   unknown or incomplete posture never silently falls back to a direct branch
+   push and hand-opened pull request.
 2. Inspect existing registry rows, checkouts, remotes and relevant Second-Mate
    charters. Project access is non-exclusive; registration does not assign every
    task in a repository to one Mate.
