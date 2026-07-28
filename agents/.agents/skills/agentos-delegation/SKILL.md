@@ -21,7 +21,10 @@ Use released PostgreSQL schema for durable coordination and native tools against
    Load `$agentos-projects` when the registry, checkout, remote or delivery
    posture must change; intake itself grants no outward project authority.
    Resolve the selected delivery workflow, its concrete review artifact and
-   merge authority before accepting ship work.
+   merge authority before accepting ship work. For Agent-authored pull-request
+   delivery without an exact recorded alternative, select the no-mistakes
+   default owned by `$agentos-projects`; never infer a direct-PR path from
+   missing project prose.
 3. Distinguish conversation from accepted work.
    An Inbox request, provider comment or idea does not become accepted work
    until the Task's first accountable Assignment exists. An unassigned Task is
@@ -126,6 +129,9 @@ Use released PostgreSQL schema for durable coordination and native tools against
    selected delivery workflow, delivery target, authorized outward effects,
    merge authority and achievable Definition of Done. Keep provider-specific
    workflow details as durable prose rather than an AgentOS delivery-mode enum.
+   When no-mistakes is selected, include `$agentos-projects` in the
+   Assignment's selected Skill material so the Crewmate receives its gate
+   ownership and escalation contract.
 5. Render the worker's harness view from the authoritative Assignment brief
    using `../crewmate/BRIEF.md`. Fill every
    marker with the owning Mate, Agent, Task, Assignment, work kind, project,
