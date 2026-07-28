@@ -31,6 +31,13 @@ creating or changing a topic.
   tools. Do not wait for automatic extraction.
 - For ordinary conversation, let the restricted post-turn extractor decide
   whether stable signal qualifies. Do not duplicate its work manually.
+- Automatic extraction runs after eligible human turns in an isolated
+  memory-only Pi agent with bounded, redacted input and only memory tools;
+  an extraction failure preserves the completed main response.
+- Dream is eligible only after at least 24 hours and five prior completed
+  sessions since first seeing the memory or the last successful Dream. It
+  reads only the bounded, redacted activity projection from the last three
+  days before consolidating private memory.
 - For a stale or contradictory memory, verify the current authority, then
   correct or remove the memory and its index hook.
 - For session privacy, use `/memory pause`, `/memory resume` or

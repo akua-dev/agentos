@@ -515,8 +515,8 @@ deterministic non-secret channel for each responsible persistent Mate. A
 current Pi Mate readiness-gates only its targeted native `pg-listen` wait, then
 catches up through the read-only durable bearings
 projection before relying on the one-shot listener. Deterministic SQL maps
-Inbox recipients, Assignment owners, hierarchy edges, Captain scope and
-external-event claims; an unowned or unresolved edge falls back to First Mate
+Inbox recipients, Assignment owners, hierarchy edges and external-event
+claims; an unowned or unresolved edge falls back to First Mate
 instead of waking every current Mate. The detailed re-arm and catch-up judgment
 belongs to `$agentos-supervision`; the wake contains no Fleet row data and
 `LISTEN/NOTIFY` never starts a pod or replaces Inbox, Task or external-event
@@ -681,7 +681,7 @@ checkout while keeping operational roles out of contributor sessions:
 - `.agents/skills/` contains workflows that apply from every AgentOS checkout
   working directory: repository development, organization evaluation and
   post-evaluation improvement review;
-- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including composition, delegation, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including composition, delegation, private memory, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
 - `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
 - a future subtree under `clis/`, `packages/` or `services/` may add its own `.agents/skills/` when development there needs a reusable workflow.
@@ -860,6 +860,9 @@ workspace keeps one `bun.lock`.
 - `agents/.agents/skills/` contains operational workflows shared by First and
   Second Mate without exposing them to contributor or runtime-development
   sessions.
+- `agents/.agents/skills/agentos-memory/` owns private, fallible per-Mate
+  memory behavior, including recall, maintenance, session privacy and routed
+  proposals; it never replaces Fleet authority.
 - `agents/.agents/skills/agentos-composition/` owns model-directed composition
   selection, native application and observed verification.
 - `agents/firstmate/` and `agents/secondmate/` contain the two persistent role instruction surfaces, their Pi configuration and role-scoped skills.
