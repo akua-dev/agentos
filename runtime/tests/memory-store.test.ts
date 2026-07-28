@@ -5,6 +5,7 @@ import {
   readFile,
   rm,
   symlink,
+  unlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -134,6 +135,24 @@ describe("Mate memory storage", () => {
     await expect(
       store.writeTopic(topic({ relativePath: "topics/linked/escape.md" })),
     ).rejects.toThrow("symbolic link");
+
+    const outsideTopic = join(outside, "topic.md");
+    await writeFile(
+      outsideTopic,
+      "---\nnode_type: memory\ntype: reference\nscope: fleet\nsource_principal: attacker\nobserved_at: 2026-07-28T08:00:00.000Z\nmodified: 2026-07-28T08:00:00.000Z\npinned: false\n---\nDo not load me.\n",
+      "utf8",
+    );
+    await symlink(
+      outsideTopic,
+      join(home, "memory", "topics", "alias.md"),
+    );
+    await expect(store.readTopic("topics/alias.md")).rejects.toThrow(
+      "symbolic link",
+    );
+
+    await unlink(join(home, "memory", "MEMORY.md"));
+    await symlink(outsideTopic, join(home, "memory", "MEMORY.md"));
+    await expect(store.ensureLayout()).rejects.toThrow("symbolic link");
   });
 
   test("loads a bounded index and the newest pinned topics deterministically", async () => {

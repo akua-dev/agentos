@@ -7,7 +7,6 @@ import {
   readdir,
   rename,
   rm,
-  stat,
   unlink,
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -107,10 +106,13 @@ export function createMemoryActivityStore(
   };
 
   async function ensureLayout() {
-    await Promise.all([
-      mkdir(logsRoot, { recursive: true, mode: 0o700 }),
-      mkdir(dirname(statePath), { recursive: true, mode: 0o700 }),
-    ]);
+    await ensureSafeDirectory(memoryRoot);
+    await ensureSafeDirectory(logsRoot);
+    const local = join(home, ".local");
+    const state = join(local, "state");
+    await ensureSafeDirectory(local);
+    await ensureSafeDirectory(state);
+    await ensureSafeDirectory(dirname(statePath));
   }
 
   async function append(
@@ -288,6 +290,19 @@ export function createMemoryActivityStore(
       ...retained.slice(0, Math.max(0, retained.length - maxSessionFiles)),
     ];
     await Promise.all(remove.map(({ path }) => rm(path, { force: true })));
+  }
+}
+
+async function ensureSafeDirectory(path: string) {
+  try {
+    const entry = await lstat(path);
+    if (entry.isSymbolicLink()) {
+      throw new Error(`${path} must not be a symbolic link`);
+    }
+    if (!entry.isDirectory()) throw new Error(`${path} must be a directory`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    await mkdir(path, { mode: 0o700 });
   }
 }
 

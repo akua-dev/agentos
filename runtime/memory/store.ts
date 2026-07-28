@@ -92,10 +92,15 @@ export function createMateMemoryStore(
   };
 
   async function ensureLayout() {
-    await mkdir(join(root, "topics"), { recursive: true, mode: 0o700 });
+    await ensureSafeDirectory(root);
+    await ensureSafeDirectory(join(root, "topics"));
     const index = join(root, INDEX_NAME);
     try {
-      await lstat(index);
+      const entry = await lstat(index);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`${index} must not be a symbolic link`);
+      }
+      if (!entry.isFile()) throw new Error(`${index} must be a regular file`);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       await atomicWrite(index, EMPTY_INDEX);
@@ -325,19 +330,24 @@ async function topicPaths(root: string): Promise<string[]> {
 }
 
 async function rejectSymlinkTraversal(root: string, target: string) {
-  await mkdir(root, { recursive: true, mode: 0o700 });
+  await ensureSafeDirectory(root);
   const rootReal = await realpath(root);
   const fromRoot = relative(root, target);
   let cursor = root;
-  for (const segment of fromRoot.split(sep).slice(0, -1)) {
+  const segments = fromRoot.split(sep);
+  for (const [index, segment] of segments.entries()) {
+    const isLeaf = index === segments.length - 1;
     cursor = join(cursor, segment);
     try {
       const entry = await lstat(cursor);
       if (entry.isSymbolicLink()) {
         throw new Error(`memory path crosses symbolic link ${cursor}`);
       }
-      if (!entry.isDirectory()) {
+      if (!isLeaf && !entry.isDirectory()) {
         throw new Error(`memory path parent is not a directory: ${cursor}`);
+      }
+      if (isLeaf && !entry.isFile()) {
+        throw new Error(`memory path must be a regular file: ${cursor}`);
       }
       const actual = await realpath(cursor);
       if (
@@ -348,11 +358,25 @@ async function rejectSymlinkTraversal(root: string, target: string) {
       }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        if (isLeaf) break;
         await mkdir(cursor, { mode: 0o700 });
         continue;
       }
       throw error;
     }
+  }
+}
+
+async function ensureSafeDirectory(path: string) {
+  try {
+    const entry = await lstat(path);
+    if (entry.isSymbolicLink()) {
+      throw new Error(`${path} must not be a symbolic link`);
+    }
+    if (!entry.isDirectory()) throw new Error(`${path} must be a directory`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    await mkdir(path, { recursive: true, mode: 0o700 });
   }
 }
 

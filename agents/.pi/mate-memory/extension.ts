@@ -11,6 +11,7 @@ import type {
 import {
   createMateMemoryStore,
   type MateMemoryStore,
+  type StartupMemoryContext,
   type StoredTopic,
 } from "../../../runtime/memory/store.ts";
 import type { MateMemoryPolicy } from "../../../runtime/memory/policy.ts";
@@ -74,16 +75,24 @@ export function registerMateMemoryExtension(
 
   pi.on("session_start", async (_event, context) => {
     paused = restoredPauseState(context);
-    await activity.ensureState(now());
+    try {
+      await activity.ensureState(now());
+    } catch (error) {
+      recordFailure(`activity state is unavailable: ${errorMessage(error)}`);
+    }
   });
 
   pi.on("input", async (event, context) => {
     maintenance.captureHumanInput(event.text, event.source);
     if (event.source !== "extension") {
-      await activity.append(context.sessionManager.getSessionId(), {
-        kind: "human",
-        text: event.text,
-      });
+      try {
+        await activity.append(context.sessionManager.getSessionId(), {
+          kind: "human",
+          text: event.text,
+        });
+      } catch (error) {
+        recordFailure(`activity projection failed: ${errorMessage(error)}`);
+      }
     }
   });
 
@@ -104,27 +113,39 @@ export function registerMateMemoryExtension(
 
   pi.on("agent_end", async (event, context) => {
     const sessionId = context.sessionManager.getSessionId();
-    for (const toolName of [...observedToolNames].sort()) {
-      await activity.append(sessionId, { kind: "tool", toolName });
+    try {
+      for (const toolName of [...observedToolNames].sort()) {
+        await activity.append(sessionId, { kind: "tool", toolName });
+      }
+      const assistant = [...event.messages]
+        .reverse()
+        .find((message) => message.role === "assistant");
+      if (!assistant || assistant.role !== "assistant") return;
+      const text = assistant.content
+        .filter(
+          (part): part is Extract<typeof part, { type: "text" }> =>
+            part.type === "text",
+        )
+        .map((part) => part.text)
+        .join("")
+        .trim();
+      if (text) await activity.append(sessionId, { kind: "assistant", text });
+    } catch (error) {
+      recordFailure(`activity projection failed: ${errorMessage(error)}`);
+    } finally {
+      observedToolNames.clear();
     }
-    observedToolNames.clear();
-    const assistant = [...event.messages]
-      .reverse()
-      .find((message) => message.role === "assistant");
-    if (!assistant || assistant.role !== "assistant") return;
-    const text = assistant.content
-      .filter(
-        (part): part is Extract<typeof part, { type: "text" }> =>
-          part.type === "text",
-      )
-      .map((part) => part.text)
-      .join("")
-      .trim();
-    if (text) await activity.append(sessionId, { kind: "assistant", text });
   });
 
   pi.on("session_shutdown", async (_event, context) => {
-    await activity.completeSession(context.sessionManager.getSessionId(), now());
+    try {
+      await activity.completeSession(
+        context.sessionManager.getSessionId(),
+        now(),
+      );
+    } catch (error) {
+      recordFailure(`session activity completion failed: ${errorMessage(error)}`);
+    }
     await maintenance.shutdown(60_000);
   });
 
@@ -132,11 +153,36 @@ export function registerMateMemoryExtension(
     if (paused || !store.policy.enabled) {
       return { systemPrompt: event.systemPrompt };
     }
-    const startup = await store.readStartupContext();
-    const pinnedBytes = startup.pinned.reduce(
-      (sum, topic) => sum + formattedTopicBytes(topic),
-      0,
-    );
+    let startup: StartupMemoryContext;
+    try {
+      startup = await store.readStartupContext();
+    } catch (error) {
+      startup = {
+        index: "",
+        pinned: [],
+        inventory: [],
+        degraded: [
+          `Mate memory is unavailable: ${errorMessage(error)}`,
+        ],
+      };
+    }
+    const boundedPinned: StoredTopic[] = [];
+    let pinnedBytes = 0;
+    for (const topic of startup.pinned) {
+      const bytes = formattedTopicBytes(topic);
+      if (
+        pinnedBytes + bytes >
+        store.policy.maxSessionAttachmentBytes
+      ) {
+        startup.degraded.push(
+          `pinned topic ${topic.relativePath} exceeds the remaining attachment budget`,
+        );
+        continue;
+      }
+      boundedPinned.push(topic);
+      pinnedBytes += bytes;
+    }
+    startup.pinned = boundedPinned;
     attachedBytes = Math.max(attachedBytes, pinnedBytes);
     let selected: StoredTopic[] = [];
     try {
@@ -302,6 +348,13 @@ export function registerMateMemoryExtension(
   function setPaused(value: boolean) {
     paused = value;
     pi.appendEntry(STATE_ENTRY, { paused });
+  }
+
+  function recordFailure(summary: string) {
+    pi.appendEntry("agentos-mate-memory-maintenance", {
+      status: "failed",
+      summary,
+    });
   }
 }
 

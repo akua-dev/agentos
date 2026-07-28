@@ -1,6 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import { Type } from "@earendil-works/pi-ai";
 import type { Model } from "@earendil-works/pi-ai";
 import {
@@ -96,6 +93,7 @@ export class MateMemoryMaintenance {
   private lastContext: MaintenanceRunContext | undefined;
   private suppressNext = false;
   private dreamDiscovery: Promise<void> | undefined;
+  private eligibleInputs = 0;
 
   constructor(options: MateMemoryMaintenanceOptions) {
     this.store = options.store;
@@ -109,6 +107,12 @@ export class MateMemoryMaintenance {
 
   captureHumanInput(text: string, source: HumanInputSource) {
     if (!isEligibleHumanInput(text, source)) return;
+    this.eligibleInputs += 1;
+    const stride = Math.max(
+      1,
+      Math.floor(this.store.policy.extractionStride),
+    );
+    if (this.eligibleInputs % stride !== 0) return;
     this.pendingInput = tail(text.trim(), this.maxInputCharacters);
   }
 
@@ -173,9 +177,16 @@ export class MateMemoryMaintenance {
       context,
       activity,
       currentSessionId,
-    ).finally(() => {
-      this.dreamDiscovery = undefined;
-    });
+    )
+      .catch((error) => {
+        this.onEvent?.({
+          status: "failed",
+          summary: `Dream discovery failed: ${errorMessage(error)}`,
+        });
+      })
+      .finally(() => {
+        this.dreamDiscovery = undefined;
+      });
     return this.dreamDiscovery;
   }
 

@@ -38,7 +38,9 @@ export const selectRelevantTopics: RelevantTopicSelector = async (input) => {
       ],
     },
     {
-      ...auth,
+      apiKey: auth.apiKey,
+      headers: auth.headers,
+      env: auth.env,
       signal: input.signal,
       temperature: 0,
       maxTokens: 1_024,

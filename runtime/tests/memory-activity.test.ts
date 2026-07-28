@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   mkdtemp,
+  mkdir,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -162,5 +164,15 @@ describe("Mate memory activity projection", () => {
         await readFile(join(home, "memory", ".consolidate-lock"), "utf8"),
       ).token,
     ).toBe("new-token");
+  });
+
+  test("refuses a symbolic-link memory root", async () => {
+    const home = await temporaryHome();
+    const outside = join(home, "outside");
+    await mkdir(outside);
+    await symlink(outside, join(home, "memory"));
+
+    const activity = createMemoryActivityStore(home);
+    await expect(activity.ensureLayout()).rejects.toThrow("symbolic link");
   });
 });

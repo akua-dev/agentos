@@ -175,6 +175,30 @@ describe("Mate memory automatic maintenance", () => {
     expect(requests).toEqual([]);
   });
 
+  test("honors the released extraction stride", async () => {
+    const { home } = await fixture();
+    const store = createMateMemoryStore(home, { extractionStride: 2 });
+    const requests: MaintenanceRunRequest[] = [];
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      runner: async (request) => {
+        requests.push(request);
+        return { summary: "nothing to save", touchedPaths: [] };
+      },
+      isPaused: () => false,
+    });
+
+    maintenance.captureHumanInput("First eligible human input", "interactive");
+    maintenance.afterAgentSettled(baseContext());
+    await maintenance.drain(1_000);
+    expect(requests).toEqual([]);
+
+    maintenance.captureHumanInput("Second eligible human input", "interactive");
+    maintenance.afterAgentSettled(baseContext());
+    await maintenance.drain(1_000);
+    expect(requests).toHaveLength(1);
+  });
+
   test("reports failures without failing the main run and drains shutdown work", async () => {
     const { store } = await fixture();
     const events: Array<{ status: string; summary: string }> = [];

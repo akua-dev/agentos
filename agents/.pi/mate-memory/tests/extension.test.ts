@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  mkdir,
   mkdtemp,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -18,6 +20,7 @@ import type {
 
 import { createMateMemoryStore } from "../../../../runtime/memory/store.ts";
 import { registerMateMemoryExtension } from "../extension.ts";
+import type { MaintenanceRunRequest } from "../maintenance.ts";
 
 type EventHandler = (event: any, context: ExtensionContext) => unknown;
 
@@ -221,6 +224,39 @@ describe("Pi Mate memory extension", () => {
     expect(Buffer.byteLength(content)).toBeLessThanOrEqual(900);
   });
 
+  test("does not let oversized pinned topics bypass the session attachment budget", async () => {
+    const { home, store } = await fixture();
+    const pinned = await store.readTopic("topics/pinned.md");
+    await store.writeTopic({
+      relativePath: pinned.relativePath,
+      metadata: pinned.metadata,
+      body: "p".repeat(2_000),
+    });
+    const pi = new FakePi();
+    registerMateMemoryExtension(pi.extensionApi(), {
+      home,
+      policy: { maxSessionAttachmentBytes: 700 },
+      selectRelevant: async () => ["topics/agentos.md"],
+    });
+
+    const result = await pi.emit("before_agent_start", {
+      prompt: "Recall AgentOS",
+      systemPrompt: "ROLE",
+      systemPromptOptions: {},
+    });
+    const loaded = result.results[0] as {
+      systemPrompt: string;
+      message?: { content: string };
+    };
+    expect(loaded.systemPrompt).not.toContain("p".repeat(100));
+    expect(loaded.systemPrompt).toContain(
+      "pinned topic topics/pinned.md exceeds the remaining attachment budget",
+    );
+    expect(loaded.message?.content).toContain(
+      "AgentOS uses PostgreSQL as durable Fleet truth.",
+    );
+  });
+
   test("pauses loading and memory writes for the current session and restores that state", async () => {
     const { home } = await fixture();
     const pi = new FakePi();
@@ -316,5 +352,86 @@ describe("Pi Mate memory extension", () => {
       "modified: 2026-07-28T10:00:00.000Z",
     );
     expect(directWrites).toBe(1);
+  });
+
+  test("connects only direct human input to restricted post-turn extraction", async () => {
+    const { home } = await fixture();
+    const pi = new FakePi();
+    const requests: MaintenanceRunRequest[] = [];
+    const controller = registerMateMemoryExtension(pi.extensionApi(), {
+      home,
+      maintenanceRunner: async (request) => {
+        requests.push(request);
+        return { summary: "nothing to save", touchedPaths: [] };
+      },
+    })!;
+    const sessionManager = {
+      getBranch: () => [],
+      getSessionId: () => "session-direct-human",
+    } as never;
+
+    await pi.emit(
+      "input",
+      {
+        text: "Remember concise result summaries",
+        source: "interactive",
+      },
+      { sessionManager },
+    );
+    await pi.emit(
+      "input",
+      {
+        text: "Internal extension maintenance message",
+        source: "extension",
+      },
+      { sessionManager },
+    );
+    await pi.emit(
+      "agent_settled",
+      {},
+      {
+        cwd: "/workspace",
+        model: { provider: "test", id: "model" } as never,
+        sessionManager,
+      },
+    );
+    await controller.maintenance.drain(1_000);
+    await controller.maintenance.shutdown(1_000);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.prompt).toContain(
+      "Remember concise result summaries",
+    );
+    expect(requests[0]!.prompt).not.toContain("Internal extension");
+  });
+
+  test("keeps the main Mate session available when the memory root is unsafe", async () => {
+    const home = await mkdtemp(join(tmpdir(), "agentos-pi-memory-unsafe-"));
+    temporaryDirectories.push(home);
+    const outside = join(home, "outside");
+    await mkdir(outside);
+    await symlink(outside, join(home, "memory"));
+    const pi = new FakePi();
+    registerMateMemoryExtension(pi.extensionApi(), { home });
+    const sessionManager = {
+      getBranch: () => [],
+      getSessionId: () => "unsafe-root",
+    } as never;
+
+    await expect(
+      pi.emit("session_start", {}, { sessionManager }),
+    ).resolves.toBeDefined();
+    const result = await pi.emit(
+      "before_agent_start",
+      {
+        prompt: "Handle an urgent Inbox event",
+        systemPrompt: "ROLE",
+        systemPromptOptions: {},
+      },
+      { sessionManager },
+    );
+    expect(
+      (result.results[0] as { systemPrompt: string }).systemPrompt,
+    ).toContain("Mate memory is unavailable");
   });
 });

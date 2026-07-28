@@ -183,11 +183,16 @@ ephemeral routing hint from likely direct human input, but never authenticates
 it or grants authority. Direct terminal delivery to another Mate is an
 exceptional recovery path for a broken listener, not ordinary communication.
 Direct Captain intervention in any attached terminal remains authoritative and is reconciled into Fleet state.
-Fleet-wide and Mate-domain Captain preferences are scoped rows in one readable
-table rather than synchronized files. Genuine unresolved Captain choices live
-in Inbox under stable keys. Investigations attest their complete choice set,
-including none, before completion; the exact answer later releases linked Task
-dependencies atomically without a separate decisions service.
+Each persistent Mate owns private, typed Markdown memory on its PVC. A bounded
+index and selected topics load as fallible context; restricted post-turn
+extraction and Dream may maintain only that memory. Memory never authorizes an
+action, proves current state or replaces shared Fleet coordination. Guidance
+for another Mate crosses the direct hierarchy edge as an Inbox proposal and
+the recipient decides whether to edit its own memory. Genuine unresolved
+Captain choices live in Inbox under stable keys. Investigations attest their
+complete choice set, including none, before completion; the exact answer later
+releases linked Task dependencies atomically without a separate decisions
+service.
 That idempotent transaction—record the response, close the speech act and apply
 its coupled state effect—is the template for any future Inbox act that changes
 durable state.
