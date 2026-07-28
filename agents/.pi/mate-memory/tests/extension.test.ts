@@ -268,10 +268,20 @@ describe("Pi Mate memory extension", () => {
   test("pauses loading and memory writes for the current session and restores that state", async () => {
     const { home } = await fixture();
     const pi = new FakePi();
-    registerMateMemoryExtension(pi.extensionApi(), {
+    const controller = registerMateMemoryExtension(pi.extensionApi(), {
       home,
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
       selectRelevant: async () => ["topics/agentos.md"],
     });
+    const sessionManager = {
+      getBranch: () => [],
+      getSessionId: () => "paused-activity",
+    } as never;
+    await pi.emit(
+      "tool_call",
+      { toolCallId: "before-pause", toolName: "read", input: {} },
+      { sessionManager },
+    );
     const notices: string[] = [];
     await pi.commands.get("memory")!.handler("pause", {
       ui: { notify: (message: string) => notices.push(message) },
@@ -298,6 +308,58 @@ describe("Pi Mate memory extension", () => {
       block: true,
       reason: "Mate memory is paused for this Pi session.",
     });
+
+    await pi.emit(
+      "input",
+      { text: "Human input while paused", source: "interactive" },
+      { sessionManager },
+    );
+    await pi.emit(
+      "agent_end",
+      {
+        messages: [
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "Assistant output while paused" }],
+          },
+        ],
+      },
+      { sessionManager },
+    );
+    expect(await controller!.activity.readRecent(3)).toBe("");
+
+    await pi.commands.get("memory")!.handler("resume", {
+      ui: { notify: () => undefined },
+    } as unknown as ExtensionCommandContext);
+    await pi.emit(
+      "input",
+      { text: "Human input after resume", source: "interactive" },
+      { sessionManager },
+    );
+    await pi.emit(
+      "tool_call",
+      { toolCallId: "after-resume", toolName: "grep", input: {} },
+      { sessionManager },
+    );
+    await pi.emit(
+      "agent_end",
+      {
+        messages: [
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "Assistant output after resume" }],
+          },
+        ],
+      },
+      { sessionManager },
+    );
+    const resumed = await controller!.activity.readRecent(3);
+    expect(resumed).toContain("Human input after resume");
+    expect(resumed).toContain(". grep");
+    expect(resumed).toContain("Assistant output after resume");
+    expect(resumed).not.toContain("Human input while paused");
+    expect(resumed).not.toContain("Assistant output while paused");
+    expect(resumed).not.toContain(". read");
 
     const restoredPi = new FakePi();
     registerMateMemoryExtension(restoredPi.extensionApi(), { home });

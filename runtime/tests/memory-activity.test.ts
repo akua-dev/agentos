@@ -12,6 +12,7 @@ import { join } from "node:path";
 
 import {
   createMemoryActivityStore,
+  redact,
   shouldDream,
 } from "../memory/activity.ts";
 
@@ -64,6 +65,39 @@ describe("Mate memory activity projection", () => {
     expect(projection).not.toContain("sk-secret-value");
     expect(projection).not.toContain("hunter2");
     expect(projection).not.toContain("--with-arguments");
+  });
+
+  test("bounds recent activity including framing and multibyte content", async () => {
+    const home = await temporaryHome();
+    const activity = createMemoryActivityStore(home, {
+      maxFileBytes: 120,
+      maxSessionFiles: 2,
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
+    });
+
+    await activity.append("first", {
+      kind: "human",
+      text: "é".repeat(200),
+    });
+    await activity.append("second", {
+      kind: "assistant",
+      text: "界".repeat(200),
+    });
+
+    const projection = await activity.readRecent(3);
+    expect(Buffer.byteLength(projection)).toBeLessThanOrEqual(240);
+    expect(projection).toContain("## ");
+    expect(projection).toContain("é");
+    expect(projection).toContain("界");
+  });
+
+  test("redacts quoted credential values", () => {
+    const projection = redact(
+      '{"password":"hunter2", "api_key": "api-secret-value"}',
+    );
+
+    expect(projection).not.toContain("hunter2");
+    expect(projection).not.toContain("api-secret-value");
   });
 
   test("tracks distinct completed prior sessions and requires both Dream thresholds", async () => {

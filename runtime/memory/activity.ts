@@ -144,17 +144,23 @@ export function createMemoryActivityStore(
       .filter(({ day }) => day >= cutoff)
       .sort((left, right) => left.path.localeCompare(right.path))
       .slice(-maxSessionFiles);
-    const parts: string[] = [];
+    const aggregateLimit = maxFileBytes * Math.min(maxSessionFiles, 8);
+    let result = "";
     let bytes = 0;
     for (const file of files) {
       const content = await readFile(file.path, "utf8");
-      const remaining = maxFileBytes * Math.min(maxSessionFiles, 8) - bytes;
-      if (remaining <= 0) break;
-      const bounded = truncateUtf8(content, remaining);
-      parts.push(`## ${file.label}\n${bounded}`);
+      const framing = `${result ? "\n" : ""}## ${file.label}\n`;
+      const remaining = aggregateLimit - bytes;
+      const framingBytes = Buffer.byteLength(framing);
+      if (framingBytes > remaining) break;
+      result += framing;
+      bytes += framingBytes;
+      const bounded = truncateUtf8(content, aggregateLimit - bytes);
+      result += bounded;
       bytes += Buffer.byteLength(bounded);
+      if (bytes >= aggregateLimit) break;
     }
-    return parts.join("\n");
+    return truncateUtf8(result, aggregateLimit);
   }
 
   async function ensureState(at = now()): Promise<MemoryActivityState> {
@@ -348,7 +354,7 @@ export function redact(value: string): string {
     )
     .replace(/\bbearer\s+\S+/gi, "Bearer [REDACTED]")
     .replace(
-      /\b(api[_-]?key|token|password|passwd|secret)\s*[:=]\s*\S+/gi,
+      /["']?\b(api[_-]?key|token|password|passwd|secret)\b["']?\s*[:=]\s*["']?[^\s"'`,}\]]{1,256}/gi,
       "$1=[REDACTED]",
     )
     .replace(

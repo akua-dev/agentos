@@ -108,6 +108,27 @@ describe("Mate memory automatic maintenance", () => {
     ).rejects.toThrow("topics/");
   });
 
+  test("reports an oversized index after the durable write commits", async () => {
+    const { home, store } = await fixture();
+    const write = createMaintenanceTools(store).find(
+      ({ name }) => name === "memory_write_index",
+    )!;
+    const content = `${Array.from({ length: 201 }, (_, index) => `line ${index}`).join("\n")}\n`;
+
+    await expect(
+      write.execute(
+        "write-index",
+        { content } as never,
+        undefined,
+        undefined,
+        {} as never,
+      ),
+    ).rejects.toThrow("MEMORY.md exceeds the 200-line loading limit");
+    expect(await readFile(join(home, "memory", "MEMORY.md"), "utf8")).toBe(
+      content,
+    );
+  });
+
   test("coalesces bursts to the newest bounded extraction window", async () => {
     const { store } = await fixture();
     const requests: MaintenanceRunRequest[] = [];

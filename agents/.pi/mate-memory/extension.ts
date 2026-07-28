@@ -88,7 +88,7 @@ export function registerMateMemoryExtension(
 
   pi.on("input", async (event, context) => {
     maintenance.captureHumanInput(event.text, event.source);
-    if (event.source !== "extension") {
+    if (!paused && event.source !== "extension") {
       try {
         await activity.append(context.sessionManager.getSessionId(), {
           kind: "human",
@@ -118,9 +118,12 @@ export function registerMateMemoryExtension(
   pi.on("agent_end", async (event, context) => {
     const sessionId = context.sessionManager.getSessionId();
     try {
+      if (paused) return;
       for (const toolName of [...observedToolNames].sort()) {
+        if (paused) return;
         await activity.append(sessionId, { kind: "tool", toolName });
       }
+      if (paused) return;
       const assistant = [...event.messages]
         .reverse()
         .find((message) => message.role === "assistant");
@@ -245,7 +248,7 @@ export function registerMateMemoryExtension(
   });
 
   pi.on("tool_call", async (event, context) => {
-    observedToolNames.add(event.toolName);
+    if (!paused) observedToolNames.add(event.toolName);
     if (!nativeFileTools.has(event.toolName)) return;
     const target = nativeToolPath(event, context);
     if (!target || !isWithin(store.root, target)) return;
@@ -351,6 +354,10 @@ export function registerMateMemoryExtension(
 
   function setPaused(value: boolean) {
     paused = value;
+    if (value) {
+      observedToolNames.clear();
+      pendingWrites.clear();
+    }
     pi.appendEntry(STATE_ENTRY, { paused });
   }
 
