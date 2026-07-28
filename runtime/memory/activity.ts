@@ -57,6 +57,10 @@ export interface MemoryActivityMutationOptions {
   beforeCommit?: () => void | Promise<void>;
 }
 
+export interface MemoryActivityReadOptions {
+  beforeRead?: () => void | Promise<void>;
+}
+
 export interface MemoryActivityStore {
   readonly logsRoot: string;
   readonly statePath: string;
@@ -66,12 +70,21 @@ export interface MemoryActivityStore {
     projection: MemoryActivityProjection,
     options?: MemoryActivityMutationOptions,
   ): Promise<void>;
-  readRecent(days?: number): Promise<string>;
+  readRecent(
+    days?: number,
+    options?: MemoryActivityReadOptions,
+  ): Promise<string>;
   ensureState(at?: Date): Promise<MemoryActivityState>;
   readState(): Promise<MemoryActivityState>;
   completeSession(sessionId: string, at?: Date): Promise<void>;
-  markDreamDiscovery(at?: Date): Promise<void>;
-  markDreamSuccess(at?: Date): Promise<void>;
+  markDreamDiscovery(
+    at?: Date,
+    options?: MemoryActivityMutationOptions,
+  ): Promise<void>;
+  markDreamSuccess(
+    at?: Date,
+    options?: MemoryActivityMutationOptions,
+  ): Promise<void>;
   claimDreamLock(owner: string): Promise<DreamLockClaim>;
   releaseDreamLock(claim: DreamLockClaim): Promise<void>;
 }
@@ -169,12 +182,17 @@ export function createMemoryActivityStore(
     await pruneLogs(at);
   }
 
-  async function readRecent(days = retentionDays): Promise<string> {
+  async function readRecent(
+    days = retentionDays,
+    options: MemoryActivityReadOptions = {},
+  ): Promise<string> {
+    await runActivityReadGuard(options.beforeRead);
     await ensureLayout();
+    await runActivityReadGuard(options.beforeRead);
     const cutoff = startOfUtcDay(
       new Date(now().getTime() - Math.max(1, days) * 86_400_000),
     );
-    const files = (await activityFiles(logsRoot))
+    const files = (await activityFiles(logsRoot, options.beforeRead))
       .filter(({ day }) => day >= cutoff)
       .sort((left, right) => left.path.localeCompare(right.path))
       .slice(-maxSessionFiles);
@@ -182,7 +200,9 @@ export function createMemoryActivityStore(
     let result = "";
     let bytes = 0;
     for (const file of files) {
-      const content = await readUtf8(file.path);
+      await runActivityReadGuard(options.beforeRead);
+      const content = await readUtf8(file.path, options.beforeRead);
+      await runActivityReadGuard(options.beforeRead);
       const framing = `${result ? "\n" : ""}## ${file.label}\n`;
       const remaining = aggregateLimit - bytes;
       const framingBytes = Buffer.byteLength(framing);
@@ -258,20 +278,26 @@ export function createMemoryActivityStore(
     });
   }
 
-  async function markDreamDiscovery(at = now()) {
+  async function markDreamDiscovery(
+    at = now(),
+    options: MemoryActivityMutationOptions = {},
+  ) {
     await withStateMutation(async () => {
       const state = await ensureStateUnlocked(at);
       state.lastDreamDiscoveryAt = at.toISOString();
-      await writeState(state);
+      await writeState(state, options);
     });
   }
 
-  async function markDreamSuccess(at = now()) {
+  async function markDreamSuccess(
+    at = now(),
+    options: MemoryActivityMutationOptions = {},
+  ) {
     await withStateMutation(async () => {
       const state = await ensureStateUnlocked(at);
       state.lastSuccessfulDreamAt = at.toISOString();
       state.lastDreamDiscoveryAt = at.toISOString();
-      await writeState(state);
+      await writeState(state, options);
     });
   }
 
@@ -292,6 +318,7 @@ export function createMemoryActivityStore(
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
+    await ensureSafeActivityPath(memoryRoot, lockPath);
     const existing = await readLock(lockPath);
     if (
       existing &&
@@ -318,6 +345,8 @@ export function createMemoryActivityStore(
 
   async function releaseDreamLock(claim: DreamLockClaim) {
     if (!claim.acquired) return;
+    await ensureLayout();
+    await ensureSafeActivityPath(memoryRoot, lockPath);
     const existing = await readLock(lockPath);
     if (
       !existing ||
@@ -333,12 +362,20 @@ export function createMemoryActivityStore(
     }
   }
 
-  async function writeState(state: MemoryActivityState) {
+  async function writeState(
+    state: MemoryActivityState,
+    options: MemoryActivityMutationOptions = {},
+  ) {
     await ensureSafeStateFile();
     await atomicWrite(
       statePath,
       `${JSON.stringify(state, null, 2)}\n`,
-      { beforeCommit: () => ensureSafeStateFile() },
+      {
+        beforeCommit: async () => {
+          await ensureSafeStateFile();
+          await options.beforeCommit?.();
+        },
+      },
     );
   }
 
@@ -520,7 +557,10 @@ function projectionPath(root: string, sessionId: string, at: Date): string {
   return join(root, year, month, day, `${digest}.md`);
 }
 
-async function activityFiles(root: string): Promise<
+async function activityFiles(
+  root: string,
+  beforeRead?: () => void | Promise<void>,
+): Promise<
   Array<{ path: string; label: string; day: number }>
 > {
   const results: Array<{ path: string; label: string; day: number }> = [];
@@ -528,9 +568,11 @@ async function activityFiles(root: string): Promise<
   return results;
 
   async function walk(directory: string, segments: string[]) {
+    await runActivityReadGuard(beforeRead);
     let entries;
     try {
       entries = await readdir(directory, { withFileTypes: true });
+      await runActivityReadGuard(beforeRead);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
       throw error;
@@ -596,13 +638,24 @@ async function atomicWrite(
   }
 }
 
-async function readUtf8(path: string): Promise<string> {
+async function readUtf8(
+  path: string,
+  beforeRead?: () => void | Promise<void>,
+): Promise<string> {
+  await runActivityReadGuard(beforeRead);
   const contents = await readFile(path);
+  await runActivityReadGuard(beforeRead);
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(contents);
   } catch {
     throw new Error(`${path} is not valid UTF-8`);
   }
+}
+
+async function runActivityReadGuard(
+  guard?: () => void | Promise<void>,
+): Promise<void> {
+  await guard?.();
 }
 
 async function writeExclusive(path: string, value: object) {

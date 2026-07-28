@@ -307,6 +307,11 @@ export class MateMemoryMaintenance {
       !this.isPaused() && this.getPauseGeneration() === pauseGeneration;
     const isCurrentMutation = () =>
       isActive() && this.mutationEpoch === mutationEpoch;
+    const assertCurrentMutation = () => {
+      if (!isCurrentMutation()) {
+        throw new Error("Mate memory maintenance run is no longer active");
+      }
+    };
     await this.drain(60_000);
     if (!isCurrentMutation()) return;
     const current = this.now();
@@ -321,7 +326,9 @@ export class MateMemoryMaintenance {
       return;
     }
     if (!isCurrentMutation()) return;
-    await activity.markDreamDiscovery(current);
+    await activity.markDreamDiscovery(current, {
+      beforeCommit: assertCurrentMutation,
+    });
     if (!isCurrentMutation()) return;
     if (
       !shouldDream(state, {
@@ -364,7 +371,9 @@ export class MateMemoryMaintenance {
       if (!isCurrentMutation()) return;
       for (const path of result.touchedPaths) touchedPaths.add(path);
       if (!isCurrentMutation()) return;
-      await activity.markDreamSuccess(current);
+      await activity.markDreamSuccess(current, {
+        beforeCommit: assertCurrentMutation,
+      });
       this.onEvent?.({
         status: "succeeded",
         summary: `Dream completed: ${boundedSummary(result.summary)}`,
@@ -593,7 +602,7 @@ function createActivityReadTool(
       if (!isActive()) {
         throw new Error("Mate memory maintenance run is no longer active");
       }
-      const recent = await activity.readRecent(3);
+      const recent = await activity.readRecent(3, { beforeRead: isActive });
       if (!isActive()) {
         throw new Error("Mate memory maintenance run is no longer active");
       }

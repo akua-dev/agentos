@@ -324,4 +324,37 @@ describe("Mate memory storage", () => {
     ).rejects.toThrow("pause generation changed");
     expect(reads).toBe(4);
   });
+
+  test("stops a bounded topic read when the guard changes after a file read", async () => {
+    const home = await temporaryHome();
+    const store = createMateMemoryStore(home);
+    await store.ensureLayout();
+    await store.writeTopic(topic({ relativePath: "topics/guarded.md" }));
+    let reads = 0;
+
+    await expect(
+      store.readTopic("topics/guarded.md", {
+        beforeRead: () => {
+          reads += 1;
+          if (reads === 6) throw new Error("pause generation changed");
+        },
+      }),
+    ).rejects.toThrow("pause generation changed");
+  });
+
+  test("does not bootstrap MEMORY.md after a layout commit guard rejects", async () => {
+    const home = await temporaryHome();
+    const store = createMateMemoryStore(home);
+
+    await expect(
+      store.readStartupContext({
+        beforeCommit: () => {
+          throw new Error("pause generation changed");
+        },
+      }),
+    ).rejects.toThrow("pause generation changed");
+    await expect(
+      readFile(join(home, "memory", "MEMORY.md"), "utf8"),
+    ).rejects.toThrow();
+  });
 });

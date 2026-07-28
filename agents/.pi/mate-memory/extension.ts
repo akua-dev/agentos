@@ -312,11 +312,22 @@ export function registerMateMemoryExtension(
     }
     if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
     if (nativeWriteTools.has(event.toolName)) {
-      maintenance.beginDirectMemoryWrite();
       const existedBeforeCall = await nativePathExists(target);
       if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
       if (!existedBeforeCall && relativePath.startsWith("topics/")) {
-        const topicCount = (await store.listTopics()).length;
+        let topicCount: number;
+        try {
+          topicCount = (
+            await store.listTopics({
+              beforeRead: () => assertMemoryGeneration(generation),
+            })
+          ).length;
+        } catch (error) {
+          if (!isActiveGeneration(generation)) {
+            return pausedMemoryToolResult();
+          }
+          throw error;
+        }
         if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
         if (
           topicCount + pendingTopicCreations.size >=
@@ -329,6 +340,7 @@ export function registerMateMemoryExtension(
         }
         pendingTopicCreations.add(event.toolCallId);
       }
+      maintenance.beginDirectMemoryWrite();
       pendingWrites.set(event.toolCallId, {
         relativePath,
         existedBeforeCall,

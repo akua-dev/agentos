@@ -7,7 +7,10 @@ import {
   createMateMemoryStore,
   type MateMemoryStore,
 } from "../../../../runtime/memory/store.ts";
-import { createMemoryActivityStore } from "../../../../runtime/memory/activity.ts";
+import {
+  createMemoryActivityStore,
+  type MemoryActivityStore,
+} from "../../../../runtime/memory/activity.ts";
 import {
   createMaintenanceTools,
   isEligibleHumanInput,
@@ -500,6 +503,66 @@ describe("Mate memory automatic maintenance", () => {
     expect((await activity.readState()).lastSuccessfulDreamAt).toBe(
       "2026-07-28T08:00:00.000Z",
     );
+  });
+
+  test("does not persist a Dream discovery marker after its guard changes", async () => {
+    const { home, store } = await fixture();
+    const realActivity = createMemoryActivityStore(home);
+    await realActivity.ensureState(new Date("2026-07-26T08:00:00.000Z"));
+    for (let index = 0; index < 5; index += 1) {
+      await realActivity.completeSession(
+        `prior-${index}`,
+        new Date(`2026-07-27T0${index}:00:00.000Z`),
+      );
+    }
+    let paused = false;
+    const activity: MemoryActivityStore = {
+      ...realActivity,
+      async markDreamDiscovery(at, options) {
+        paused = true;
+        return realActivity.markDreamDiscovery(at, options);
+      },
+    };
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      runner: async () => ({ summary: "not reached", touchedPaths: [] }),
+      isPaused: () => paused,
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
+    });
+
+    await maintenance.maybeDream(baseContext(), activity, "current");
+
+    expect((await realActivity.readState()).lastDreamDiscoveryAt).toBeUndefined();
+  });
+
+  test("does not persist a Dream success marker after its guard changes", async () => {
+    const { home, store } = await fixture();
+    const realActivity = createMemoryActivityStore(home);
+    await realActivity.ensureState(new Date("2026-07-26T08:00:00.000Z"));
+    for (let index = 0; index < 5; index += 1) {
+      await realActivity.completeSession(
+        `prior-${index}`,
+        new Date(`2026-07-27T0${index}:00:00.000Z`),
+      );
+    }
+    let paused = false;
+    const activity: MemoryActivityStore = {
+      ...realActivity,
+      async markDreamSuccess(at, options) {
+        paused = true;
+        return realActivity.markDreamSuccess(at, options);
+      },
+    };
+    const maintenance = new MateMemoryMaintenance({
+      store,
+      runner: async () => ({ summary: "dreamed", touchedPaths: [] }),
+      isPaused: () => paused,
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
+    });
+
+    await maintenance.maybeDream(baseContext(), activity, "current");
+
+    expect((await realActivity.readState()).lastSuccessfulDreamAt).toBeUndefined();
   });
 
   test("releases the Dream lock and preserves the prior schedule marker on failure", async () => {

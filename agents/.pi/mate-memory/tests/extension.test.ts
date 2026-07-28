@@ -562,10 +562,11 @@ describe("Pi Mate memory extension", () => {
     });
     const delayedStore: MateMemoryStore = {
       ...store,
-      async listTopics() {
+      async listTopics(options) {
         listStarted();
         await listReleased;
-        return store.listTopics();
+        await options?.beforeRead?.();
+        return store.listTopics(options);
       },
     };
     const pi = new FakePi();
@@ -589,6 +590,66 @@ describe("Pi Mate memory extension", () => {
       block: true,
       reason: "Mate memory is paused for this Pi session.",
     });
+  });
+
+  test("does not suppress extraction when a native capacity preflight is blocked", async () => {
+    const home = await mkdtemp(join(tmpdir(), "agentos-pi-memory-blocked-preflight-"));
+    temporaryDirectories.push(home);
+    const store = createMateMemoryStore(home, { maxTopicFiles: 1 });
+    await store.ensureLayout();
+    await store.writeTopic({
+      relativePath: "topics/existing.md",
+      metadata: {
+        node_type: "memory",
+        type: "project",
+        scope: "fleet",
+        source_principal: "captain",
+        observed_at: "2026-07-28T08:00:00.000Z",
+        modified: "2026-07-28T08:00:00.000Z",
+        pinned: false,
+      },
+      body: "Existing topic.",
+    });
+    const requests: MaintenanceRunRequest[] = [];
+    const pi = new FakePi();
+    const controller = registerMateMemoryExtension(pi.extensionApi(), {
+      home,
+      store,
+      maintenanceRunner: async (request) => {
+        requests.push(request);
+        return { summary: "nothing to save", touchedPaths: [] };
+      },
+    });
+    const sessionManager = {
+      getBranch: () => [],
+      getSessionId: () => "blocked-preflight",
+    } as never;
+
+    const blocked = await pi.emit("tool_call", {
+      toolCallId: "blocked-write",
+      toolName: "write",
+      input: { path: join(home, "memory", "topics", "new.md") },
+    });
+    expect(blocked.results[0]).toEqual({
+      block: true,
+      reason: "Mate memory has reached its 1-topic limit.",
+    });
+    await pi.emit(
+      "input",
+      { text: "Remember this after blocked write", source: "interactive" },
+      { sessionManager },
+    );
+    await pi.emit(
+      "agent_settled",
+      {},
+      {
+        model: { provider: "test", id: "model" } as never,
+        sessionManager,
+      },
+    );
+    await controller!.maintenance.drain(1_000);
+
+    expect(requests).toHaveLength(1);
   });
 
   test("validates and stamps successful native topic edits", async () => {

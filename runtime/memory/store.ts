@@ -2,7 +2,6 @@ import {
   lstat,
   mkdir,
   open,
-  readFile,
   readdir,
   realpath,
   rename,
@@ -48,24 +47,20 @@ export interface StartupMemoryContext {
 
 export interface MemoryReadOptions {
   beforeRead?: () => void | Promise<void>;
+  beforeCommit?: () => void;
 }
 
-export interface StampOptions {
+export interface StampOptions extends MemoryReadOptions {
   now?: Date;
   enforceTopicLimit?: boolean;
-  beforeRead?: () => void | Promise<void>;
-  beforeCommit?: () => void;
 }
 
-export interface MemoryMutationOptions {
-  beforeRead?: () => void | Promise<void>;
-  beforeCommit?: () => void;
-}
+export interface MemoryMutationOptions extends MemoryReadOptions {}
 
 export interface MateMemoryStore {
   readonly root: string;
   readonly policy: MateMemoryPolicy;
-  ensureLayout(): Promise<void>;
+  ensureLayout(options?: MemoryReadOptions): Promise<void>;
   readStartupContext(options?: MemoryReadOptions): Promise<StartupMemoryContext>;
   listTopics(options?: MemoryReadOptions): Promise<StoredTopic[]>;
   readTopic(
@@ -115,19 +110,26 @@ export function createMateMemoryStore(
     resolveMemoryPath,
   };
 
-  async function ensureLayout() {
-    await ensureSafeDirectory(root);
-    await ensureSafeDirectory(join(root, "topics"));
+  async function ensureLayout(options: MemoryReadOptions = {}) {
+    await runReadGuard(options.beforeRead);
+    await ensureSafeDirectory(root, options.beforeRead);
+    await runReadGuard(options.beforeRead);
+    await ensureSafeDirectory(join(root, "topics"), options.beforeRead);
+    await runReadGuard(options.beforeRead);
     const index = join(root, INDEX_NAME);
+    await runReadGuard(options.beforeRead);
     try {
       const entry = await lstat(index);
+      await runReadGuard(options.beforeRead);
       if (entry.isSymbolicLink()) {
         throw new Error(`${index} must not be a symbolic link`);
       }
       if (!entry.isFile()) throw new Error(`${index} must be a regular file`);
     } catch (error) {
+      if (error instanceof MemoryReadGuardError) throw error;
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      await atomicWrite(index, EMPTY_INDEX);
+      await runReadGuard(options.beforeRead);
+      await atomicWrite(index, EMPTY_INDEX, options);
     }
   }
 
@@ -135,7 +137,7 @@ export function createMateMemoryStore(
     options: MemoryReadOptions = {},
   ): Promise<StartupMemoryContext> {
     await runReadGuard(options.beforeRead);
-    await ensureLayout();
+    await ensureLayout(options);
     await runReadGuard(options.beforeRead);
     const degraded: string[] = [];
     let index = "";
@@ -144,6 +146,7 @@ export function createMateMemoryStore(
       const boundedIndex = await readUtf8Prefix(
         join(root, INDEX_NAME),
         policy.maxIndexBytes,
+        options.beforeRead,
       );
       const rawIndex = boundedIndex.text;
       if (boundedIndex.truncated) {
@@ -226,7 +229,7 @@ export function createMateMemoryStore(
     options: MemoryReadOptions = {},
   ): Promise<StoredTopic[]> {
     await runReadGuard(options.beforeRead);
-    await ensureLayout();
+    await ensureLayout(options);
     await runReadGuard(options.beforeRead);
     const topics: StoredTopic[] = [];
     for (const relativePath of await topicPaths(root, options.beforeRead)) {
@@ -244,7 +247,11 @@ export function createMateMemoryStore(
     await runReadGuard(options.beforeRead);
     const path = await resolveMemoryPath(relativePath);
     await runReadGuard(options.beforeRead);
-    const bounded = await readUtf8Prefix(path, policy.maxTopicBytes);
+    const bounded = await readUtf8Prefix(
+      path,
+      policy.maxTopicBytes,
+      options.beforeRead,
+    );
     if (bounded.truncated) {
       throw new Error(
         `${canonicalTopicPath(relativePath)} exceeds the ${policy.maxTopicBytes}-byte topic limit`,
@@ -293,7 +300,7 @@ export function createMateMemoryStore(
     options: MemoryMutationOptions = {},
   ): Promise<StoredTopic> {
     await runReadGuard(options.beforeRead);
-    await ensureLayout();
+    await ensureLayout(options);
     await runReadGuard(options.beforeRead);
     const relativePath = canonicalTopicPath(topic.relativePath);
     await runReadGuard(options.beforeRead);
@@ -352,7 +359,7 @@ export function createMateMemoryStore(
     options: MemoryMutationOptions = {},
   ) {
     await runReadGuard(options.beforeRead);
-    await ensureLayout();
+    await ensureLayout(options);
     await runReadGuard(options.beforeRead);
     if (typeof content !== "string") {
       throw new Error("MEMORY.md content must be text");
@@ -486,16 +493,24 @@ async function rejectSymlinkTraversal(root: string, target: string) {
   }
 }
 
-async function ensureSafeDirectory(path: string) {
+async function ensureSafeDirectory(
+  path: string,
+  beforeRead?: () => void | Promise<void>,
+) {
+  await runReadGuard(beforeRead);
   try {
     const entry = await lstat(path);
+    await runReadGuard(beforeRead);
     if (entry.isSymbolicLink()) {
       throw new Error(`${path} must not be a symbolic link`);
     }
     if (!entry.isDirectory()) throw new Error(`${path} must be a directory`);
   } catch (error) {
+    if (error instanceof MemoryReadGuardError) throw error;
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    await runReadGuard(beforeRead);
     await mkdir(path, { recursive: true, mode: 0o700 });
+    await runReadGuard(beforeRead);
   }
 }
 
@@ -531,33 +546,29 @@ async function atomicWrite(
   }
 }
 
-async function readUtf8(path: string): Promise<string> {
-  const contents = await readFile(path);
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(contents);
-  } catch {
-    throw new Error(`${path} is not valid UTF-8`);
-  }
-}
-
 async function readUtf8Prefix(
   path: string,
   maxBytes: number,
+  beforeRead?: () => void | Promise<void>,
 ): Promise<{ text: string; truncated: boolean }> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
     throw new Error("memory byte limit must be a positive safe integer");
   }
+  await runReadGuard(beforeRead);
   const handle = await open(path, "r");
   try {
+    await runReadGuard(beforeRead);
     const contents = Buffer.allocUnsafe(maxBytes + 1);
     let bytesRead = 0;
     while (bytesRead < contents.length) {
+      await runReadGuard(beforeRead);
       const result = await handle.read(
         contents,
         bytesRead,
         contents.length - bytesRead,
         bytesRead,
       );
+      await runReadGuard(beforeRead);
       if (result.bytesRead === 0) break;
       bytesRead += result.bytesRead;
     }

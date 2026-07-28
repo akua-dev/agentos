@@ -275,6 +275,61 @@ describe("Mate memory activity projection", () => {
     await expect(activity.readState()).rejects.toThrow("symbolic link");
   });
 
+  test("stops reading the activity projection when its read guard changes", async () => {
+    const home = await temporaryHome();
+    const activity = createMemoryActivityStore(home, {
+      now: () => new Date("2026-07-28T08:00:00.000Z"),
+    });
+    await activity.append("first", { kind: "human", text: "first activity" });
+    await activity.append("second", { kind: "human", text: "second activity" });
+    let reads = 0;
+
+    await expect(
+      activity.readRecent(3, {
+        beforeRead: () => {
+          reads += 1;
+          if (reads === 11) throw new Error("pause generation changed");
+        },
+      }),
+    ).rejects.toThrow("pause generation changed");
+  });
+
+  test("does not read a symbolic-link Dream lock outside the Mate home", async () => {
+    const home = await temporaryHome();
+    const outside = join(home, "outside-lock.json");
+    const activity = createMemoryActivityStore(home);
+    await activity.ensureLayout();
+    await writeFile(
+      outside,
+      JSON.stringify({
+        owner: "outside",
+        token: "outside",
+        startedAt: "2026-07-28T08:00:00.000Z",
+      }),
+      "utf8",
+    );
+    await symlink(outside, join(home, "memory", ".consolidate-lock"));
+
+    await expect(activity.claimDreamLock("inside")).rejects.toThrow(
+      "symbolic link",
+    );
+  });
+
+  test("honors a Dream marker commit guard", async () => {
+    const home = await temporaryHome();
+    const activity = createMemoryActivityStore(home);
+    await activity.ensureState(new Date("2026-07-28T08:00:00.000Z"));
+
+    await expect(
+      activity.markDreamSuccess(new Date("2026-07-28T09:00:00.000Z"), {
+        beforeCommit: () => {
+          throw new Error("pause generation changed");
+        },
+      }),
+    ).rejects.toThrow("pause generation changed");
+    expect((await activity.readState()).lastSuccessfulDreamAt).toBeUndefined();
+  });
+
   test("preserves concurrent session and Dream state updates", async () => {
     const home = await temporaryHome();
     const activity = createMemoryActivityStore(home);
