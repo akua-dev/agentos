@@ -744,6 +744,42 @@ describe("Pi Mate memory extension", () => {
     expect(reads).toBe(2);
   });
 
+  test("passes the pause-generation commit guard into startup bootstrap", async () => {
+    const home = await mkdtemp(join(tmpdir(), "agentos-pi-memory-bootstrap-"));
+    temporaryDirectories.push(home);
+    const store = createMateMemoryStore(home);
+    const pi = new FakePi();
+    const guardedStore: MateMemoryStore = {
+      ...store,
+      async readStartupContext(options) {
+        return store.readStartupContext({
+          beforeRead: options?.beforeRead,
+          beforeCommit: () => {
+            void pi.commands.get("memory")!.handler("pause", {
+              ui: { notify: () => undefined },
+            } as unknown as ExtensionCommandContext);
+            options?.beforeCommit?.();
+          },
+        });
+      },
+    };
+    registerMateMemoryExtension(pi.extensionApi(), {
+      home,
+      store: guardedStore,
+    });
+
+    const result = await pi.emit("before_agent_start", {
+      prompt: "Bootstrap memory",
+      systemPrompt: "ROLE",
+      systemPromptOptions: {},
+    });
+
+    expect(result.results[0]).toEqual({ systemPrompt: "ROLE" });
+    await expect(
+      readFile(join(home, "memory", "MEMORY.md"), "utf8"),
+    ).rejects.toThrow();
+  });
+
   test("connects only direct human input to restricted post-turn extraction", async () => {
     const { home } = await fixture();
     const pi = new FakePi();

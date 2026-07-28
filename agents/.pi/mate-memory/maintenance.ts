@@ -442,7 +442,10 @@ export function createMaintenanceTools(
       parameters: Empty,
       async execute() {
         assertActive();
-        const topics = await store.listTopics({ beforeRead: assertActive });
+        const topics = await store.listTopics({
+          beforeRead: assertActive,
+          beforeCommit: assertActive,
+        });
         assertActive();
         return textResult(
           JSON.stringify(
@@ -463,6 +466,7 @@ export function createMaintenanceTools(
         assertActive();
         const startup = await store.readStartupContext({
           beforeRead: assertActive,
+          beforeCommit: assertActive,
         });
         assertActive();
         return textResult(startup.index);
@@ -575,7 +579,10 @@ export function createMaintenanceTools(
         });
         assertReadyToMutate();
         const warnings = (
-          await store.readStartupContext({ beforeRead: assertActive })
+          await store.readStartupContext({
+            beforeRead: assertActive,
+            beforeCommit: assertActive,
+          })
         ).degraded.filter(
           (warning) => warning.startsWith("MEMORY.md"),
         );

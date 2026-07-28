@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import {
   mkdir,
   mkdtemp,
@@ -356,5 +357,24 @@ describe("Mate memory storage", () => {
     await expect(
       readFile(join(home, "memory", "MEMORY.md"), "utf8"),
     ).rejects.toThrow();
+  });
+
+  test("stops guarded path traversal before the next parent component", async () => {
+    const home = await temporaryHome();
+    const store = createMateMemoryStore(home);
+    await store.ensureLayout();
+    let reads = 0;
+
+    await expect(
+      store.resolveMemoryPath("topics/deep/topic.md", {
+        beforeRead: () => {
+          reads += 1;
+          if (reads === 10) throw new Error("pause generation changed");
+        },
+      }),
+    ).rejects.toThrow("pause generation changed");
+    expect(
+      existsSync(join(home, "memory", "topics", "deep")),
+    ).toBe(false);
   });
 });

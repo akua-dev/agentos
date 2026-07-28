@@ -194,6 +194,7 @@ export function registerMateMemoryExtension(
     try {
       startup = await store.readStartupContext({
         beforeRead: () => assertMemoryGeneration(generation),
+        beforeCommit: () => assertMemoryGeneration(generation),
       });
     } catch (error) {
       startup = {
@@ -303,8 +304,11 @@ export function registerMateMemoryExtension(
     let relativePath: string;
     try {
       relativePath = memoryRelativePath(store.root, target);
-      await store.resolveMemoryPath(relativePath);
+      await store.resolveMemoryPath(relativePath, {
+        beforeRead: () => assertMemoryGeneration(generation),
+      });
     } catch (error) {
+      if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
       return {
         block: true,
         reason: `Unsafe Mate memory path: ${errorMessage(error)}`,
@@ -312,7 +316,15 @@ export function registerMateMemoryExtension(
     }
     if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
     if (nativeWriteTools.has(event.toolName)) {
-      const existedBeforeCall = await nativePathExists(target);
+      let existedBeforeCall: boolean;
+      try {
+        existedBeforeCall = await nativePathExists(target, () =>
+          assertMemoryGeneration(generation),
+        );
+      } catch (error) {
+        if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
+        throw error;
+      }
       if (!isActiveGeneration(generation)) return pausedMemoryToolResult();
       if (!existedBeforeCall && relativePath.startsWith("topics/")) {
         let topicCount: number;
@@ -320,6 +332,7 @@ export function registerMateMemoryExtension(
           topicCount = (
             await store.listTopics({
               beforeRead: () => assertMemoryGeneration(generation),
+              beforeCommit: () => assertMemoryGeneration(generation),
             })
           ).length;
         } catch (error) {
@@ -362,6 +375,7 @@ export function registerMateMemoryExtension(
       if (pending.relativePath === "MEMORY.md") {
         const startup = await store.readStartupContext({
           beforeRead: () => assertMemoryGeneration(generation),
+          beforeCommit: () => assertMemoryGeneration(generation),
         });
         if (!isActiveGeneration(generation)) return;
         const indexWarnings = startup.degraded.filter((warning) =>
@@ -449,7 +463,9 @@ export function registerMateMemoryExtension(
       const generation = pauseGeneration;
       assertMemoryGeneration(generation);
       const relativePath = canonicalTopicPath(path);
-      await store.resolveMemoryPath(relativePath);
+      await store.resolveMemoryPath(relativePath, {
+        beforeRead: () => assertMemoryGeneration(generation),
+      });
       assertMemoryGeneration(generation);
       maintenance.beginDirectMemoryWrite();
       await store.deleteTopic(relativePath, {
@@ -588,9 +604,14 @@ function pausedMemoryToolResult() {
   };
 }
 
-async function nativePathExists(path: string): Promise<boolean> {
+async function nativePathExists(
+  path: string,
+  beforeRead?: () => void,
+): Promise<boolean> {
+  beforeRead?.();
   try {
     const entry = await lstat(path);
+    beforeRead?.();
     if (entry.isSymbolicLink()) {
       throw new Error(`memory path crosses symbolic link ${path}`);
     }

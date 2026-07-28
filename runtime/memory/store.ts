@@ -83,7 +83,10 @@ export interface MateMemoryStore {
     content: string,
     options?: MemoryMutationOptions,
   ): Promise<void>;
-  resolveMemoryPath(relativePath: string): Promise<string>;
+  resolveMemoryPath(
+    relativePath: string,
+    options?: MemoryReadOptions,
+  ): Promise<string>;
 }
 
 const INDEX_NAME = "MEMORY.md";
@@ -245,7 +248,7 @@ export function createMateMemoryStore(
     options: MemoryReadOptions = {},
   ): Promise<StoredTopic> {
     await runReadGuard(options.beforeRead);
-    const path = await resolveMemoryPath(relativePath);
+    const path = await resolveMemoryPath(relativePath, options);
     await runReadGuard(options.beforeRead);
     const bounded = await readUtf8Prefix(
       path,
@@ -304,7 +307,7 @@ export function createMateMemoryStore(
     await runReadGuard(options.beforeRead);
     const relativePath = canonicalTopicPath(topic.relativePath);
     await runReadGuard(options.beforeRead);
-    const path = await resolveMemoryPath(relativePath);
+    const path = await resolveMemoryPath(relativePath, options);
     await runReadGuard(options.beforeRead);
     const exists = await pathExists(path);
     await runReadGuard(options.beforeRead);
@@ -348,7 +351,7 @@ export function createMateMemoryStore(
     options: MemoryMutationOptions = {},
   ) {
     await runReadGuard(options.beforeRead);
-    const path = await resolveMemoryPath(relativePath);
+    const path = await resolveMemoryPath(relativePath, options);
     await runReadGuard(options.beforeRead);
     options.beforeCommit?.();
     await unlink(path);
@@ -367,7 +370,11 @@ export function createMateMemoryStore(
     await atomicWrite(join(root, INDEX_NAME), content, options);
   }
 
-  async function resolveMemoryPath(relativePath: string): Promise<string> {
+  async function resolveMemoryPath(
+    relativePath: string,
+    options: MemoryReadOptions = {},
+  ): Promise<string> {
+    await runReadGuard(options.beforeRead);
     const normalized =
       relativePath === INDEX_NAME ? INDEX_NAME : canonicalTopicPath(relativePath);
     if (isAbsolute(normalized)) throw new Error("memory path must be relative");
@@ -380,7 +387,8 @@ export function createMateMemoryStore(
     ) {
       throw new Error("memory path escapes the Mate memory root");
     }
-    await rejectSymlinkTraversal(root, path);
+    await rejectSymlinkTraversal(root, path, options.beforeRead);
+    await runReadGuard(options.beforeRead);
     return path;
   }
 }
@@ -455,9 +463,15 @@ async function runReadGuard(
   }
 }
 
-async function rejectSymlinkTraversal(root: string, target: string) {
-  await ensureSafeDirectory(root);
+async function rejectSymlinkTraversal(
+  root: string,
+  target: string,
+  beforeRead?: () => void | Promise<void>,
+) {
+  await ensureSafeDirectory(root, beforeRead);
+  await runReadGuard(beforeRead);
   const rootReal = await realpath(root);
+  await runReadGuard(beforeRead);
   const fromRoot = relative(root, target);
   let cursor = root;
   const segments = fromRoot.split(sep);
@@ -465,7 +479,9 @@ async function rejectSymlinkTraversal(root: string, target: string) {
     const isLeaf = index === segments.length - 1;
     cursor = join(cursor, segment);
     try {
+      await runReadGuard(beforeRead);
       const entry = await lstat(cursor);
+      await runReadGuard(beforeRead);
       if (entry.isSymbolicLink()) {
         throw new Error(`memory path crosses symbolic link ${cursor}`);
       }
@@ -475,7 +491,9 @@ async function rejectSymlinkTraversal(root: string, target: string) {
       if (isLeaf && !entry.isFile()) {
         throw new Error(`memory path must be a regular file: ${cursor}`);
       }
+      await runReadGuard(beforeRead);
       const actual = await realpath(cursor);
+      await runReadGuard(beforeRead);
       if (
         actual !== rootReal &&
         !actual.startsWith(`${rootReal}${sep}`)
@@ -485,7 +503,9 @@ async function rejectSymlinkTraversal(root: string, target: string) {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         if (isLeaf) break;
+        await runReadGuard(beforeRead);
         await mkdir(cursor, { mode: 0o700 });
+        await runReadGuard(beforeRead);
         continue;
       }
       throw error;
