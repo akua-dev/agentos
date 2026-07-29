@@ -9,8 +9,8 @@ describe('canonicalSourceUrl', () => {
   it.each([
     ['README.md', 'https://github.com/akua-dev/agentos/blob/main/README.md'],
     [
-      'agents/firstmate/.agents/skills/agentos-bootstrap/SKILL.md',
-      'https://github.com/akua-dev/agentos/blob/main/agents/firstmate/.agents/skills/agentos-bootstrap/SKILL.md',
+      'packages/agentos/resources/roles/firstmate/skills/agentos-bootstrap/SKILL.md',
+      'https://github.com/akua-dev/agentos/blob/main/packages/agentos/resources/roles/firstmate/skills/agentos-bootstrap/SKILL.md',
     ],
     [
       'database/migrations',

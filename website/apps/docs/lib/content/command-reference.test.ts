@@ -10,11 +10,6 @@ describe('discoverCommandReference', () => {
     );
     const expected = [
       {
-        command: 'composition-verify',
-        description: 'Verify one resolved Agent composition bundle',
-        path: 'clis/composition-verify',
-      },
-      {
         command: 'github-app-token',
         description: 'Mint and safely materialize a scoped GitHub App installation token',
         path: 'clis/github-app-token',

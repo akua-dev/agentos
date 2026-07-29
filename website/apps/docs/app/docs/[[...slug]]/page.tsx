@@ -45,9 +45,9 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
       <p className="text-lg text-fd-muted-foreground mb-2">{page.data.description}</p>
       <CanonicalSources sources={page.data.canonical} />
       <div className="flex flex-row flex-wrap gap-2 items-center border-b pb-6 mb-4">
-        <MarkdownCopyButton markdownUrl={`${page.url}.mdx`} />
+        <MarkdownCopyButton markdownUrl={page.url.replace(/^\/docs/, '/llms.mdx')} />
         <ViewOptionsPopover
-          markdownUrl={`${page.url}.mdx`}
+          markdownUrl={page.url.replace(/^\/docs/, '/llms.mdx')}
           githubUrl={`https://github.com/akua-dev/agentos/blob/main/website/apps/docs/content/docs/${page.path}`}
         />
       </div>

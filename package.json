@@ -7,7 +7,7 @@
   "workspaces": ["clis/*", "database", "packages/*", "services/*", "website/apps/docs"],
   "scripts": {
     "build": "bun run --filter @akua-dev/agentos build",
-    "test": "bun run build && bun test . ./agents/.pi/background-tasks ./agents/.pi/supervision-guard ./agents/.pi/openai-server-compaction ./agents/.pi/mate-memory --path-ignore-patterns='website/apps/docs/**' && bun run site:test",
+    "test": "bun run build && bun test . ./packages/agentos/src/background-tasks ./packages/agentos/src/supervision-guard ./packages/agentos/src/openai-server-compaction ./packages/agentos/src/mate-memory --path-ignore-patterns='website/apps/docs/**' && bun run site:test",
     "typecheck": "tsc --project tsconfig.json",
     "check": "bun run test && bun run typecheck && bun run site:lint && bun run site:typecheck",
     "site:dev": "bun run --cwd website/apps/docs dev",

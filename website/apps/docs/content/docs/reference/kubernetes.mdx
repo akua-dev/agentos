@@ -3,22 +3,22 @@ title: Kubernetes resources
 description: Role-owned workload assets and their runtime responsibilities.
 canonical:
   - label: Shared runtime base
-    path: runtime/kubernetes
+    path: packages/agentos/runtime/kubernetes
   - label: First Mate resources
-    path: agents/firstmate/kubernetes
+    path: packages/agentos/resources/roles/firstmate/kubernetes
   - label: Second Mate resources
-    path: agents/secondmate/kubernetes
+    path: packages/agentos/resources/roles/secondmate/kubernetes
   - label: Crewmate resources
-    path: agents/crewmate/kubernetes
+    path: packages/agentos/resources/crewmates/default/kubernetes
 ---
 
 | Resource area | Responsibility |
 | --- | --- |
-| `runtime/kubernetes/base` | Shared StatefulSet and runtime container shape |
-| `runtime/kubernetes/mate` | Persistent-Mate specialization |
-| `agents/firstmate/kubernetes` | Namespace, service, identity, bindings and First-Mate patch |
-| `agents/secondmate/kubernetes` | Persistent domain-leader workload and identity |
-| `agents/crewmate/kubernetes` | Bounded worker workload and identity |
+| `packages/agentos/runtime/kubernetes/base` | Shared StatefulSet and runtime container shape |
+| `packages/agentos/runtime/kubernetes/mate` | Persistent-Mate specialization |
+| `packages/agentos/resources/roles/firstmate/kubernetes` | Namespace, service, identity, bindings and First-Mate patch |
+| `packages/agentos/resources/roles/secondmate/kubernetes` | Persistent domain-leader workload and identity |
+| `packages/agentos/resources/crewmates/default/kubernetes` | Bounded worker workload and identity |
 | `database/kubernetes/cloudnative-pg` | Minimal optional self-hosted database operand |
 | `services/ai-gateway/kubernetes` | Optional gateway Service, StatefulSet and NetworkPolicy |
 
