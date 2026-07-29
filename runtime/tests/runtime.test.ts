@@ -195,6 +195,7 @@ describe("Mate runtime", () => {
       "--",
       "pi",
       "--no-context-files",
+      "--continue",
     ];
 
     await waitFor(async () =>
@@ -210,15 +211,15 @@ describe("Mate runtime", () => {
     ]);
   });
 
-  test("resumes the sole native Pi session when Herdr has no agent", async () => {
+  test("delegates sole-session recovery to Pi when Herdr has no agent", async () => {
     const { env, state } = await createHarness([]);
-    const persistedSession = join(
+    const sessions = join(
       env.PI_CODING_AGENT_DIR!,
       "sessions",
-      "--legacy-cwd--",
-      "session.jsonl",
+      `--${env.AGENTOS_AGENT_CWD!.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`,
     );
-    await mkdir(join(env.PI_CODING_AGENT_DIR!, "sessions", "--legacy-cwd--"), {
+    const persistedSession = join(sessions, "session.jsonl");
+    await mkdir(sessions, {
       recursive: true,
     });
     await writeFile(
@@ -243,8 +244,7 @@ describe("Mate runtime", () => {
       "--",
       "pi",
       "--no-context-files",
-      "--session",
-      persistedSession,
+      "--continue",
     ];
 
     await waitFor(async () =>
@@ -262,7 +262,7 @@ describe("Mate runtime", () => {
     ).toEqual([expectedStart]);
   });
 
-  test("resumes from Pi's configured session directory with native tilde expansion", async () => {
+  test("delegates configured session directory recovery to Pi", async () => {
     const { env, state } = await createHarness([]);
     const home = join(state, "home");
     const sessionDirectory = join(home, "retained-sessions");
@@ -297,14 +297,14 @@ describe("Mate runtime", () => {
       (await readCalls(state)).some((call) =>
         call[0] === "agent" &&
         call[1] === "start" &&
-        call.includes(persistedSession),
+        call.at(-1) === "--continue",
       ),
     );
     child.kill("SIGTERM");
     expect(await child.exited).toBe(0);
   });
 
-  test("resolves Pi's relative session directory from the target Mate cwd", async () => {
+  test("delegates relative session directory recovery from the target Mate cwd to Pi", async () => {
     const distributionRoot = await mkdtemp(
       join(tmpdir(), "agentos-relative-distribution-"),
     );
@@ -347,14 +347,15 @@ describe("Mate runtime", () => {
       (await readCalls(state)).some((call) =>
         call[0] === "agent" &&
         call[1] === "start" &&
-        call.includes(persistedSession),
+        call.includes(agentCwd) &&
+        call.at(-1) === "--continue",
       ),
     );
     child.kill("SIGTERM");
     expect(await child.exited).toBe(0);
   });
 
-  test("resumes when blank and malformed lines precede the native Pi header", async () => {
+  test("delegates malformed session preambles to Pi", async () => {
     const { env, state } = await createHarness([]);
     const sessions = join(env.PI_CODING_AGENT_DIR!, "sessions", "--legacy-cwd--");
     const persistedSession = join(sessions, "session.jsonl");
@@ -387,14 +388,14 @@ describe("Mate runtime", () => {
       (await readCalls(state)).some((call) =>
         call[0] === "agent" &&
         call[1] === "start" &&
-        call.includes(persistedSession),
+        call.at(-1) === "--continue",
       ),
     );
     child.kill("SIGTERM");
     expect(await child.exited).toBe(0);
   });
 
-  test("does not discover a Pi header beyond Pi's bounded one-megabyte scan", async () => {
+  test("delegates bounded session discovery to Pi", async () => {
     const { env, state } = await createHarness([]);
     const sessionDirectory = join(state, "oversized-sessions");
     const persistedSession = join(sessionDirectory, "oversized.jsonl");
@@ -422,16 +423,20 @@ describe("Mate runtime", () => {
       (await readCalls(state)).some((call) =>
         call[0] === "agent" &&
         call[1] === "start" &&
-        !call.includes(persistedSession),
+        call.at(-1) === "--continue",
       ),
     );
     child.kill("SIGTERM");
     expect(await child.exited).toBe(0);
   });
 
-  test("fails closed instead of creating a fresh Pi session when retained sessions are ambiguous", async () => {
+  test("delegates multiple retained sessions to Pi's native recent recovery", async () => {
     const { env, state } = await createHarness([]);
-    const sessions = join(env.PI_CODING_AGENT_DIR!, "sessions", "--legacy-cwd--");
+    const sessions = join(
+      env.PI_CODING_AGENT_DIR!,
+      "sessions",
+      `--${env.AGENTOS_AGENT_CWD!.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`,
+    );
     await mkdir(sessions, { recursive: true });
     await Promise.all(
       ["session-one.jsonl", "session-two.jsonl"].map((name, index) =>
@@ -447,18 +452,15 @@ describe("Mate runtime", () => {
       stderr: "pipe",
       stdout: "pipe",
     });
-    const [exitCode, stderr] = await Promise.all([
-      child.exited,
-      new Response(child.stderr).text(),
-    ]);
-
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain("no unique session matches");
-    expect(
-      (await readCalls(state)).filter(
-        (call) => call[0] === "agent" && call[1] === "start",
+    await waitFor(async () =>
+      (await readCalls(state)).some((call) =>
+        call[0] === "agent" &&
+        call[1] === "start" &&
+        call.at(-1) === "--continue",
       ),
-    ).toEqual([]);
+    );
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
   });
 
   test("gives a persistent checkout access to release-installed dependencies", async () => {
@@ -850,6 +852,7 @@ describe("Mate runtime", () => {
       "--",
       "pi",
       "--no-context-files",
+      "--continue",
     ];
 
     await waitFor(async () =>
