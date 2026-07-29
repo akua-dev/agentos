@@ -55,6 +55,7 @@ export {
 } from "./resources.ts";
 export {
   composeAgentOSStartupPrompt,
+  preflightAgentOSStartup,
   registerAgentOSStartup,
   type AgentOSStartupContributionV1,
   type AgentOSStartupOptions,

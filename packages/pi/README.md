@@ -15,8 +15,8 @@ The public surface includes:
 - `preflightAgentOSComposition` and `registerAgentOSRuntime` for explicit
   registrations with declared tool, command, Skill, message and entry names;
 - instruction and resource composition helpers;
-- bounded startup contribution aggregation and one configurable
-  `session_start` registration; and
+- Pi-compatible startup contribution validation, pure startup preflight,
+  bounded aggregation and one configurable `session_start` registration; and
 - factories and defaults for the released background-task, memory, compaction
   and supervision behaviors.
 

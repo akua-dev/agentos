@@ -8,6 +8,7 @@ import {
   createAgentOSSupervisionGuardRegistration,
   defaultAgentOSRuntime,
   preflightAgentOSComposition,
+  preflightAgentOSStartup,
   registerAgentOSInstructions,
   registerAgentOSResources,
   registerAgentOSRuntime,
@@ -170,6 +171,18 @@ function preflightDefaultRoleComposition(
     ...composition.runtime,
     compositionClaims(role, composition.names),
   ]);
+  preflightAgentOSStartup({
+    customType: composition.startup.customType,
+    prompt: startupPrompt,
+  });
+  const declaredSkills = new Set(composition.names.skills ?? []);
+  for (const contribution of composition.startup.contributions) {
+    if (!declaredSkills.has(contribution.skill)) {
+      throw new Error(
+        `startup contribution "${contribution.id}" references undeclared Skill "${contribution.skill}"`,
+      );
+    }
+  }
   return startupPrompt;
 }
 

@@ -60,6 +60,38 @@ describe("default AgentOS lifecycle composition", () => {
     expect(fake.registrations).toEqual([]);
   });
 
+  test("rejects an undelivered startup Skill before any part registers", async () => {
+    const fake = createFakePi();
+    const composition = roleComposition("first_mate");
+    const entrypoint = createDefaultAgentOSEntrypoint({
+      getRole: () => "first_mate",
+      loadRole: async () => ({
+        ...composition,
+        names: { ...composition.names, skills: [] },
+      }),
+    });
+
+    await expect(entrypoint(fake.pi)).rejects.toThrow(
+      'startup contribution "@example/first_mate:startup" references undeclared Skill "example-first-mate-startup"',
+    );
+    expect(fake.registrations).toEqual([]);
+  });
+
+  test("rejects invalid startup metadata before any part registers", async () => {
+    const fake = createFakePi();
+    const composition = roleComposition("first_mate");
+    const entrypoint = createDefaultAgentOSEntrypoint({
+      getRole: () => "first_mate",
+      loadRole: async () => ({
+        ...composition,
+        startup: { ...composition.startup, customType: "" },
+      }),
+    });
+
+    await expect(entrypoint(fake.pi)).rejects.toThrow("custom message type");
+    expect(fake.registrations).toEqual([]);
+  });
+
   for (const role of ["first_mate", "second_mate"] as const) {
     test(`injects only the packaged ${role} identity`, async () => {
       const fake = createFakePi();

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   composeAgentOSStartupPrompt,
+  preflightAgentOSStartup,
   registerAgentOSStartup,
   type AgentOSStartupContributionV1,
 } from "../src/index.ts";
@@ -65,9 +66,9 @@ describe("AgentOS startup composition", () => {
     ).toThrow("id");
     expect(() =>
       composeAgentOSStartupPrompt([
-        contribution("example:skill", { skill: "s".repeat(129) }),
+        contribution("example:skill", { skill: "s".repeat(65) }),
       ]),
-    ).toThrow("skill");
+    ).toThrow("valid Pi Skill name");
     expect(() =>
       composeAgentOSStartupPrompt([
         contribution("example:instruction", {
@@ -84,6 +85,45 @@ describe("AgentOS startup composition", () => {
         ),
       ),
     ).toThrow("16384 UTF-8 bytes");
+  });
+
+  test("accepts only Skill names discoverable by the supported Pi build", () => {
+    for (const skill of [
+      "Uppercase",
+      "underscore_name",
+      "-leading",
+      "trailing-",
+      "two--hyphens",
+      "s".repeat(65),
+    ]) {
+      expect(() =>
+        composeAgentOSStartupPrompt([
+          contribution("example:invalid-skill", { skill }),
+        ]),
+      ).toThrow("valid Pi Skill name");
+    }
+    expect(() =>
+      composeAgentOSStartupPrompt([
+        contribution("example:valid-skill", {
+          skill: "valid-pi-skill-81",
+        }),
+      ]),
+    ).not.toThrow();
+  });
+
+  test("preflights startup metadata without attaching a handler", () => {
+    expect(() =>
+      preflightAgentOSStartup({
+        customType: "",
+        prompt: "Load $example-startup.",
+      }),
+    ).toThrow("custom message type");
+    expect(() =>
+      preflightAgentOSStartup({
+        customType: "@example/agentos:startup",
+        prompt: "  ",
+      }),
+    ).toThrow("prompt must not be empty");
   });
 
   test("requests one inspectable follow-up only while Pi is idle", async () => {

@@ -149,7 +149,8 @@ whole composition when any of these limits are exceeded:
 
 - at most 16 contributions;
 - `id` at most 128 characters;
-- `skill` at most 128 characters;
+- `skill` is a Pi-compatible name of at most 64 lowercase letters, numbers and
+  non-consecutive hyphens;
 - `instruction` at most 2048 UTF-8 bytes per contribution; and
 - at most 16384 UTF-8 bytes across all `instruction` fields.
 
@@ -158,7 +159,9 @@ into one bounded `session_start` follow-up. Reject overflow rather than
 truncating or splitting it. Do not let each dependency trigger a competing
 model turn merely because it was imported. Keep this descriptor limited to
 startup aggregation; tools, commands and other Pi behavior remain ordinary
-registration functions.
+registration functions. Before attaching any Pi behavior, validate the startup
+message metadata and confirm that every contribution names a Skill declared by
+the selected distribution.
 
 Do not rely on Pi's duplicate-name resolution. The selected Pi build may keep
 the first registration across extensions while a later registration replaces

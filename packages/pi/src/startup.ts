@@ -23,9 +23,10 @@ export type AgentOSStartupOptions = {
 
 const MAX_CONTRIBUTIONS = 16;
 const MAX_ID_CHARACTERS = 128;
-const MAX_SKILL_CHARACTERS = 128;
+const MAX_SKILL_CHARACTERS = 64;
 const MAX_INSTRUCTION_BYTES = 2_048;
 const MAX_TOTAL_INSTRUCTION_BYTES = 16_384;
+const PI_SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function composeAgentOSStartupPrompt(
   contributions: readonly AgentOSStartupContributionV1[],
@@ -62,10 +63,11 @@ export function composeAgentOSStartupPrompt(
       if (
         typeof contribution.skill !== "string" ||
         contribution.skill.length === 0 ||
-        contribution.skill.length > MAX_SKILL_CHARACTERS
+        contribution.skill.length > MAX_SKILL_CHARACTERS ||
+        !PI_SKILL_NAME.test(contribution.skill)
       ) {
         throw new Error(
-          `startup contribution skill must be at most ${MAX_SKILL_CHARACTERS} characters`,
+          `startup contribution skill must be a valid Pi Skill name of at most ${MAX_SKILL_CHARACTERS} lowercase letters, numbers, and non-consecutive hyphens`,
         );
       }
       if (
@@ -96,8 +98,7 @@ export function composeAgentOSStartupPrompt(
     .join("\n\n");
 }
 
-export function registerAgentOSStartup(
-  pi: ExtensionAPI,
+export function preflightAgentOSStartup(
   options: AgentOSStartupOptions,
 ): void {
   if (options.enabled === false) return;
@@ -105,6 +106,14 @@ export function registerAgentOSStartup(
     throw new Error("AgentOS startup prompt must not be empty");
   }
   assertQualifiedName(options.customType, "AgentOS startup custom message type");
+}
+
+export function registerAgentOSStartup(
+  pi: ExtensionAPI,
+  options: AgentOSStartupOptions,
+): void {
+  preflightAgentOSStartup(options);
+  if (options.enabled === false) return;
   const reasons = new Set(options.reasons ?? ["startup", "reload"]);
   let triggered = false;
 
