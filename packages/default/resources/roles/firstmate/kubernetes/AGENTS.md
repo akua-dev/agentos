@@ -6,7 +6,7 @@ topology belongs with the component it deploys; First Mate's authority to
 operate it belongs in RBAC and Skills, not in this directory's ownership.
 
 - Keep resources declarative and renderable with native Kustomize and kubectl.
-- Patch the shared Pi lifecycle from the repository-root
+- Patch the shared Pi lifecycle from this distribution's
   `runtime/kubernetes/mate`; keep only First-Mate identity, working directory,
   tasks and authority here.
 - The base must remain namespaced and retain the agent home PVC.

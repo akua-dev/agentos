@@ -12,8 +12,8 @@ running Second-Mate identity.
   root; add a role-only Skill here only when it is genuinely Second-Mate
   specific.
 - Keep role-specific native workload identity, RBAC, credentials, working
-  directory and task selection here while the repository-root shared Mate
-  lifecycle stays under `runtime/kubernetes/mate/` and the default executable
-  lifecycle stays under `packages/default/runtime/`.
+  directory and task selection here while this distribution's shared Mate
+  lifecycle stays under `runtime/kubernetes/mate/` and its executable lifecycle
+  stays under `runtime/`.
 - Test instruction injection, Skill discovery, Mise selection and rendered
   Kubernetes behavior through their public or native interfaces.
