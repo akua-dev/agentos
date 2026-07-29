@@ -93,7 +93,7 @@ ARG AGENTOS_GIT_UPSTREAM=https://github.com/akua-dev/agentos.git
 
 COPY . /tmp/agentos-source
 
-RUN bun /tmp/agentos-source/runtime/create-image-seed.ts \
+RUN bun /tmp/agentos-source/packages/agentos/runtime/create-image-seed.ts \
       --source /tmp/agentos-source \
       --output /opt/agentos-seed \
       --origin "$AGENTOS_GIT_REMOTE" \
@@ -104,18 +104,13 @@ FROM agentos-base AS agentos-runtime-dependencies
 WORKDIR /tmp/agentos-dependencies
 
 COPY package.json bun.lock ./
-COPY clis/composition-verify/package.json clis/composition-verify/package.json
 COPY clis/github-app-token/package.json clis/github-app-token/package.json
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
+COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
-COPY clis/composition-verify/composition-verify.ts clis/composition-verify/composition-verify.ts
 COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
 COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
-COPY runtime/composition/digest.ts runtime/composition/digest.ts
-COPY runtime/composition/filesystem.ts runtime/composition/filesystem.ts
-COPY runtime/composition/manifest-v1.schema.json runtime/composition/manifest-v1.schema.json
-COPY runtime/composition/manifest.ts runtime/composition/manifest.ts
 
 RUN bun install \
       --frozen-lockfile \
@@ -123,13 +118,33 @@ RUN bun install \
       --no-progress \
       --production \
       --filter @agentos/root \
-      --filter @agentos/composition-verify \
+      --filter @akua-dev/agentos \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
       --filter @agentos/ai-gateway \
-  && bun clis/composition-verify/composition-verify.ts --help >/dev/null \
   && bun clis/github-app-token/github-app-token.ts --help >/dev/null \
   && bun clis/pg-listen/pg-listen.ts --help >/dev/null
+
+FROM agentos-base AS agentos-package-build
+
+WORKDIR /tmp/agentos-package-build
+
+COPY package.json bun.lock tsconfig.json ./
+COPY clis/github-app-token/package.json clis/github-app-token/package.json
+COPY clis/pg-listen/package.json clis/pg-listen/package.json
+COPY database/package.json database/package.json
+COPY packages/agentos/package.json packages/agentos/package.json
+COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY packages/agentos/tsconfig.build.json packages/agentos/tsconfig.build.json
+COPY packages/agentos/build.ts packages/agentos/build.ts
+COPY packages/agentos/src packages/agentos/src
+
+RUN bun install \
+      --frozen-lockfile \
+      --ignore-scripts \
+      --no-progress \
+      --filter @akua-dev/agentos \
+  && bun run --filter @akua-dev/agentos build
 
 FROM agentos-base
 
@@ -138,36 +153,32 @@ COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/node_modules/ \
   /opt/agentos/node_modules/
 COPY --from=agentos-runtime-dependencies \
-  /tmp/agentos-dependencies/clis/composition-verify/node_modules/ \
-  /opt/agentos/clis/composition-verify/node_modules/
-COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/clis/pg-listen/node_modules/ \
   /opt/agentos/clis/pg-listen/node_modules/
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/ai-gateway/node_modules/ \
   /opt/agentos/services/ai-gateway/node_modules/
+COPY --from=agentos-package-build \
+  /tmp/agentos-package-build/packages/agentos/dist/ \
+  /opt/agentos/packages/agentos/dist/
 
 RUN chmod 0644 \
     /etc/mise/config.toml \
     /etc/mise/mise.lock \
     /opt/agentos/mise.toml \
     /opt/agentos/mise.lock \
-    /opt/agentos/agents/firstmate/mise.toml \
-    /opt/agentos/agents/crewmate/BRIEF.md \
-    /opt/agentos/agents/secondmate/mise.toml \
+    /opt/agentos/packages/agentos/resources/roles/firstmate/mise.toml \
+    /opt/agentos/packages/agentos/resources/crewmates/default/BRIEF.md \
+    /opt/agentos/packages/agentos/resources/roles/secondmate/mise.toml \
   && chmod 0755 \
-    /opt/agentos/runtime/prepare-home.ts \
-    /opt/agentos/runtime/create-image-seed.ts \
-    /opt/agentos/runtime/run-mate.ts \
-    /opt/agentos/runtime/health.ts \
+    /opt/agentos/packages/agentos/runtime/prepare-home.ts \
+    /opt/agentos/packages/agentos/runtime/create-image-seed.ts \
+    /opt/agentos/packages/agentos/runtime/run-mate.ts \
+    /opt/agentos/packages/agentos/runtime/health.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \
   && chmod 0755 \
-    /opt/agentos/clis/composition-verify/composition-verify.ts \
     /opt/agentos/clis/github-app-token/github-app-token.ts \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
-  && ln -s \
-    /opt/agentos/clis/composition-verify/composition-verify.ts \
-    /usr/local/bin/composition-verify \
   && ln -s \
     /opt/agentos/clis/github-app-token/github-app-token.ts \
     /usr/local/bin/github-app-token \

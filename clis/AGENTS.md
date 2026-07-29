@@ -22,9 +22,10 @@ new command.
   executable interface and failure behavior, not selected source strings.
 - Installation on `PATH` is an explicit image decision. A workspace package or
   executable bit alone does not make a command part of an AgentOS release.
-- Put reusable imported code in `packages/`, Pi integration in `agents/.pi/`,
-  Mate lifecycle mechanics in `runtime/`, and conditional usage guidance in
-  one Agent Skill.
+- Put reusable imported code and Pi behavior in `packages/`, all
+  distribution-owned persistent-Agent lifecycle mechanics in that
+  distribution's `runtime/`, and conditional usage guidance in one Agent
+  Skill.
 
 ## Qualification examples
 
@@ -49,11 +50,5 @@ new command.
   record on stderr after registering `LISTEN`, so a caller can close the
   notification gap before catching up durable state. It adds no Fleet policy,
   interprets no payload and remains useful outside AgentOS.
-- `composition-verify` qualifies because no native origin, filesystem or
-  harness CLI can validate the shared versioned manifest, canonical manifest
-  digest, exact selected material tree, absence of unselected context and
-  native-loadable Skill identity as one deterministic boundary. It never
-  fetches, copies, installs, loads or activates material.
-
 Before adding another CLI, document the missing native capability and reject
-the addition if direct composition of reviewed tools already solves it.
+the addition if direct use of reviewed tools already solves it.

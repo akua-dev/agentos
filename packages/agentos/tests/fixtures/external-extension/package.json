@@ -1,0 +1,11 @@
+{
+  "name": "@example/agentos-extension",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "peerDependencies": {
+    "@akua-dev/agentos": "^0.1.0",
+    "@earendil-works/pi-ai": "0.81.1",
+    "@earendil-works/pi-coding-agent": "0.81.1"
+  }
+}
