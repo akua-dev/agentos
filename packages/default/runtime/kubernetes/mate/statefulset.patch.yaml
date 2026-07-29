@@ -19,6 +19,8 @@ spec:
               value: /home/agent
             - name: AGENTOS_RELEASE_ROOT
               value: /opt/agentos
+            - name: NODE_PATH
+              value: /opt/agentos/node_modules
             - name: AGENTOS_AGENT_CWD
               value: /opt/agentos
             - name: AGENTOS_AGENT_NAME

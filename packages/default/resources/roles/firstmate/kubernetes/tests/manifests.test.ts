@@ -189,6 +189,7 @@ describe("First Mate Kubernetes resources", () => {
     );
     expect(environment.AGENTOS_AGENT_NAME).toBe("firstmate");
     expect(environment.AGENTOS_AGENT_ROLE).toBe("first_mate");
+    expect(environment.NODE_PATH).toBe("/opt/agentos/node_modules");
     expect(environment.AGENTOS_MODEL).toBeUndefined();
     expect(environment.AGENTOS_THINKING).toBeUndefined();
     expect(environment.PI_OAUTH_CALLBACK_HOST).toBe("0.0.0.0");
