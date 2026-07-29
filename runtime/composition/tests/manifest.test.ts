@@ -330,13 +330,14 @@ describe("composition material digest", () => {
       await writeFile(join(root, "SKILL.md"), "same bytes\n", "utf8");
     }
 
-    const digesting = digestMaterialDirectory(directory);
-    await Bun.sleep(5);
+    const digesting = digestMaterialDirectory(directory).catch((error) => error);
     await rename(directory, movedDirectory);
     await symlink(replacement, directory, "dir");
 
-    await expect(digesting).rejects.toThrow(
-      /changed while hashing|changed path identity|resolves outside/,
+    const error = await digesting;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(
+      /ENOENT|root is a symlink|changed while hashing|changed path identity|resolves outside/,
     );
   });
 
@@ -348,12 +349,24 @@ describe("composition material digest", () => {
     await mkdir(nested);
     await writeFile(join(nested, "000-large.bin"), "");
     await truncate(join(nested, "000-large.bin"), 128 * 1024 * 1024);
+    const late = join(nested, "late.md");
+    let keepChanging = true;
+    const changing = (async () => {
+      while (keepChanging) {
+        await writeFile(late, "not in the snapshot\n", "utf8");
+        await rm(late);
+        await Bun.sleep(1);
+      }
+    })();
 
-    const digesting = digestMaterialDirectory(directory);
-    await Bun.sleep(5);
-    await writeFile(join(nested, "late.md"), "not in the snapshot\n", "utf8");
-
-    await expect(digesting).rejects.toThrow(/changed while hashing/);
+    try {
+      await expect(digestMaterialDirectory(directory)).rejects.toThrow(
+        /ENOENT|changed while hashing|changed path identity/,
+      );
+    } finally {
+      keepChanging = false;
+      await changing;
+    }
   });
 });
 

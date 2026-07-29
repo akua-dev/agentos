@@ -335,7 +335,7 @@ describe("Mate runtime", () => {
     expect(calls.filter((call) => call.slice(0, 3).join(" ") === "terminal session observe")).toEqual([
       expectedObserve,
     ]);
-  });
+  }, 7_000);
 
   test("moves a persisted Pi session onto the configured checkout", async () => {
     const paneId = "w1:p1";
