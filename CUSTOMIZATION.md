@@ -26,8 +26,11 @@ smallest choice when an organization needs another Skill, tool, integration,
 startup check or other independent behavior.
 
 A **replacement distribution** supplies one custom AgentOS extension
-composition. Pi's native resource configuration disables the released
-executable entrypoint and enables the replacement before a safe `/reload`.
+composition. On the current release, role-local files under
+`agents/<role>/.pi/extensions` are auto-discovered, so Pi package toggles alone
+do not remove the released executable owner. Before a safe `/reload`, require
+either a reviewed distribution or fork that removes that owner, or an explicit
+discovery change that does so; verify exactly one owner remains.
 Released Skills may remain selected independently. A complete replacement may
 also supply First- and Second-Mate Mise configuration, Kubernetes overlays and
 an immutable workload image.

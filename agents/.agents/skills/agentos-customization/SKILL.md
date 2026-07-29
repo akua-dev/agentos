@@ -84,8 +84,15 @@ package dependencies. If a needed AgentOS export does not exist, choose an
 independent extension, an exact reviewed AgentOS fork or stop. Documentation is
 not proof that an import exists.
 
-For composed consumption, declare the supported `@agentos/pi` range as a
-`peerDependency` and use a compatible `devDependency` to compile and test the
+The composed-consumption API below is future architecture, not a current release
+contract. It becomes usable only after a selected AgentOS release publishes a
+documented `@agentos/pi` package, its public exports and its isolated-package
+compatibility rules. Current releases without those public exports remain closed
+to this path; use standalone additive behavior, an exact reviewed AgentOS fork or
+stop.
+
+In that future architecture only, declare the supported `@agentos/pi` range as
+a `peerDependency` and use a compatible `devDependency` to compile and test the
 package. Let the final distribution resolve and pin the concrete version.
 Shared values must remain plain structural data. Do not use classes, symbols,
 `instanceof` checks or process-global state to establish compatibility across
@@ -112,24 +119,26 @@ Choose exactly one consumption mode:
   commands, hooks, Skills and lifecycle effects are independent of released
   AgentOS behavior. Namespace every tool, command, Skill, message, startup
   contribution and persisted entry with its owning package.
-- **Composed:** add the package as a pinned dependency of the selected
-  distribution, import its registration functions into the one AgentOS
-  composition entrypoint and include only its intended Skills through the
-  distribution's Pi manifest. Do not expose its standalone entrypoint.
+- **Composed (future architecture only):** once the selected distribution
+  publishes the documented `@agentos/pi` boundary, add the package as a pinned
+  dependency, import its registration functions into the one AgentOS composition
+  entrypoint and include only its intended Skills through the distribution's Pi
+  manifest. Do not expose its standalone entrypoint. Current releases without
+  that boundary remain closed to composed consumption.
 
-Use composed mode whenever ordering matters or the package overlaps
+Use the future composed mode whenever ordering matters or the package overlaps
 always-present identity, instruction assembly, startup turns, supervision,
 background commands or another released responsibility. Select one owner for
 each overlapping behavior; never use extension load order or last-writer-wins
 registration as an override mechanism.
 
-Allow several independently loaded extensions to import `@agentos/pi`.
-Public AgentOS functions must remain stateless, accept `pi` explicitly and use
-plain structural values so separate Pi package module roots do not need shared
-singletons, symbols or `instanceof` identity.
+In that future architecture, several independently loaded extensions may call
+`@agentos/pi` functions. Public AgentOS functions must remain stateless, accept
+`pi` explicitly and use plain structural values so separate Pi package module
+roots do not need shared singletons, symbols or `instanceof` identity.
 
-When several composed packages require startup judgment, let them export this
-small, versioned structural value:
+When several future-composed packages require startup judgment, let them export
+this small, versioned structural value:
 
 ```ts
 export type AgentOSStartupContributionV1 = {
@@ -140,12 +149,22 @@ export type AgentOSStartupContributionV1 = {
 };
 ```
 
-Use a package-qualified `id` and Skill name. The distribution validates the
-version, rejects duplicate IDs, preserves the explicit input order and
-aggregates the instructions into one bounded `session_start` follow-up. Do not
-let each dependency trigger a competing model turn merely because it was
-imported. Keep this descriptor limited to startup aggregation; tools, commands
-and other Pi behavior remain ordinary registration functions.
+Use a package-qualified `id` and Skill name. Before registration or triggering,
+the distribution validates the version, rejects duplicate IDs and rejects the
+whole composition when any of these limits are exceeded:
+
+- at most 16 contributions;
+- `id` at most 128 characters;
+- `skill` at most 128 characters;
+- `instruction` at most 2048 UTF-8 bytes per contribution; and
+- at most 16384 UTF-8 bytes across all `instruction` fields.
+
+It preserves the explicit input order and aggregates the accepted instructions
+into one bounded `session_start` follow-up. Reject overflow rather than
+truncating or splitting it. Do not let each dependency trigger a competing
+model turn merely because it was imported. Keep this descriptor limited to
+startup aggregation; tools, commands and other Pi behavior remain ordinary
+registration functions.
 
 Do not rely on Pi's duplicate-name resolution. The selected Pi build may keep
 the first registration across extensions while a later registration replaces
@@ -300,10 +319,16 @@ owns the verified native lifecycle.
    public registration functions rather than patching an already loaded
    extension.
 2. Install the replacement package.
-3. Through `pi config`, disable the exact released AgentOS executable resource
-   and enable the replacement entrypoint. Retain released Skills only when the
-   intended composition still selects them. Never leave two owners registered
-   accidentally for the same default behavior.
+3. Do not assume `pi config` can disable a released executable role resource. In
+   the current release, files under `agents/<role>/.pi/extensions` are
+   auto-discovered, so package toggling alone can leave the released handlers
+   active beside the replacement. Require a reviewed distribution or fork, or
+   an explicit discovery change that removes the released executable owner from
+   the selected role's discovery path before reload. Use `pi config` only for
+   resources the exact Pi build documents as configurable. Retain released
+   Skills only when the intended composition still selects them, and fail closed
+   unless effective discovery verifies exactly one owner for every replaced
+   behavior.
 4. Invoke `/reload` at an idle turn boundary. Do not hot-patch the running
    extension instance or start a second Pi writer for the same home.
 5. Verify the replacement. If verification fails, restore the prior package
@@ -340,8 +365,8 @@ After install or rollback:
 
 1. Re-run `pi list` and inspect `pi config` without exposing secrets.
 2. Require Pi's native loaded-extension and Skill catalog to resolve the exact
-   intended package paths. A successful install command or present file is not
-   enough.
+   intended package paths and exactly one owner for each replaced behavior. A
+   successful install command or present file is not enough.
 3. Observe the exact Herdr Agent across `/reload`. Require the existing Pi
    session to remain singular and usable.
 4. If the package defines startup behavior, observe one bounded custom message
@@ -364,6 +389,9 @@ After install or rollback:
   or stop; do not guess settings JSON.
 - Missing public AgentOS export: use an independent extension or reviewed fork;
   do not deep-import internals.
+- Released role executable remains in auto-discovery or exactly one replacement
+  owner cannot be proven: require a reviewed distribution or explicit discovery
+  change before reload.
 - Incompatible `@agentos/pi` peer range or startup contribution version: fail
   composition before registration.
 - Duplicate package-qualified identifier or Pi resource name: fail composition;
