@@ -1,8 +1,8 @@
 # Customize AgentOS
 
 AgentOS is deliberately open to trusted customization. Pi remains the extension
-host and package registry: an organization can install an ordinary Pi package
-that adds to the released AgentOS behavior or supplies its own selected
+host and package-loading boundary: an organization can install an ordinary Pi
+package that adds to the released AgentOS behavior or supplies its own selected
 distribution.
 
 A customization package can deliver:
@@ -35,7 +35,7 @@ Released Skills may remain selected independently. A complete replacement may
 also supply First- and Second-Mate Mise configuration, Kubernetes overlays and
 an immutable workload image.
 
-Prefer one exact Pi-discovered AgentOS entrypoint. Keep First- and Second-Mate
+Use one exact Pi-discovered AgentOS entrypoint. Keep First- and Second-Mate
 composition modules outside Pi's extension discovery and let the entrypoint
 select exactly one from the explicit deployed role. Missing or unknown role
 configuration must fail closed rather than load both.

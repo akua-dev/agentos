@@ -133,9 +133,10 @@ each overlapping behavior; never use extension load order or last-writer-wins
 registration as an override mechanism.
 
 In that future architecture, several independently loaded extensions may call
-`@agentos/pi` functions. Public AgentOS functions must remain stateless, accept
-`pi` explicitly and use plain structural values so separate Pi package module
-roots do not need shared singletons, symbols or `instanceof` identity.
+`@agentos/pi` functions. Public AgentOS composition functions must remain inert
+until explicitly invoked, stay stateless, accept `pi` explicitly and use plain
+structural values so separate Pi package module roots do not need shared
+singletons, symbols or `instanceof` identity.
 
 When several future-composed packages require startup judgment, let them export
 this small, versioned structural value:
