@@ -7,7 +7,7 @@ import { LearnLayout } from './learn-layout';
 
 afterEach(() => {
   cleanup();
-  window.localStorage.clear();
+  window.localStorage?.clear();
 });
 
 describe('LearnLayout', () => {
