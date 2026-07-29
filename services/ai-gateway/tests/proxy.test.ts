@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createProxyHandler } from "../src/proxy.ts";
 import type { RouteLease } from "../src/types.ts";
 
-function request(path = "/responses", token = "fleet-token") {
+function request(path = "/responses", token = "fleet-token", signal?: AbortSignal) {
   return new Request(`http://gateway.test${path}`, {
     method: "POST",
     headers: {
@@ -12,6 +12,7 @@ function request(path = "/responses", token = "fleet-token") {
       "session-id": "session-a",
     },
     body: JSON.stringify({ model: "gpt-test", input: "hello" }),
+    signal,
   });
 }
 
@@ -299,6 +300,62 @@ describe("authenticated raw Responses proxy", () => {
 
     expect(observation).toBeUndefined();
     expect(releaseCount).toBe(1);
+  });
+
+  test("does not report request abort as an upstream stream failure", async () => {
+    let markReadStarted: () => void = () => undefined;
+    const readStarted = new Promise<void>((resolve) => {
+      markReadStarted = resolve;
+    });
+    let markReleased: () => void = () => undefined;
+    const released = new Promise<void>((resolve) => {
+      markReleased = resolve;
+    });
+    let observation: unknown;
+    const requestController = new AbortController();
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => {
+          markReleased();
+        },
+      }),
+      fetchImpl: async (_input, init) => {
+        const signal = init?.signal;
+        if (!signal) throw new Error("expected upstream abort signal");
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              signal.addEventListener("abort", () => controller.error(signal.reason), {
+                once: true,
+              });
+            },
+            pull() {
+              markReadStarted();
+            },
+          }),
+        );
+      },
+      observeStreamFailure(value) {
+        observation = value;
+      },
+    });
+
+    const response = await handler(request("/responses", "fleet-token", requestController.signal));
+    const reader = response.body?.getReader();
+    expect(reader).toBeDefined();
+    const pendingRead = reader!.read();
+    await readStarted;
+    requestController.abort();
+    await expect(pendingRead).rejects.toMatchObject({ name: "AbortError" });
+    await released;
+
+    expect(observation).toBeUndefined();
   });
 
   test("accepts and strips the dedicated Fleet client headers", async () => {

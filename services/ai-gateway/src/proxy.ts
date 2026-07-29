@@ -124,6 +124,7 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
       upstream.body,
       lease,
       options.heartbeatMs ?? 40_000,
+      request.signal,
       upstreamEncoding,
       options.observeStreamFailure ?? logStreamFailure,
     );
@@ -183,6 +184,7 @@ function streamWithLease(
   body: ReadableStream<Uint8Array>,
   lease: RouteLease,
   heartbeatMs: number,
+  downstreamSignal: AbortSignal,
   upstreamEncoding: UpstreamEncoding,
   observeStreamFailure: (observation: StreamFailureObservation) => void | Promise<void>,
 ) {
@@ -214,15 +216,18 @@ function streamWithLease(
       try {
         next = await reader.read();
       } catch (error) {
-        const observation: StreamFailureObservation = {
-          event: "upstream_stream_failure",
-          upstreamEncoding,
-          failureKind: classifyStreamFailure(error, upstreamEncoding),
-          chunksForwarded,
-          bytesForwarded,
-        };
+        const downstreamAborted = downstreamSignal.aborted;
         controller.error(error);
-        void reportStreamFailure(observeStreamFailure, observation);
+        if (!downstreamAborted) {
+          const observation: StreamFailureObservation = {
+            event: "upstream_stream_failure",
+            upstreamEncoding,
+            failureKind: classifyStreamFailure(error, upstreamEncoding),
+            chunksForwarded,
+            bytesForwarded,
+          };
+          void reportStreamFailure(observeStreamFailure, observation);
+        }
         await finish();
         return;
       }
