@@ -7,6 +7,7 @@ import {
   composeAgentOSStartupPrompt,
   createAgentOSSupervisionGuardRegistration,
   defaultAgentOSRuntime,
+  discoverAgentOSSkillNames,
   preflightAgentOSComposition,
   preflightAgentOSStartup,
   registerAgentOSInstructions,
@@ -42,25 +43,6 @@ export type DefaultAgentOSEntrypointOptions = {
   ) => Promise<DefaultRoleCompositionV1>;
 };
 
-export const defaultSharedSkillNames = Object.freeze([
-  "agentos-ai-gateway",
-  "agentos-artifact-fs",
-  "agentos-auth",
-  "agentos-composition",
-  "agentos-customization",
-  "agentos-database",
-  "agentos-decisions",
-  "agentos-delegation",
-  "agentos-diagnostics",
-  "agentos-harnesses",
-  "agentos-image-builds",
-  "agentos-memory",
-  "agentos-projects",
-  "agentos-registry",
-  "agentos-runtime",
-  "agentos-supervision",
-]);
-
 export function createDefaultAgentOSEntrypoint(
   options: DefaultAgentOSEntrypointOptions = {},
 ) {
@@ -70,7 +52,7 @@ export function createDefaultAgentOSEntrypoint(
   return async function registerDefaultAgentOS(pi: ExtensionAPI): Promise<void> {
     const role = selectedRole(getRole());
     const composition = await loadRole(role);
-    const startupPrompt = preflightDefaultRoleComposition(role, composition);
+    const startupPrompt = await preflightDefaultRoleComposition(role, composition);
     const claims = compositionClaims(role, composition.names);
 
     registerAgentOSResources(pi, composition.resources);
@@ -86,8 +68,10 @@ export function createDefaultAgentOSEntrypoint(
 export async function loadPackagedRoleComposition(
   role: DefaultAgentOSRole,
   directory: "firstmate" | "secondmate",
-  roleSkillNames: readonly string[],
 ): Promise<DefaultRoleCompositionV1> {
+  const distributionRoot = fileURLToPath(
+    new URL("../", import.meta.url),
+  );
   const roleRoot = fileURLToPath(
     new URL(`../resources/roles/${directory}/`, import.meta.url),
   );
@@ -98,13 +82,22 @@ export async function loadPackagedRoleComposition(
   if (!instructions.trim()) {
     throw new Error(`Required role instructions are empty: ${instructionsPath}`);
   }
-  const roleSkillPaths = roleSkillNames.length > 0 ? ["skills"] : [];
-  for (const path of roleSkillPaths) {
-    await access(
-      fileURLToPath(
-        new URL(`../resources/roles/${directory}/${path}/`, import.meta.url),
-      ),
-    );
+  const roleSkillsPath = fileURLToPath(
+    new URL(`../resources/roles/${directory}/skills/`, import.meta.url),
+  );
+  const skillPaths = ["skills"];
+  try {
+    await access(roleSkillsPath);
+    skillPaths.push(`resources/roles/${directory}/skills`);
+  } catch {}
+  const resources = resolveAgentOSResources({
+    version: 1,
+    baseDirectory: distributionRoot,
+    skillPaths,
+  });
+  const skillNames = await discoverAgentOSSkillNames(resources.skillPaths ?? []);
+  if (skillNames.length === 0) {
+    throw new Error(`No delivered Skills found for default AgentOS role ${role}`);
   }
 
   const runtime = [
@@ -125,14 +118,10 @@ export async function loadPackagedRoleComposition(
     ],
     names: {
       version: 1,
-      skills: [...defaultSharedSkillNames, ...roleSkillNames],
+      skills: skillNames,
       messages: [startupCustomType],
     },
-    resources: resolveAgentOSResources({
-      version: 1,
-      baseDirectory: roleRoot,
-      skillPaths: roleSkillPaths,
-    }),
+    resources,
     runtime,
     startup: {
       customType: startupCustomType,
@@ -156,10 +145,10 @@ function selectedRole(value: string | undefined): DefaultAgentOSRole {
   );
 }
 
-function preflightDefaultRoleComposition(
+async function preflightDefaultRoleComposition(
   role: DefaultAgentOSRole,
   composition: DefaultRoleCompositionV1,
-): string {
+): Promise<string> {
   if (composition.version !== 1 || composition.resources.version !== 1) {
     throw new Error(`Unsupported default AgentOS composition for ${role}`);
   }
@@ -176,11 +165,24 @@ function preflightDefaultRoleComposition(
     prompt: startupPrompt,
   });
   const declaredSkills = new Set(composition.names.skills ?? []);
+  const deliveredSkills = new Set(
+    await discoverAgentOSSkillNames(composition.resources.skillPaths ?? []),
+  );
   for (const contribution of composition.startup.contributions) {
     if (!declaredSkills.has(contribution.skill)) {
       throw new Error(
         `startup contribution "${contribution.id}" references undeclared Skill "${contribution.skill}"`,
       );
+    }
+    if (!deliveredSkills.has(contribution.skill)) {
+      throw new Error(
+        `startup contribution "${contribution.id}" references unavailable Skill "${contribution.skill}"`,
+      );
+    }
+  }
+  for (const skill of declaredSkills) {
+    if (!deliveredSkills.has(skill)) {
+      throw new Error(`AgentOS skill claim "${skill}" is not delivered`);
     }
   }
   return startupPrompt;

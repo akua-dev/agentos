@@ -48,6 +48,7 @@ export {
   type OpenAIServerCompactionDependencies,
 } from "./openai-server-compaction/extension.ts";
 export {
+  discoverAgentOSSkillNames,
   registerAgentOSResources,
   resolveAgentOSResources,
   type AgentOSResourceInputV1,

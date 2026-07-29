@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { resolve } from "node:path";
 
 import {
   createDefaultAgentOSEntrypoint,
@@ -15,7 +16,6 @@ afterEach(() => {
 });
 
 function roleComposition(role: "first_mate" | "second_mate"): DefaultRoleCompositionV1 {
-  const roleName = role.replace("_", "-");
   const runtime: AgentOSRegistrationV1 = {
     version: 1,
     id: `@example/${role}:runtime`,
@@ -38,10 +38,15 @@ function roleComposition(role: "first_mate" | "second_mate"): DefaultRoleComposi
     ],
     names: {
       version: 1,
-      skills: [`example-${roleName}-startup`],
+      skills: ["agentos-supervision"],
       messages: [`@example/${role}:startup`],
     },
-    resources: { version: 1 },
+    resources: {
+      version: 1,
+      skillPaths: [
+        resolve(import.meta.dir, "..", "skills", "agentos-supervision", "SKILL.md"),
+      ],
+    },
     runtime: [runtime],
     startup: {
       customType: `@example/${role}:startup`,
@@ -49,7 +54,7 @@ function roleComposition(role: "first_mate" | "second_mate"): DefaultRoleComposi
         {
           version: 1,
           id: `@example/${role}:startup`,
-          skill: `example-${roleName}-startup`,
+          skill: "agentos-supervision",
           instruction: `Reconcile ${role}.`,
         },
       ],
@@ -91,6 +96,31 @@ describe("default AgentOS entrypoint", () => {
       "AGENTOS_AGENT_ROLE must be first_mate or second_mate",
     );
     expect(loads).toBe(0);
+    expect(fake.registrations).toEqual([]);
+  });
+
+  test("fails closed when a startup Skill is not delivered", async () => {
+    const fake = createFakePi();
+    const composition = roleComposition("first_mate");
+    const entrypoint = createDefaultAgentOSEntrypoint({
+      getRole: () => "first_mate",
+      loadRole: async () => ({
+        ...composition,
+        names: { ...composition.names, skills: ["missing-startup"] },
+        resources: { version: 1 },
+        startup: {
+          ...composition.startup,
+          contributions: composition.startup.contributions.map((contribution) => ({
+            ...contribution,
+            skill: "missing-startup",
+          })),
+        },
+      }),
+    });
+
+    await expect(entrypoint(fake.pi)).rejects.toThrow(
+      'startup contribution "@example/first_mate:startup" references unavailable Skill "missing-startup"',
+    );
     expect(fake.registrations).toEqual([]);
   });
 

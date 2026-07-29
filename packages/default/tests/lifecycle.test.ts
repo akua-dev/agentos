@@ -35,7 +35,7 @@ describe("default AgentOS lifecycle composition", () => {
     ).toContain("first_mate identity");
     expect(fake.messages).toHaveLength(1);
     expect(fake.messages[0]?.message.content).toContain(
-      "Load $example-first-mate-startup",
+      "Load $agentos-supervision",
     );
   });
 
@@ -72,7 +72,7 @@ describe("default AgentOS lifecycle composition", () => {
     });
 
     await expect(entrypoint(fake.pi)).rejects.toThrow(
-      'startup contribution "@example/first_mate:startup" references undeclared Skill "example-first-mate-startup"',
+      'startup contribution "@example/first_mate:startup" references undeclared Skill "agentos-supervision"',
     );
     expect(fake.registrations).toEqual([]);
   });

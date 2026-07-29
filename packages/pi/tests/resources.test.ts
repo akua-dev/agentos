@@ -1,13 +1,43 @@
 import { describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import {
+  discoverAgentOSSkillNames,
   resolveAgentOSResources,
   registerAgentOSResources,
 } from "../src/index.ts";
 import { createFakePi } from "./fake-pi.ts";
 
 describe("AgentOS resource composition", () => {
+  test("discovers native Skill names from delivered SKILL.md metadata", async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "agentos-pi-skills-"));
+    try {
+      const skillDirectory = resolve(root, "directory-name");
+      await mkdir(skillDirectory, { recursive: true });
+      await writeFile(
+        resolve(skillDirectory, "SKILL.md"),
+        [
+          "---",
+          "name: metadata-name",
+          "description: A delivered Skill.",
+          "---",
+          "",
+          "# Skill",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+
+      expect(await discoverAgentOSSkillNames([root])).toEqual([
+        "metadata-name",
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("resolves only package-contained role resource paths", async () => {
     const baseDirectory = resolve(import.meta.dir, "fixtures", "distribution");
     const resources = resolveAgentOSResources({

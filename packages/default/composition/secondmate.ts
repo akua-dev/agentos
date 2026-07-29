@@ -4,5 +4,5 @@ import {
 } from "./shared.ts";
 
 export function loadSecondMateComposition(): Promise<DefaultRoleCompositionV1> {
-  return loadPackagedRoleComposition("second_mate", "secondmate", []);
+  return loadPackagedRoleComposition("second_mate", "secondmate");
 }
