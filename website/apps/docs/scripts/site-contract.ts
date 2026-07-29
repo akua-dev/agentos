@@ -56,7 +56,7 @@ export const routeExpectations: readonly RouteExpectation[] = [
   {
     path: '/learn',
     status: 200,
-    includes: ['Learn to build an autonomous company', 'Four guided'],
+    includes: ['What is an autonomous company?', 'What you will be able to run'],
     excludes: ['Fumadocs Blog'],
   },
   {

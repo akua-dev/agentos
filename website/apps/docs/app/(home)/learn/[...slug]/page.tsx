@@ -25,7 +25,12 @@ export default async function Page(props: PageProps<'/learn/[...slug]'>) {
   const neighbors = getLessonNeighbors(curriculum, lesson.lessonId);
 
   return (
-    <LearnLayout curriculum={curriculum} lesson={lesson} toc={toc}>
+    <LearnLayout
+      curriculum={curriculum}
+      selection={{ kind: 'lesson', lessonId: lesson.lessonId }}
+      lesson={lesson}
+      toc={toc}
+    >
       <article className="mx-auto max-w-[74ch]">
         <LessonHeader lesson={lesson} />
         <details className="mb-8 rounded-xl border p-4 xl:hidden">

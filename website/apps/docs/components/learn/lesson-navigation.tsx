@@ -22,7 +22,15 @@ export function LessonNavigation({
           <span className="font-medium">{previous.title}</span>
         </Link>
       ) : (
-        <div />
+        <Link
+          href="/learn"
+          className="rounded-xl border p-4 transition-colors hover:bg-fd-accent"
+        >
+          <span className="mb-2 flex items-center gap-1 text-xs text-fd-muted-foreground">
+            <ArrowLeft className="size-3.5" aria-hidden /> Previous
+          </span>
+          <span className="font-medium">Introduction</span>
+        </Link>
       )}
       {next ? (
         <Link
@@ -40,7 +48,7 @@ export function LessonNavigation({
           className="rounded-xl border p-4 text-right transition-colors hover:bg-fd-accent"
         >
           <span className="mb-2 block text-xs text-fd-muted-foreground">Finished</span>
-          <span className="font-medium">Return to course map</span>
+          <span className="font-medium">Review the course introduction</span>
         </Link>
       )}
     </nav>
