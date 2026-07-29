@@ -13,7 +13,10 @@ afterEach(async () => {
   );
 });
 
-async function discoveredCommands(role: "firstmate" | "secondmate") {
+async function discoveredCommands(
+  role: "firstmate" | "secondmate",
+  options: { loadExtensions?: boolean; loadSkills?: boolean } = {},
+) {
   const agentDirectory = await mkdtemp(join(tmpdir(), `agentos-pi-${role}-`));
   temporaryDirectories.push(agentDirectory);
   await writeFile(
@@ -27,8 +30,9 @@ async function discoveredCommands(role: "firstmate" | "secondmate") {
       "rpc",
       "--no-session",
       "--offline",
-      "--no-skills",
       "--no-prompt-templates",
+      ...(options.loadExtensions === false ? ["--no-extensions"] : []),
+      ...(options.loadSkills ? [] : ["--no-skills"]),
     ],
     {
       cwd: resolve(import.meta.dir, `../../../${role}`),
@@ -69,6 +73,20 @@ describe("Pi project-local background task discovery", () => {
         expect.objectContaining({
           name: "background-commands",
           source: "extension",
+        }),
+      );
+    });
+
+    test(`${role} exposes the shared AgentOS upgrade Skill through Pi`, async () => {
+      const commands = await discoveredCommands(role, {
+        loadExtensions: false,
+        loadSkills: true,
+      });
+
+      expect(commands).toContainEqual(
+        expect.objectContaining({
+          name: "skill:agentos-upgrade",
+          source: "skill",
         }),
       );
     });
