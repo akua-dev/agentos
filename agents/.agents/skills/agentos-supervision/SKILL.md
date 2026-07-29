@@ -43,8 +43,10 @@ Supervise only direct children; every Second Mate owns its own subtree.
    tracked upstream or the image seed differs, report the available revision
    without changing a dirty checkout, installing tools, reloading Pi or
    restarting the Pod. Load `$agentos-upgrade` for an authorized stable
-   one-Mate release update or rollback; load `$agentos-development` for an
-   AgentOS source or exact-commit dogfood change.
+   one-Mate release update or rollback. When exact Captain authority instead
+   covers all active persistent Mates in the Fleet, First Mate loads
+   `$agentos-fleet-upgrade`. Load `$agentos-development` for an AgentOS source
+   or exact-commit dogfood change.
 
 Before any Fleet mutation, confirm this Pod's one named Herdr Agent and native
 Pi session are the authoritative writer for the Mate home. Attachments join that

@@ -89,8 +89,13 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
 For an exact stable release update of one persistent Mate, load the [AgentOS
 Upgrade Skill](../../../../.agents/skills/agentos-upgrade/SKILL.md). It is the
 sole owner of that update and rollback procedure; do not combine it with a
-database migration. Exact-commit dogfood remains in
-`$agentos-development`, `$agentos-image-builds` and `$agentos-registry`.
+database migration.
+
+For one exact stable release across all active persistent Mates, load the
+[AgentOS Fleet Upgrade Skill](../agentos-fleet-upgrade/SKILL.md).
+
+Exact-commit dogfood remains in `$agentos-development`,
+`$agentos-image-builds` and `$agentos-registry`.
 
 For removal, first present two explicit scopes:
 

@@ -1,6 +1,6 @@
 ---
 name: agentos-upgrade
-description: Upgrade one persistent AgentOS Mate to an exact published stable release, resume its post-replacement verification, or roll back that failed upgrade while preserving its checkout, PVC, native harness session and installation-specific Kubernetes wiring. Use when the Captain authorizes a stable First- or Second-Mate update or First Mate updates one managed Mate. Do not use for dogfood rollouts, database migrations or Fleet-wide rollout.
+description: Upgrade one persistent AgentOS Mate to an exact published stable release, resume its post-replacement verification, or roll back that failed upgrade while preserving its checkout, PVC, native harness session and installation-specific Kubernetes wiring. Use when the Captain authorizes a stable First- or Second-Mate update, First Mate updates one managed Mate, or $agentos-fleet-upgrade invokes one frozen-roster member. Do not use for dogfood rollouts, database migrations or Fleet sequencing.
 ---
 
 # Upgrade one persistent Mate
@@ -30,6 +30,12 @@ Load `$agentos-runtime` before inspecting or changing Kubernetes or Herdr.
    stable candidate, then obtain confirmation of the exact version before
    mutation. Skip that confirmation only when exact standing authority already
    defines both selection and the named Mate.
+
+For one member of an exact Captain-authorized Fleet rollout, the frozen roster
+from `$agentos-fleet-upgrade` supplies authority for only that currently named
+target. This Skill never enumerates, orders or advances that roster. Return
+control to the Fleet Skill only after this target reaches its final verified
+or failed boundary.
 
 The instruction does not authorize another Mate, Fleet fan-out, a database
 migration or repair, topology, credentials, RBAC, source delivery, release
@@ -181,8 +187,10 @@ Verify:
 
 Report the exact version, commit, release index digest, platform manifest
 digests, readiness, PVC and session evidence, plus every deliberately deferred
-database or Fleet update. Only after that report may the Mate reconcile and
-re-arm normal supervision.
+database or Fleet update. For a target inside a frozen Fleet rollout, return
+that result to `$agentos-fleet-upgrade`; only the enclosing First-Mate workflow
+may select another member. Otherwise, only after that report may the Mate
+reconcile and re-arm normal supervision.
 
 ## Roll back visibly
 

@@ -91,4 +91,30 @@ describe("Pi project-local background task discovery", () => {
       );
     });
   }
+
+  test("scopes the AgentOS Fleet upgrade Skill to First Mate", async () => {
+    const [firstMateCommands, secondMateCommands] = await Promise.all([
+      discoveredCommands("firstmate", {
+        loadExtensions: false,
+        loadSkills: true,
+      }),
+      discoveredCommands("secondmate", {
+        loadExtensions: false,
+        loadSkills: true,
+      }),
+    ]);
+
+    expect(firstMateCommands).toContainEqual(
+      expect.objectContaining({
+        name: "skill:agentos-fleet-upgrade",
+        source: "skill",
+      }),
+    );
+    expect(secondMateCommands).not.toContainEqual(
+      expect.objectContaining({
+        name: "skill:agentos-fleet-upgrade",
+        source: "skill",
+      }),
+    );
+  });
 });
