@@ -134,8 +134,7 @@ Second Mate requires a non-empty charter summary and scope in metadata. The
 Function creates neither PostgreSQL roles nor Kubernetes resources.
 
 `0005_durable_coordination_contracts.sql` makes core Mate artifacts explicit.
-Captain rows carry Fleet or Mate-domain scope while every registered Agent
-keeps the complete read view. Assignments store their authoritative brief,
+Assignments store their authoritative brief,
 resolved dispatch profile, final or handoff report and append-only handoff
 link. `agentos.handoff_task_assignment` preserves one Task identity across an
 atomic, idempotent transfer. Captain choices remain Inbox deliveries under a
@@ -215,11 +214,13 @@ repair is outside the released Function contract and must not be represented as
 Function-authorized. Completed Assignment history cannot be repaired in place.
 
 The released persistent-composition path goes through
-`agentos.replace_agent_composition` with an active Fleet- or Agent-scoped
-Captain row under the exact `agent-composition-authority` topic and a durable
-reason. An unrelated Captain preference is not mutation authority. Only First
-Mate can change its own or a direct Second Mate's desired composition; the
-immediately prior manifest is retained
+`agentos.replace_agent_composition` with the exact approved
+`captain_decision_answer` created by
+`agentos.resolve_agent_composition_decision`. The answer is bound to the
+target Agent and exact manifest; an unrelated, unresolved or rejected answer
+is not mutation authority. Only First Mate can create or resolve this
+composition decision and change its own or a direct Second Mate's desired
+composition; the immediately prior manifest is retained
 in Agent metadata for one explicit rollback. Incorrect durable state uses the
 separate `agentos.repair_agent_composition` path so repair is visible rather
 than disguised as ordinary selection. Owner-level administrative writes remain
@@ -244,3 +245,11 @@ wake hints to deterministic responsible Mate channels instead of the global
 channel. The hints remain non-secret routing signals; durable rows remain the
 source of truth. `tests/targeted-notifications.test.ts` exercises routing,
 rollback and channel isolation.
+
+`0015_mate_memory.sql` removes the legacy shared Captain preference table
+after failing closed when any active row still needs preservation. Private
+context instead belongs to each persistent Mate's PVC. Exact Captain choices
+remain durable Inbox speech acts. The migration adds exact persistent
+composition decision and answer Functions, updates composition mutation
+checks, notifications, bearings, runtime grants and RLS references, and leaves
+existing Tasks and Assignments unchanged.

@@ -13,8 +13,9 @@ native harness.
 Use this precedence:
 
 1. an explicit Captain choice for this Agent or Task;
-2. durable Captain dispatch policy whose natural-language condition fits the
-   task, selected by the Mate's judgment rather than first-match code;
+2. relevant private Mate memory containing stable Captain guidance whose
+   natural-language condition fits the task, selected by the Mate's judgment
+   rather than first-match code;
 3. the selected harness's own persisted or built-in defaults.
 
 An omitted model or effort is meaningful. Omit its launch flag and let the
@@ -23,8 +24,9 @@ AgentOS default.
 Reject an unavailable or unverified harness instead of translating it to a
 different one silently. Check current authentication and quota before choosing
 an expensive profile, but do not let stale quota telemetry block dispatch.
-Resolve the Fleet's durable model-capacity posture before treating a worker as
-launch-ready. When it selects the recommended pooled path, load
+Resolve the Fleet's model-capacity guidance from relevant private Mate memory
+and exact Inbox decisions before treating a worker as launch-ready. When it
+selects the recommended pooled path, load
 `$agentos-ai-gateway`, verify that this workload is an approved client and
 configure the selected harness through its native provider settings. Otherwise
 verify direct auth owned by this Agent. Never turn direct provider auth into
@@ -32,20 +34,22 @@ pooled routing or switch credential kind/model silently. Gateway `401`, `429`, t
 failures remain native harness failures; do not hide them behind a prompt queue
 or wrapper.
 
-For a new Crewmate only, when neither an explicit Captain instruction nor the
-matching durable dispatch policy selects effort, choose a native level
+For a new Crewmate only, when neither an explicit Captain instruction nor
+matching private-memory guidance selects effort, choose a native level
 proportionally: low for a well-understood bounded path, xhigh for ambiguous
 investigation or design, and intermediate levels as uncertainty, complexity or
 blast radius grows. Never choose `max` from this fallback; it requires explicit
-Captain preference. If the selected harness lacks the intended level, cap it at
+Captain authority. If the selected harness lacks the intended level, cap it at
 its highest verified non-`max` value. This fallback is an Assignment decision,
 not a Pi setting or persistent Agent default.
 
-Read durable natural-language dispatch policy from scoped Captain state at
-every Crewmate intake. Record the resolved harness and every selected
-harness-native choice in the versioned composition manifest, with those native
-choices under its opaque `settings` object. Keep natural-language policy out of
-scripts and TypeScript unions.
+Read relevant natural-language dispatch guidance from private Mate memory
+through `$agentos-memory` at every Crewmate intake. Treat memory as fallible
+context, never approval or current state; exact Task, Assignment and Inbox
+authority wins. Record the resolved harness and every selected harness-native
+choice in the versioned composition manifest, with those native choices under
+its opaque `settings` object. Keep natural-language policy out of scripts and
+TypeScript unions.
 
 ## Keep worker harnesses unattended
 

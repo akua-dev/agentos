@@ -26,10 +26,13 @@ spec:
             - install
             - --locked
             - node
+            - gh
             - kubectl
             - github:ogulcancelik/herdr
+            - github:kunchenguid/no-mistakes
             - github:kunchenguid/treehouse
             - npm:@openai/codex
+            - npm:gh-axi
           env: &role-environment
             - name: HOME
               value: /home/agent

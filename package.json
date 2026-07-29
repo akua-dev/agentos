@@ -6,7 +6,7 @@
   "type": "module",
   "workspaces": ["clis/*", "database", "services/*"],
   "scripts": {
-    "test": "bun test . ./agents/.pi/background-tasks ./agents/.pi/supervision-guard ./agents/.pi/openai-server-compaction",
+    "test": "bun test . ./agents/.pi/background-tasks ./agents/.pi/supervision-guard ./agents/.pi/openai-server-compaction ./agents/.pi/mate-memory",
     "typecheck": "tsc --project tsconfig.json",
     "check": "bun run test && bun run typecheck"
   },
@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "ajv": "8.20.0",
+    "yaml": "2.9.0",
     "zod": "4.4.3"
   }
 }

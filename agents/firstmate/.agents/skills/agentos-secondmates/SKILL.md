@@ -45,11 +45,13 @@ Require one durable charter with:
 
 Store the charter only through the released schema or provisioning primitive that owns its exact format.
 Do not improvise a second registry in Markdown, terminal state or an unreviewed JSON shape.
-Fleet-wide Captain state remains in `captain.scope = 'fleet'`; domain-local
-Second-Mate state uses `scope = 'agent'` with that Mate's UUID. Every Agent may
-read both for context, but no file copy or inherited Pi configuration becomes a
-second authority. Learnings remain domain-local unless promoted through a
-reviewed shared AgentOS or project instruction change.
+Keep stable Fleet-wide or domain guidance in the owning Mate's private context
+through `$agentos-memory`; it is fallible context and never a shared
+coordination, charter or approval authority. Keep the Second-Mate charter in
+the released `agents.metadata.charter` shape, and use Inbox for exact Captain
+decisions. Do not copy memory into another home or inherited Pi configuration.
+Learnings remain domain-local unless promoted through a reviewed shared
+AgentOS or project instruction change.
 
 ## Provision and hand off
 
