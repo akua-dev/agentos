@@ -212,7 +212,7 @@ function streamWithLease(
 
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
-      let next: ReadableStreamReadResult<Uint8Array>;
+      let next: Awaited<ReturnType<typeof reader.read>>;
       try {
         next = await reader.read();
       } catch (error) {
