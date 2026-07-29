@@ -691,7 +691,7 @@ checkout while keeping operational roles out of contributor sessions:
 - `.agents/skills/` contains workflows that apply from every AgentOS checkout
   working directory: repository development, organization evaluation and
   post-evaluation improvement review;
-- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including composition, delegation, private memory, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including composition, delegation, private memory, supervision, runtime, stable one-Mate upgrades, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
 - `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
 - a future subtree under `clis/`, `packages/` or `services/` may add its own `.agents/skills/` when development there needs a reusable workflow.
@@ -873,6 +873,9 @@ workspace keeps one `bun.lock`.
 - `agents/.agents/skills/agentos-memory/` owns private, fallible per-Mate
   memory behavior, including recall, maintenance, session privacy and routed
   proposals; it never replaces Fleet authority.
+- `agents/.agents/skills/agentos-upgrade/` owns exact stable one-Mate release
+  selection, authority, rollout, verification and rollback; database migration
+  and dogfood delivery remain separate workflows.
 - `agents/.agents/skills/agentos-composition/` owns model-directed composition
   selection, native application and observed verification.
 - `agents/firstmate/` and `agents/secondmate/` contain the two persistent role instruction surfaces, their Pi configuration and role-scoped skills.

@@ -103,6 +103,7 @@ A target project's nearer Mise configuration may add or override tools inside it
   pausing or routing private Mate context.
 - Load `$agentos-supervision` at session start and for Inbox draining, direct-report monitoring, recovery, stuck agents or wake handling.
 - Load `$agentos-runtime` for Kubernetes, Herdr, Mise, attach, worktrees, health and runtime recovery.
+- Load `$agentos-upgrade` only for an exactly authorized stable self-update or rollback; route Fleet-wide selection and other-Mate updates through First Mate.
 - Load `$agentos-auth` for provider login, credentials, rotation, revocation or quota identity.
 - Load `$agentos-ai-gateway` before inspecting or proposing pooled Fleet AI
   capacity, and route Fleet-wide mutations through First Mate unless the exact

@@ -116,6 +116,7 @@ A target project's nearer Mise configuration may add or override tools inside it
 - Load `$agentos-supervision` at session start and for Inbox draining, direct-report monitoring, recovery, stuck agents or wake handling.
 - Load `$agentos-secondmates` for every Second-Mate lifecycle or routing operation.
 - Load `$agentos-runtime` for Kubernetes, Herdr, Mise, attach, worktrees, health and runtime recovery.
+- Load `$agentos-upgrade` for an exact stable release update or rollback of First Mate or one managed Mate.
 - Load `$agentos-auth` for provider login, credentials, rotation, revocation or quota identity.
 - Load `$agentos-ai-gateway` before selecting, installing, configuring,
   authenticating, recovering or retiring pooled Fleet AI capacity.
