@@ -82,6 +82,7 @@ describe("installed default distribution discovery", () => {
     expect(commands).toContain("memory");
     expect(commands).toContain("skill:agentos-supervision");
     expect(commands).toContain("skill:agentos-bootstrap");
+    expect(commands).toContain("skill:agentos-upgrade");
   });
 
   test("Second Mate does not receive First-Mate-only Skills", async () => {
@@ -89,6 +90,7 @@ describe("installed default distribution discovery", () => {
     expect(commands).toContain("background-commands");
     expect(commands).toContain("memory");
     expect(commands).toContain("skill:agentos-supervision");
+    expect(commands).toContain("skill:agentos-upgrade");
     expect(commands).not.toContain("skill:agentos-bootstrap");
     expect(commands).not.toContain("skill:agentos-secondmates");
   });
