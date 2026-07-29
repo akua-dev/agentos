@@ -1,22 +1,26 @@
 ---
-title: Copilots join the workflow
+title: Copilots enter the workflow
 description: Instructions, retrieval and integrations improve assistance without transferring responsibility.
 courseId: models-to-agents
 courseTitle: From models to Agents
 courseOrder: 1
 lessonId: copilots-enter-workflow
 lessonOrder: 3
-estimatedMinutes: 2
+estimatedMinutes: 7
 canonical:
   - label: AgentOS source-of-truth rules
     path: ARCHITECTURE.md
 ---
 
-## Better context, closer to the work
+## The mental model
 
-A copilot can retrieve repository files, apply standing instructions, inspect an issue and suggest
-a patch inside the editor. The model sees better context and the human spends less effort moving
-information between systems.
+A copilot brings the conversation closer to real work. It can retrieve repository files, apply
+standing instructions, inspect an issue and suggest a patch in the editor. The model sees better
+context and the human spends less effort moving information.
+
+Assistance is not delegation. A copilot can propose a code change while the human remains the
+active loop: choosing the file, accepting edits, running checks, interpreting failure and deciding
+when the result is ready.
 
 Three additions are common:
 
@@ -24,19 +28,29 @@ Three additions are common:
 - **retrieval** grounds output in relevant current material;
 - **integrations** expose external systems.
 
-None makes copied context authoritative. Git owns source, the issue provider owns the issue and a
-current test run owns its observed result.
+None of them makes the copied context authoritative. Git still owns the source, the issue provider
+owns the issue and current tests own their observed result.
 
-## A suggestion still needs an owner
+## Worked example: suggest a validation patch
 
-The copilot retrieves an onboarding handler and proposes server-side validation. That is far better
-than a context-free answer, but the human still chooses the file, accepts edits, runs checks,
-interprets failure and decides when the change is ready.
+The copilot retrieves the onboarding handler and its tests. It notices that the handler trusts a
+client-side address check and proposes server-side validation.
 
-The unanswered questions are organizational: Is this the real cause? Which workflow applies? May
-the system edit, commit or open a review? What evidence closes the work?
+That is much better than a context-free answer. Yet several questions remain yours:
 
-Until those decisions are delegated, the copilot is an excellent pair—not an accountable worker.
+- Is this the actual causal boundary or a plausible guess?
+- Does the repository require a particular test and review workflow?
+- May the system modify source, commit or open a pull request?
+- What evidence would make the outcome complete?
+
+Until those are delegated, the copilot is an excellent pair—not an accountable worker.
+
+## What changes at this layer?
+
+- The model receives relevant working context automatically.
+- Stable instructions reduce repeated prompting.
+- Suggestions can appear directly where work happens.
+- The human still owns diagnosis, action, recovery and completion.
 
 Next, [tools let a model act](/learn/01-models-to-agents/tools-let-model-act).
 See [native authorities](/docs/concepts/native-authorities) for why retrieved context remains

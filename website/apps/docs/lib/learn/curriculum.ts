@@ -34,12 +34,6 @@ function requirePositiveInteger(value: number, label: string) {
   }
 }
 
-function requireConciseChapter(value: number) {
-  if (!Number.isInteger(value) || value < 2 || value > 3) {
-    throw new Error('estimatedMinutes must be between 2 and 3');
-  }
-}
-
 export function buildCurriculum(records: readonly LearnPageRecord[]): Curriculum {
   const lessonIds = new Set<string>();
   const urls = new Set<string>();
@@ -50,7 +44,7 @@ export function buildCurriculum(records: readonly LearnPageRecord[]): Curriculum
   for (const record of records) {
     requirePositiveInteger(record.courseOrder, 'courseOrder');
     requirePositiveInteger(record.lessonOrder, 'lessonOrder');
-    requireConciseChapter(record.estimatedMinutes);
+    requirePositiveInteger(record.estimatedMinutes, 'estimatedMinutes');
     if (!record.url.startsWith('/learn/') || record.url === '/learn/') {
       throw new Error(`Invalid lesson URL: ${record.url}`);
     }

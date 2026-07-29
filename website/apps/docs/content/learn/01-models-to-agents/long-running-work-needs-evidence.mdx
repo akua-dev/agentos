@@ -6,7 +6,7 @@ courseTitle: From models to Agents
 courseOrder: 1
 lessonId: long-running-work-needs-evidence
 lessonOrder: 7
-estimatedMinutes: 3
+estimatedMinutes: 7
 canonical:
   - label: Benchmark specification
     path: benchmarks/SPEC.md
@@ -14,7 +14,7 @@ canonical:
     path: ARCHITECTURE.md
 ---
 
-## Prove the claim in its authority
+## The mental model
 
 As an outcome spans more tools and more time, the chance of interruption, stale assumptions and
 partial success rises. Durable work needs checkpoints that another session can inspect and
@@ -30,12 +30,12 @@ Evidence is tied to the authority that owns the claim:
 | workload recovered | identity, PVC, session and preserved-work observations |
 | human approved | exact durable decision |
 
-An ever-growing transcript may explain why the Agent acted. Native artifacts prove what became
-true.
+An ever-growing transcript is not a substitute. It may explain why the Agent acted, while native
+artifacts prove what became true.
 
-## A short, reviewable result
+## Worked example: return a reviewable result
 
-The onboarding Agent can finish with:
+The onboarding Agent completes with:
 
 ```text
 commit: 7f4c… add server-side address validation
@@ -45,11 +45,15 @@ remaining risk: existing clients may rely on undocumented whitespace normalizati
 authority used: branch push + review creation; no merge
 ```
 
-The report is short because the evidence is durable. If the test failed, preserving its output and
-the branch would be more truthful than marking the outcome complete.
+That report is short because the evidence is durable. If the test failed, preserving the failing
+output and branch would be more truthful than marking the outcome complete.
 
-One durable Agent can now own work across time. The next problem is organizational: several Agents
-still need responsibility, hierarchy and shared truth.
+## What changes at this layer?
 
-Continue to Course 2: [Agents are not a
+- Work can survive and be assessed across time.
+- Completion becomes a verifiable claim rather than a conversational feeling.
+- Failures and unresolved risks remain visible.
+- The next bottleneck appears: several durable Agents still need ownership and organization.
+
+Continue to Course 2: [Parallel Agents are not yet a
 company](/learn/02-agents-to-companies/parallel-agents-not-company).

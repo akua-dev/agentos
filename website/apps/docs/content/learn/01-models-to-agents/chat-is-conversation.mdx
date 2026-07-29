@@ -1,39 +1,54 @@
 ---
-title: Chat carries context
-description: Conversation preserves earlier turns while the human still carries the goal.
+title: Chat makes generation conversational
+description: Turns and context create continuity inside a conversation while the human still carries the goal.
 courseId: models-to-agents
 courseTitle: From models to Agents
 courseOrder: 1
 lessonId: chat-is-conversation
 lessonOrder: 2
-estimatedMinutes: 2
+estimatedMinutes: 6
 canonical:
   - label: AgentOS product orientation
     path: README.md
 ---
 
-## Context creates a conversation
+## The mental model
 
-Chat wraps repeated model calls in turns. Earlier messages enter later context, so you can correct
-an assumption and refine an artifact without restating everything.
+Chat wraps repeated model calls in a conversation. Earlier turns are assembled into later context,
+so you can clarify, critique and progressively refine an artifact.
 
 ```text
 human turn → model response → human correction → model response
 ```
 
-That is conversational continuity, not responsibility. The human still decides when to return,
-which new facts matter and what happens outside the conversation. Context is also finite and
-fallible: a summary may preserve the shape of a discussion while dropping one critical constraint.
+This creates conversational continuity, not independent responsibility. The chat can remember the
+launch plan while its context is loaded. The human still decides when to return, which new facts
+matter and what action follows.
 
-## When the world changes
+Long conversations also expose a limit: context is finite and fallible. A summary may preserve the
+shape of earlier discussion while dropping a constraint. A chat transcript is useful history but
+not the source of truth for a repository, production system or accepted organizational work.
 
-Suppose the model drafts an onboarding launch plan. You explain that billing cannot change in the
-first release, and it revises the plan. Chat handles that correction naturally.
+## Worked example: refine the launch
 
-Tomorrow, analytics reveal a new failure mode. The chat does not wake itself, retrieve the signal
-or decide who owns the response. You must return with the evidence and recover the right context.
+Continue the previous chapter:
 
-A transcript is useful history, but Git still owns source, production owns live state and accepted
-work needs a durable owner.
+1. The model drafts an onboarding launch plan.
+2. You explain that the company cannot change billing in the first release.
+3. The model revises the plan around account creation and validation.
+4. Tomorrow, analytics show a new failure mode.
+
+The first three steps fit naturally in chat. Step four happens outside it. You must return with the
+signal, recover the right context and decide whether the plan now needs work.
+
+Chat reduces the effort of expressing corrections. It does not wake itself because production
+changed, create an accountable owner or prove completion.
+
+## What changes at this layer?
+
+- Repeated generation becomes an interactive dialogue.
+- Earlier turns can influence later output.
+- Refinement becomes cheap and natural.
+- The human still preserves the objective and decides each next action.
 
 Next, [copilots enter the workflow](/learn/01-models-to-agents/copilots-enter-workflow).

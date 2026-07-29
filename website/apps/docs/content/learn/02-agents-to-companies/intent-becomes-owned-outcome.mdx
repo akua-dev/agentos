@@ -1,12 +1,12 @@
 ---
-title: Intent becomes owned work
+title: Intent must become an owned outcome
 description: Accepted work needs stable identity before execution can be accountable.
 courseId: agents-to-companies
 courseTitle: From Agents to companies
 courseOrder: 2
 lessonId: intent-becomes-owned-outcome
 lessonOrder: 2
-estimatedMinutes: 2
+estimatedMinutes: 7
 canonical:
   - label: Chain of custody
     path: ARCHITECTURE.md
@@ -14,7 +14,7 @@ canonical:
     path: packages/agentos/skills/agentos-delegation/SKILL.md
 ---
 
-## Acceptance creates responsibility
+## The mental model
 
 Human intent may begin in a support system, issue tracker or direct conversation. The provider
 remains the human workflow authority. Once the Fleet accepts the outcome, it needs a durable
@@ -24,25 +24,33 @@ identity that does not disappear with the incoming notification or first worker.
 external intent → acceptance → stable Task identity → active owner
 ```
 
-Not every event deserves a Task. Reconciliation checks existing work, duplication, scope and
-authority before the organization commits.
+Acceptance is a meaningful boundary. Not every event deserves a Task, and an Agent should not turn
+every alert into work. Reconciliation checks existing intent, duplication, scope and authority
+before the organization commits.
 
-## Preserve the outcome, not the notification
+## Worked example: accept the checkout outcome
 
 The support event says:
 
 > Customer 481 could submit an address whose validity period ended yesterday.
 
-The event remains provider evidence. First Mate reconciles it with the current project, finds no
-existing Task and accepts:
+The provider event remains evidence. First Mate reconciles it with the current project and finds no
+existing Task. The company accepts:
 
 > Checkout rejects expired addresses server-side and the fix is delivered through the payments
 > repository’s reviewed workflow.
 
-That outcome stays stable even if diagnosis later finds the bug in a shared date library. Strategy
-can change without rewriting what the company accepted.
+That outcome is stable even if diagnosis later shows the bug is in a shared date library rather
+than checkout. The execution strategy can change without rewriting what the company accepted.
 
 The Task does not claim the support event is true in every detail. It preserves the outcome the
-organization agreed to carry. Execution still needs one active owner.
+organization agreed to carry.
+
+## What changes at this layer?
+
+- External signals are reconciled instead of automatically becoming work.
+- Accepted intent survives notification loss and worker turnover.
+- People can ask whether the organization has accepted an outcome.
+- Execution still needs one accountable active owner.
 
 Next, learn [Tasks and Assignments](/learn/02-agents-to-companies/tasks-and-assignments).

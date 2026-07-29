@@ -6,7 +6,7 @@ courseTitle: From Agents to companies
 courseOrder: 2
 lessonId: attention-operating-problem
 lessonOrder: 6
-estimatedMinutes: 3
+estimatedMinutes: 8
 canonical:
   - label: Supervision procedure
     path: packages/agentos/skills/agentos-supervision/SKILL.md
@@ -14,7 +14,7 @@ canonical:
     path: database/migrations/0013_targeted_mate_notifications.sql
 ---
 
-## Durable work, ephemeral wake
+## The mental model
 
 Organizations fail when everything interrupts everyone or when important work is only ephemeral.
 AgentOS separates the durable communication from the signal that attention may be useful.
@@ -28,10 +28,10 @@ commit Inbox row
   → resolves only when the speech act permits it
 ```
 
-PostgreSQL `LISTEN/NOTIFY` is a wake hint, not a queue. A disconnected Agent may miss it while the
-row remains. After reconnecting, the Agent queries durable bearings.
+PostgreSQL `LISTEN/NOTIFY` is a wake hint, not a queue. A disconnected Agent can miss the signal
+while the row remains. After reconnecting, it queries what still needs attention.
 
-## A decision survives a crash
+## Worked example: decision delivery survives a crash
 
 The payments Second Mate sends the migration decision upward and commits the Inbox row. First Mate
 wakes, presents the question and the Captain reads it. The terminal then crashes.
@@ -45,9 +45,15 @@ On recovery:
 
 Only the Captain’s exact answer resolves it. The system never equates “displayed” with “approved.”
 
-A person talks to the company surface; First Mate routes internally. People do not maintain a map
-of Mate handles or receive every worker update. Wake, load, read and resolve remain different
-events because human attention is scarce organizational capacity.
+This model also protects human attention. A person talks to the company surface; First Mate routes
+internally. People do not maintain a map of Second-Mate handles or receive every worker update.
+
+## What changes at this layer?
+
+- Important speech acts survive missed notifications and process loss.
+- Wake, load, read and resolve have different evidence.
+- Attention can be targeted through hierarchy instead of broadcast.
+- Human judgment is treated as scarce organizational capacity.
 
 Read [Organizational attention](/docs/concepts/organizational-attention). Next, keep [one honest
 source of truth per concern](/learn/02-agents-to-companies/one-source-of-truth).

@@ -1,12 +1,12 @@
 ---
-title: Agents own outcomes
+title: An Agent owns an outcome
 description: Delegation begins when a system can carry a bounded goal through reason, action, observation and evidence.
 courseId: models-to-agents
 courseTitle: From models to Agents
 courseOrder: 1
 lessonId: agent-owns-outcome
 lessonOrder: 5
-estimatedMinutes: 3
+estimatedMinutes: 8
 canonical:
   - label: AgentOS vision
     path: VISION.md
@@ -14,7 +14,7 @@ canonical:
     path: ARCHITECTURE.md
 ---
 
-## The delegation threshold
+## The mental model
 
 An Agent accepts a bounded outcome and carries it through a loop:
 
@@ -27,13 +27,14 @@ outcome
   → return evidence
 ```
 
-The threshold is responsibility, not a library. The human no longer chooses every command. The
-Agent chooses routine next steps within a defined scope and escalates consequences it does not own.
+The delegation threshold is responsibility, not a particular library. The human no longer chooses
+every next command. The Agent chooses within a defined scope and knows which consequences require
+escalation.
 
 A good outcome says what should become true, what evidence closes it and what authority is absent.
-It does not pre-script every observation.
+It does not encode a brittle workflow graph for every possible observation.
 
-## One bounded result
+## Worked example: own onboarding validation
 
 Delegate:
 
@@ -41,9 +42,9 @@ Delegate:
 > workflow. Preserve current API compatibility, run the required checks and return the review
 > artifact. Do not merge.
 
-The Agent inspects instructions, confirms the cause, edits in an isolated branch, runs checks and
-creates the selected review artifact. If a schema migration becomes necessary, it stops at that
-newly consequential boundary rather than expanding scope.
+The Agent inspects project instructions, confirms the cause, edits in an isolated branch, runs
+tests, responds to failures and creates the selected review artifact. If a schema migration becomes
+necessary, it stops at that newly consequential boundary rather than silently broadening scope.
 
 The outcome can end in three truthful states:
 
@@ -51,7 +52,14 @@ The outcome can end in three truthful states:
 - **blocked**, with the exact missing capability or decision;
 - **failed**, with preserved work and evidence.
 
-“Still working” is not evidence. “Done” without the selected artifact is not completion.
+“Still working” is not evidence, and “done” without the selected artifact is not completion.
+
+## What changes at this layer?
+
+- The system, not the human, chooses routine next steps.
+- One bounded result becomes the unit of delegation.
+- Evidence and escalation define truthful closure.
+- Session durability now matters because the outcome outlives one inference.
 
 Next, [harnesses make Agents durable](/learn/01-models-to-agents/harnesses-make-agents-durable).
 Compare the precise layers in [Models, Agents and harnesses](/docs/concepts/models-agents-harnesses).

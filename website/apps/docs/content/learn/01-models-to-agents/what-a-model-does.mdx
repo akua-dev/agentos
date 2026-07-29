@@ -6,17 +6,22 @@ courseTitle: From models to Agents
 courseOrder: 1
 lessonId: what-a-model-does
 lessonOrder: 1
-estimatedMinutes: 2
+estimatedMinutes: 6
 canonical:
   - label: AgentOS vision
     path: VISION.md
 ---
 
-## Generation is not ownership
+## The mental model
 
-A model receives context and generates an output. It can explain, plan, classify or write code in
-ways that feel like reasoning. But one inference has no durable goal, independent clock or
-responsibility for what happens next.
+A model receives context and predicts an output. The output can explain, plan, classify, write code
+or combine ideas in ways that feel like reasoning. But the model call itself has no durable goal,
+no independent clock and no responsibility for what happens after the response.
+
+Generation is not ownership. If you ask for a launch plan, the model can generate an excellent
+one. It does not notice tomorrow that a dependency slipped, contact the owner, revise the sequence
+and return proof that the launch became ready—unless another system preserves the goal and calls it
+again.
 
 ```text
 context + instructions
@@ -26,18 +31,29 @@ context + instructions
 generated output
 ```
 
-Fluent output can be intelligent without being an actor. Continuity, authority and accountability
-must come from systems around the model.
+The distinction matters because fluent output tempts us to attribute organizational properties to
+a single inference. Intelligence in a response does not create continuity, authority or
+accountability.
 
-## A launch plan is still an answer
+## Worked example: one launch paragraph
 
 You ask:
 
 > Draft a launch plan for a new onboarding flow. Include risks and a small first release.
 
-The answer may contain excellent milestones and risks. You still decide whether to accept it,
-preserve the plan, find an owner and notice when reality changes. If the browser closes, the model
-has not abandoned an Assignment—there was no Assignment. It completed an inference.
+The model produces milestones, a staged rollout and a risk list. That is useful generation. You
+still decide whether the plan is accepted, preserve it somewhere durable, create work, find owners
+and notice when reality changes.
+
+If the browser closes, the model has not failed its Assignment—there was no Assignment. It
+completed an inference.
+
+## What changes at this layer?
+
+- Natural language becomes a programmable input and output surface.
+- The system can generate plans and artifacts from context.
+- The human still carries the goal, continuity and every consequence.
+- No durable actor exists yet.
 
 Next, [chat makes generation conversational](/learn/01-models-to-agents/chat-is-conversation).
 Technical terms are collected in the [AgentOS glossary](/docs/reference/glossary).

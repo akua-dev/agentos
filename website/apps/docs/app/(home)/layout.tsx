@@ -6,6 +6,7 @@ import {
   NavbarMenuLink,
   NavbarMenuTrigger,
 } from 'fumadocs-ui/layouts/home/navbar';
+import Link from 'fumadocs-core/link';
 import { Book, ComponentIcon, Pencil, PlusIcon, Server } from 'lucide-react';
 
 export default function Layout({ children }: LayoutProps<'/'>) {
@@ -35,7 +36,9 @@ export default function Layout({ children }: LayoutProps<'/'>) {
           on: 'nav',
           children: (
             <NavbarMenu>
-              <NavbarMenuTrigger>Documentation</NavbarMenuTrigger>
+              <NavbarMenuTrigger>
+                <Link href="/docs">Documentation</Link>
+              </NavbarMenuTrigger>
               <NavbarMenuContent>
                 <NavbarMenuLink href="/docs/start/get-started" className="md:row-span-2">
                   <div className="-mx-3 -mt-3 mb-4 flex min-h-28 items-center justify-center rounded-t-lg bg-brand/10">

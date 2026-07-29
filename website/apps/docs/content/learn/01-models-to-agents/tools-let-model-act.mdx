@@ -6,13 +6,13 @@ courseTitle: From models to Agents
 courseOrder: 1
 lessonId: tools-let-model-act
 lessonOrder: 4
-estimatedMinutes: 3
+estimatedMinutes: 7
 canonical:
   - label: AgentOS system boundaries
     path: ARCHITECTURE.md
 ---
 
-## Action creates consequences
+## The mental model
 
 Tools turn a proposed action into a request against an external system. The harness describes
 available operations, the model selects one with arguments, and the tool returns an observation
@@ -22,21 +22,23 @@ that can influence the next inference.
 reason → call tool → external consequence → observe → reason again
 ```
 
-This is where a generated choice can change reality. Reading a file is modest; sending mail,
-spending money, changing infrastructure or merging code is not. Tool availability therefore needs
-sandboxing, native permission and organizational authority.
+This is the first layer where a generated choice can change reality. Reading a file is a modest
+consequence; sending mail, spending money, changing infrastructure or merging code is much larger.
+Tool availability therefore needs sandboxing, native permission and organizational authority.
 
-The result is evidence only for the system that produced it. A provider may return an issue while
-Git proves that the referenced commit does not exist.
+The tool result is evidence, not automatically truth about everything. A provider call can return
+an issue while Git shows the named commit does not exist. The loop must respect the authority of
+each system.
 
-## Inspect, change, verify
+## Worked example: inspect the issue
 
-The system reads an onboarding issue through the provider, then inspects the handler and tests
-through repository tools. It can compare human intent with current source without asking you to
-paste either.
+The system calls a provider tool to read the onboarding issue, then uses repository tools to inspect
+the handler and tests. It can now compare human intent with current source instead of asking you to
+paste both.
 
-Editing the handler creates a consequence. If that write was not authorized, intelligence does not
-excuse it. If the edit succeeds but no test runs, the observation is incomplete.
+If it calls a write tool to edit the handler, an external consequence occurs. If the write was
+never authorized, intelligence does not excuse the boundary violation. If the edit succeeds but no
+test runs, the observation is incomplete.
 
 A safe action loop asks:
 
@@ -44,5 +46,12 @@ A safe action loop asks:
 2. Is this Agent authorized for the consequence?
 3. Which native source proves the result?
 4. What observation should change the next plan?
+
+## What changes at this layer?
+
+- Generated choices can affect external systems.
+- Observations can feed a multi-step loop.
+- Permission and authority become product requirements.
+- A tool call still does not create a durable owner.
 
 Next, [an Agent owns an outcome](/learn/01-models-to-agents/agent-owns-outcome).

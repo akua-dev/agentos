@@ -6,7 +6,7 @@ courseTitle: Operate your first Fleet
 courseOrder: 3
 lessonId: make-consequential-decision
 lessonOrder: 7
-estimatedMinutes: 3
+estimatedMinutes: 8
 canonical:
   - label: Decision procedure
     path: packages/agentos/skills/agentos-decisions/SKILL.md
@@ -14,7 +14,7 @@ canonical:
     path: database/migrations/0005_durable_coordination_contracts.sql
 ---
 
-## Ask for one exact choice
+## The mental model
 
 A consequential question is a durable speech act with a stable key, exact body and explicit
 dependencies. The originating investigation can finish while the decision remains open.
@@ -26,9 +26,9 @@ First Mate presents the human meaning:
 - what each option changes;
 - the exact choice requested.
 
-Internal hold IDs stay out of the human question unless needed for diagnosis.
+It does not expose internal hold IDs unless needed for diagnosis.
 
-## Scope merge authority
+## Worked example: scope merge authority
 
 The onboarding pull request is green. The project normally requires a human merge. You decide:
 
@@ -44,6 +44,13 @@ safe authority contract.
 
 Reading, acknowledging or discussing the question does not resolve it. The released database
 Function couples the answer with local Task state.
+
+## What changes at this layer?
+
+- Human choices become exact durable inputs to execution.
+- Dependencies unblock atomically with resolution.
+- Authority scope can be inspected later.
+- Permission cannot be mistaken for approval.
 
 Next, [recover an interrupted
 worker](/learn/03-operate-first-fleet/recover-interrupted-worker).
