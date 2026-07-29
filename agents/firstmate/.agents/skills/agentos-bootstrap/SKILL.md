@@ -29,7 +29,10 @@ Treat the current local agent as a temporary seed and establish the persistent c
    - a direct installation into one explicit existing cluster, accepting its selected namespace-scoped or host cluster-admin boundary.
    Keep every non-Akua path complete without Akua. Explain that shared-node vCluster is API and control-plane isolation, not independent node, kernel, CNI or CSI isolation.
 3. Against the selected host or target context, inspect client and server versions, StorageClasses, namespace `agentos`, StatefulSet, Pods, PVCs, ServiceAccount and bindings. Use `kubectl auth can-i` for the exact create and update permissions the selected path needs. Keep this phase read-only. For vCluster, inspect host permissions and isolation capabilities separately from the empty virtual target.
-4. If an AgentOS First Mate or home PVC already exists, inspect its ownership, release image and health. Reconcile the owned installation; never create a competing First Mate.
+4. If an AgentOS First Mate or home PVC already exists, inspect its ownership,
+   release image and health. Reconcile only incomplete bootstrap or handoff
+   state here; route an existing stable release update to the shared upgrade
+   Skill. Never create a competing First Mate.
 5. Prefer the latest stable GitHub release and require a published, immutable `v<semver>` tag plus the fixed-name AgentOS manifest assets required by the selected path. Select only assets under `/releases/download/<tag>/`, never a branch manifest or a mutable latest-download URL. If no stable release fits and the developer explicitly chooses preview software, use an exact Git commit, render from that checkout and bind every First-Mate container to the same immutable `@sha256:` image; never install a branch snapshot or mutable tag. Verify that the manifest label identifies the selected stable or preview revision. Do not expect CNPG or PostgreSQL versions in AgentOS release metadata; the database skill discovers current compatible official releases when that path is chosen.
 
 For a dedicated or direct existing cluster, the temporary seed needs only a compatible `kubectl`, the selected context's authentication and a browser for interactive provider login. It does not need an AgentOS clone, Mise, Bun, Node, Docker, Helm or PostgreSQL. The vCluster path additionally needs a reviewed vCluster CLI only after that topology is approved. Discover the current stable version and host compatibility from the [official vCluster documentation](https://www.vcluster.com/docs/vcluster/), then install and invoke an exact version; do not install vCluster Platform implicitly. If a required client or external credential plugin is absent, explain what is missing and ask before installing it.
@@ -83,35 +86,11 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
 
 ## Upgrade or remove an installation
 
-Treat both operations as a new reconciliation: inspect first, resolve the exact
-installed release, image digest, database migration journal, retained PVC,
-persistent AgentOS checkout and active work, then explain the proposed state
-change. Never overwrite a dirty or divergent checkout, strand an Assignment or
-assume that deleting a workload also retires its durable Agent identity.
-
-For an upgrade:
-
-1. Resolve one newer immutable stable release and its fixed-name manifest. Read
-   the intervening release and migration changes, verify the target image
-   digest and inspect the server-side manifest diff. Stop when the release lacks
-   an executable migration or compatibility path from the installed version.
-2. Preserve unfinished work before changing the persistent AgentOS checkout.
-   With approval, fetch and select the exact release tag in the clean checkout;
-   never copy changed release files into the PVC or edit the immutable image
-   seed.
-3. Load [AgentOS Database](../../../../.agents/skills/agentos-database/SKILL.md)
-   when migrations are pending. Establish the developer-selected backup or
-   recovery boundary first, then apply only the release's ordered forward
-   migrations in its documented compatibility order. AgentOS has no implicit
-   down-migration or database rollback path.
-4. Explain the First-Mate interruption and ask before applying the selected new
-   manifest. Preserve the existing StatefulSet identity and home claim; never
-   recreate the namespace or PVC as an upgrade shortcut.
-5. Verify the observed target digest on every init and runtime container, the
-   same PVC and native Pi session, the exact release checkout, Herdr attach,
-   provider authentication, database identity and released security checks.
-   Reapply an approved installation-specific database client patch only when
-   inspection proves the manifest update removed it.
+For an exact stable release update of one persistent Mate, load the [AgentOS
+Upgrade Skill](../../../../.agents/skills/agentos-upgrade/SKILL.md). It is the
+sole owner of that update and rollback procedure; do not combine it with a
+database migration. Exact-commit dogfood remains in
+`$agentos-development`, `$agentos-image-builds` and `$agentos-registry`.
 
 For removal, first present two explicit scopes:
 
