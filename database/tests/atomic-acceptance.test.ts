@@ -203,13 +203,12 @@ describe.serial("atomic Task acceptance", () => {
         database.exec(`
           INSERT INTO agentos.task_assignments (
             id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-            status, status_text, brief, dispatch_profile
+            status, status_text, brief
           ) VALUES (
             '51000000-0000-4000-8000-000000000030',
             '41000000-0000-4000-8000-000000000030',
             '${ids.crewA}', '${ids.secondA}', 'ship', 'assigned',
-            'Attempted non-atomic acceptance', '# Raw acceptance brief',
-            '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb
+            'Attempted non-atomic acceptance', '# Raw acceptance brief'
           )
         `),
       ).rejects.toThrow();
@@ -228,11 +227,10 @@ describe.serial("atomic Task acceptance", () => {
       await expect(
         createAcceptedTask({
           assignmentId: ids.invalidAssignment,
-          dispatchProfile:
-            '{"version":1,"harness":"pi","materials":[],"settings":{}}',
+          brief: "",
           taskId: ids.invalidTask,
         }),
-      ).rejects.toThrow("composition harness must match the assigned Agent");
+      ).rejects.toThrow("complete Task, Assignment and brief text");
 
       await expect(
         createAcceptedTask({
@@ -321,12 +319,11 @@ describe.serial("atomic Task acceptance", () => {
       );
       INSERT INTO agentos.task_assignments (
         id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-        status, status_text, brief, dispatch_profile
+        status, status_text, brief
       ) VALUES (
         '${ids.historicalAssignment}', '${ids.historicalTask}', '${ids.crewA}',
         '${ids.secondA}', 'ship', 'assigned', 'Original owner',
-        '# Historical brief',
-        '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb
+        '# Historical brief'
       );
       UPDATE agentos.task_assignments
          SET status = 'completed',
@@ -349,13 +346,12 @@ describe.serial("atomic Task acceptance", () => {
       database.exec(`
         INSERT INTO agentos.task_assignments (
           id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-          status, status_text, brief, dispatch_profile
+          status, status_text, brief
         ) VALUES (
           '51000000-0000-4000-8000-000000000024',
           '${ids.firstTask}', '${ids.replacementCrew}', '${ids.secondA}',
           'ship', 'assigned', 'Invalid concurrent owner',
-          '# Concurrent brief',
-          '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb
+          '# Concurrent brief'
         )
       `),
     ).rejects.toThrow(
@@ -369,8 +365,7 @@ describe.serial("atomic Task acceptance", () => {
           '${ids.replacementCrew}',
           '# Replacement brief',
           'The first owner preserved its findings.',
-          'Transferred to the replacement owner',
-          '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb
+          'Transferred to the replacement owner'
         )::text AS id
       `);
 
@@ -401,16 +396,14 @@ function createAcceptedTask(
   overrides: {
     agentId?: string;
     assignmentId?: string;
-    dispatchProfile?: string;
+    brief?: string;
     taskId?: string;
     title?: string;
   } = {},
 ) {
   const agentId = overrides.agentId ?? ids.crewA;
   const assignmentId = overrides.assignmentId ?? ids.firstAssignment;
-  const dispatchProfile =
-    overrides.dispatchProfile ??
-    '{"version":1,"harness":"codex","materials":[],"settings":{}}';
+  const brief = overrides.brief ?? "# Complete brief";
   const taskId = overrides.taskId ?? ids.firstTask;
   const title = overrides.title ?? "Implement atomic acceptance";
 
@@ -436,8 +429,7 @@ function createAcceptedTask(
         'ship',
         'assigned',
         'Crewmate owns the accepted outcome',
-        '# Complete brief',
-        '${dispatchProfile}'::jsonb,
+        '${brief}',
         '{"acceptance":"initial"}'::jsonb
       )
   `);
@@ -459,7 +451,6 @@ function acceptBacklogTask(taskId: string, assignmentId: string) {
         'assigned',
         'Crewmate owns the accepted backlog outcome',
         '# Backlog acceptance brief',
-        '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb,
         '{"acceptance":"backlog"}'::jsonb
       )
   `);

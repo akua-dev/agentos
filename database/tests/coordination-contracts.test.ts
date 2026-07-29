@@ -80,6 +80,23 @@ afterAll(async () => {
 });
 
 describe.serial("durable Fleet coordination contracts", () => {
+  test("exposes the complete handoff contract", async () => {
+    const signatures = await database.query<{ arguments: string }>(`
+      SELECT pg_get_function_identity_arguments(procedure.oid) AS arguments
+        FROM pg_proc AS procedure
+        JOIN pg_namespace AS namespace
+          ON namespace.oid = procedure.pronamespace
+       WHERE namespace.nspname = 'agentos'
+         AND procedure.proname = 'handoff_task_assignment'
+    `);
+    expect(signatures.rows).toEqual([
+      {
+        arguments:
+          "p_assignment_id uuid, p_destination_agent_id uuid, p_brief text, p_report text, p_status_text text",
+      },
+    ]);
+  });
+
   test("stores explicit Assignment artifacts without shared preference state", async () => {
     const columns = await database.query<{ column_name: string }>(`
       SELECT column_name
@@ -87,7 +104,7 @@ describe.serial("durable Fleet coordination contracts", () => {
        WHERE table_schema = 'agentos'
          AND table_name = 'task_assignments'
          AND column_name IN (
-           'brief', 'report', 'dispatch_profile', 'supersedes_assignment_id',
+           'brief', 'report', 'supersedes_assignment_id',
            'decision_keys', 'decisions_attested_at',
            'decisions_attested_by_agent_id'
          )
@@ -97,7 +114,6 @@ describe.serial("durable Fleet coordination contracts", () => {
     expect(columns.rows.map(({ column_name }) => column_name)).toEqual([
       "brief",
       "report",
-      "dispatch_profile",
       "supersedes_assignment_id",
       "decision_keys",
       "decisions_attested_at",
@@ -126,37 +142,22 @@ describe.serial("durable Fleet coordination contracts", () => {
       database.exec(`
         INSERT INTO agentos.task_assignments (
           id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-          status, status_text, dispatch_profile
+          status, status_text
         ) VALUES (
           '${ids.shipAssignment}', '${ids.shipTask}', '${ids.scout}',
-          '${ids.firstMate}', 'ship', 'assigned', 'Missing its brief',
-          '{"version":1,"harness":"codex","materials":[]}'::jsonb
+          '${ids.firstMate}', 'ship', 'assigned', 'Missing its brief'
         )
       `),
     ).rejects.toThrow("Task Assignment requires a durable brief");
 
-    await expect(
-      database.exec(`
-        INSERT INTO agentos.task_assignments (
-          id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-          status, status_text, brief, dispatch_profile
-        ) VALUES (
-          '${ids.shipAssignment}', '${ids.shipTask}', '${ids.scout}',
-          '${ids.firstMate}', 'ship', 'assigned', 'Mismatched harness profile',
-          '# Ship brief', '{"version":1,"harness":"pi","materials":[]}'::jsonb
-        )
-      `),
-    ).rejects.toThrow("composition harness must match the assigned Agent");
-
     await database.exec(`
       INSERT INTO agentos.task_assignments (
         id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-        status, status_text, brief, dispatch_profile, started_at
+        status, status_text, brief, started_at
       ) VALUES (
         '${ids.shipAssignment}', '${ids.shipTask}', '${ids.scout}',
         '${ids.firstMate}', 'ship', 'active', 'Implementation started',
         '# Ship brief',
-        '{"version":1,"harness":"codex","materials":[],"settings":{"effort":"high"}}'::jsonb,
         transaction_timestamp()
       )
     `);
@@ -179,8 +180,7 @@ describe.serial("durable Fleet coordination contracts", () => {
         '${ids.destination}',
         '# Replacement brief',
         'The original worker preserved its current findings.',
-        'Transferred after an explicit handoff',
-        '{"version":1,"harness":"codex","materials":[],"settings":{"effort":"medium"}}'::jsonb
+        'Transferred after an explicit handoff'
       )::text AS id
     `);
     const replacementId = handoff.rows[0]!.id;
@@ -191,8 +191,7 @@ describe.serial("durable Fleet coordination contracts", () => {
         '${ids.destination}',
         '# Replacement brief',
         'The original worker preserved its current findings.',
-        'Transferred after an explicit handoff',
-        '{"version":1,"harness":"codex","materials":[],"settings":{"effort":"medium"}}'::jsonb
+        'Transferred after an explicit handoff'
       )::text AS id
     `);
     expect(repeated.rows[0]!.id).toBe(replacementId);
@@ -242,12 +241,11 @@ describe.serial("durable Fleet coordination contracts", () => {
       );
       INSERT INTO agentos.task_assignments (
         id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-        status, status_text, brief, dispatch_profile, started_at
+        status, status_text, brief, started_at
       ) VALUES (
         '${ids.scoutAssignment}', '${ids.scoutTask}', '${ids.scout}',
         '${ids.firstMate}', 'scout', 'active', 'Investigation started',
         '# Scout brief',
-        '{"version":1,"harness":"codex","materials":[],"settings":{"effort":"high"}}'::jsonb,
         transaction_timestamp()
       )
     `);
@@ -328,12 +326,11 @@ describe.serial("durable Fleet coordination contracts", () => {
       );
       INSERT INTO agentos.task_assignments (
         id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-        status, status_text, brief, dispatch_profile, started_at
+        status, status_text, brief, started_at
       ) VALUES (
         '${ids.reviewAssignment}', '${ids.reviewTask}', '${ids.destination}',
         '${ids.firstMate}', 'review', 'active', 'Review started',
         '# Review brief',
-        '{"version":1,"harness":"codex","materials":[],"settings":{"effort":"medium"}}'::jsonb,
         transaction_timestamp()
       )
     `);

@@ -82,36 +82,29 @@
     {
       "idx": 11,
       "version": "7",
-      "when": 1784810821916,
-      "tag": "0011_agent_composition",
+      "when": 1785144306433,
+      "tag": "0011_atomic_task_acceptance",
       "breakpoints": true
     },
     {
       "idx": 12,
       "version": "7",
-      "when": 1785144306433,
-      "tag": "0012_atomic_task_acceptance",
+      "when": 1785144898319,
+      "tag": "0012_current_mate_bearings",
       "breakpoints": true
     },
     {
       "idx": 13,
       "version": "7",
-      "when": 1785144898319,
-      "tag": "0013_current_mate_bearings",
+      "when": 1785145385518,
+      "tag": "0013_targeted_mate_notifications",
       "breakpoints": true
     },
     {
       "idx": 14,
       "version": "7",
-      "when": 1785145385518,
-      "tag": "0014_targeted_mate_notifications",
-      "breakpoints": true
-    },
-    {
-      "idx": 15,
-      "version": "7",
       "when": 1785198333179,
-      "tag": "0015_mate_memory",
+      "tag": "0014_mate_memory",
       "breakpoints": true
     }
   ]

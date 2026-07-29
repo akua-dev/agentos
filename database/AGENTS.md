@@ -43,18 +43,11 @@ and preserve it.
   future speech act with a state effect: one released idempotent Function must
   record the response, close the delivery and apply the coupled state mutation
   in one short transaction.
-- Keep the complete Assignment brief, final or handoff report, versioned
-  composition manifest and append-only handoff history in `task_assignments`.
-- Keep Agent- and Assignment-scoped composition on the shared versioned
-  manifest contract. Freeze the Assignment brief and composition at execution
-  start, block active harness drift, and expose the released reasoned
-  First-Mate repair for corrupt active dispatch data; completed history remains
-  immutable. Use the exact Captain-composition decision Functions as the
-  released persistent replacement or repair path. First Mate remains the PostgreSQL owner: its
+- Keep the complete Assignment brief, final or handoff report and append-only
+  handoff history in `task_assignments`. Freeze the brief at execution start
+  and preserve completed history. First Mate remains the PostgreSQL owner: its
   explicit administrative writes are outside this subordinate authorization
   boundary and must never be described as proof that a released Function ran.
-  PostgreSQL records desired composition and the immediate rollback manifest;
-  native harness state remains observed authority.
 - Preserve accepted provider payloads intact in `external_events.payload`. The same event rows own their small burst, claim and reconciliation state; do not add a reconciliation table or background outbox.
 - Keep PostgreSQL notifications as small transactional wake hints only. Current
   releases route them on deterministic per-Mate channels; never put row

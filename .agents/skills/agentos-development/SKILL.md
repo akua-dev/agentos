@@ -19,6 +19,7 @@ Git and its remote own delivered source. The persistent home owns unfinished wor
 
 Follow the repository's root and nearer `AGENTS.md` for knowledge placement and
 source ownership. For Kubernetes reuse, follow `ARCHITECTURE.md` and the nearer
-`runtime/AGENTS.md`; do not infer a shared lifecycle from similar YAML alone.
+`packages/agentos/runtime/AGENTS.md`; do not infer a shared lifecycle from
+similar YAML alone.
 Rewrite or prune stale guidance; a stow or memory sweep alone never creates a
 Skill.

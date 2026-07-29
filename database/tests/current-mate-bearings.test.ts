@@ -155,42 +155,34 @@ beforeAll(async () => {
 
     INSERT INTO agentos.task_assignments (
       id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-      status, status_text, brief, report, dispatch_profile, ended_at
+      status, status_text, brief, report, ended_at
     ) VALUES
       (
         '${ids.ownAssignment}', '${ids.ownTask}', '${ids.secondA}',
         '${ids.firstMate}', 'coordinate', 'active', 'Mate work active',
-        '# Own brief', NULL,
-        '{"version":1,"harness":"pi","materials":[],"settings":{}}'::jsonb,
-        NULL
+        '# Own brief', NULL, NULL
       ),
       (
         '${ids.childAssignment}', '${ids.childTask}', '${ids.crewA}',
         '${ids.secondA}', 'ship', 'active', 'Child work active',
-        '# Child brief', NULL,
-        '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb,
-        NULL
+        '# Child brief', NULL, NULL
       ),
       (
         '${ids.siblingAssignment}', '${ids.siblingTask}', '${ids.crewB}',
         '${ids.secondB}', 'ship', 'active', 'Sibling work active',
-        '# Sibling brief', NULL,
-        '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb,
-        NULL
+        '# Sibling brief', NULL, NULL
       ),
       (
         '${ids.ownershipGapAssignment}', '${ids.ownershipGapTask}',
         '${ids.crewA}', '${ids.secondA}', 'ship', 'completed',
         'Historical owner completed', '# Historical brief',
         'The historical owner returned its report.',
-        '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb,
         transaction_timestamp()
       ),
       (
         '${ids.completedActiveAssignment}', '${ids.completedActiveTask}',
         '${ids.crewA}', '${ids.secondA}', 'ship', 'active',
         'Ownership still active', '# Completed Task brief', NULL,
-        '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb,
         NULL
       );
 

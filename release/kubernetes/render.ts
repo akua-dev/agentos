@@ -54,7 +54,7 @@ export async function renderRelease({
   const variants = [
     {
       kustomization: firstMateKustomization(
-        "../agents/firstmate/kubernetes/base",
+        "../packages/agentos/resources/roles/firstmate/kubernetes/base",
         image,
         version,
       ),
@@ -64,7 +64,7 @@ export async function renderRelease({
     },
     {
       kustomization: firstMateKustomization(
-        "../agents/firstmate/kubernetes/overlays/cluster-admin",
+        "../packages/agentos/resources/roles/firstmate/kubernetes/overlays/cluster-admin",
         image,
         version,
       ),

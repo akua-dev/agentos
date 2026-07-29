@@ -30,7 +30,6 @@ describe("public benchmark contracts", () => {
     const paths = [
       "scenarios/quickstart-to-delivery/scenario.json",
       "scenarios/interrupted-worker-recovery/scenario.json",
-      "scenarios/composition-integrity-recovery/scenario.json",
       "scenarios/hierarchy-reporting-after-background-wake/scenario.json",
       "scenarios/captain-authorized-capacity-recovery/scenario.json",
     ];
