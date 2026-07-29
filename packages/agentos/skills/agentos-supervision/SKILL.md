@@ -39,7 +39,13 @@ Supervise only direct children; every Second Mate owns its own subtree.
    Never create a duplicate Agent to avoid diagnosis.
 7. Treat an idle Second Mate with no active child work as healthy.
    Do not restart it, retire it or ask it to invent work.
-8. Fetch the persistent AgentOS checkout's configured remotes read-only. If its tracked upstream or the image seed differs, report the available revision without changing a dirty checkout, installing tools, reloading Pi or restarting the Pod. Load `$agentos-development` before any update.
+8. Fetch the persistent AgentOS checkout's configured remotes read-only. If its
+   tracked upstream or the image seed differs, report the available revision
+   without changing a dirty checkout, installing tools, reloading Pi or
+   restarting the Pod. Load `$agentos-upgrade` for an exactly authorized stable
+   update or rollback of one persistent Mate or, from First Mate, the active
+   persistent Fleet. Load `$agentos-development` for source changes or
+   exact-commit dogfood.
 
 Before any Fleet mutation, confirm this Pod's one named Herdr Agent and native
 Pi session are the authoritative writer for the Mate home. Attachments join that

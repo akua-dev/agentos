@@ -223,9 +223,23 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
 
 ## Apply released assets
 
-1. Ask before provisioning PostgreSQL, creating a database or role, changing grants, or applying migrations.
+1. Ask before provisioning PostgreSQL, creating a database or role, changing
+   grants, or applying migrations. When `$agentos-upgrade` supplies exact
+   Captain authority for one published stable release and the current Fleet,
+   that same authority covers only preparation and application of the
+   release's ordered pending AgentOS migrations; do not ask again. It does not
+   cover topology, credentials, login roles, grants outside released
+   migrations, arbitrary Fleet-row repair or down-migration.
 2. Apply the topology selected by the developer. Do not rank external PostgreSQL ahead of self-hosted CloudNativePG, or vice versa.
-3. Before the first migration on an agent, explain that the pinned Drizzle and PostgreSQL driver dependencies will occupy about 90 MB on its PVC and ask for tooling-installation approval. From the selected release's `database/` directory, run `mise run database:prepare`. It installs only `@agentos/database` production dependencies from the release root `bun.lock` into a content-addressed persistent workspace and reuses a completed workspace on later runs. Trust its printed package path; do not run a second ad hoc `bun install` in that workspace.
+3. Before the first migration on an agent, explain that the pinned Drizzle and
+   PostgreSQL driver dependencies will occupy about 90 MB on its PVC and ask
+   for tooling-installation approval unless the exact `$agentos-upgrade`
+   authority in step 1 already covers the selected release. From the selected
+   release's `database/` directory, run `mise run database:prepare`. It installs
+   only `@agentos/database` production dependencies from the release root
+   `bun.lock` into a content-addressed persistent workspace and reuses a
+   completed workspace on later runs. Trust its printed package path; do not
+   run a second ad hoc `bun install` in that workspace.
 4. Apply pending migrations as the selected Fleet-owner login from the path printed by `database:prepare` with `bun run --cwd <prepared-path> migrate`, injecting `DATABASE_URL` and, when used, `PGPASSFILE` into only that process from the approved secret source. For the released in-cluster CNPG shape, use the non-secret URL and `~/.pgpass` handoff defined above. The released config resolves that entry in memory before constructing `pg`; never put the password in a command argument or restore the driver's deprecated implicit pgpass fallback. Drizzle Kit owns ordering and the applied-migration journal. Stop on a separate migration identity instead of weakening the automatic root binding.
 5. Use released Functions and Triggers for shared invariants instead of rewriting equivalent ad hoc SQL in every agent session.
 6. Use released RLS policies and role grants; never bypass them to make a failing workflow pass.

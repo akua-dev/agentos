@@ -1,0 +1,4 @@
+interface:
+  display_name: "Upgrade AgentOS"
+  short_description: "Upgrade one Mate or an authorized Fleet safely"
+  default_prompt: "Use $agentos-upgrade to preflight and upgrade the authorized AgentOS Mate or Fleet to an exact stable release."
