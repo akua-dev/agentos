@@ -63,11 +63,11 @@ and final report, remove it from the mutation sequence and do not restart it.
 If no member needs mutation, keep the frozen roster and proceed to the
 consolidated report below without restarting any member.
 
-When any frozen Second Mate still needs mutation, choose one healthy idle frozen
-Second Mate that remains in the mutation sequence at a safe turn boundary as
-canary. The canary must never be First Mate, a verified no-op, a post-snapshot
-Mate, or any non-Second-Mate. If none is safe, wait or ask the Captain rather
-than interrupting work. Freeze the remaining order:
+When any frozen Second Mate still needs mutation, choose one healthy idle
+Second Mate that is both in the frozen roster and still needs mutation, at a
+safe turn boundary, as canary. The canary must never be First Mate, a verified
+no-op, a post-snapshot Mate, or any non-Second-Mate. If none is safe, wait or
+ask the Captain rather than interrupting work. Freeze the remaining order:
 
 1. the Second-Mate canary;
 2. every remaining Second Mate needing mutation, one at a time; and
