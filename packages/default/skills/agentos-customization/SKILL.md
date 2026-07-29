@@ -69,7 +69,8 @@ A customization package may include:
 - Pi extensions, prompt resources and themes;
 - always-present instruction resources injected through reviewed Pi hooks;
 - Skills with adjacent SQL, TypeScript, YAML, templates or composition assets;
-- explicit `roles/firstmate/` and `roles/secondmate/` directories containing
+- explicit `resources/roles/firstmate/` and
+  `resources/roles/secondmate/` directories containing
   native `mise.toml` and Kubernetes resources;
 - named Crewmate profiles, image selections and capability requirements; and
 - independent programs used through their own native interfaces.

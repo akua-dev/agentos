@@ -1,12 +1,15 @@
 # Shared persistent-Agent runtime boundary
 
 This subtree contains Kubernetes mechanics shared by persistent Agents plus
-executable lifecycle mechanics shared only by persistent First and Second
-Mates. It is not an agent role and it is not an in-cluster CLI. Read the runtime
-boundary in `../ARCHITECTURE.md` before changing its ownership.
+compatibility entrypoints for the default distribution's executable lifecycle.
+The default lifecycle implementations and distribution-owned runtime assets
+live under `../packages/default/runtime/`. This subtree is not an agent role
+and it is not an in-cluster CLI. Read the runtime boundary in
+`../ARCHITECTURE.md` before changing its ownership.
 
 - Implement only real container lifecycle behavior: persistent-home
-  reconciliation, Herdr/Pi process supervision and Kubernetes health probes.
+  reconciliation, Herdr/Pi process supervision and Kubernetes health probes;
+  keep default-distribution implementations in that package's runtime.
 - Keep only retained-home, Pod-security, home-mount and role-neutral Mise/Herdr
   semantics in `kubernetes/base/`. Stateless workers do not inherit this base.
 - Keep Pi and `mate:*` defaults shared by First and Second Mate in

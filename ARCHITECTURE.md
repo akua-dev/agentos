@@ -385,10 +385,10 @@ not require a first-start download. The persistent AgentOS Git checkout
 provides the current repository and role Mise configuration; agent-owned
 additions live separately under `~/.config/mise/conf.d/`.
 Release-owned Node dependencies are installed in the immutable image at
-`/opt/agentos/node_modules`. `runtime/run-mate.ts` passes that release path
-through `NODE_PATH` to Herdr and its Pi child, so Pi extensions loaded from the
-persistent checkout can resolve release dependencies without installing them
-into the checkout or PVC.
+`/opt/agentos/node_modules`. `packages/default/runtime/run-mate.ts` passes that
+release path through `NODE_PATH` to Herdr and its Pi child, so Pi extensions
+loaded from the persistent checkout can resolve release dependencies without
+installing them into the checkout or PVC.
 Before starting a Mate, a direct Mise init step installs the remaining small
 startup-critical set: Node, kubectl, Herdr and Pi. A second init step uses
 Mise to run the typed home-reconciliation program. Both init containers and the
@@ -807,6 +807,7 @@ workspace. The tree reflects ownership, not deployment order:
 │   └── default/                      released replaceable distribution
 │       ├── extensions/agentos.ts     sole Pi-discovered AgentOS entrypoint
 │       ├── composition/              ordinary role composition modules
+│       ├── runtime/                   default Mate lifecycle and runtime assets
 │       ├── skills/                   shared operational Skills
 │       └── resources/
 │           ├── roles/                role identity, Skills, Mise and K8s
@@ -827,7 +828,9 @@ workspace. The tree reflects ownership, not deployment order:
 │   ├── composition/                  context-manifest and digest validation
 │   ├── kubernetes/base/              retained-home Agent StatefulSet
 │   ├── kubernetes/mate/              Pi lifecycle for First/Second Mate
-│   ├── *.ts                          typed image and home lifecycle mechanics
+│   ├── create-image-seed.ts          typed image-seed builder
+│   ├── distribution.ts, pi-session.ts compatibility exports
+│   ├── health.ts, prepare-home.ts, run-mate.ts compatibility entrypoints
 │   └── tests/                        observable runtime behavior tests
 ├── services/
 │   ├── AGENTS.md                     admission boundary for optional services
@@ -876,13 +879,16 @@ workspace. The tree reflects ownership, not deployment order:
   ownership. Their generator, immutable release or ignored workspace remains
   authoritative.
 
-The retained-home StatefulSet shared by persistent Agents and the executable
-First/Second-Mate lifecycle live under `runtime/`; this is not an agent role,
-external CLI or generic importable runtime package. `runtime/kubernetes/base/`
-contains only semantics common to persistent Agents, while
-`runtime/kubernetes/mate/` adds Pi and Mate health behavior. Each role owns its
-Kubernetes workload patch and surrounding ServiceAccount, Service, identity,
-credentials, harness choice and authority under its distribution role.
+The retained-home StatefulSet shared by persistent Agents lives under the
+root `runtime/`; this is not an agent role, external CLI or generic importable
+runtime package. `runtime/kubernetes/base/` contains only semantics common to
+persistent Agents, while `runtime/kubernetes/mate/` adds Pi and Mate health
+behavior. The default distribution's executable First/Second-Mate lifecycle
+and its native runtime assets live under `packages/default/runtime/`; the root
+TypeScript entrypoints preserve the shared invocation paths. Each role owns
+its Kubernetes workload patch and surrounding ServiceAccount, Service,
+identity, credentials, harness choice and authority under its distribution
+role.
 Stateless workers do not inherit the retained-home base. Optional component
 topology stays with that component even when First Mate is its normal operator.
 
@@ -964,8 +970,10 @@ workspace keeps one `bun.lock`.
 - `release/kubernetes/` is authoritative for human-readable
   First-Mate and database manifest rendering; stable generated assets belong
   to immutable GitHub releases, while previews remain exact-commit builds.
-- `runtime/` owns only shared persistent-Agent Kubernetes mechanics, common
-  First/Second-Mate executable lifecycle and the role-neutral `agentos` image.
+- `runtime/` owns shared persistent-Agent Kubernetes mechanics, image-seed
+  creation and compatibility entrypoints; it does not select an Agent role.
+- `packages/default/runtime/` owns the default distribution's executable
+  First/Second-Mate lifecycle and its native runtime assets.
 - `database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
 - Release assets pin exact versions, digests and checksums.
 - `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_SOURCES.md` are authoritative for redistributed third-party licensing and source offers.

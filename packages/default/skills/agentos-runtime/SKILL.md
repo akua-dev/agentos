@@ -88,7 +88,8 @@ wrapper CLI for this sequence.
 - Keep one pod, ServiceAccount, durable home PVC, database principal and
   pod-local Herdr server per Agent.
 - Use `../secondmate/kubernetes/base` from First Mate and
-  `../crewmate/kubernetes/base` from either Mate. Never apply a generic base
+  `../../crewmates/default/kubernetes/base` from either Mate. Never apply a
+  generic base
   directly: it contains visible placeholder identity and local-development
   image values.
 - Use `AGENTOS_AGENT_NAME`, `AGENTOS_AGENT_CWD`, `HERDR_SESSION` and the

@@ -133,7 +133,7 @@ Use released PostgreSQL schema for durable coordination and native tools against
    Assignment's selected Skill material so the Crewmate receives its gate
    ownership and escalation contract.
 5. Render the worker's harness view from the authoritative Assignment brief
-   using `../crewmate/BRIEF.md`. Fill every
+   using `../../crewmates/default/BRIEF.md`. Fill every
    marker with the owning Mate, Agent, Task, Assignment, work kind, project,
    primary checkout, workspace kind, isolated workspace, outcome, acceptance
    criteria, constraints, delivery workflow, delivery target, authorized
@@ -150,7 +150,7 @@ Use released PostgreSQL schema for durable coordination and native tools against
    ArtifactFS Scout may instead use only the Assignment-scoped mount prepared
    through `$agentos-artifact-fs`; its overlay is scratch state and can never be
    promoted directly into delivered work.
-7. Create the dedicated workload from `../crewmate/kubernetes/base` through a
+7. Create the dedicated workload from `../../crewmates/default/kubernetes/base` through a
    reviewed per-Agent Kustomize overlay and native kubectl, then start the
    selected harness through the pod-local Herdr CLI only after the complete
    rendered brief and exact Assignment-scoped composition bundle have been
