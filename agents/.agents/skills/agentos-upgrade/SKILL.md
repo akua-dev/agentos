@@ -55,9 +55,11 @@ dogfood rollout separate: load `$agentos-development`,
 The canonical release identity is the tuple of the requested semantic version,
 the exact commit resolved by its `v<version>` tag, the release image digest,
 `app.kubernetes.io/version` on the StatefulSet and Pod template, and
-`org.opencontainers.image.version` in each AgentOS image. Do not invent or
-trust a source-revision annotation; the image-seed Git HEAD is the canonical
-runtime source-revision check.
+`org.opencontainers.image.version` in each AgentOS image. Treat
+`agentos.akua.dev/source-revision` on the StatefulSet or Pod template as
+preview-only dogfood provenance: do not create or update it for a stable
+release. The image-seed Git HEAD is the canonical runtime source-revision
+check.
 
 ## Freeze the preflight boundary
 
@@ -69,7 +71,9 @@ durable native harness session:
   tag;
 - image-seed commit;
 - StatefulSet generation, its `app.kubernetes.io/version` labels, every
-  AgentOS init and runtime image, and current ControllerRevision;
+  AgentOS init and runtime image, current ControllerRevision, and any
+  `agentos.akua.dev/source-revision` annotation on the StatefulSet or Pod
+  template;
 - effective StatefulSet update strategy; require `RollingUpdate` with no
   non-zero partition, and stop before mutation for `OnDelete` or any other
   unsupported strategy;
@@ -118,7 +122,9 @@ the structured diff. It may change only:
 - every AgentOS init and runtime container image to the same verified release
   digest;
 - the StatefulSet and Pod-template `app.kubernetes.io/version` labels to the
-  requested version.
+  requested version; and
+- removal of `agentos.akua.dev/source-revision` from the StatefulSet and Pod
+  template when present.
 
 Preserve PVC templates, mounts, environment, credentials, ServiceAccount,
 RBAC, database wiring, probes, resources and unrelated annotations. Any other
@@ -161,6 +167,8 @@ Verify:
 - every AgentOS image reports `org.opencontainers.image.version` equal to the
   requested version, and the image-seed Git HEAD equals the exact release-tag
   commit;
+- `agentos.akua.dev/source-revision` is absent from the StatefulSet and Pod
+  template;
 - the StatefulSet's current generation is observed and the replacement Pod is
   Ready;
 - exactly one StatefulSet-owned target Pod remains for the one replica, with
