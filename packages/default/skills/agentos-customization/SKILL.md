@@ -344,8 +344,9 @@ Use this only when the requested change includes role Mise, image or Kubernetes
 configuration:
 
 1. Stage the exact reviewed distribution and its rollback source before
-   changing the running workload. Prefer an immutable image digest for a stable
-   deployment; a retained mutable checkout is a development boundary.
+   changing the running workload. Preserve the current Pi session path with the
+   rollback source. Prefer an immutable image digest for a stable deployment;
+   a retained mutable checkout is a development boundary.
 2. Inspect and render the distribution's Kustomize overlay through native
    Kubernetes tooling. Require it to retain the intended home PVC and select
    the exact role working directory, Mise task, identity, ServiceAccount, RBAC,
@@ -354,11 +355,19 @@ configuration:
    separate authority required for the workload change.
 4. Apply the reviewed overlay and wait for the exact rollout. Do not use Pi
    `/reload` as a substitute for a pod lifecycle change.
-5. Through the real Herdr Agent, verify that the singular Pi session resumed
-   from the retained home and loaded the intended distribution resources.
+5. Through the real Herdr Agent, verify that one Pi session runs from the
+   target role directory, recovered the expected retained state from the home,
+   and loaded the intended distribution resources. When the role directory
+   changes, require the runtime to allocate the target session through the
+   installed Pi runtime in Pi's configured session directory before releasing
+   the current Herdr pane; retain the source session unchanged as rollback. An
+   in-place session-header rewrite, a target outside that directory or multiple
+   Herdr Agents is a failure.
 6. If verification fails, restore the prior image and overlay through native
-   Kubernetes tooling, then verify the same retained session. Reverting Pi
-   package selection alone does not revert a workload change.
+   Kubernetes tooling, then verify the retained source session from the
+   rollback role directory. Do not delete or rewrite either session while
+   retrying. Reverting Pi package selection alone does not revert a workload
+   change.
 
 ## Verify observable behavior
 

@@ -92,9 +92,11 @@ wrapper CLI for this sequence.
   generic base
   directly: it contains visible placeholder identity and local-development
   image values.
-- Use `AGENTOS_AGENT_NAME`, `AGENTOS_AGENT_CWD`, `HERDR_SESSION` and the
-  role-scoped Mise tasks to run the common Mate runtime. Preserve one exact
-  named Herdr Agent and fail closed on duplicates.
+- Use explicit `AGENTOS_AGENT_ROLE` and `AGENTOS_DISTRIBUTION_ROOT` with an
+  `AGENTOS_AGENT_CWD` that exactly selects that role directory, plus
+  `AGENTOS_AGENT_NAME`, `HERDR_SESSION` and the role-scoped Mise tasks to run
+  the common Mate runtime. Preserve one exact named Herdr Agent and fail closed
+  on duplicates.
 - Allow ordinary processes beside agents in Herdr panes.
 - Arrange optional fleet workspaces with Kubernetes-exec panes into remote
   pod-local Herdr sessions when requested. The remote sessions remain
@@ -231,10 +233,12 @@ activation command or prescribed private-home layout.
   worktree before resume. Preserve same-task work and refuse a fresh workspace
   while ownership is ambiguous.
 - Preserve the Herdr Agent's native session reference before a deliberate exit.
-  Prefer the harness's documented graceful command or quit keybinding, then
-  resume the same native session with the current reviewed flags. Use Pi
-  `/reload` only for reloadable resources, not as a substitute for process,
-  environment or authentication recovery.
+  For a distribution working-directory change, load `$agentos-customization`:
+  it owns the transactional Pi-session relocation and rollback rather than an
+  in-place header edit. Otherwise prefer the harness's documented graceful
+  command or quit keybinding, then resume the native session with the current
+  reviewed flags. Use Pi `/reload` only for reloadable resources, not as a
+  substitute for process, environment or authentication recovery.
 - Let the supervising model decide whether to retry, attach, rotate auth, change model, restart a process, or leave the agent stopped.
 
 Use only released Kustomize assets and native tool interfaces. Fail closed on ambiguous ownership or missing runtime assets.
