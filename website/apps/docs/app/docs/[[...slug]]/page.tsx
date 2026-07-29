@@ -86,7 +86,6 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
             },
           })}
         />
-        {page.data.index ? <DocsCategory url={page.url} /> : null}
       </div>
       {lastModified && <PageLastUpdate date={lastModified} />}
     </DocsPage>

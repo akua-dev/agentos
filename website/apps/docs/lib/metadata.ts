@@ -1,12 +1,19 @@
 import type { Metadata } from 'next/types';
 
+export const baseUrl = new URL(
+  process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.NODE_ENV === 'development'
+      ? 'http://localhost:3000'
+      : 'https://agentos.akua.dev'),
+);
+
 export function createMetadata(override: Metadata): Metadata {
   return {
     ...override,
     openGraph: {
       title: override.title ?? undefined,
       description: override.description ?? undefined,
-      url: 'https://agentos.akua.dev',
+      url: baseUrl.toString(),
       images: '/banner.png',
       siteName: 'AgentOS',
       ...override.openGraph,
@@ -22,10 +29,3 @@ export function createMetadata(override: Metadata): Metadata {
     alternates: override.alternates,
   };
 }
-
-export const baseUrl = new URL(
-  process.env.NEXT_PUBLIC_SITE_URL ??
-    (process.env.NODE_ENV === 'development'
-      ? 'http://localhost:3000'
-      : 'https://agentos.akua.dev'),
-);

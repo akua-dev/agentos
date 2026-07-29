@@ -4,6 +4,7 @@ import {
   type ComponentProps,
   Fragment,
   type HTMLAttributes,
+  type KeyboardEvent,
   type ReactElement,
   type ReactNode,
   type RefObject,
@@ -157,6 +158,37 @@ export function Writing({
   tabs: Record<(typeof writingTabs)[number]['value'], ReactNode>;
 }) {
   const [tab, setTab] = useState<(typeof writingTabs)[number]['value']>('chatbot');
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const selectTab = (index: number) => {
+    setTab(writingTabs[index].value);
+    tabRefs.current[index]?.focus();
+  };
+
+  const handleTabKeyDown = (index: number, event: KeyboardEvent<HTMLButtonElement>) => {
+    let nextIndex: number | undefined;
+
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        nextIndex = (index + 1) % writingTabs.length;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        nextIndex = (index - 1 + writingTabs.length) % writingTabs.length;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = writingTabs.length - 1;
+        break;
+    }
+
+    if (nextIndex === undefined) return;
+    event.preventDefault();
+    selectTab(nextIndex);
+  };
 
   return (
     <div className="col-span-full my-16">
@@ -179,13 +211,18 @@ export function Writing({
               type="button"
               role="tab"
               aria-selected={item.value === tab}
+              tabIndex={item.value === tab ? 0 : -1}
               aria-controls={`progression-${item.value}`}
               id={`progression-tab-${item.value}`}
+              ref={(element) => {
+                tabRefs.current[index] = element;
+              }}
               className={cn(
                 'rounded-md px-2 py-1 text-base font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand sm:text-lg',
                 item.value === tab && 'text-brand',
               )}
-              onClick={() => setTab(item.value)}
+              onClick={() => selectTab(index)}
+              onKeyDown={(event) => handleTabKeyDown(index, event)}
             >
               {item.name}
             </button>
