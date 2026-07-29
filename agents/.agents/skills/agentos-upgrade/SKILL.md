@@ -22,7 +22,9 @@ Load `$agentos-runtime` before inspecting or changing Kubernetes or Herdr.
      release;
    - updating that one Mate workload to the release's immutable image; and
    - changing only the verified stable release metadata: the StatefulSet and
-     Pod-template `app.kubernetes.io/version` labels to the requested version;
+     Pod-template `app.kubernetes.io/version` labels to the requested version,
+     and removing only the exact preview-only dogfood
+     `agentos.akua.dev/source-revision` annotation from both when present;
    - the single Pod replacement required to activate the image.
 4. If the Captain says only “update AgentOS,” resolve and present the newest
    stable candidate, then obtain confirmation of the exact version before
