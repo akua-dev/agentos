@@ -30,7 +30,7 @@ The initial compatibility matrix is:
 
 | `@agentos/pi` | Pi AI API | Pi coding-agent API |
 | --- | --- | --- |
-| `0.1.x` | `0.81.1` | `0.81.1` |
+| `0.1.0` | `0.81.1` | `0.81.1` |
 
 See the repository's `CUSTOMIZATION.md` and released
 `agentos-customization` Skill for the complete trusted-package workflow.

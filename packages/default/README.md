@@ -26,4 +26,4 @@ The initial compatibility matrix is:
 
 | `@agentos/default` | `@agentos/pi` | Pi coding agent |
 | --- | --- | --- |
-| `0.1.x` | `0.1.x` | `0.81.1` |
+| `0.1.0` | `0.1.0` | `0.81.1` |

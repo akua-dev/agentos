@@ -87,7 +87,11 @@ import {
 export const runtime: AgentOSRegistrationV1 = {
   version: 1,
   id: "@acme/agentos:runtime",
-  names: { version: 1, commands: ["acme-agentos-status"] },
+  names: {
+    version: 1,
+    commands: ["acme-agentos-status"],
+    messages: ["@acme/agentos:startup"],
+  },
   register(pi) {
     pi.registerCommand("acme-agentos-status", {
       description: "Inspect the Acme customization",
