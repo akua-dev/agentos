@@ -1,9 +1,16 @@
 import {
-  SessionManager,
-  SettingsManager,
-} from "@earendil-works/pi-coding-agent";
-import { readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, resolve } from "node:path";
+  readFile,
+  realpath,
+  rename,
+  writeFile,
+} from "node:fs/promises";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+type PiRuntime = Pick<
+  typeof import("@earendil-works/pi-coding-agent"),
+  "SessionManager" | "SettingsManager"
+>;
 
 export type PiSessionContents = {
   contents: string;
@@ -51,6 +58,8 @@ export async function preparePiSessionRelocation(
 
   try {
     process.chdir(cwd);
+    const { SessionManager, SettingsManager } =
+      await loadPiRuntime(environment);
     const settings = SettingsManager.create(
       cwd,
       environment.PI_CODING_AGENT_DIR || undefined,
@@ -91,6 +100,86 @@ export async function preparePiSessionRelocation(
     true,
   );
   return target;
+}
+
+const piPackageName = "@earendil-works/pi-coding-agent";
+const supportedPiVersion = "0.81.1";
+let piRuntimePromise: Promise<PiRuntime> | undefined;
+
+function loadPiRuntime(
+  environment: NodeJS.ProcessEnv,
+): Promise<PiRuntime> {
+  piRuntimePromise ??= resolvePiRuntime(environment);
+  return piRuntimePromise;
+}
+
+async function resolvePiRuntime(
+  environment: NodeJS.ProcessEnv,
+): Promise<PiRuntime> {
+  let entrypoint: string | undefined;
+  try {
+    entrypoint = fileURLToPath(import.meta.resolve(piPackageName));
+  } catch {
+    const child = Bun.spawn(["mise", "which", "pi"], {
+      cwd: environment.AGENTOS_RELEASE_ROOT || process.cwd(),
+      env: environment,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const [exitCode, stdout] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    const executable = stdout.trim();
+    if (exitCode !== 0 || !isAbsolute(executable)) {
+      throw new Error(
+        "Could not locate the installed Pi package through Mise.",
+      );
+    }
+    entrypoint = await findPiPackageEntrypoint(await realpath(executable));
+  }
+
+  const packageEntrypoint =
+    await findPiPackageEntrypoint(await realpath(entrypoint));
+  const runtime = await import(pathToFileURL(packageEntrypoint).href) as
+    Partial<PiRuntime>;
+  if (
+    typeof runtime.SessionManager !== "function" ||
+    typeof runtime.SettingsManager !== "function"
+  ) {
+    throw new Error(
+      `${piPackageName}@${supportedPiVersion} does not expose its session runtime.`,
+    );
+  }
+  return runtime as PiRuntime;
+}
+
+async function findPiPackageEntrypoint(path: string): Promise<string> {
+  let directory = dirname(path);
+  for (let depth = 0; depth < 8; depth += 1) {
+    try {
+      const manifest = JSON.parse(
+        await readFile(join(directory, "package.json"), "utf8"),
+      ) as Record<string, unknown>;
+      if (manifest.name === piPackageName) {
+        if (manifest.version !== supportedPiVersion) {
+          throw new Error(
+            `Expected ${piPackageName}@${supportedPiVersion}, received ${String(manifest.version)}.`,
+          );
+        }
+        return join(directory, "dist", "index.js");
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    const parent = dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  throw new Error(
+    `Could not resolve ${piPackageName}@${supportedPiVersion} from ${path}.`,
+  );
 }
 
 async function writePiSession(

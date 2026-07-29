@@ -742,11 +742,14 @@ describe("Mate runtime", () => {
       stderr: "pipe",
       stdout: "pipe",
     });
-    await waitFor(async () =>
-      (await readCalls(state)).some(
+    await waitFor(async () => {
+      if (child.exitCode !== null) {
+        throw new Error(await new Response(child.stderr).text());
+      }
+      return (await readCalls(state)).some(
         (call) => call[0] === "agent" && call[1] === "start",
-      ),
-    );
+      );
+    });
     child.kill("SIGTERM");
     expect(await child.exited).toBe(0);
     const start = (await readCalls(state)).find(
