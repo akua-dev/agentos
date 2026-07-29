@@ -1,5 +1,9 @@
+import {
+  SessionManager,
+  SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 import { readFile, rename, writeFile } from "node:fs/promises";
-import { isAbsolute } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 
 export type PiSessionContents = {
   contents: string;
@@ -17,15 +21,92 @@ export async function migratePiSessionCwd(
   }
   const { contents, header, headerStart, lineBreak } =
     await readPiSession(path);
+  await writePiSession(
+    path,
+    contents,
+    headerStart,
+    lineBreak,
+    {
+      ...header,
+      cwd,
+    },
+  );
+}
+
+export async function preparePiSessionRelocation(
+  path: string,
+  cwd: string,
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
+  if (!isAbsolute(cwd)) {
+    throw new Error("A relocated Pi session working directory must be absolute.");
+  }
+  const source = resolve(path);
+  const { contents, header, headerStart, lineBreak } =
+    await readPiSession(source);
+  const previousCwd = process.cwd();
+  let target: string;
+  let targetDirectory: string;
+  let targetHeader: PiSessionContents["header"];
+
+  try {
+    process.chdir(cwd);
+    const settings = SettingsManager.create(
+      cwd,
+      environment.PI_CODING_AGENT_DIR || undefined,
+    );
+    const sessionDirectory =
+      environment.PI_CODING_AGENT_SESSION_DIR ||
+      settings.getSessionDir();
+    const manager = SessionManager.create(cwd, sessionDirectory);
+    const sessionFile = manager.getSessionFile();
+    if (!sessionFile) {
+      throw new Error("Pi did not allocate a persisted session path.");
+    }
+    target = resolve(cwd, sessionFile);
+    targetDirectory = resolve(cwd, manager.getSessionDir());
+    targetHeader = {
+      ...header,
+      ...manager.getHeader(),
+      cwd,
+      parentSession: source,
+      type: "session",
+    };
+  } finally {
+    process.chdir(previousCwd);
+  }
+
+  if (
+    resolve(dirname(source)) === targetDirectory &&
+    header.cwd === cwd
+  ) {
+    return source;
+  }
+  await writePiSession(
+    target,
+    contents,
+    headerStart,
+    lineBreak,
+    targetHeader,
+    true,
+  );
+  return target;
+}
+
+async function writePiSession(
+  path: string,
+  contents: string,
+  headerStart: number,
+  lineBreak: number,
+  header: PiSessionContents["header"],
+  create = false,
+): Promise<void> {
   const next = `${path}.agentos-next`;
   const remainder = lineBreak === -1 ? "\n" : contents.slice(lineBreak);
   await writeFile(
     next,
-    `${contents.slice(0, headerStart)}${JSON.stringify({
-      ...header,
-      cwd,
-    })}${remainder}`,
-    { mode: 0o600 },
+    `${contents.slice(0, headerStart)}${JSON.stringify(header)}${remainder}`,
+    { flag: create ? "wx" : "w", mode: 0o600 },
   );
   await rename(next, path);
 }

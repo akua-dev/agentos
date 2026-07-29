@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { resolvePersistentMateDistribution } from "./distribution.ts";
 import {
-  migratePiSessionCwd,
+  preparePiSessionRelocation,
   readPiSession,
 } from "./pi-session.ts";
 
@@ -114,12 +114,14 @@ async function relocateMate(mate: Agent) {
     );
   }
 
-  await readPiSession(persistedSession);
+  const relocatedSession = await preparePiSessionRelocation(
+    persistedSession,
+    agentCwd,
+  );
   await $`herdr pane close ${paneId} --session ${session}`;
   for (let attempt = 0; attempt < 20; attempt += 1) {
     if ((await mateStatus()) !== 0) {
-      await migratePiSessionCwd(persistedSession, agentCwd);
-      await startMate(persistedSession);
+      await startMate(relocatedSession);
       return;
     }
     await Bun.sleep(100);

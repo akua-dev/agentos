@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 type Agent = {
   agent_session?: { kind: string; value: string };
@@ -79,6 +87,7 @@ if (args[0] === "server") {
   const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
   console.log(JSON.stringify({ result: { type: "agent_list", agents } }));
 } else if (command === "agent start") {
+  if (process.env.FAKE_HERDR_FAIL_START === "1") process.exit(42);
   const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
   const cwdIndex = args.indexOf("--cwd");
   agents.push({
@@ -609,7 +618,7 @@ describe("Mate runtime", () => {
     ]);
   });
 
-  test("moves a persisted Pi session onto the configured checkout", async () => {
+  test("prepares a rollback-safe Pi session on the configured checkout", async () => {
     const paneId = "w1:p1";
     const { env, state } = await createHarness([]);
     const persistedSession = join(state, "session.jsonl");
@@ -640,26 +649,11 @@ describe("Mate runtime", () => {
       stderr: "pipe",
       stdout: "pipe",
     });
-    const expectedStart = [
-      "agent",
-      "start",
-      "firstmate",
-      "--cwd",
-      env.AGENTOS_AGENT_CWD!,
-      "--no-focus",
-      "--session",
-      "agentos-firstmate-test",
-      "--",
-      "pi",
-      "--no-context-files",
-      "--session",
-      persistedSession,
-    ];
-
     await waitFor(async () =>
       (await readCalls(state)).some((call) =>
-        call.length === expectedStart.length &&
-        call.every((argument, index) => argument === expectedStart[index]),
+        call[0] === "agent" &&
+        call[1] === "start" &&
+        call.includes("--session"),
       ),
     );
     child.kill("SIGTERM");
@@ -668,17 +662,204 @@ describe("Mate runtime", () => {
     expect(calls.filter((call) => call[0] === "pane" && call[1] === "close")).toEqual([
       ["pane", "close", paneId, "--session", "agentos-firstmate-test"],
     ]);
-    expect(calls.filter((call) => call[0] === "agent" && call[1] === "start")).toEqual([
-      expectedStart,
-    ]);
-    const sessionLines = (await readFile(persistedSession, "utf8")).trim().split("\n");
-    expect(JSON.parse(sessionLines[0]!)).toEqual({
+    const starts = calls.filter(
+      (call) => call[0] === "agent" && call[1] === "start",
+    );
+    expect(starts).toHaveLength(1);
+    const relocatedSession = starts[0]!.at(-1)!;
+    expect(relocatedSession).not.toBe(persistedSession);
+    expect(JSON.parse((await readFile(persistedSession, "utf8")).split("\n")[0]!))
+      .toEqual({
+        cwd: "/opt/agentos/packages/default/resources/roles/firstmate",
+        id: "session-1",
+        type: "session",
+        version: 3,
+      });
+    const sessionLines = (await readFile(relocatedSession, "utf8"))
+      .trim()
+      .split("\n");
+    expect(JSON.parse(sessionLines[0]!)).toMatchObject({
       cwd: env.AGENTOS_AGENT_CWD,
-      id: "session-1",
+      parentSession: persistedSession,
       type: "session",
       version: 3,
     });
     expect(JSON.parse(sessionLines[1]!)).toEqual({ message: "preserve me", type: "message" });
+  });
+
+  test("resolves a relocated sessionDir from the target Mate cwd", async () => {
+    const distributionRoot = await mkdtemp(
+      join(tmpdir(), "agentos-relocation-distribution-"),
+    );
+    temporaryDirectories.push(distributionRoot);
+    const agentCwd = join(
+      distributionRoot,
+      "resources",
+      "roles",
+      "firstmate",
+    );
+    await mkdir(agentCwd, { recursive: true });
+    const { env, state } = await createHarness([], {
+      AGENTOS_AGENT_CWD: agentCwd,
+      AGENTOS_DISTRIBUTION_ROOT: distributionRoot,
+      PI_CODING_AGENT_SESSION_DIR: "",
+    });
+    const persistedSession = join(state, "legacy-session.jsonl");
+    const previousCwd =
+      "/opt/agentos/packages/default/resources/roles/firstmate";
+    await Promise.all([
+      mkdir(env.PI_CODING_AGENT_DIR!, { recursive: true }),
+      writeFile(
+        persistedSession,
+        `${JSON.stringify({
+          cwd: previousCwd,
+          id: "session-relative-relocation",
+          type: "session",
+          version: 3,
+        })}\n`,
+        "utf8",
+      ),
+    ]);
+    await writeFile(
+      join(env.PI_CODING_AGENT_DIR!, "settings.json"),
+      `${JSON.stringify({ sessionDir: ".pi/relocated-sessions" })}\n`,
+      "utf8",
+    );
+    await writeFile(
+      join(state, "agents.json"),
+      JSON.stringify([
+        {
+          agent_session: { kind: "path", value: persistedSession },
+          cwd: previousCwd,
+          name: "firstmate",
+          pane_id: "w1:p1",
+        },
+      ]),
+    );
+
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    await waitFor(async () =>
+      (await readCalls(state)).some(
+        (call) => call[0] === "agent" && call[1] === "start",
+      ),
+    );
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
+    const start = (await readCalls(state)).find(
+      (call) => call[0] === "agent" && call[1] === "start",
+    )!;
+    expect(dirname(start.at(-1)!)).toBe(
+      join(agentCwd, ".pi", "relocated-sessions"),
+    );
+  });
+
+  test("keeps a native recovery path when relocated Mate startup fails", async () => {
+    const paneId = "w1:p1";
+    const previousCwd =
+      "/opt/agentos/packages/default/resources/roles/firstmate";
+    const { env, state } = await createHarness([], {
+      FAKE_HERDR_FAIL_START: "1",
+    });
+    const sourceDirectory = join(state, "legacy-sessions");
+    const persistedSession = join(sourceDirectory, "session.jsonl");
+    const sourceContents = [
+      "",
+      "{malformed",
+      "null",
+      "false",
+      JSON.stringify({
+        cwd: previousCwd,
+        id: "session-relocation-rollback",
+        type: "session",
+        version: 3,
+      }),
+      JSON.stringify({ message: "preserve me", type: "message" }),
+      "",
+    ].join("\n");
+    await mkdir(sourceDirectory, { recursive: true });
+    await writeFile(persistedSession, sourceContents, "utf8");
+    await writeFile(
+      join(state, "agents.json"),
+      JSON.stringify([
+        {
+          agent_session: { kind: "path", value: persistedSession },
+          cwd: previousCwd,
+          name: "firstmate",
+          pane_id: paneId,
+        },
+      ]),
+    );
+
+    const failedStart = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    expect(await failedStart.exited).toBe(1);
+    await new Response(failedStart.stderr).text();
+
+    expect(await readFile(persistedSession, "utf8")).toBe(sourceContents);
+    const targetDirectory = join(
+      env.PI_CODING_AGENT_DIR!,
+      "sessions",
+      `--${env.AGENTOS_AGENT_CWD!.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`,
+    );
+    const targetSessions = (await readdir(targetDirectory))
+      .filter((name) => name.endsWith(".jsonl"));
+    expect(targetSessions).toHaveLength(1);
+    const targetContents = await readFile(
+      join(targetDirectory, targetSessions[0]!),
+      "utf8",
+    );
+    expect(targetContents.startsWith("\n{malformed\nnull\nfalse\n")).toBe(
+      true,
+    );
+    const targetHeader = targetContents
+      .split("\n")
+      .map((line) => {
+        try {
+          return JSON.parse(line) as unknown;
+        } catch {
+          return undefined;
+        }
+      })
+      .find(
+        (entry): entry is Record<string, unknown> =>
+          Boolean(entry) &&
+          typeof entry === "object" &&
+          !Array.isArray(entry) &&
+          (entry as Record<string, unknown>).type === "session",
+      );
+    expect(targetHeader).toMatchObject({
+      cwd: env.AGENTOS_AGENT_CWD,
+      parentSession: persistedSession,
+      type: "session",
+      version: 3,
+    });
+
+    const retryEnvironment: Record<string, string | undefined> = {
+      ...env,
+    };
+    delete retryEnvironment.FAKE_HERDR_FAIL_START;
+    const recoveredStart = Bun.spawn([process.execPath, runMate], {
+      env: retryEnvironment,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    await waitFor(async () =>
+      (await readCalls(state)).some(
+        (call) =>
+          call[0] === "agent" &&
+          call[1] === "start" &&
+          call.at(-1) === "--continue",
+      ),
+    );
+    recoveredStart.kill("SIGTERM");
+    expect(await recoveredStart.exited).toBe(0);
   });
 
   test("restarts a persisted Pi session when Herdr restored only stale pane metadata", async () => {
@@ -709,7 +890,7 @@ describe("Mate runtime", () => {
       (await readCalls(state)).some((call) =>
         call[0] === "agent" &&
         call[1] === "start" &&
-        call.includes(persistedSession),
+        call.includes("--session"),
       ),
       6_000,
     );
