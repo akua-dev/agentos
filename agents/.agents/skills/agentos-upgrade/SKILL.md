@@ -48,6 +48,13 @@ Never infer a digest from a mutable tag or release prose. Keep an exact-commit
 dogfood rollout separate: load `$agentos-development`,
 `$agentos-image-builds` and `$agentos-registry` for that workflow instead.
 
+The canonical release identity is the tuple of the requested semantic version,
+the exact commit resolved by its `v<version>` tag, the release image digest,
+`app.kubernetes.io/version` on the StatefulSet and Pod template, and
+`org.opencontainers.image.version` in each AgentOS image. Do not invent or
+trust a source-revision annotation; the image-seed Git HEAD is the canonical
+runtime source-revision check.
+
 ## Freeze the preflight boundary
 
 Resolve the current execution boundary and exact target context, namespace,
@@ -57,13 +64,21 @@ durable native harness session:
 - persistent checkout commit, branch or detached state, cleanliness and target
   tag;
 - image-seed commit;
-- StatefulSet generation, version and source metadata, every AgentOS init and
-  runtime image, and current ControllerRevision;
+- StatefulSet generation, its `app.kubernetes.io/version` labels, every
+  AgentOS init and runtime image, and current ControllerRevision;
+- effective StatefulSet update strategy; require `RollingUpdate` with no
+  non-zero partition, and stop before mutation for `OnDelete` or any other
+  unsupported strategy;
 - observed Pod image IDs, readiness and restart counts;
 - home PVC name, UID and bound volume;
 - Herdr session, Mate handle, pane and native harness session reference; and
-- every installation-specific Pod-template field that the image-only update
-  must preserve.
+- redacted, non-secret installation wiring needed to preserve the Pod
+  template: field names, labels, annotations, commands, arguments, working
+  directories, probes, resources, volume names and mount paths, read-only
+  flags, ServiceAccount, security settings, and environment names and source
+  types. For Secret-backed fields, record only the Secret name/key and
+  reference or mount path; replace literal values with `<redacted>` and never
+  record Secret data, tokens, passwords or connection URI contents.
 
 Stop before mutation on insufficient authority, a dirty checkout, an
 ambiguous Mate or session, an unbound PVC, an unhealthy current runtime, an
@@ -90,9 +105,8 @@ the structured diff. It may change only:
 
 - every AgentOS init and runtime container image to the same verified release
   digest;
-- workload and Pod-template stable-version labels;
-- exact source-revision annotations; and
-- preview-only annotations that are invalid for a stable release.
+- the StatefulSet and Pod-template `app.kubernetes.io/version` labels to the
+  requested version.
 
 Preserve PVC templates, mounts, environment, credentials, ServiceAccount,
 RBAC, database wiring, probes, resources and unrelated annotations. Any other
@@ -105,29 +119,36 @@ diff requires separate authority or a smaller patch.
 2. Apply the reviewed patch once to the one named Mate.
 3. Wait for that one StatefulSet rollout within a bounded deadline.
 
-The expected Pod replacement is part of the authorized operation. Do not
-update another Mate, create a second harness writer, copy the checkout into the
-image seed, invoke another restart or treat temporary rollout unavailability
-as a reason to broaden the operation.
+The expected single Pod replacement is the StatefulSet's `RollingUpdate`; do
+not manually delete the Pod, invoke another restart, update another Mate,
+create a second harness writer, copy the checkout into the image seed, or
+treat temporary rollout unavailability as a reason to broaden the operation.
 
 ## Finish verification before supervision
 
-The worker that owns the upgrade remains responsible across Pod replacement.
-For a self-update, the resumed native harness session must finish this
-verification and report before it arms or returns to ordinary supervision. For
-a managed-Mate update, First Mate must complete the same target verification
-before reporting or continuing the rollout elsewhere.
+For a managed-Mate update, First Mate remains responsible for the target
+verification before reporting or continuing the rollout elsewhere. For a
+self-update, the direct supervisor is the recovery owner if the replacement
+cannot start Herdr or Pi: the Captain for First Mate, or First Mate for Second
+Mate. The initiating worker must not claim recovery or re-arm supervision when
+it cannot resume. The recovery owner uses native Kubernetes, Git and Herdr to
+inspect the named Mate and the preserved evidence, and asks for separate
+authority before any rollback that would require another Pod replacement.
 
 Verify:
 
 - the persistent checkout and image-seed commits equal the release commit;
 - every desired and observed AgentOS image equals the release digest;
+- the StatefulSet and Pod-template `app.kubernetes.io/version` labels equal
+  the requested version;
+- every AgentOS image reports `org.opencontainers.image.version` equal to the
+  requested version, and the image-seed Git HEAD equals the exact release-tag
+  commit;
 - the StatefulSet's current generation is observed and the replacement Pod is
   Ready;
 - the replacement Pod has no unexpected container restarts;
 - the original home PVC UID and native harness session reference remain;
-- all recorded installation-specific Pod-template wiring remains; and
-- preview-only release metadata is gone.
+- all recorded installation-specific Pod-template wiring remains.
 
 Report the exact version, commit, digest, readiness, PVC and session evidence,
 plus every deliberately deferred database or Fleet update. Only after that
@@ -139,11 +160,12 @@ If failure occurs before Pod replacement, restore whichever of checkout or
 workload state changed and verify the original runtime.
 
 If the replacement Pod fails readiness or session recovery, restore the
-preserved prior checkout reference and immutable images for the same Mate.
-Preserve its PVC and failed-Pod evidence, then verify the prior desired and
-observed state.
+preserved prior checkout reference and immutable images for the same Mate only
+under the recovery owner's authority. Preserve its PVC and failed-Pod
+evidence, then verify the prior desired and observed state.
 
 Report the first unverified boundary. Do not add credentials, change RBAC,
-apply a migration, update another Mate or create a replacement Agent to hide
-the failure. If rollback also fails, remain attached and report the exact live
-state.
+apply a migration, update another Mate, create a replacement Agent or perform
+an unapproved second restart to hide the failure. If the recovery owner cannot
+restore the prior state, leave the evidence intact and report the exact live
+state to the Captain.
