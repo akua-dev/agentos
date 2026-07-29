@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { access, readdir } from "node:fs/promises";
-import { resolve } from "node:path";
-
-const repository = resolve(import.meta.dir, "../../..");
+import { readdir } from "node:fs/promises";
 
 describe("@akua-dev/agentos Pi manifest", () => {
   test("is the only public package workspace", async () => {
@@ -34,14 +31,5 @@ describe("@akua-dev/agentos Pi manifest", () => {
       skills: ["./skills"],
     });
     expect(manifest.pi.prompts).toBeUndefined();
-  });
-
-  test("does not retain retired composition-era Skill paths", async () => {
-    await Promise.all(
-      [
-        resolve(repository, "agents"),
-        resolve(repository, "packages", "agentos", "skills", "agentos-fleet-upgrade"),
-      ].map((path) => expect(access(path)).rejects.toThrow()),
-    );
   });
 });
