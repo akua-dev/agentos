@@ -25,6 +25,7 @@ export async function findPiSessionToResume(
     environment.PI_CODING_AGENT_DIR ||
       join(environment.HOME || homedir(), ".pi", "agent"),
     environment,
+    cwd,
   );
   const environmentSessionDirectory =
     environment.PI_CODING_AGENT_SESSION_DIR;
@@ -34,7 +35,7 @@ export async function findPiSessionToResume(
   const sessionDirectory =
     !configuredSessionDirectory
       ? join(agentDirectory, "sessions")
-      : normalizePiPath(configuredSessionDirectory, environment);
+      : normalizePiPath(configuredSessionDirectory, environment, cwd);
   const paths = await sessionPaths(sessionDirectory);
   const candidates = [] as Array<{ path: string; cwd: string }>;
 
@@ -56,11 +57,11 @@ export async function findPiSessionToResume(
   }
 
   if (candidates.length === 0) return undefined;
-  const normalizedCwd = normalizePiPath(cwd, environment);
+  const normalizedCwd = normalizePiPath(cwd, environment, cwd);
   const matching = candidates.filter(
     (candidate) =>
       candidate.cwd !== "" &&
-      normalizePiPath(candidate.cwd, environment) === normalizedCwd,
+      normalizePiPath(candidate.cwd, environment, cwd) === normalizedCwd,
   );
   if (matching.length === 1) {
     return matching[0]!.path;
@@ -287,6 +288,7 @@ async function readSessionDirectorySetting(
 function normalizePiPath(
   path: string,
   environment: NodeJS.ProcessEnv,
+  baseDirectory: string,
 ): string {
   const home = environment.HOME || homedir();
   const expanded =
@@ -296,6 +298,7 @@ function normalizePiPath(
         ? join(home, path.slice(2))
         : path;
   return resolve(
+    baseDirectory,
     expanded.startsWith("file://") ? fileURLToPath(expanded) : expanded,
   );
 }

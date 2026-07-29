@@ -304,6 +304,56 @@ describe("Mate runtime", () => {
     expect(await child.exited).toBe(0);
   });
 
+  test("resolves Pi's relative session directory from the target Mate cwd", async () => {
+    const distributionRoot = await mkdtemp(
+      join(tmpdir(), "agentos-relative-distribution-"),
+    );
+    temporaryDirectories.push(distributionRoot);
+    const agentCwd = join(
+      distributionRoot,
+      "resources",
+      "roles",
+      "firstmate",
+    );
+    const { env, state } = await createHarness([], {
+      AGENTOS_AGENT_CWD: agentCwd,
+      AGENTOS_DISTRIBUTION_ROOT: distributionRoot,
+    });
+    const sessionDirectory = join(agentCwd, ".pi", "retained-sessions");
+    const persistedSession = join(sessionDirectory, "session.jsonl");
+    await Promise.all([
+      mkdir(sessionDirectory, { recursive: true }),
+      mkdir(env.PI_CODING_AGENT_DIR!, { recursive: true }),
+    ]);
+    await Promise.all([
+      writeFile(
+        join(env.PI_CODING_AGENT_DIR!, "settings.json"),
+        `${JSON.stringify({ sessionDir: ".pi/retained-sessions" })}\n`,
+        "utf8",
+      ),
+      writeFile(
+        persistedSession,
+        `${JSON.stringify({ cwd: agentCwd, id: "session-relative", type: "session", version: 3 })}\n`,
+        "utf8",
+      ),
+    ]);
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    await waitFor(async () =>
+      (await readCalls(state)).some((call) =>
+        call[0] === "agent" &&
+        call[1] === "start" &&
+        call.includes(persistedSession),
+      ),
+    );
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
+  });
+
   test("resumes when blank and malformed lines precede the native Pi header", async () => {
     const { env, state } = await createHarness([]);
     const sessions = join(env.PI_CODING_AGENT_DIR!, "sessions", "--legacy-cwd--");
