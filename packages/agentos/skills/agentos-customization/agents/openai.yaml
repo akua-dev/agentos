@@ -1,0 +1,4 @@
+interface:
+  display_name: "Customize AgentOS"
+  short_description: "Build and apply trusted AgentOS customizations"
+  default_prompt: "Use $agentos-customization to add or replace AgentOS behavior and role resources through a reviewed Pi package or complete distribution."

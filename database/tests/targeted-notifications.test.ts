@@ -90,19 +90,17 @@ beforeAll(async () => {
 
     INSERT INTO agentos.task_assignments (
       id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-      status, status_text, brief, dispatch_profile
+      status, status_text, brief
     ) VALUES
       (
         '${ids.crewAssignment}', '${ids.crewTask}', '${ids.crewA}',
         '${ids.secondA}', 'ship', 'active', 'Crewmate phase active',
-        '# Crew brief',
-        '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb
+        '# Crew brief'
       ),
       (
         '${ids.mateAssignment}', '${ids.mateTask}', '${ids.secondA}',
         '${ids.firstMate}', 'coordinate', 'active', 'Mate phase active',
-        '# Mate brief',
-        '{"version":1,"harness":"pi","materials":[],"settings":{}}'::jsonb
+        '# Mate brief'
       );
   `);
 
@@ -304,7 +302,6 @@ describe.serial("targeted Mate notifications", () => {
           'assigned',
           'Second Mate A owns the outcome',
           '# Atomic routing brief',
-          '{"version":1,"harness":"pi","materials":[],"settings":{}}'::jsonb,
           '{}'::jsonb
         )
     `);

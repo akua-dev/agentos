@@ -181,75 +181,28 @@ adding the receipt primitive must not erase Second Mate's later Captain-domain,
 Assignment-artifact or durable-coordination privileges. The full authorization
 and coordination suites exercise the preserved grants with real roles.
 
-`0011_agent_composition.sql` defines one versioned composition-manifest
-contract for persistent Agents and bounded Assignments. A nullable
-`agents.resolved_composition` is desired persistent state; the existing
-`task_assignments.dispatch_profile` becomes the pinned Assignment-scoped form
-of the same contract. PostgreSQL validates recognized material kinds, exact
-provenance, content digests, safe relative entrypoints and matching harness
-identity. The recognized materials are Markdown instructions and Agent Skills;
-all other native runtime choices are preserved as opaque `settings` that
-PostgreSQL deliberately does not interpret. The versioned top-level envelope
-is closed so new native knobs cannot leak back into the core schema. Runtime
-capabilities such as Mise, MCP and harness extensions remain native rather than
-becoming material kinds.
-Existing dispatch profiles are upgraded in place without losing their runtime
-choices. Every registered Agent keeps the complete read view, while no child
-runtime receives a new composition-update grant. The pure manifest validators
-remain executable for registered table writers because PostgreSQL evaluates
-the Assignment `CHECK` as its caller; the persistent mutation Functions remain
-closed.
-`tests/composition-manifests.test.ts` exercises accepted and rejected manifests,
-harness consistency and real role permissions against the complete chain.
-
-An Assignment's `brief`, `started_at` and `dispatch_profile` freeze when
-execution starts. Its Agent cannot change to a harness that contradicts an
-active Assignment. The released repair path for genuinely corrupt active
-dispatch data is `agentos.repair_task_assignment_dispatch`: First Mate supplies
-the complete replacement brief, valid matching composition and a durable
-reason, and the prior values remain in Assignment metadata. First Mate is also
-the PostgreSQL owner and therefore retains explicit administrative repair
-authority that PostgreSQL cannot meaningfully deny to its owner; such a direct
-repair is outside the released Function contract and must not be represented as
-Function-authorized. Completed Assignment history cannot be repaired in place.
-
-The released persistent-composition path goes through
-`agentos.replace_agent_composition` with the exact approved
-`captain_decision_answer` created by
-`agentos.resolve_agent_composition_decision`. The answer is bound to the
-target Agent and exact manifest; an unrelated, unresolved or rejected answer
-is not mutation authority. Only First Mate can create or resolve this
-composition decision and change its own or a direct Second Mate's desired
-composition; the immediately prior manifest is retained
-in Agent metadata for one explicit rollback. Incorrect durable state uses the
-separate `agentos.repair_agent_composition` path so repair is visible rather
-than disguised as ordinary selection. Owner-level administrative writes remain
-possible by definition and are not evidence that these released checks ran.
-These rows still do not claim that Pi, files or Herdr loaded the desired setup.
-
-`0012_atomic_task_acceptance.sql` adds the idempotent
+`0011_atomic_task_acceptance.sql` adds the idempotent
 `agentos.create_task_with_assignment` and `agentos.accept_backlog_task`
 Functions. A new accepted outcome or a deliberately accepted backlog Task gets
 its first accountable Assignment in one transaction; an unassigned Task
 remains backlog. `tests/atomic-acceptance.test.ts` exercises the acceptance and
 retry paths.
 
-`0013_current_mate_bearings.sql` adds the read-only
+`0012_current_mate_bearings.sql` adds the read-only
 `agentos.current_mate_bearings()` projection for an authenticated Mate's
 durable reconciliation references. It excludes message bodies, external
 payloads, runtime health and routing decisions. `tests/current-mate-bearings.test.ts`
 exercises its shape and authorization.
 
-`0014_targeted_mate_notifications.sql` routes transactional table-and-operation
+`0013_targeted_mate_notifications.sql` routes transactional table-and-operation
 wake hints to deterministic responsible Mate channels instead of the global
 channel. The hints remain non-secret routing signals; durable rows remain the
 source of truth. `tests/targeted-notifications.test.ts` exercises routing,
 rollback and channel isolation.
 
-`0015_mate_memory.sql` removes the legacy shared Captain preference table
+`0014_mate_memory.sql` removes the legacy shared Captain preference table
 after failing closed when any active row still needs preservation. Private
 context instead belongs to each persistent Mate's PVC. Exact Captain choices
-remain durable Inbox speech acts. The migration adds exact persistent
-composition decision and answer Functions, updates composition mutation
-checks, notifications, bearings, runtime grants and RLS references, and leaves
-existing Tasks and Assignments unchanged.
+remain durable Inbox speech acts. The migration updates notifications,
+bearings, runtime grants and RLS references while leaving existing Tasks and
+Assignments unchanged.

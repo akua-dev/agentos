@@ -8,7 +8,6 @@ import metricCatalogSchema from "./schemas/metric-catalog.schema.json";
 import scenarioSchema from "./schemas/scenario.schema.json";
 import metricCatalog from "./metrics/catalog.json";
 import capacityRecoveryScenario from "./scenarios/captain-authorized-capacity-recovery/scenario.json";
-import compositionRecoveryScenario from "./scenarios/composition-integrity-recovery/scenario.json";
 import hierarchyReportingScenario from "./scenarios/hierarchy-reporting-after-background-wake/scenario.json";
 import recoveryScenario from "./scenarios/interrupted-worker-recovery/scenario.json";
 import quickstartScenario from "./scenarios/quickstart-to-delivery/scenario.json";
@@ -29,7 +28,6 @@ const scenarios = new Map(
     quickstartScenario,
     recoveryScenario,
     capacityRecoveryScenario,
-    compositionRecoveryScenario,
     hierarchyReportingScenario,
   ].map((scenario) => [scenario.id, scenario]),
 );

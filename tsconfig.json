@@ -17,13 +17,11 @@
   },
   "include": [
     "*.ts",
-    "agents/**/*.ts",
-    "agents/.pi/**/*.ts",
     "benchmarks/**/*.ts",
     "clis/**/*.ts",
     "database/**/*.ts",
+    "packages/**/*.ts",
     "release/**/*.ts",
-    "runtime/**/*.ts",
     "services/**/*.ts"
   ]
 }
