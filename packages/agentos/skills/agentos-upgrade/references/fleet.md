@@ -53,10 +53,11 @@ pull policy, unable to pull the digest, still performing a consequential
 mutation or otherwise outside the shared atomic boundary, stop before the first
 mutation and report the blocker.
 
-A member already matching the target checkout commit, desired and observed
-release image membership, stable metadata, PVC identity, native session and
-preserved installation wiring is a verified no-op. Keep it in the frozen roster
-and final report, remove it from the mutation sequence and do not restart it.
+A member already matching the target checkout and image-seed commits, desired
+and observed release image membership, stable metadata, PVC identity, native
+session and preserved installation wiring is a verified no-op. Record both
+commits in its no-op evidence. Keep it in the frozen roster and final report,
+remove it from the mutation sequence and do not restart it.
 
 ## Choose and publish the serial order
 
