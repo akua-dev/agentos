@@ -1,6 +1,6 @@
 ---
 name: agentos-upgrade
-description: Upgrade one persistent AgentOS Mate or, from First Mate with exact Captain authority, every active persistent Mate in one Fleet to an exact published stable release. Use for stable First- or Second-Mate updates, resumed post-replacement verification, and authorized rollback boundaries. Do not use for dogfood, database migrations, Crewmates, provisioning, retired Mates, services, or another Fleet.
+description: Upgrade one persistent AgentOS Mate or, from First Mate with exact Captain authority, every active persistent Mate in one Fleet to an exact published stable release, including its run-once released database migrations. Use for stable First- or Second-Mate updates, resumed post-replacement verification, and authorized rollback boundaries. Do not use for dogfood, Crewmates, provisioning, retired Mates, services, or another Fleet.
 ---
 
 # Upgrade AgentOS
@@ -25,12 +25,14 @@ changing Kubernetes or Herdr.
      authority.
    - Second Mate may update only itself under exact Captain authority delivered
      directly or through First Mate consistently with its charter.
-   - Read [the complete one-Mate procedure](references/one-mate.md) before
-     preflight or mutation.
+   - Read both [the complete one-Mate procedure](references/one-mate.md) and
+     [the released database phase](references/database.md) before preflight or
+     mutation.
 5. For every active persistent Mate in the Fleet:
    - require exact Captain authority covering that whole scope;
    - require the authenticated caller to be the active root First Mate;
-   - read both [the complete one-Mate procedure](references/one-mate.md) and
+   - read [the complete one-Mate procedure](references/one-mate.md),
+     [the released database phase](references/database.md) and
      [the complete Fleet procedure](references/fleet.md) before preflight or
      mutation; and
    - let the Fleet procedure select each member while the one-Mate procedure
@@ -39,12 +41,17 @@ changing Kubernetes or Herdr.
    maintenance intent, a version preference, package availability or access to
    native tools.
 
-The instruction does not authorize a database migration or repair, exact-commit
-dogfood, release publication, merge, topology or RBAC change, credential
-change, dirty-state removal, another Fleet, Crewmates, provisioning or retired
-Mates, services, or retirement of a PVC, session, Agent or rollback reference.
+The exact stable-upgrade instruction includes the selected release's pinned
+migration-tool preparation and ordered pending AgentOS migrations on the same
+Fleet; the database reference applies them once through `$agentos-database`
+before workload mutation without another Captain approval. It does not
+authorize database or CloudNativePG topology changes, credential or login-role
+creation, grants outside released migrations, arbitrary Fleet-row repair,
+down-migration, exact-commit dogfood, release publication, merge, RBAC change,
+dirty-state removal, another Fleet, Crewmates, provisioning or retired Mates,
+services, or retirement of a PVC, session, Agent or rollback reference.
 
 Route exact-commit dogfood through `$agentos-development`,
-`$agentos-image-builds` and `$agentos-registry`. Load `$agentos-database` only
-for a separately authorized migration. Stop at every unverified authority,
-release, runtime or recovery boundary rather than broadening the operation.
+`$agentos-image-builds` and `$agentos-registry`. Stop at every unverified
+authority, release, database, runtime or recovery boundary rather than
+broadening the operation.

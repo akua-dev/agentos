@@ -267,6 +267,13 @@ describe("publishable AgentOS Pi artifacts", () => {
           "skills",
           "agentos-upgrade",
           "references",
+          "database.md",
+        ),
+        join(
+          installedAgentOS,
+          "skills",
+          "agentos-upgrade",
+          "references",
           "one-mate.md",
         ),
         join(

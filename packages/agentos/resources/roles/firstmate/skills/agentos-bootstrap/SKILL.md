@@ -92,12 +92,14 @@ assume that deleting a workload also retires its durable Agent identity.
 For an exact stable update of First Mate, one managed persistent Mate, or all
 active persistent Mates, load
 [AgentOS Upgrade](../../../../../skills/agentos-upgrade/SKILL.md). That Skill
-owns release verification, atomic workload replacement, Fleet ordering and
-rollback boundaries. It never authorizes a database migration; load
-[AgentOS Database](../../../../../skills/agentos-database/SKILL.md) only for a
-separately authorized migration with its own recovery boundary. Exact-commit
-dogfood remains an AgentOS development workflow rather than an installation
-upgrade.
+owns release verification, run-once sequencing of the selected release's
+required database migrations through
+[AgentOS Database](../../../../../skills/agentos-database/SKILL.md), atomic
+declarative/live workload replacement, Fleet ordering and rollback boundaries.
+The exact stable-upgrade authority covers those released migrations without a
+second approval; it does not cover database topology or improvised repair.
+Exact-commit dogfood remains an AgentOS development workflow rather than an
+installation upgrade.
 
 For removal, first present two explicit scopes:
 

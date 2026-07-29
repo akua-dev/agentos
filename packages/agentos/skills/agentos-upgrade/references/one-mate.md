@@ -9,8 +9,10 @@ Never enumerate, reorder or advance the Fleet here.
 
 - [Verify the release](#verify-the-release)
 - [Freeze the preflight boundary](#freeze-the-preflight-boundary)
+- [Reconcile the released database](#reconcile-the-released-database)
 - [Preview the reversible change](#preview-the-reversible-change)
 - [Activate one Mate once](#activate-one-mate-once)
+- [Diagnose a failed rollout](#diagnose-a-failed-rollout)
 - [Finish verification before supervision](#finish-verification-before-supervision)
 - [Roll back visibly](#roll-back-visibly)
 
@@ -39,6 +41,9 @@ identity is the tuple of:
 Treat `agentos.akua.dev/source-revision` on the StatefulSet or Pod template as
 preview-only dogfood provenance. Do not create or update it for a stable
 release. Use the image-seed Git HEAD as the runtime source-revision check.
+Release publication, image metadata and a successful pull prove provenance and
+availability; they do not prove that this Mate's role-specific init and runtime
+paths can start.
 
 ## Freeze the preflight boundary
 
@@ -49,6 +54,9 @@ evidence in the current durable native Pi session:
 - persistent checkout commit, branch or detached state, cleanliness and target
   tag;
 - image-seed commit;
+- any installation-owned Kustomize or resource source for the target, its exact
+  paths, a secret-safe render, and the rendered release identity and preserved
+  wiring compared structurally with the live StatefulSet;
 - StatefulSet generation, `app.kubernetes.io/version` labels, every AgentOS
   init and runtime image, current ControllerRevision, and any
   `agentos.akua.dev/source-revision` annotation on the StatefulSet or Pod
@@ -76,25 +84,42 @@ data, tokens, passwords or connection URI contents.
 Stop before mutation on insufficient authority, a dirty checkout, an ambiguous
 Mate or session, a scaled, extra or missing target Pod, an unbound PVC, an
 unhealthy current runtime, an unsupported update or pull policy, unverified
-pull access, an unverifiable release, or an unexplained checkout, source or
-image mismatch. Never reset, clean or overwrite the checkout to make preflight
-pass.
+pull access, an unverifiable release, unexplained checkout or image mismatch,
+or any unexplained difference between an installation-owned declarative source
+and the live workload. An unapplied staged release is drift, not an input to the
+current upgrade. Never reset, clean, overwrite or silently render and apply
+that state to make preflight pass.
 
-Apply no database migration and start no partial-migration investigation.
-Preserve the database Secret and connection wiring. If the target runtime
-cannot use the installed schema, roll back the runtime under the recovery
-boundary and report the incompatibility.
+## Reconcile the released database
+
+For a standalone named-Mate upgrade, after the complete target preflight passes
+and before changing Git, a declarative source or Kubernetes, follow
+[the released database phase](database.md). The database reference records a
+verified no-op or applies the selected release's pending migrations once under
+the same upgrade authority. For a Fleet rollout, consume the enclosing Fleet
+procedure's recorded database result and never invoke that phase per member.
+
+If a Second-Mate self-update requires First Mate to execute the Fleet-owner
+database phase, wait for First Mate's exact result instead of requesting a new
+Captain approval or continuing locally. After the database result, recheck the
+named target's identity, checkout, declarative/live baseline, active work, PVC
+and native session. Stop if any earlier preflight fact no longer holds.
 
 ## Preview the reversible change
 
 Keep the previous checkout branch or exact commit reachable. Record the prior
 immutable images, version and source metadata, ControllerRevision, PVC UID and
-native Pi session reference before changing Git or Kubernetes. The native
-session is the recovery record; create no upgrade-state file or database row.
+native Pi session reference before changing Git or Kubernetes. When an
+installation-owned declarative source exists, also preserve its exact prior
+release fields and secret-safe rendered comparison. The native session is the
+recovery record; create no upgrade-state file, shadow manifest or database row.
 
-Build the smallest patch from the observed live workload instead of replacing
-its installation-specific manifest. Preview it against the live API and inspect
-the structured diff. Permit only:
+When an installation-owned declarative source exists, change the release fields
+there and render it through its native Kustomize or resource path. When none
+exists, build the smallest patch from the observed live workload and record
+that boundary instead of inventing a persistent source. Preview the resulting
+resource against the live API and inspect the complete structured diff. Permit
+only:
 
 - every AgentOS init and runtime container image changing to the same verified
   release index digest;
@@ -111,13 +136,32 @@ annotations. Any other diff requires separate authority or a smaller patch.
 
 1. Switch the clean persistent checkout to the verified release tag without
    deleting the previous branch.
-2. Apply the reviewed patch once to the named Mate.
+2. Apply the reviewed rendered source or live patch once to the named Mate.
 3. Wait for that StatefulSet rollout within a bounded deadline.
 
 The expected single Pod replacement belongs to the StatefulSet's
 `RollingUpdate`. Do not manually delete the Pod, invoke another restart, update
 another Mate, create a second harness writer, copy the checkout into the image
 seed, or broaden the operation because the rollout is temporarily unavailable.
+
+## Diagnose a failed rollout
+
+If the bounded rollout wait fails or the replacement is not Ready, preserve
+secret-safe evidence before recovery:
+
+- StatefulSet observed generation, current and update ControllerRevisions;
+- target Pod ownership, phase, scheduling state and bounded events;
+- every init and runtime container's state, reason, exit code, restart count,
+  desired image and observed image ID;
+- bounded current and previous logs for the failed container without Secret
+  values;
+- the retained home PVC identity; and
+- Herdr and native Pi session identity when the runtime reached those layers.
+
+Classify the first failed boundary as scheduling, image retrieval, init,
+runtime, readiness or native-session recovery. Do not hide it with a live
+dependency workaround, `NODE_PATH` change, PVC patch, credential change,
+unreviewed environment mutation, manual Pod deletion or update to another Mate.
 
 ## Finish verification before supervision
 
@@ -139,6 +183,8 @@ Verify:
   requested version;
 - `agentos.akua.dev/source-revision` is absent from StatefulSet and Pod
   template;
+- any installation-owned declarative source renders the same selected release
+  identity and preserved wiring now observed on the live StatefulSet;
 - the current StatefulSet generation is observed and the replacement Pod is
   Ready;
 - exactly one StatefulSet-owned target Pod remains and the prior Pod is no
@@ -148,21 +194,24 @@ Verify:
 - all recorded installation-specific Pod-template wiring remains.
 
 Report the exact version, commit, release index and platform digests, readiness,
-PVC and session evidence, and every deliberately deferred database or Fleet
-update. Inside a Fleet rollout, return that result without selecting another
-member. Otherwise, reconcile and re-arm ordinary supervision only after the
-report.
+database result, declarative/live source result, PVC and session evidence, and
+every deliberately deferred Fleet update. Inside a Fleet rollout, return that
+result without selecting another member. Otherwise, reconcile and re-arm
+ordinary supervision only after the report.
 
 ## Roll back visibly
 
-If failure occurs before Pod replacement, restore whichever of checkout or
-workload state changed and verify the original runtime.
+If failure occurs before Pod replacement, restore whichever of checkout,
+installation-owned declarative source or workload state changed and verify the
+original source/live agreement and runtime.
 
 If the replacement fails readiness or session recovery, preserve the failed-Pod
-evidence. Restore the prior checkout reference and immutable images for the same
+evidence from the diagnostic boundary. Restore the prior checkout reference,
+installation-owned declarative release fields and immutable images for the same
 Mate only under the recovery owner's authority. A rollback requiring another
 Pod replacement needs separate authority; the original upgrade instruction
-does not grant it. After an authorized restore, verify the prior checkout and
+does not grant it. After an authorized restore, verify the prior declarative
+source renders the restored live release and wiring, the prior checkout and
 image-seed commits, every desired image reference and observed image ID against
 the prior release's platform members, the prior version and source metadata,
 StatefulSet generation and readiness, the original home PVC UID and native Pi
@@ -171,7 +220,7 @@ before reporting recovery. If any restored-runtime check is unverified, report
 that boundary and the exact live state instead of declaring rollback complete.
 
 Report the first unverified boundary. Do not add credentials, change RBAC,
-apply a migration, update another Mate, create a replacement Agent or perform
+replay a migration, update another Mate, create a replacement Agent or perform
 an unapproved second restart to hide failure. If the recovery owner cannot
 restore prior state, leave the evidence intact and report the exact live state
 to the Captain.
