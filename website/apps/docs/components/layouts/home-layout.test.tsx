@@ -22,7 +22,7 @@ describe('home layout', () => {
         useParams={() => ({})}
         useRouter={() => ({ push: () => {}, refresh: () => {} })}
       >
-        <Layout>
+        <Layout params={Promise.resolve({})}>
           <p>Content</p>
         </Layout>
       </FrameworkProvider>,
