@@ -3,17 +3,22 @@
 import { Menu, X } from 'lucide-react';
 import { useRef } from 'react';
 import type { Curriculum } from '@/lib/learn/curriculum';
-import { CurriculumNavigation } from './learn-sidebar';
+import { CurriculumNavigation, type LearnSelection } from './learn-sidebar';
 
 export function LearnDrawer({
   curriculum,
-  selectedLessonId,
+  selection,
 }: {
   curriculum: Curriculum;
-  selectedLessonId?: string;
+  selection: LearnSelection;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLButtonElement>(null);
+  const selectedTitle =
+    selection.kind === 'introduction'
+      ? 'Introduction'
+      : (curriculum.lessons.find((lesson) => lesson.lessonId === selection.lessonId)?.title ??
+        'AgentOS Learn');
 
   function close() {
     dialogRef.current?.close();
@@ -21,10 +26,7 @@ export function LearnDrawer({
 
   return (
     <div className="sticky top-14 z-20 flex items-center justify-between border-y bg-fd-background/95 px-4 py-2 backdrop-blur lg:hidden">
-      <p className="truncate text-sm font-medium">
-        {curriculum.lessons.find((lesson) => lesson.lessonId === selectedLessonId)?.title ??
-          'Course map'}
-      </p>
+      <p className="truncate text-sm font-medium">{selectedTitle}</p>
       <button
         ref={openerRef}
         type="button"
@@ -54,7 +56,7 @@ export function LearnDrawer({
         <div className="h-[calc(100dvh-57px)] overflow-y-auto px-3 py-6">
           <CurriculumNavigation
             curriculum={curriculum}
-            selectedLessonId={selectedLessonId}
+            selection={selection}
             onNavigate={close}
           />
         </div>

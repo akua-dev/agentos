@@ -20,9 +20,15 @@ export function LearnLayout({
 
   return (
     <>
-      <LearnDrawer curriculum={curriculum} selectedLessonId={lesson.lessonId} />
+      <LearnDrawer
+        curriculum={curriculum}
+        selection={{ kind: 'lesson', lessonId: lesson.lessonId }}
+      />
       <div className="mx-auto grid w-full max-w-[1600px] lg:grid-cols-[290px_minmax(0,1fr)] xl:grid-cols-[290px_minmax(0,1fr)_250px]">
-        <LearnSidebar curriculum={curriculum} selectedLessonId={lesson.lessonId} />
+        <LearnSidebar
+          curriculum={curriculum}
+          selection={{ kind: 'lesson', lessonId: lesson.lessonId }}
+        />
         <main className="min-w-0 px-5 py-10 sm:px-8 lg:px-12 xl:px-16">{children}</main>
         <aside className="sticky top-16 hidden h-[calc(100dvh-4rem)] overflow-y-auto border-l px-6 py-8 xl:block">
           <p className="mb-3 text-xs font-medium tracking-wide text-fd-muted-foreground uppercase">
