@@ -5,7 +5,7 @@
   "type": "module",
   "sideEffects": false,
   "keywords": ["pi-package"],
-  "files": ["composition", "extensions", "resources", "skills", "README.md"],
+  "files": ["composition", "extensions", "resources", "runtime", "skills", "README.md"],
   "pi": {
     "extensions": ["./extensions/agentos.ts"],
     "skills": ["./skills"]

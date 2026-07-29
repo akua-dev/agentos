@@ -273,6 +273,60 @@ describe("publishable AgentOS Pi artifacts", () => {
       ),
     ).rejects.toThrow();
 
+    const nativeResourceRoots = [
+      join(installedDefault, "resources", "roles", "firstmate"),
+      join(installedDefault, "resources", "roles", "secondmate"),
+      join(installedDefault, "resources", "crewmates", "default"),
+    ];
+    for (const resourceRoot of nativeResourceRoots) {
+      const mise = Bun.TOML.parse(
+        await readFile(join(resourceRoot, "mise.toml"), "utf8"),
+      ) as { tasks: Record<string, { file: string }> };
+      await Promise.all(
+        Object.values(mise.tasks).map(({ file }) =>
+          access(resolve(resourceRoot, file)),
+        ),
+      );
+    }
+
+    const nativeKubernetesRoots = [
+      join(
+        installedDefault,
+        "resources",
+        "roles",
+        "firstmate",
+        "kubernetes",
+        "base",
+      ),
+      join(
+        installedDefault,
+        "resources",
+        "roles",
+        "secondmate",
+        "kubernetes",
+        "base",
+      ),
+      join(
+        installedDefault,
+        "resources",
+        "crewmates",
+        "default",
+        "kubernetes",
+        "base",
+      ),
+    ];
+    for (const kubernetesRoot of nativeKubernetesRoots) {
+      const rendered = await run(
+        ["kubectl", "kustomize", kubernetesRoot],
+        { cwd: installation },
+      );
+      expect(rendered).toEqual({
+        exitCode: 0,
+        stderr: "",
+        stdout: expect.any(String),
+      });
+    }
+
     const priorRole = process.env.AGENTOS_AGENT_ROLE;
     process.env.AGENTOS_AGENT_ROLE = "first_mate";
     try {

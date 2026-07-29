@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-agent
+  labels:
+    app.kubernetes.io/name: agentos-agent
+    app.kubernetes.io/part-of: agentos
+spec:
+  replicas: 1
+  serviceName: agentos-agent
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-agent
+  template:
+    metadata:
+      annotations:
+        agentos.akua.dev/container: agentos
+        agentos.akua.dev/herdr-session: agentos-agent
+      labels:
+        agentos.akua.dev/agent: agent
+        app.kubernetes.io/name: agentos-agent
+        app.kubernetes.io/part-of: agentos
+    spec:
+      serviceAccountName: agentos-agent
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: install-tools
+          image: agentos:dev
+          imagePullPolicy: Never
+          workingDir: /opt/agentos
+          command:
+            - mise
+          args:
+            - install
+            - --locked
+            - node
+            - kubectl
+            - github:ogulcancelik/herdr
+          env: &runtime-environment
+            - name: HOME
+              value: /home/agent
+            - name: AGENTOS_RELEASE_ROOT
+              value: /opt/agentos
+            - name: AGENTOS_AGENT_CWD
+              value: /opt/agentos
+            - name: AGENTOS_AGENT_NAME
+              value: agent
+            - name: AGENTOS_AGENT_ROLE
+              value: agent
+            - name: HERDR_CONFIG_PATH
+              value: /home/agent/.config/herdr/config.toml
+            - name: HERDR_SESSION
+              value: agentos-agent
+            - name: MISE_SYSTEM_CONFIG_FILE
+              value: /etc/mise/config.toml
+            - name: MISE_GITHUB_GITHUB_ATTESTATIONS
+              value: "false"
+            - name: MISE_GITHUB_SLSA
+              value: "false"
+            - name: MISE_TRUSTED_CONFIG_PATHS
+              value: /opt/agentos
+            - name: PATH
+              value: /home/agent/.local/share/mise/shims:/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts: &home-volume
+            - name: home
+              mountPath: /home/agent
+      containers:
+        - name: agentos
+          image: agentos:dev
+          imagePullPolicy: Never
+          workingDir: /opt/agentos
+          command:
+            - herdr
+          args:
+            - server
+            - --session
+            - agentos-agent
+          env: *runtime-environment
+          securityContext: *container-security
+          volumeMounts: *home-volume
+          livenessProbe:
+            exec:
+              command:
+                - herdr
+                - status
+                - --json
+                - --session
+                - agentos-agent
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - herdr
+                - status
+                - --json
+                - --session
+                - agentos-agent
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+  volumeClaimTemplates:
+    - metadata:
+        name: home
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi

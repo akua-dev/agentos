@@ -6,7 +6,7 @@ resources:
   - serviceaccount.yaml
   - rolebinding.yaml
   - service.yaml
-  - ../../../../../../../runtime/kubernetes/mate
+  - ../../../../../runtime/kubernetes/mate
 patches:
   - path: statefulset.patch.yaml
     target:

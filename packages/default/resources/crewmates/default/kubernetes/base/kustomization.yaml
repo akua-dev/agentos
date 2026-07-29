@@ -4,7 +4,7 @@ namespace: agentos
 resources:
   - serviceaccount.yaml
   - service.yaml
-  - ../../../../../../../runtime/kubernetes/base
+  - ../../../../../runtime/kubernetes/base
 patches:
   - path: statefulset.patch.yaml
     target:

@@ -185,10 +185,10 @@ RUN chmod 0644 \
     /opt/agentos/packages/default/resources/crewmates/default/BRIEF.md \
     /opt/agentos/packages/default/resources/roles/secondmate/mise.toml \
   && chmod 0755 \
-    /opt/agentos/runtime/prepare-home.ts \
+    /opt/agentos/packages/default/runtime/prepare-home.ts \
     /opt/agentos/runtime/create-image-seed.ts \
-    /opt/agentos/runtime/run-mate.ts \
-    /opt/agentos/runtime/health.ts \
+    /opt/agentos/packages/default/runtime/run-mate.ts \
+    /opt/agentos/packages/default/runtime/health.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \
   && chmod 0755 \
     /opt/agentos/clis/composition-verify/composition-verify.ts \

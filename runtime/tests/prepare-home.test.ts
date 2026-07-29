@@ -250,6 +250,75 @@ if (args.join(" ") === "integration install pi") {
     expect(await readFile(persistentMarker, "utf8")).toBe("unfinished work\n");
   });
 
+  test("materializes a selected distribution into an existing retained checkout", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "agentos-retained-distribution-"));
+    temporaryDirectories.push(sandbox);
+    const home = join(sandbox, "home");
+    const fakeBin = join(sandbox, "bin");
+    const logDirectory = join(sandbox, "logs");
+    const checkout = join(home, "projects", "agentos");
+    const oldRole = join(checkout, "agents", "firstmate");
+    const distributionRoot = join(checkout, "packages", "default");
+    const roleDirectory = join(
+      distributionRoot,
+      "resources",
+      "roles",
+      "firstmate",
+    );
+    await Promise.all([
+      mkdir(fakeBin, { recursive: true }),
+      mkdir(logDirectory, { recursive: true }),
+      mkdir(join(checkout, ".git"), { recursive: true }),
+      mkdir(oldRole, { recursive: true }),
+    ]);
+    await Promise.all([
+      writeFile(join(checkout, "mise.toml"), "[tools]\n", "utf8"),
+      writeFile(join(oldRole, "unfinished.md"), "keep me\n", "utf8"),
+    ]);
+    await Promise.all([
+      makeExecutable(
+        join(fakeBin, "mise"),
+        `#!/usr/bin/env bun
+import { appendFile } from "node:fs/promises";
+import { join } from "node:path";
+const args = process.argv.slice(2);
+if (args[0] === "trust" && !(await Bun.file(args.at(-1)!).exists())) {
+  process.exit(1);
+}
+await appendFile(
+  join(process.env.FAKE_LOG_DIRECTORY!, "mise.log"),
+  args.join(" ") + "\\n",
+);
+`,
+      ),
+      makeExecutable(
+        join(fakeBin, "herdr"),
+        `#!/usr/bin/env bun
+if (process.argv.slice(2).join(" ") !== "integration install pi") process.exit(1);
+`,
+      ),
+    ]);
+
+    const result = await run(prepareHome, {
+      AGENTOS_AGENT_CWD: roleDirectory,
+      AGENTOS_AGENT_ROLE: "first_mate",
+      AGENTOS_CHECKOUT: checkout,
+      AGENTOS_DISTRIBUTION_ROOT: distributionRoot,
+      AGENTOS_RELEASE_ROOT: repository,
+      FAKE_LOG_DIRECTORY: logDirectory,
+      HOME: home,
+      HERDR_CONFIG_PATH: join(home, ".config", "herdr", "config.toml"),
+      MISE_SYSTEM_CONFIG_FILE: join(repository, "mise.toml"),
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+    });
+
+    expect(result).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+    await expect(stat(roleDirectory)).resolves.toBeDefined();
+    expect(await readFile(join(oldRole, "unfinished.md"), "utf8")).toBe(
+      "keep me\n",
+    );
+  });
+
   test("does not infer a Mate distribution from the checkout or current directory", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "agentos-missing-distribution-"));
     temporaryDirectories.push(sandbox);
