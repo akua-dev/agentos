@@ -1,4 +1,5 @@
 import { access, readFile } from "node:fs/promises";
+import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -78,21 +79,24 @@ export async function loadPackagedRoleSetup(
   role: DefaultAgentOSRole,
   directory: "firstmate" | "secondmate",
 ): Promise<DefaultRoleSetupV1> {
-  const distributionRoot = fileURLToPath(
-    new URL("../../", import.meta.url),
-  );
-  const instructionsPath = fileURLToPath(
-    new URL(
-      `../../resources/roles/${directory}/instructions.md`,
-      import.meta.url,
-    ),
+  const distributionRoot = selectedDistributionRoot();
+  const instructionsPath = join(
+    distributionRoot,
+    "resources",
+    "roles",
+    directory,
+    "instructions.md",
   );
   const instructions = await readFile(instructionsPath, "utf8");
   if (!instructions.trim()) {
     throw new Error(`Required role instructions are empty: ${instructionsPath}`);
   }
-  const roleSkillsPath = fileURLToPath(
-    new URL(`../../resources/roles/${directory}/skills/`, import.meta.url),
+  const roleSkillsPath = join(
+    distributionRoot,
+    "resources",
+    "roles",
+    directory,
+    "skills",
   );
   const skillPaths = ["skills"];
   if (role === "first_mate") {
@@ -158,6 +162,17 @@ export async function loadPackagedRoleSetup(
       ],
     },
   };
+}
+
+function selectedDistributionRoot(): string {
+  const configuredRoot = process.env.AGENTOS_DISTRIBUTION_ROOT?.trim();
+  if (configuredRoot) {
+    if (!isAbsolute(configuredRoot)) {
+      throw new Error("AGENTOS_DISTRIBUTION_ROOT must be an absolute path");
+    }
+    return configuredRoot;
+  }
+  return fileURLToPath(new URL("../../", import.meta.url));
 }
 
 function selectedRole(value: string | undefined): DefaultAgentOSRole {

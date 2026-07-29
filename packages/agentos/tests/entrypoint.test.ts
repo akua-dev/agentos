@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { resolve } from "node:path";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import {
   createDefaultAgentOSEntrypoint,
+  loadPackagedRoleSetup,
   type DefaultRoleSetupV1,
 } from "../src/roles/shared.ts";
 import type { AgentOSRegistrationV1 } from "@akua-dev/agentos";
@@ -142,6 +145,55 @@ describe("default AgentOS entrypoint", () => {
       'startup custom message type "@example/first_mate:unclaimed-startup" is not declared',
     );
     expect(fake.registrations).toEqual([]);
+  });
+
+  test("loads default role resources from the selected distribution", async () => {
+    const distributionRoot = await mkdtemp(
+      join(tmpdir(), "agentos-selected-distribution-"),
+    );
+    const roleDirectory = join(
+      distributionRoot,
+      "resources",
+      "roles",
+      "firstmate",
+    );
+    const packageRoot = resolve(import.meta.dir, "..");
+    const priorDistributionRoot = process.env.AGENTOS_DISTRIBUTION_ROOT;
+    try {
+      await mkdir(roleDirectory, { recursive: true });
+      await Promise.all([
+        cp(join(packageRoot, "skills"), join(distributionRoot, "skills"), {
+          recursive: true,
+        }),
+        cp(
+          join(packageRoot, "resources", "roles", "firstmate", "skills"),
+          join(roleDirectory, "skills"),
+          { recursive: true },
+        ),
+      ]);
+      await writeFile(
+        join(roleDirectory, "instructions.md"),
+        "Persistent selected role identity.\n",
+      );
+      process.env.AGENTOS_DISTRIBUTION_ROOT = distributionRoot;
+
+      const setup = await loadPackagedRoleSetup("first_mate", "firstmate");
+
+      expect(setup.instructions[0]?.content).toBe(
+        "Persistent selected role identity.\n",
+      );
+      expect(setup.resources.skillPaths).toEqual([
+        join(distributionRoot, "skills"),
+        join(roleDirectory, "skills"),
+      ]);
+    } finally {
+      if (priorDistributionRoot === undefined) {
+        delete process.env.AGENTOS_DISTRIBUTION_ROOT;
+      } else {
+        process.env.AGENTOS_DISTRIBUTION_ROOT = priorDistributionRoot;
+      }
+      await rm(distributionRoot, { recursive: true, force: true });
+    }
   });
 
   for (const role of ["first_mate", "second_mate"] as const) {
