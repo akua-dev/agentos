@@ -41,7 +41,9 @@ Use the official provider and Git origins to require all of these:
 - a published, non-draft, non-prerelease semantic-version release;
 - a release tag that resolves to one exact commit on the official default
   branch;
-- an immutable multi-platform AgentOS image digest published by that release;
+- an immutable multi-platform AgentOS image index digest published by that
+  release, with its platform manifest members resolved through native registry
+  inspection;
   and
 - the appropriate fixed-name First-Mate release asset when First Mate is the
   target, with its version and every AgentOS image matching the release.
@@ -74,6 +76,11 @@ durable native harness session:
 - effective replica count and target Pod; require exactly one desired replica
   and exactly one healthy, non-terminating StatefulSet-owned target Pod, and
   stop before mutation for a scaled, extra, missing or ambiguous Pod;
+- effective image pull policy for every target AgentOS init and runtime
+  container; require `Always` or `IfNotPresent`, and verify that the target
+  runtime either already has the exact release digest or can pull it through
+  the approved native registry path. Stop before mutation for `Never`, any
+  other policy, or unverified pull access. Preserve this policy in the patch;
 - observed Pod image IDs, readiness and restart counts;
 - home PVC name, UID and bound volume;
 - Herdr session, Mate handle, pane and native harness session reference; and
@@ -115,7 +122,8 @@ the structured diff. It may change only:
 
 Preserve PVC templates, mounts, environment, credentials, ServiceAccount,
 RBAC, database wiring, probes, resources and unrelated annotations. Any other
-diff requires separate authority or a smaller patch.
+diff requires separate authority or a smaller patch. Image pull policy is not
+an allowed patch field; changing it requires separate authority.
 
 ## Activate one Mate once
 
@@ -143,7 +151,11 @@ authority before any rollback that would require another Pod replacement.
 Verify:
 
 - the persistent checkout and image-seed commits equal the release commit;
-- every desired and observed AgentOS image equals the release digest;
+- every desired AgentOS image reference equals the release multi-platform image
+  index digest;
+- every observed AgentOS image ID resolves to a platform manifest digest listed
+  by that release index; report the index digest together with each observed
+  platform and member digest;
 - the StatefulSet and Pod-template `app.kubernetes.io/version` labels equal
   the requested version;
 - every AgentOS image reports `org.opencontainers.image.version` equal to the
@@ -157,9 +169,10 @@ Verify:
 - the original home PVC UID and native harness session reference remain;
 - all recorded installation-specific Pod-template wiring remains.
 
-Report the exact version, commit, digest, readiness, PVC and session evidence,
-plus every deliberately deferred database or Fleet update. Only after that
-report may the Mate reconcile and re-arm normal supervision.
+Report the exact version, commit, release index digest, platform manifest
+digests, readiness, PVC and session evidence, plus every deliberately deferred
+database or Fleet update. Only after that report may the Mate reconcile and
+re-arm normal supervision.
 
 ## Roll back visibly
 
