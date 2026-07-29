@@ -136,6 +136,7 @@ COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
 COPY packages/agentos/tsconfig.build.json packages/agentos/tsconfig.build.json
+COPY packages/agentos/build.ts packages/agentos/build.ts
 COPY packages/agentos/src packages/agentos/src
 
 RUN bun install \
