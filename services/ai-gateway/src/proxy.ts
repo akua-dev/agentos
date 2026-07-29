@@ -221,15 +221,16 @@ function streamWithLease(
         chunksForwarded = boundedAdd(chunksForwarded, 1);
         bytesForwarded = boundedAdd(bytesForwarded, next.value.byteLength);
       } catch (error) {
-        await finish();
-        await reportStreamFailure(observeStreamFailure, {
+        const observation: StreamFailureObservation = {
           event: "upstream_stream_failure",
           upstreamEncoding,
           failureKind: classifyStreamFailure(error, upstreamEncoding),
           chunksForwarded,
           bytesForwarded,
-        });
+        };
         controller.error(error);
+        void reportStreamFailure(observeStreamFailure, observation);
+        await finish();
       }
     },
     async cancel(reason) {

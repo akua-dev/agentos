@@ -211,6 +211,51 @@ describe("authenticated raw Responses proxy", () => {
     expect(released).toBe(true);
   });
 
+  test("does not delay stream failures for an asynchronous observer", async () => {
+    let observationStarted = false;
+    let resolveObservation: (() => void) | undefined;
+    const observationPending = new Promise<void>((resolve) => {
+      resolveObservation = resolve;
+    });
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => undefined,
+      }),
+      fetchImpl: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.error(new Error("upstream stream failed"));
+            },
+          }),
+        ),
+      observeStreamFailure() {
+        observationStarted = true;
+        return observationPending;
+      },
+    });
+
+    const response = await handler(request());
+    const readOutcome = response.arrayBuffer().then(
+      () => "completed" as const,
+      () => "failed" as const,
+    );
+    const outcome = await Promise.race([
+      readOutcome,
+      Bun.sleep(100).then(() => "blocked" as const),
+    ]);
+    resolveObservation?.();
+
+    expect(outcome).toBe("failed");
+    expect(observationStarted).toBe(true);
+  });
+
   test("accepts and strips the dedicated Fleet client headers", async () => {
     let upstream: Request | undefined;
     const handler = createProxyHandler({
