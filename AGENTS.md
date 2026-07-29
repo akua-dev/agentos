@@ -24,6 +24,11 @@ Repository-wide constraints:
   mechanics in versioned SQL or TypeScript, and contributor procedure in
   `CONTRIBUTING.md`. Other documentation may link or give one deliberate risk
   reminder, but must not duplicate the workflow.
+- In Agent-facing surfaces such as `AGENTS.md`, role instructions and Skills,
+  route to a discoverable Skill with its exact `$skill-name`. Do not use a
+  Markdown link to `SKILL.md` for invocation or routing. Contributor
+  documentation may link to Skill source when discussing implementation or
+  ownership, and external source citations may retain links.
 - Use PostgreSQL, Kubernetes, Herdr, Git, PVCs and provider tools through their
   native interfaces. Do not introduce an AgentOS CLI wrapper, shadow state,
   daemon, controller or background service without an explicitly reviewed

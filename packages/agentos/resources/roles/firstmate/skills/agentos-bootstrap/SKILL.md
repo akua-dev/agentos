@@ -38,9 +38,9 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
 
 1. Establish the chosen target before installing AgentOS. For vCluster, create it in a dedicated host namespace with explicit host-cluster approval, enable reviewed Pod Security, resource, and network policies supported by that host, and keep a separate explicit kubeconfig or context for its API. Verify that cluster-admin inside the vCluster cannot administer the host API. Do not claim hard isolation when workloads still share host nodes or when the host CNI cannot enforce the selected NetworkPolicy.
 2. Explain the namespace-scoped `agentos-firstmate.yaml` and the dedicated-target `agentos-firstmate-cluster-admin.yaml`, including the recovery operations unavailable in scoped mode. A dedicated real cluster or isolated vCluster normally uses cluster-admin inside that target; a direct shared host installation requires a separate explicit decision. Ask for the selected RBAC and installation approval.
-3. Load [AgentOS Runtime](../../../../../skills/agentos-runtime/SKILL.md). Apply the selected stable release URL or reviewed local preview manifest with `kubectl --context <target-context> apply -f <source>`. Never apply the AgentOS manifest through the host context when vCluster was selected.
+3. Load `$agentos-runtime`. Apply the selected stable release URL or reviewed local preview manifest with `kubectl --context <target-context> apply -f <source>`. Never apply the AgentOS manifest through the host context when vCluster was selected.
 4. Wait for the StatefulSet and verify a bound retained PVC, two successful sequential init containers, one running First Mate container, exactly one Herdr agent named `firstmate`, and the selected image digest on all three containers.
-5. Load [AgentOS Authentication](../../../../../skills/agentos-auth/SKILL.md). Authenticate Pi inside the persistent pod and verify a harmless real model request.
+5. Load `$agentos-auth`. Authenticate Pi inside the persistent pod and verify a harmless real model request.
    When the Captain selects a concrete First-Mate model or thinking level after
    the initial Pi session already exists, apply it through Pi's native live
    interface and verify the effective live profile; writing `settings.json`
@@ -50,10 +50,10 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
    it, and either path needs its own approval.
 6. Replace the Pod once. Verify the same PVC identity, an Agent-home marker, exactly one First Mate pane, the same native Pi session and ordinary Mise tool resolution from a foreign worktree. If a GitHub App was selected, verify that only First Mate received its Secret mount and prove one harmless short-lived-token read after replacement.
 7. Attach the developer to the persistent First Mate, hand it authority and stop the local seed from performing competing Fleet work.
-8. From the cluster First Mate, load [AgentOS Database](../../../../../skills/agentos-database/SKILL.md). Present external PostgreSQL and self-hosted CloudNativePG without an implicit preference. After the developer chooses, use the released AgentOS database shape and apply its SQL assets as the selected Fleet-owner login; the migrations create or adopt the root First-Mate row and bind it to that same login. Do not create a separate migrator or manually map First Mate. For self-hosting, discover and verify the current compatible official CNPG and PostgreSQL releases before requesting installation approval.
+8. From the cluster First Mate, load `$agentos-database`. Present external PostgreSQL and self-hosted CloudNativePG without an implicit preference. After the developer chooses, use the released AgentOS database shape and apply its SQL assets as the selected Fleet-owner login; the migrations create or adopt the root First-Mate row and bind it to that same login. Do not create a separate migrator or manually map First Mate. For self-hosting, discover and verify the current compatible official CNPG and PostgreSQL releases before requesting installation approval.
 9. After Fleet identity exists, present the model-capacity posture for workers
    and trusted harness automation. Recommend the optional
-   [Fleet AI Gateway](../../../../../skills/agentos-ai-gateway/SKILL.md)
+   `$agentos-ai-gateway`
    for a delegation-ready Fleet; keep direct authentication owned separately by
    every Agent harness as the complete minimal alternative and recovery path.
    Explain the gateway's additional service, retained credential authority,
@@ -90,12 +90,10 @@ change. Never overwrite a dirty or divergent checkout, strand an Assignment or
 assume that deleting a workload also retires its durable Agent identity.
 
 For an exact stable update of First Mate, one managed persistent Mate, or all
-active persistent Mates, load
-[AgentOS Upgrade](../../../../../skills/agentos-upgrade/SKILL.md). That Skill
-owns release verification, run-once sequencing of the selected release's
-required database migrations through
-[AgentOS Database](../../../../../skills/agentos-database/SKILL.md), atomic
-declarative/live workload replacement, Fleet ordering and rollback boundaries.
+active persistent Mates, load `$agentos-upgrade`. That Skill owns release
+verification, run-once sequencing of the selected release's required database
+migrations through `$agentos-database`, atomic declarative/live workload
+replacement, Fleet ordering and rollback boundaries.
 The exact stable-upgrade authority covers those released migrations without a
 second approval; it does not cover database topology or improvised repair.
 Exact-commit dogfood remains an AgentOS development workflow rather than an
@@ -119,6 +117,9 @@ or unintended cluster-wide grant remains; report retained PVCs, database state
 and credentials rather than calling a state-retaining removal complete data
 deletion.
 
-If bootstrap or later dogfooding needs a private image path, load [AgentOS Image Builds](../../../../../skills/agentos-image-builds/SKILL.md) and [AgentOS Registry](../../../../../skills/agentos-registry/SKILL.md). Do not install a builder or registry merely because AgentOS itself is being installed from a public immutable image.
+If bootstrap or later dogfooding needs a private image path, load
+`$agentos-image-builds` and `$agentos-registry`. Do not install a builder or
+registry merely because AgentOS itself is being installed from a public
+immutable image.
 
 Repeat safely from the first incomplete verified boundary after interruption.
