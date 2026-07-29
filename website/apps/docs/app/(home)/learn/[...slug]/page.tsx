@@ -31,9 +31,9 @@ export default async function Page(props: PageProps<'/learn/[...slug]'>) {
       lesson={lesson}
       toc={toc}
     >
-      <article className="mx-auto max-w-[74ch]">
+      <article className="mx-auto max-w-[704px]">
         <LessonHeader lesson={lesson} />
-        <details className="mb-8 rounded-xl border p-4 xl:hidden">
+        <details className="mb-7 rounded-lg border p-4 xl:hidden">
           <summary className="cursor-pointer font-medium">Chapter outline</summary>
           <ul className="mt-3 space-y-2 text-sm">
             {toc.map((item) => (
@@ -49,7 +49,7 @@ export default async function Page(props: PageProps<'/learn/[...slug]'>) {
         <div className="prose max-w-none text-fd-foreground/90">
           <Mdx components={getMDXComponents()} />
         </div>
-        <div className="mt-8 xl:hidden">
+        <div className="mt-7 xl:hidden">
           <LessonProgress
             lessonId={lesson.lessonId}
             validLessonIds={curriculum.lessons.map((item) => item.lessonId)}

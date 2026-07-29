@@ -10,11 +10,11 @@ export function LessonNavigation({
   next?: Lesson;
 }) {
   return (
-    <nav aria-label="Lesson navigation" className="mt-14 grid gap-4 border-t pt-7 sm:grid-cols-2">
+    <nav aria-label="Lesson navigation" className="mt-10 grid gap-3 border-t pt-6 sm:grid-cols-2">
       {previous ? (
         <Link
           href={previous.url}
-          className="rounded-xl border p-4 transition-colors hover:bg-fd-accent"
+          className="min-h-20 rounded-lg border p-3.5 transition-colors hover:bg-fd-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           <span className="mb-2 flex items-center gap-1 text-xs text-fd-muted-foreground">
             <ArrowLeft className="size-3.5" aria-hidden /> Previous
@@ -24,7 +24,7 @@ export function LessonNavigation({
       ) : (
         <Link
           href="/learn"
-          className="rounded-xl border p-4 transition-colors hover:bg-fd-accent"
+          className="min-h-20 rounded-lg border p-3.5 transition-colors hover:bg-fd-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           <span className="mb-2 flex items-center gap-1 text-xs text-fd-muted-foreground">
             <ArrowLeft className="size-3.5" aria-hidden /> Previous
@@ -35,7 +35,7 @@ export function LessonNavigation({
       {next ? (
         <Link
           href={next.url}
-          className="rounded-xl border p-4 text-right transition-colors hover:bg-fd-accent"
+          className="min-h-20 rounded-lg border p-3.5 text-right transition-colors hover:bg-fd-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           <span className="mb-2 flex items-center justify-end gap-1 text-xs text-fd-muted-foreground">
             Next <ArrowRight className="size-3.5" aria-hidden />
@@ -45,7 +45,7 @@ export function LessonNavigation({
       ) : (
         <Link
           href="/learn"
-          className="rounded-xl border p-4 text-right transition-colors hover:bg-fd-accent"
+          className="min-h-20 rounded-lg border p-3.5 text-right transition-colors hover:bg-fd-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           <span className="mb-2 block text-xs text-fd-muted-foreground">Finished</span>
           <span className="font-medium">Review the course introduction</span>
