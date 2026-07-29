@@ -4,7 +4,6 @@ import {
   chmod,
   mkdir,
   mkdtemp,
-  open,
   rename,
   rm,
   symlink,
@@ -288,31 +287,40 @@ describe("composition material digest", () => {
     );
   });
 
-  test("rejects a same-size file change while streaming its digest", async () => {
+  test("rejects a same-size file change from another process while streaming its digest", async () => {
     const directory = await temporaryDirectory("agentos-composition-race-");
     const path = join(directory, "large.bin");
+    const readyPath = join(directory, "mutator-ready");
+    const mutatorPath = join(directory, "mutator.ts");
     await writeFile(path, "");
     await truncate(path, 64 * 1024 * 1024);
+    await writeFile(
+      mutatorPath,
+      `import { open, writeFile } from "node:fs/promises";
+const handle = await open(process.argv[2]!, "r+");
+await writeFile(process.argv[3]!, "ready\\n", "utf8");
+let byte = 0;
+while (true) {
+  await handle.write(Uint8Array.of(byte++ % 256), 0, 1, 0);
+  await handle.sync();
+}
+`,
+      "utf8",
+    );
 
-    const handle = await open(path, "r+");
-    let keepChanging = true;
-    const changing = (async () => {
-      let byte = 0;
-      while (keepChanging) {
-        await handle.write(Uint8Array.of(byte++ % 256), 0, 1, 0);
-        await handle.sync();
-        await Bun.sleep(1);
-      }
-      await handle.close();
-    })();
+    const mutator = Bun.spawn([process.execPath, mutatorPath, path, readyPath], {
+      stderr: "pipe",
+      stdout: "ignore",
+    });
 
     try {
+      await waitForFile(readyPath);
       await expect(digestMaterialDirectory(directory)).rejects.toThrow(
         /changed while hashing|changed path identity while reading/,
       );
     } finally {
-      keepChanging = false;
-      await changing;
+      mutator.kill();
+      await mutator.exited;
     }
   });
 
@@ -361,4 +369,13 @@ async function temporaryDirectory(prefix: string) {
   const directory = await mkdtemp(join(tmpdir(), prefix));
   temporaryDirectories.push(directory);
   return directory;
+}
+
+async function waitForFile(path: string, timeout = 3_000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (await Bun.file(path).exists()) return;
+    await Bun.sleep(5);
+  }
+  throw new Error(`Timed out waiting for ${path}`);
 }
