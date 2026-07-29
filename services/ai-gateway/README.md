@@ -23,5 +23,14 @@ files and are observed by the running Bun service without a Caddy, Envoy or
 other dynamic-route control plane. Provider adapters and selection semantics
 remain reviewed source delivered through the normal image lifecycle.
 
+The request plane asks the upstream for `identity` content encoding. Bun Fetch
+decodes encoded responses before exposing their body while retaining the
+upstream encoding header; avoiding that decoder removes a failure boundary for
+long response streams, and the proxy still strips stale response encoding and
+length headers. If an upstream body read fails, the gateway records only a
+bounded failure kind, an `identity`/`encoded` bucket, and saturated chunk and
+byte counters. It never records the error text, URL, headers, body or provider
+identity.
+
 The package, executable, Kubernetes resources, Service DNS, Secret, PVC path,
 environment and client headers consistently use the `ai-gateway` identity.
