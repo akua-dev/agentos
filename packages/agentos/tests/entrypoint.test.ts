@@ -7,7 +7,7 @@ import {
   createDefaultAgentOSEntrypoint,
   loadPackagedRoleSetup,
   type DefaultRoleSetupV1,
-} from "../src/roles/shared.ts";
+} from "../src/roles/default.ts";
 import type { AgentOSRegistrationV1 } from "@akua-dev/agentos";
 import { createFakePi } from "./fake-pi.ts";
 

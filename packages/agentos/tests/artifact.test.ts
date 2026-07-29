@@ -251,6 +251,7 @@ describe("publishable AgentOS Pi artifacts", () => {
         join(installedAgentOS, "dist", "roles", "firstmate.js"),
         join(installedAgentOS, "dist", "roles", "secondmate.js"),
         join(installedAgentOS, "extensions", "agentos.ts"),
+        join(installedAgentOS, "runtime", "create-image-seed.ts"),
         join(installedAgentOS, "skills", "agentos-customization", "SKILL.md"),
         join(
           installedAgentOS,
@@ -294,6 +295,12 @@ describe("publishable AgentOS Pi artifacts", () => {
       ].map((path) => access(path)),
     );
     await expect(access(join(installedAgentOS, "prompts"))).rejects.toThrow();
+    await expect(
+      access(join(installedAgentOS, "dist", "runtime.js")),
+    ).rejects.toThrow();
+    await expect(
+      access(join(installedAgentOS, "dist", "roles", "shared.js")),
+    ).rejects.toThrow();
     await expect(
       access(
         join(

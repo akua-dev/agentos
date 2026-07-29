@@ -13,7 +13,7 @@ running Second-Mate identity.
   specific.
 - Keep role-specific native workload identity, RBAC, credentials, working
   directory and task selection here while this distribution's shared Mate
-  lifecycle stays under `runtime/kubernetes/mate/` and its executable lifecycle
-  stays under `runtime/`.
+  lifecycle stays under `packages/agentos/runtime/kubernetes/mate/` and its
+  executable lifecycle stays under `packages/agentos/runtime/`.
 - Test instruction injection, Skill discovery, Mise selection and rendered
   Kubernetes behavior through their public or native interfaces.

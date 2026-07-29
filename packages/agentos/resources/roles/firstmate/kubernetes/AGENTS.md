@@ -7,8 +7,8 @@ operate it belongs in RBAC and Skills, not in this directory's ownership.
 
 - Keep resources declarative and renderable with native Kustomize and kubectl.
 - Patch the shared Pi lifecycle from this distribution's
-  `runtime/kubernetes/mate`; keep only First-Mate identity, working directory,
-  tasks and authority here.
+  `packages/agentos/runtime/kubernetes/mate`; keep only First-Mate identity,
+  working directory, tasks and authority here.
 - The base must remain namespaced and retain the agent home PVC.
 - Cluster-admin is a separate, explicitly approved overlay.
 - Do not encode provider, model or thinking defaults in Kubernetes resources.

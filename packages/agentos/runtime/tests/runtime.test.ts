@@ -19,11 +19,11 @@ type Agent = {
   pane_id?: string;
 };
 
-const repository = new URL("../..", import.meta.url).pathname.replace(
+const repository = new URL("../../../..", import.meta.url).pathname.replace(
   /\/$/,
   "",
 );
-const mateRuntime = join(repository, "runtime");
+const mateRuntime = join(repository, "packages", "agentos", "runtime");
 const runMate = join(mateRuntime, "run-mate.ts");
 const health = join(mateRuntime, "health.ts");
 const defaultDistributionRoot = join(repository, "packages", "agentos");

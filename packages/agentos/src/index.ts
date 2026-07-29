@@ -12,7 +12,7 @@ export {
   type DefaultAgentOSEntrypointOptions,
   type DefaultAgentOSRole,
   type DefaultRoleSetupV1,
-} from "./roles/shared.ts";
+} from "./roles/default.ts";
 export {
   createAgentOSBackgroundTasksRegistration,
   createAgentOSMateMemoryRegistration,

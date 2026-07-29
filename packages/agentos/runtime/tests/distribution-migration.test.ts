@@ -21,7 +21,7 @@ type Resource = {
   spec?: Record<string, any>;
 };
 
-const repository = new URL("../..", import.meta.url).pathname.replace(
+const repository = new URL("../../../..", import.meta.url).pathname.replace(
   /\/$/,
   "",
 );

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createDefaultAgentOSEntrypoint } from "../src/roles/shared.ts";
+import { createDefaultAgentOSEntrypoint } from "../src/roles/default.ts";
 import { loadFirstMateSetup } from "../src/roles/firstmate.ts";
 import { loadSecondMateSetup } from "../src/roles/secondmate.ts";
 import { createFakePi } from "./fake-pi.ts";

@@ -5,8 +5,9 @@ This subtree owns the reusable separate-Pod Crewmate workload base.
 - First or Second Mate creates a reviewed per-agent overlay and invokes native
   kubectl; Crewmates never create other agents.
 - Patch retained-home and Pod-security mechanics from this distribution's
-  `runtime/kubernetes/base`; keep Assignment identity, database credentials,
-  selected tools, harness commands and role-specific probes here.
+  `packages/agentos/runtime/kubernetes/base`; keep Assignment identity,
+  database credentials, selected tools, harness commands and role-specific
+  probes here.
 - Require a distinct ServiceAccount, home PVC, database identity, selected
   image and pod-local Herdr session.
 - Start the selected harness with its native command through Herdr only after

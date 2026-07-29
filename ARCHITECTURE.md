@@ -733,7 +733,7 @@ workspace. The tree reflects ownership, not deployment order:
 │   └── agentos/                      public API and Pi-native distribution
 │       ├── extensions/agentos.ts     sole Pi-discovered AgentOS entrypoint
 │       ├── src/                      inert API, registrations and role setups
-│       ├── runtime/                  default Mate lifecycle and runtime assets
+│       ├── runtime/                  lifecycle, K8s, image seed and tests
 │       ├── skills/                   shared operational Skills
 │       └── resources/
 │           ├── roles/                role identity, Skills, Mise and K8s
@@ -748,14 +748,6 @@ workspace. The tree reflects ownership, not deployment order:
 │   ├── migrations/                   released schema and authorization truth
 │   ├── runtime/                      deterministic migration preparation
 │   └── tests/                        behavioral PGlite contract tests
-├── runtime/
-│   ├── AGENTS.md                     shared persistent-Agent runtime boundary
-│   ├── kubernetes/base/              retained-home Agent StatefulSet
-│   ├── kubernetes/mate/              Pi lifecycle for First/Second Mate
-│   ├── create-image-seed.ts          typed image-seed builder
-│   ├── distribution.ts, pi-session.ts compatibility exports
-│   ├── health.ts, prepare-home.ts, run-mate.ts compatibility entrypoints
-│   └── tests/                        observable runtime behavior tests
 ├── services/
 │   ├── AGENTS.md                     admission boundary for optional services
 │   └── ai-gateway/                   service, tests and optional K8s topology
@@ -785,8 +777,9 @@ workspace. The tree reflects ownership, not deployment order:
   state and request lifecycle. Keep it authenticated, independently testable
   and outside Fleet coordination authority.
 - Put retained-home, Pod-security and role-neutral Herdr mechanics shared by
-  persistent Agents in `runtime/kubernetes/base/`. Add the persistent Pi Mate
-  lifecycle in `runtime/kubernetes/mate/`; put role identity, credentials,
+  persistent Agents in `packages/agentos/runtime/kubernetes/base/`. Add the
+  persistent Pi Mate lifecycle in
+  `packages/agentos/runtime/kubernetes/mate/`; put role identity, credentials,
   RBAC, harness choice and role-specific probes in the selected distribution's
   role resource directory.
 - Put released database objects, authorization and transactional coordination
@@ -802,16 +795,14 @@ workspace. The tree reflects ownership, not deployment order:
   ownership. Their generator, immutable release or ignored workspace remains
   authoritative.
 
-The retained-home StatefulSet shared by persistent Agents lives under the
-root `runtime/`; this is not an agent role, external CLI or generic importable
-runtime package. `runtime/kubernetes/base/` contains only semantics common to
-persistent Agents, while `runtime/kubernetes/mate/` adds Pi and Mate health
-behavior. The default distribution's executable First/Second-Mate lifecycle
-and its native runtime assets live under `packages/agentos/runtime/`; the root
-TypeScript entrypoints preserve the shared invocation paths. Each role owns
-its Kubernetes workload patch and surrounding ServiceAccount, Service,
-identity, credentials, harness choice and authority under its distribution
-role.
+The default distribution's executable First/Second-Mate lifecycle, image-seed
+builder, observable tests and shared native runtime assets live together under
+`packages/agentos/runtime/`; this is not an agent role, external CLI or generic
+importable runtime package. Its `kubernetes/base/` contains only semantics
+common to persistent Agents, while `kubernetes/mate/` adds Pi and Mate health
+behavior. Each role owns its Kubernetes workload patch and surrounding
+ServiceAccount, Service, identity, credentials, harness choice and authority
+under its distribution role.
 Stateless workers do not inherit the retained-home base. Optional component
 topology stays with that component even when First Mate is its normal operator.
 
@@ -875,11 +866,12 @@ workspace keeps one `bun.lock`.
 - `database/kubernetes/cloudnative-pg/` is authoritative only for the optional
   self-hosted CloudNativePG topology; it does not own SQL schema, controller
   installation or third-party version selection.
-- `runtime/AGENTS.md` governs shared container lifecycle mechanics without selecting an Agent role.
-- `runtime/kubernetes/base/` owns only the retained-home StatefulSet mechanics
-  shared by persistent Agents.
-- `runtime/kubernetes/mate/` owns the Pi and `mate:*` lifecycle shared by First
-  and Second Mate.
+- `packages/agentos/runtime/AGENTS.md` governs shared container lifecycle
+  mechanics without selecting an Agent role.
+- `packages/agentos/runtime/kubernetes/base/` owns only the retained-home
+  StatefulSet mechanics shared by persistent Agents.
+- `packages/agentos/runtime/kubernetes/mate/` owns the Pi and `mate:*`
+  lifecycle shared by First and Second Mate.
 - `packages/agentos/resources/roles/*/kubernetes/` and
   `packages/agentos/resources/crewmates/default/kubernetes/` are authoritative
   for the default distribution's role-owned Kubernetes patches and surrounding
@@ -891,10 +883,10 @@ workspace keeps one `bun.lock`.
 - `release/kubernetes/` is authoritative for human-readable
   First-Mate and database manifest rendering; stable generated assets belong
   to immutable GitHub releases, while previews remain exact-commit builds.
-- `runtime/` owns shared persistent-Agent Kubernetes mechanics, image-seed
-  creation and compatibility entrypoints; it does not select an Agent role.
 - `packages/agentos/runtime/` owns the default distribution's executable
-  First/Second-Mate lifecycle and its native runtime assets.
+  First/Second-Mate lifecycle, shared persistent-Agent Kubernetes mechanics,
+  image-seed creation and observable runtime tests; it does not select an Agent
+  role.
 - `database/migrations/` and its Drizzle migration journal are authoritative for database semantics, security and applied order; `database/drizzle.tooling.ts` is deliberately empty and non-authoritative.
 - Release assets pin exact versions, digests and checksums.
 - `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_SOURCES.md` are authoritative for redistributed third-party licensing and source offers.
@@ -913,5 +905,4 @@ Patching, linking, embedding Herdr source, or otherwise tightening that boundary
 AgentOS does not introduce autonomous schedulers, heartbeat infrastructure,
 AgentOS-specific Kubernetes CRDs or operators, a PostgreSQL wrapper API,
 prompt queues, universal traffic proxies, transcript-capturing AI gateways,
-task-specific PVCs, mandatory semantic indexing, or compatibility with the
-failed predecessor implementation.
+task-specific PVCs or mandatory semantic indexing.

@@ -22,10 +22,10 @@ new command.
   executable interface and failure behavior, not selected source strings.
 - Installation on `PATH` is an explicit image decision. A workspace package or
   executable bit alone does not make a command part of an AgentOS release.
-- Put reusable imported code and Pi behavior in `packages/`,
-  distribution-owned Mate lifecycle mechanics in that distribution's
-  `runtime/`, shared persistent-Agent mechanics and compatibility entrypoints
-  in root `runtime/`, and conditional usage guidance in one Agent Skill.
+- Put reusable imported code and Pi behavior in `packages/`, all
+  distribution-owned persistent-Agent lifecycle mechanics in that
+  distribution's `runtime/`, and conditional usage guidance in one Agent
+  Skill.
 
 ## Qualification examples
 

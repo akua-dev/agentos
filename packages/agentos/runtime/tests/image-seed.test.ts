@@ -4,8 +4,14 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const repository = new URL("../..", import.meta.url).pathname.replace(/\/$/, "");
-const createImageSeed = join(repository, "runtime", "create-image-seed.ts");
+const repository = new URL("../../../..", import.meta.url).pathname.replace(/\/$/, "");
+const createImageSeed = join(
+  repository,
+  "packages",
+  "agentos",
+  "runtime",
+  "create-image-seed.ts",
+);
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {

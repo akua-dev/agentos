@@ -93,7 +93,7 @@ ARG AGENTOS_GIT_UPSTREAM=https://github.com/akua-dev/agentos.git
 
 COPY . /tmp/agentos-source
 
-RUN bun /tmp/agentos-source/runtime/create-image-seed.ts \
+RUN bun /tmp/agentos-source/packages/agentos/runtime/create-image-seed.ts \
       --source /tmp/agentos-source \
       --output /opt/agentos-seed \
       --origin "$AGENTOS_GIT_REMOTE" \
@@ -171,7 +171,7 @@ RUN chmod 0644 \
     /opt/agentos/packages/agentos/resources/roles/secondmate/mise.toml \
   && chmod 0755 \
     /opt/agentos/packages/agentos/runtime/prepare-home.ts \
-    /opt/agentos/runtime/create-image-seed.ts \
+    /opt/agentos/packages/agentos/runtime/create-image-seed.ts \
     /opt/agentos/packages/agentos/runtime/run-mate.ts \
     /opt/agentos/packages/agentos/runtime/health.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \

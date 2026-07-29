@@ -12,11 +12,11 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-const repository = new URL("../..", import.meta.url).pathname.replace(
+const repository = new URL("../../../..", import.meta.url).pathname.replace(
   /\/$/,
   "",
 );
-const mateRuntime = join(repository, "runtime");
+const mateRuntime = join(repository, "packages", "agentos", "runtime");
 const prepareHome = join(mateRuntime, "prepare-home.ts");
 const temporaryDirectories: string[] = [];
 

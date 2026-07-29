@@ -20,9 +20,9 @@
     }
   },
   "scripts": {
-    "build": "tsc --project tsconfig.build.json",
+    "build": "bun ./build.ts",
     "prepack": "bun run build",
-    "test": "bun test tests src"
+    "test": "bun test tests src runtime/tests resources"
   },
   "pi": {
     "extensions": ["./extensions/agentos.ts"],

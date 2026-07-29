@@ -22,7 +22,6 @@
     "database/**/*.ts",
     "packages/**/*.ts",
     "release/**/*.ts",
-    "runtime/**/*.ts",
     "services/**/*.ts"
   ]
 }
