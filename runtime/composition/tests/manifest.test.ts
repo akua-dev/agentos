@@ -61,7 +61,7 @@ function manifest(): CompositionManifest {
         kind: "git",
         locator: "github.com/akua-dev/agentos",
         revision: "0123456789abcdef",
-        path: "agents/.agents/skills/agentos-composition",
+        path: "packages/default/skills/agentos-composition",
       },
       digest: `sha256:${"b".repeat(64)}`,
     },

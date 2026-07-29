@@ -52,7 +52,7 @@ function manifest(harness = "pi") {
       origin: {
         kind: "git",
         locator: "github.com/akua-dev/agentos",
-        path: "agents/.agents/skills/agentos-composition",
+        path: "packages/default/skills/agentos-composition",
         revision: "0123456789abcdef",
       },
       digest: `sha256:${"a".repeat(64)}`,

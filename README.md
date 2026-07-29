@@ -65,6 +65,20 @@ You need: a coding agent, a Kubernetes context (or let it help you create a
 disposable one), and a browser for provider login. You don't need: this repo,
 a CLI, Docker, Helm, or a PostgreSQL install.
 
+## Built to be customized
+
+Pi is AgentOS's extension host. A trusted organization package can add ordinary
+Pi behavior beside the released crew or replace the complete AgentOS
+distribution: role instructions, Skills, startup behavior, First- and
+Second-Mate Mise and Kubernetes resources, and Crewmate setups. The public
+`@agentos/pi` library exposes inert composition helpers while
+`@agentos/default` is the replaceable released distribution.
+
+Loading a package never implies that a database migration or workload rollout
+happened. Pi, PostgreSQL, Kubernetes, Herdr, Git, PVCs and providers remain
+separate native authorities. See [Customize AgentOS](./CUSTOMIZATION.md) for the
+package shape and the canonical Skill that guides safe selection and rollback.
+
 ## Benchmarks
 
 AgentOS does not ask you to trust an autonomy demo. We publish every benchmark

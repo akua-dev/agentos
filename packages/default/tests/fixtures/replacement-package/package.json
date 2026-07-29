@@ -1,0 +1,16 @@
+{
+  "name": "@example/agentos-replacement",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "keywords": ["pi-package"],
+  "pi": {
+    "extensions": ["./extensions/replacement.ts"],
+    "skills": ["./skills"]
+  },
+  "peerDependencies": {
+    "@agentos/pi": "^0.1.0",
+    "@earendil-works/pi-ai": "0.81.1",
+    "@earendil-works/pi-coding-agent": "0.81.1"
+  }
+}

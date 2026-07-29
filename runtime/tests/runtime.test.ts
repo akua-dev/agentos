@@ -18,6 +18,13 @@ const repository = new URL("../..", import.meta.url).pathname.replace(
 const mateRuntime = join(repository, "runtime");
 const runMate = join(mateRuntime, "run-mate.ts");
 const health = join(mateRuntime, "health.ts");
+const defaultDistributionRoot = join(repository, "packages", "default");
+const defaultFirstMateCwd = join(
+  defaultDistributionRoot,
+  "resources",
+  "roles",
+  "firstmate",
+);
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -128,9 +135,10 @@ if (args[0] === "server") {
   const env = {
     ...process.env,
     AGENTOS_RELEASE_ROOT: repository,
-    AGENTOS_AGENT_CWD: join(repository, "agents", "firstmate"),
+    AGENTOS_AGENT_CWD: defaultFirstMateCwd,
     AGENTOS_AGENT_NAME: "firstmate",
     AGENTOS_AGENT_ROLE: "first_mate",
+    AGENTOS_DISTRIBUTION_ROOT: defaultDistributionRoot,
     FAKE_HERDR_STATE: state,
     HERDR_SESSION: "agentos-firstmate-test",
     PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
@@ -179,12 +187,13 @@ describe("Mate runtime", () => {
       "start",
       "firstmate",
       "--cwd",
-      join(repository, "agents", "firstmate"),
+      defaultFirstMateCwd,
       "--no-focus",
       "--session",
       "agentos-firstmate-test",
       "--",
       "pi",
+      "--no-context-files",
     ];
 
     await waitFor(async () =>
@@ -203,7 +212,10 @@ describe("Mate runtime", () => {
   test("gives a persistent checkout access to release-installed dependencies", async () => {
     const releaseRoot = "/opt/agentos-test";
     const { env, state } = await createHarness([], {
-      AGENTOS_AGENT_CWD: "/home/agent/projects/agentos/agents/firstmate",
+      AGENTOS_AGENT_CWD:
+        "/home/agent/projects/agentos/packages/default/resources/roles/firstmate",
+      AGENTOS_DISTRIBUTION_ROOT:
+        "/home/agent/projects/agentos/packages/default",
       AGENTOS_RELEASE_ROOT: releaseRoot,
       NODE_PATH: "",
     });
@@ -241,15 +253,20 @@ describe("Mate runtime", () => {
       "utf8",
     );
     const persistentCheckout = join(releaseRoot, "persistent-checkout");
-    const extension = join(
-      persistentCheckout,
-      "agents",
+    const distributionRoot = join(persistentCheckout, "packages", "default");
+    const firstMateCwd = join(
+      distributionRoot,
+      "resources",
+      "roles",
       "firstmate",
+    );
+    const extension = join(
+      firstMateCwd,
       ".pi",
       "extensions",
       "agentos-mate-memory.mjs",
     );
-    await mkdir(join(persistentCheckout, "agents", "firstmate", ".pi", "extensions"), {
+    await mkdir(join(firstMateCwd, ".pi", "extensions"), {
       recursive: true,
     });
     await writeFile(
@@ -266,7 +283,8 @@ describe("Mate runtime", () => {
       "utf8",
     );
     const { env, state } = await createHarness([], {
-      AGENTOS_AGENT_CWD: join(persistentCheckout, "agents", "firstmate"),
+      AGENTOS_AGENT_CWD: firstMateCwd,
+      AGENTOS_DISTRIBUTION_ROOT: distributionRoot,
       AGENTOS_RELEASE_ROOT: releaseRoot,
       FAKE_PI_EXTENSION: extension,
       NODE_PATH: "",
@@ -286,7 +304,7 @@ describe("Mate runtime", () => {
   });
 
   test("triggers native restore instead of creating a second First Mate", async () => {
-    const cwd = join(repository, "agents", "firstmate");
+    const cwd = defaultFirstMateCwd;
     const { env, state } = await createHarness([]);
     const persistedSession = join(state, "current-session.jsonl");
     await writeFile(
@@ -344,7 +362,12 @@ describe("Mate runtime", () => {
     await writeFile(
       persistedSession,
       [
-        JSON.stringify({ cwd: "/opt/agentos/agents/firstmate", id: "session-1", type: "session", version: 3 }),
+        JSON.stringify({
+          cwd: "/opt/agentos/packages/default/resources/roles/firstmate",
+          id: "session-1",
+          type: "session",
+          version: 3,
+        }),
         JSON.stringify({ message: "preserve me", type: "message" }),
         "",
       ].join("\n"),
@@ -374,6 +397,7 @@ describe("Mate runtime", () => {
       "agentos-firstmate-test",
       "--",
       "pi",
+      "--no-context-files",
       "--session",
       persistedSession,
     ];
@@ -479,6 +503,50 @@ describe("Mate runtime", () => {
     ).toEqual([]);
   });
 
+  test("fails closed without an explicit distribution root", async () => {
+    const { env, state } = await createHarness([]);
+    const invalidEnvironment: Record<string, string | undefined> = {
+      ...env,
+      AGENTOS_DISTRIBUTION_ROOT: undefined,
+    };
+
+    const child = Bun.spawn([process.execPath, runMate], {
+      env: invalidEnvironment,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const [exitCode, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stderr).text(),
+    ]);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("AGENTOS_DISTRIBUTION_ROOT");
+    expect(await readCalls(state)).toEqual([]);
+  });
+
+  test("fails closed when the Pi working directory is outside the selected role", async () => {
+    const { env, state } = await createHarness([], {
+      AGENTOS_AGENT_CWD: join(repository, "somewhere-else"),
+    });
+
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const [exitCode, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stderr).text(),
+    ]);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain(
+      `AGENTOS_AGENT_CWD must equal ${defaultFirstMateCwd}`,
+    );
+    expect(await readCalls(state)).toEqual([]);
+  });
+
   test("separates server liveness from required-agent readiness", async () => {
     const { env, state } = await createHarness([]);
 
@@ -501,10 +569,16 @@ describe("Mate runtime", () => {
   });
 
   test("runs and checks the configured Second Mate identity", async () => {
-    const secondMateCwd = join(repository, "agents", "secondmate");
+    const secondMateCwd = join(
+      defaultDistributionRoot,
+      "resources",
+      "roles",
+      "secondmate",
+    );
     const { env, state } = await createHarness([], {
       AGENTOS_AGENT_CWD: secondMateCwd,
       AGENTOS_AGENT_NAME: "delivery-second",
+      AGENTOS_AGENT_ROLE: "second_mate",
       HERDR_SESSION: "agentos-delivery-second",
     });
     const child = Bun.spawn([process.execPath, runMate], {
@@ -523,6 +597,7 @@ describe("Mate runtime", () => {
       "agentos-delivery-second",
       "--",
       "pi",
+      "--no-context-files",
     ];
 
     await waitFor(async () =>

@@ -12,7 +12,12 @@ import {
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { createMateMemoryStore } from "./memory/store.ts";
+import { createMateMemoryStore } from "@agentos/pi";
+
+import {
+  isPersistentMateRole,
+  resolvePersistentMateDistribution,
+} from "./distribution.ts";
 
 const home = requiredEnvironment("HOME");
 const releaseRoot = withoutTrailingSlash(
@@ -26,7 +31,10 @@ const herdrConfig =
   process.env.HERDR_CONFIG_PATH ??
   join(home, ".config", "herdr", "config.toml");
 const agentRole = requiredEnvironment("AGENTOS_AGENT_ROLE");
-const usesPi = agentRole === "first_mate" || agentRole === "second_mate";
+const usesPi = isPersistentMateRole(agentRole);
+const mateDistribution = usesPi
+  ? resolvePersistentMateDistribution(process.env)
+  : undefined;
 const agentCheckout =
   process.env.AGENTOS_CHECKOUT ?? join(home, "projects", "agentos");
 const piAgentDirectory =
@@ -79,7 +87,7 @@ if (usesPi) await reconcileSelectedPiDefaults();
 await $`mise trust ${systemConfig}`;
 if (usesPi) {
   await $`mise trust ${join(agentCheckout, "mise.toml")}`;
-  await $`mise trust ${join(agentCheckout, "agents", roleDirectory(), "mise.toml")}`;
+  await $`mise trust ${join(mateDistribution!.roleDirectory, "mise.toml")}`;
 }
 
 if (usesPi) {
@@ -90,6 +98,7 @@ if (usesPi) {
     : {};
   trust[releaseRoot] = true;
   trust[agentCheckout] = true;
+  trust[mateDistribution!.distributionRoot] = true;
   await writeFile(nextTrustFile, `${JSON.stringify(trust, null, 2)}\n`, {
     mode: 0o600,
   });
@@ -208,10 +217,4 @@ async function copyReleaseRemotes() {
       await $`git -C ${agentCheckout} remote set-url --add ${remote} ${url}`.quiet();
     }
   }
-}
-
-function roleDirectory(): string {
-  if (agentRole === "first_mate") return "firstmate";
-  if (agentRole === "second_mate") return "secondmate";
-  throw new Error(`Role ${agentRole} does not use a persistent AgentOS checkout`);
 }

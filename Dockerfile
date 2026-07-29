@@ -108,6 +108,8 @@ COPY clis/composition-verify/package.json clis/composition-verify/package.json
 COPY clis/github-app-token/package.json clis/github-app-token/package.json
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
+COPY packages/default/package.json packages/default/package.json
+COPY packages/pi/package.json packages/pi/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
 COPY clis/composition-verify/composition-verify.ts clis/composition-verify/composition-verify.ts
 COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
@@ -123,6 +125,8 @@ RUN bun install \
       --no-progress \
       --production \
       --filter @agentos/root \
+      --filter @agentos/default \
+      --filter @agentos/pi \
       --filter @agentos/composition-verify \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
@@ -130,6 +134,28 @@ RUN bun install \
   && bun clis/composition-verify/composition-verify.ts --help >/dev/null \
   && bun clis/github-app-token/github-app-token.ts --help >/dev/null \
   && bun clis/pg-listen/pg-listen.ts --help >/dev/null
+
+FROM agentos-base AS agentos-pi-build
+
+WORKDIR /tmp/agentos-pi-build
+
+COPY package.json bun.lock tsconfig.json ./
+COPY clis/composition-verify/package.json clis/composition-verify/package.json
+COPY clis/github-app-token/package.json clis/github-app-token/package.json
+COPY clis/pg-listen/package.json clis/pg-listen/package.json
+COPY database/package.json database/package.json
+COPY packages/default/package.json packages/default/package.json
+COPY packages/pi/package.json packages/pi/package.json
+COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY packages/pi/tsconfig.build.json packages/pi/tsconfig.build.json
+COPY packages/pi/src packages/pi/src
+
+RUN bun install \
+      --frozen-lockfile \
+      --ignore-scripts \
+      --no-progress \
+      --filter @agentos/pi \
+  && bun run --filter @agentos/pi build
 
 FROM agentos-base
 
@@ -146,15 +172,18 @@ COPY --from=agentos-runtime-dependencies \
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/ai-gateway/node_modules/ \
   /opt/agentos/services/ai-gateway/node_modules/
+COPY --from=agentos-pi-build \
+  /tmp/agentos-pi-build/packages/pi/dist/ \
+  /opt/agentos/packages/pi/dist/
 
 RUN chmod 0644 \
     /etc/mise/config.toml \
     /etc/mise/mise.lock \
     /opt/agentos/mise.toml \
     /opt/agentos/mise.lock \
-    /opt/agentos/agents/firstmate/mise.toml \
-    /opt/agentos/agents/crewmate/BRIEF.md \
-    /opt/agentos/agents/secondmate/mise.toml \
+    /opt/agentos/packages/default/resources/roles/firstmate/mise.toml \
+    /opt/agentos/packages/default/resources/crewmates/default/BRIEF.md \
+    /opt/agentos/packages/default/resources/roles/secondmate/mise.toml \
   && chmod 0755 \
     /opt/agentos/runtime/prepare-home.ts \
     /opt/agentos/runtime/create-image-seed.ts \

@@ -67,7 +67,7 @@ Inspect Git remotes before publishing. Generally useful changes belong in a
 reviewed pull request to `akua-dev/agentos`; organization-specific or private
 changes belong in that organization's fork or mirror. Agent-authored
 pull-request delivery follows the default and exception defined in the
-[`agentos-projects` Skill](./agents/.agents/skills/agentos-projects/SKILL.md).
+[`agentos-projects` Skill](./packages/default/skills/agentos-projects/SKILL.md).
 Commit the feature branch and follow the selected workflow's Skill and live
 CLI guidance instead of opening a parallel pull request manually. Pull-request
 creation is part of the accepted ship delivery; merge remains separately gated
@@ -121,7 +121,7 @@ docker build \
   --build-arg AGENTOS_GIT_REMOTE="$(git config --get remote.origin.url)" \
   --tag agentos:dev \
   .
-kubectl --context orbstack apply --kustomize agents/firstmate/kubernetes/base
+kubectl --context orbstack apply --kustomize packages/default/resources/roles/firstmate/kubernetes/base
 kubectl --context orbstack --namespace agentos rollout status statefulset/agentos-firstmate --timeout=10m
 kubectl --context orbstack --namespace agentos get pods
 kubectl --context orbstack --namespace agentos logs agentos-firstmate-0 --all-containers
@@ -149,7 +149,7 @@ docker build \
   --tag agentos:dev \
   .
 kind load docker-image agentos:dev --name agentos
-kubectl --context kind-agentos apply --kustomize agents/firstmate/kubernetes/base
+kubectl --context kind-agentos apply --kustomize packages/default/resources/roles/firstmate/kubernetes/base
 ```
 
 ## Disposable Kubernetes from inside a cluster
@@ -211,8 +211,8 @@ the release manifest with that digest, and apply it through `vcluster connect`.
 If no such path exists, stop at source, SQL, and rendered-manifest checks rather
 than adding an ad hoc registry or privileged builder.
 
-Load [`agentos-image-builds`](./agents/.agents/skills/agentos-image-builds/SKILL.md)
-for builder selection and [`agentos-registry`](./agents/.agents/skills/agentos-registry/SKILL.md)
+Load [`agentos-image-builds`](./packages/default/skills/agentos-image-builds/SKILL.md)
+for builder selection and [`agentos-registry`](./packages/default/skills/agentos-registry/SKILL.md)
 for registry design. The preferred new in-cluster candidate is a one-shot
 BuildKit Job in a supported Kubernetes Pod user namespace; rootless BuildKit
 and Buildah remain environment-dependent alternatives. Kaniko is archived.
@@ -255,7 +255,7 @@ supervised lifecycle: authentication and first-run trust, isolated workspace,
 native launch, busy/status inspection, short steer, interrupt, verified wake,
 native resume, failure visibility and safe teardown. Do not silently substitute
 an unverified harness. Follow the shared
-[`agentos-harnesses`](./agents/.agents/skills/agentos-harnesses/SKILL.md) Skill
+[`agentos-harnesses`](./packages/default/skills/agentos-harnesses/SKILL.md) Skill
 for the selected harness; a workspace-trust chooser or routine command approval
 after dispatch means the unattended launch has not succeeded. Provider ingress
 work also needs a fixture or sandbox

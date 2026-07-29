@@ -1,0 +1,26 @@
+{
+  "name": "@agentos/default",
+  "version": "0.1.0",
+  "description": "The released replaceable AgentOS distribution for Pi",
+  "type": "module",
+  "sideEffects": false,
+  "keywords": ["pi-package"],
+  "files": ["composition", "extensions", "resources", "skills", "README.md"],
+  "pi": {
+    "extensions": ["./extensions/agentos.ts"],
+    "skills": ["./skills"]
+  },
+  "dependencies": {
+    "@agentos/pi": "0.1.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "0.81.1"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.81.1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

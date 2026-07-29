@@ -115,9 +115,19 @@ if (args.join(" ") === "integration install pi") {
       ),
     ]);
 
+    const checkout = join(home, "projects", "agentos");
+    const distributionRoot = join(checkout, "packages", "default");
+    const roleDirectory = join(
+      distributionRoot,
+      "resources",
+      "roles",
+      "firstmate",
+    );
     const environment = {
       AGENTOS_RELEASE_ROOT: repository,
+      AGENTOS_AGENT_CWD: roleDirectory,
       AGENTOS_AGENT_ROLE: "first_mate",
+      AGENTOS_DISTRIBUTION_ROOT: distributionRoot,
       AGENTOS_MODEL: "openai-codex/gpt-5.6-sol",
       AGENTOS_THINKING: "xhigh",
       FAKE_LOG_DIRECTORY: logDirectory,
@@ -137,7 +147,6 @@ if (args.join(" ") === "integration install pi") {
     await expect(
       stat(join(home, ".agents", "skills", "agentos-delegation")),
     ).rejects.toThrow();
-    const checkout = join(home, "projects", "agentos");
     expect((await $`git -C ${checkout} rev-parse HEAD`.text()).trim()).toBe(
       (await $`git -C ${repository} rev-parse HEAD`.text()).trim(),
     );
@@ -154,6 +163,7 @@ if (args.join(" ") === "integration install pi") {
       "/workspace": false,
       [repository]: true,
       [checkout]: true,
+      [distributionRoot]: true,
     });
     expect(JSON.parse(await readFile(piSettings, "utf8"))).toEqual({
       defaultModel: "gpt-5.6-sol",
@@ -187,7 +197,7 @@ if (args.join(" ") === "integration install pi") {
     expect((await readFile(join(logDirectory, "mise.log"), "utf8")).trim().split("\n")).toEqual([
       `trust ${join(repository, "mise.toml")}`,
       `trust ${join(checkout, "mise.toml")}`,
-      `trust ${join(checkout, "agents", "firstmate", "mise.toml")}`,
+      `trust ${join(roleDirectory, "mise.toml")}`,
     ]);
     expect((await readFile(join(logDirectory, "herdr.log"), "utf8")).trim().split("\n")).toEqual([
       "integration install pi",
@@ -238,5 +248,30 @@ if (args.join(" ") === "integration install pi") {
 
     expect(restarted).toEqual({ exitCode: 0, stderr: "", stdout: "" });
     expect(await readFile(persistentMarker, "utf8")).toBe("unfinished work\n");
+  });
+
+  test("does not infer a Mate distribution from the checkout or current directory", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "agentos-missing-distribution-"));
+    temporaryDirectories.push(sandbox);
+    const result = await run(prepareHome, {
+      AGENTOS_AGENT_CWD: join(
+        sandbox,
+        "home",
+        "projects",
+        "agentos",
+        "packages",
+        "default",
+        "resources",
+        "roles",
+        "firstmate",
+      ),
+      AGENTOS_AGENT_ROLE: "first_mate",
+      AGENTOS_RELEASE_ROOT: repository,
+      HOME: join(sandbox, "home"),
+      PATH: process.env.PATH ?? "",
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("AGENTOS_DISTRIBUTION_ROOT");
   });
 });

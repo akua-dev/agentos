@@ -1,8 +1,13 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
-import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+
+import { resolvePersistentMateDistribution } from "./distribution.ts";
+import {
+  migratePiSessionCwd,
+  readPiSession,
+} from "./pi-session.ts";
 
 type Agent = {
   agent_session?: { kind?: unknown; value?: unknown };
@@ -13,7 +18,8 @@ type Agent = {
 type AgentList = { result?: { agents?: Agent[] } };
 
 const agentName = requiredEnvironment("AGENTOS_AGENT_NAME");
-const agentCwd = requiredEnvironment("AGENTOS_AGENT_CWD");
+const { roleDirectory: agentCwd } =
+  resolvePersistentMateDistribution(process.env);
 const session = process.env.HERDR_SESSION ?? `agentos-${agentName}`;
 process.env.NODE_PATH ||= join(
   process.env.AGENTOS_RELEASE_ROOT ?? "/opt/agentos",
@@ -89,6 +95,7 @@ async function startMate(persistedSession?: string) {
     session,
     "--",
     "pi",
+    "--no-context-files",
     ...(persistedSession ? ["--session", persistedSession] : []),
   ];
   await $`${command}`;
@@ -111,36 +118,13 @@ async function relocateMate(mate: Agent) {
   await $`herdr pane close ${paneId} --session ${session}`;
   for (let attempt = 0; attempt < 20; attempt += 1) {
     if ((await mateStatus()) !== 0) {
-      await migratePiSessionCwd(persistedSession);
+      await migratePiSessionCwd(persistedSession, agentCwd);
       await startMate(persistedSession);
       return;
     }
     await Bun.sleep(100);
   }
   throw new Error(`Herdr did not release ${agentName} after closing pane ${paneId}.`);
-}
-
-async function migratePiSessionCwd(path: string) {
-  const { contents, header, lineBreak } = await readPiSession(path);
-  const next = `${path}.agentos-next`;
-  const remainder = lineBreak === -1 ? "\n" : contents.slice(lineBreak);
-  await writeFile(
-    next,
-    `${JSON.stringify({ ...header, cwd: agentCwd })}${remainder}`,
-    { mode: 0o600 },
-  );
-  await rename(next, path);
-}
-
-async function readPiSession(path: string) {
-  const contents = await readFile(path, "utf8");
-  const lineBreak = contents.indexOf("\n");
-  const firstLine = lineBreak === -1 ? contents : contents.slice(0, lineBreak);
-  const header = JSON.parse(firstLine) as Record<string, unknown>;
-  if (header.type !== "session" || typeof header.cwd !== "string") {
-    throw new Error(`Refusing to move ${agentName}: ${path} has no valid Pi session header.`);
-  }
-  return { contents, header, lineBreak };
 }
 
 async function waitUntilServerReady(serverProcess: Bun.Subprocess) {

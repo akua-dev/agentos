@@ -4,9 +4,10 @@
   "description": "AgentOS runtime, optional services, executable primitives, and database workspace",
   "private": true,
   "type": "module",
-  "workspaces": ["clis/*", "database", "services/*"],
+  "workspaces": ["clis/*", "database", "packages/*", "services/*"],
   "scripts": {
-    "test": "bun test . ./agents/.pi/background-tasks ./agents/.pi/supervision-guard ./agents/.pi/openai-server-compaction ./agents/.pi/mate-memory",
+    "build": "bun run --filter @agentos/pi build",
+    "test": "bun run build && bun test .",
     "typecheck": "tsc --project tsconfig.json",
     "check": "bun run test && bun run typecheck"
   },
@@ -17,6 +18,7 @@
     "typescript": "7.0.2"
   },
   "dependencies": {
+    "@agentos/pi": "workspace:*",
     "ajv": "8.20.0",
     "yaml": "2.9.0",
     "zod": "4.4.3"
