@@ -183,11 +183,16 @@ ephemeral routing hint from likely direct human input, but never authenticates
 it or grants authority. Direct terminal delivery to another Mate is an
 exceptional recovery path for a broken listener, not ordinary communication.
 Direct Captain intervention in any attached terminal remains authoritative and is reconciled into Fleet state.
-Fleet-wide and Mate-domain Captain preferences are scoped rows in one readable
-table rather than synchronized files. Genuine unresolved Captain choices live
-in Inbox under stable keys. Investigations attest their complete choice set,
-including none, before completion; the exact answer later releases linked Task
-dependencies atomically without a separate decisions service.
+Each persistent Mate owns private, typed Markdown memory on its PVC. A bounded
+index and selected topics load as fallible context; restricted post-turn
+extraction and Dream may maintain only that memory. Memory never authorizes an
+action, proves current state or replaces shared Fleet coordination. Guidance
+for another Mate crosses the direct hierarchy edge as an Inbox proposal and
+the recipient decides whether to edit its own memory. Genuine unresolved
+Captain choices live in Inbox under stable keys. Investigations attest their
+complete choice set, including none, before completion; the exact answer later
+releases linked Task dependencies atomically without a separate decisions
+service.
 That idempotent transaction—record the response, close the speech act and apply
 its coupled state effect—is the template for any future Inbox act that changes
 durable state.
@@ -327,13 +332,21 @@ AgentOS images install that pair as `/etc/mise/config.toml` and
 not require a first-start download. The persistent AgentOS Git checkout
 provides the current repository and role Mise configuration; agent-owned
 additions live separately under `~/.config/mise/conf.d/`.
+Release-owned Node dependencies are installed in the immutable image at
+`/opt/agentos/node_modules`. `runtime/run-mate.ts` passes that release path
+through `NODE_PATH` to Herdr and its Pi child, so Pi extensions loaded from the
+persistent checkout can resolve release dependencies without installing them
+into the checkout or PVC.
 Before starting a Mate, a direct Mise init step installs the remaining small
 startup-critical set: Node, kubectl, Herdr and Pi. A second init step uses
 Mise to run the typed home-reconciliation program. Both init containers and the
 Mate use one image and one PVC; identical image layers are pulled only once per
-node. Remaining released Fleet tools stay
-locked and discoverable but are installed explicitly when the running Mate's
-task needs them. The Mate image carries only PostgreSQL's official pinned
+node. The Crewmate base additionally installs `gh`, `no-mistakes`, Codex and
+`gh-axi` for its reviewed pull-request delivery path; the default and exception
+for Agent-authored delivery are owned by the [`agentos-projects` Skill](./agents/.agents/skills/agentos-projects/SKILL.md).
+Other remaining released Fleet tools stay locked and discoverable but are
+installed explicitly when the running Mate's task needs them. The Mate image
+carries only PostgreSQL's official pinned
 `postgresql-client-18` package, so agents can invoke `psql` immediately without
 compiling or embedding a PostgreSQL server.
 
@@ -469,7 +482,7 @@ PostgreSQL is the durable fleet authority for at least:
 - tasks and backlog;
 - inbox requests, questions, decisions, replies and read state;
 - durable status, handoff and coordination history;
-- captain notes and learnings;
+- curated, evidence-backed Fleet learnings;
 - pod and PVC locators;
 - schema and release metadata required for safe recovery.
 
@@ -510,8 +523,8 @@ deterministic non-secret channel for each responsible persistent Mate. A
 current Pi Mate readiness-gates only its targeted native `pg-listen` wait, then
 catches up through the read-only durable bearings
 projection before relying on the one-shot listener. Deterministic SQL maps
-Inbox recipients, Assignment owners, hierarchy edges, Captain scope and
-external-event claims; an unowned or unresolved edge falls back to First Mate
+Inbox recipients, Assignment owners, hierarchy edges and external-event
+claims; an unowned or unresolved edge falls back to First Mate
 instead of waking every current Mate. The detailed re-arm and catch-up judgment
 belongs to `$agentos-supervision`; the wake contains no Fleet row data and
 `LISTEN/NOTIFY` never starts a pod or replaces Inbox, Task or external-event
@@ -524,7 +537,7 @@ One PostgreSQL database is one Fleet. Core tables therefore carry no `fleet_id`;
 
 The initial durable model stays deliberately small:
 
-- `captain` stores multiple captain preferences and context entries, never a synthetic singleton Fleet row;
+- each persistent Mate's PVC stores its own private, typed memory; it is fallible context, not PostgreSQL authority;
 - `agents` stores hierarchy, role and runtime locators, but not Kubernetes or Herdr health;
 - `projects` stores non-exclusive work scopes without assigning one permanent owner;
 - `tasks` stores durable backlog and accepted outcomes, dependencies and its
@@ -647,12 +660,14 @@ Direct First-Mate authentication remains the fastest initial handoff and a
 verified recovery path. After Fleet identity exists, First Mate presents two
 worker-capacity postures: the recommended Fleet AI Gateway for a delegation-ready
 Fleet, or direct authentication owned separately by every worker harness. The
-Captain's selection is durable Fleet policy. Installing the gateway, starting
-provider login and distributing its client Secret remain explicit or standing
-authorizations; recommendation never makes them implicit. Bootstrap may finish
-in minimal single-Mate mode without the gateway, but AgentOS does not call the
-Fleet delegation-ready until one approved worker or trusted harness automation
-has completed a harmless real model request through the selected capacity path.
+Captain's selection is fallible guidance in the owning Mate's private
+context; exact approval and coupled state changes remain durable Inbox
+decisions. Installing the gateway, starting provider login and distributing
+its client Secret remain explicit or standing authorizations; recommendation
+never makes them implicit. Bootstrap may finish in minimal single-Mate mode
+without the gateway, but AgentOS does not call the Fleet delegation-ready
+until one approved worker or trusted harness automation has completed a
+harmless real model request through the selected capacity path.
 
 For a stable install, the seed resolves the latest published GitHub release,
 verifies that release is immutable, and applies only its fixed-name assets
@@ -676,7 +691,7 @@ checkout while keeping operational roles out of contributor sessions:
 - `.agents/skills/` contains workflows that apply from every AgentOS checkout
   working directory: repository development, organization evaluation and
   post-evaluation improvement review;
-- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including composition, delegation, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including composition, delegation, private memory, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
 - `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
 - a future subtree under `clis/`, `packages/` or `services/` may add its own `.agents/skills/` when development there needs a reusable workflow.
@@ -855,6 +870,9 @@ workspace keeps one `bun.lock`.
 - `agents/.agents/skills/` contains operational workflows shared by First and
   Second Mate without exposing them to contributor or runtime-development
   sessions.
+- `agents/.agents/skills/agentos-memory/` owns private, fallible per-Mate
+  memory behavior, including recall, maintenance, session privacy and routed
+  proposals; it never replaces Fleet authority.
 - `agents/.agents/skills/agentos-composition/` owns model-directed composition
   selection, native application and observed verification.
 - `agents/firstmate/` and `agents/secondmate/` contain the two persistent role instruction surfaces, their Pi configuration and role-scoped skills.

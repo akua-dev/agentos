@@ -2,6 +2,7 @@
 
 import { $ } from "bun";
 import { readFile, rename, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 type Agent = {
   agent_session?: { kind?: unknown; value?: unknown };
@@ -14,6 +15,10 @@ type AgentList = { result?: { agents?: Agent[] } };
 const agentName = requiredEnvironment("AGENTOS_AGENT_NAME");
 const agentCwd = requiredEnvironment("AGENTOS_AGENT_CWD");
 const session = process.env.HERDR_SESSION ?? `agentos-${agentName}`;
+process.env.NODE_PATH ||= join(
+  process.env.AGENTOS_RELEASE_ROOT ?? "/opt/agentos",
+  "node_modules",
+);
 
 let server: Bun.Subprocess | undefined;
 let observer: Bun.Subprocess | undefined;

@@ -59,10 +59,13 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
    Explain the gateway's additional service, retained credential authority,
    selected-client Secret and NetworkPolicy boundary, and that pooled personal
    subscription use is experimental rather than provider-endorsed. Record the
-   Captain's choice in Fleet-scoped Captain state. Ask separately before gateway
-   installation, each provider login, initial client-Secret distribution and
-   any required Pod restart unless exact standing authorization already covers
-   the action. Verify one harmless real no-tool request from an approved worker
+   Captain's selected posture as private First-Mate context through
+   `$agentos-memory`; treat it as fallible guidance, not approval or current
+   state. Preserve any exact approval or coupled state change through Inbox
+   with `$agentos-decisions`. Ask separately before gateway installation, each
+   provider login, initial client-Secret distribution and any required Pod
+   restart unless exact standing authorization already covers the action. Verify
+   one harmless real no-tool request from an approved worker
    or trusted harness automation through the selected path. If the Captain
    defers this step, report minimal single-Mate mode plainly and require a
    verified direct login before each future worker launch; do not call the Fleet

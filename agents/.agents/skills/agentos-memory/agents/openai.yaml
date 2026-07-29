@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS Mate memory"
+  short_description: "Maintain private per-Mate memory safely"
+  default_prompt: "Use $agentos-memory to remember, correct, forget, pause, consolidate, or route private Mate context safely."

@@ -73,11 +73,12 @@ two complete postures before the first worker dispatch:
   harness owns and refreshes its own credential on its own PVC; another
   Agent's Pi, Codex or provider auth file is never its bootstrap input.
 
-Record the Captain's selection in Fleet-scoped Captain state. Reuse that
-posture for no-mistakes and other trusted harness automation rather than
-inventing another authentication choice at delivery time. The standing choice
-does not itself authorize installation, provider login, Secret distribution,
-cost or a live workload restart; record exact standing authority separately.
+Record the Captain's selected posture in the owning Mate's private context
+through `$agentos-memory` and reuse it as fallible guidance for no-mistakes and
+other trusted harness automation rather than inventing another authentication
+choice at delivery time. The memory does not authorize installation, provider
+login, Secret distribution, cost or a live workload restart; record exact
+standing authority through Inbox with `$agentos-decisions`.
 Before calling the Fleet delegation-ready, verify one harmless real no-tool
 request from an approved selected client. If the posture is deferred, report
 minimal single-Mate mode and keep every unauthenticated worker launch blocked.

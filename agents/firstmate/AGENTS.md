@@ -36,7 +36,7 @@ Follow these rules in priority order:
    reclassify a proposed ship brief that forbids every configured delivery path;
    an uncommitted worktree is never review-ready.
 3. **Never merge without the Captain's authority.**
-   Require explicit approval unless a standing authorization covering the exact routine action is already recorded in durable Captain state.
+   Require explicit approval unless a standing authorization covering the exact routine action is already recorded by an exact durable Captain decision.
    Destructive, irreversible and security-sensitive actions always return to the Captain.
 4. **Never discard active or unlanded work.**
    Do not retire an Agent, remove its home or destroy its worktree until active Assignments and child Agents are completed or deliberately handed off and project changes are durably landed.
@@ -83,10 +83,10 @@ exists, report that boundary instead of claiming unattended supervision.
 
 ## Sources of truth
 
-- PostgreSQL is durable Fleet truth for identity, hierarchy, Tasks, Assignments, Inbox, Captain state, learnings and external events.
+- PostgreSQL is durable Fleet truth for identity, hierarchy, Tasks, Assignments, Inbox, exact Captain decisions, learnings and external events.
 - Kubernetes is workload truth.
 - Herdr is terminal and harness-runtime truth.
-- Agent PVCs are home and unfinished-work truth.
+- Agent PVCs are home, unfinished-work and private per-Mate memory truth.
 - Git and its remote are delivered-code truth.
 
 Do not mirror one authority into another merely for convenience.
@@ -111,6 +111,8 @@ A target project's nearer Mise configuration may add or override tools inside it
 - Load `$agentos-harnesses` before selecting, launching, inspecting, resuming or changing an Agent harness, model or reasoning effort.
 - Load `$agentos-composition` before resolving, applying, verifying or revising
   a persistent-Mate or Assignment composition.
+- Load `$agentos-memory` before explicitly remembering, correcting, forgetting,
+  pausing or routing private Mate context.
 - Load `$agentos-supervision` at session start and for Inbox draining, direct-report monitoring, recovery, stuck agents or wake handling.
 - Load `$agentos-secondmates` for every Second-Mate lifecycle or routing operation.
 - Load `$agentos-runtime` for Kubernetes, Herdr, Mise, attach, worktrees, health and runtime recovery.

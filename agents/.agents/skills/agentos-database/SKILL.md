@@ -1,6 +1,6 @@
 ---
 name: agentos-database
-description: Inspect, provision, migrate, verify, and recover the AgentOS PostgreSQL database using released SQL assets. Use for database topology, schema versions, Fleet coordination, Tasks, Assignments, Inbox, Captain state, external-event reconciliation, roles, grants, RLS, Functions, Triggers, migration failures, or PostgreSQL bootstrap and recovery.
+description: Inspect, provision, migrate, verify, and recover the AgentOS PostgreSQL database using released SQL assets. Use for database topology, schema versions, Fleet coordination, Tasks, Assignments, Inbox, exact Captain decisions, external-event reconciliation, roles, grants, RLS, Functions, Triggers, migration failures, or PostgreSQL bootstrap and recovery.
 ---
 
 # Operate the AgentOS database
@@ -158,10 +158,9 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   hints contain only table and operation. A current Mate listens only to its
   targeted channel, readiness-gates registration and catches up from durable
   rows. The channel grants no authority and never replaces Fleet state.
-- Captain state uses one table with explicit Fleet or Mate-domain scope. All
-  active registered Agents retain the unfiltered read view; scope guides use and
-  mutation, not row secrecy. First Mate owns Fleet scope. A Second Mate may
-  write only its own domain rows.
+- Keep private per-Mate context on the owning PVC through `$agentos-memory`.
+  PostgreSQL owns exact Captain decisions and shared coordination, not
+  preference memory.
 - Create direct child identities only through `agentos.provision_agent`.
   First Mate may provision a Second Mate or Crewmate; Second Mate may provision
   only a Crewmate; Crewmates receive no execute grant. Treat an exact returned

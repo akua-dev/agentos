@@ -12,6 +12,8 @@ import {
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { createMateMemoryStore } from "./memory/store.ts";
+
 const home = requiredEnvironment("HOME");
 const releaseRoot = withoutTrailingSlash(
   process.env.AGENTOS_RELEASE_ROOT ?? "/opt/agentos",
@@ -46,6 +48,7 @@ await Promise.all(
 );
 
 if (usesPi) await ensureAgentosCheckout();
+if (usesPi) await createMateMemoryStore(home).ensureLayout();
 
 const pgpassSource = process.env.AGENTOS_PGPASS_SOURCE;
 if (pgpassSource) {

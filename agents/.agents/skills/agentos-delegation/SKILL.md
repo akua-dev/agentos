@@ -21,7 +21,10 @@ Use released PostgreSQL schema for durable coordination and native tools against
    Load `$agentos-projects` when the registry, checkout, remote or delivery
    posture must change; intake itself grants no outward project authority.
    Resolve the selected delivery workflow, its concrete review artifact and
-   merge authority before accepting ship work.
+   merge authority before accepting ship work. For Agent-authored pull-request
+   delivery without an exact recorded alternative, select the no-mistakes
+   default owned by `$agentos-projects`; never infer a direct-PR path from
+   missing project prose.
 3. Distinguish conversation from accepted work.
    An Inbox request, provider comment or idea does not become accepted work
    until the Task's first accountable Assignment exists. An unassigned Task is
@@ -92,17 +95,19 @@ Use released PostgreSQL schema for durable coordination and native tools against
    lacks scope requests the exact delta upward; it never receives First Mate's
    App key or silently falls back to another identity.
 2. Load `$agentos-composition`, then select the smallest reviewed composition
-   that fits the task and recorded Captain policy. Resolve the concrete harness,
+   that fits the task and relevant private Mate guidance plus exact Task or
+   Inbox authority. Resolve the concrete harness,
    ordered instruction and Skill material, opaque native settings and non-secret
    capability requirements into the versioned Assignment manifest. Model,
    effort, image and every other harness-native knob belong under `settings`;
    never restore the legacy flat dispatch-profile shape.
    Keep First and Second Mates on Pi; permit a worker harness only when the selected release verifies it.
    Require remote images to be approved and pinned by digest.
-   Load `$agentos-harnesses`; consult scoped natural-language dispatch policy
-   on every intake and record the concrete resolution on the Assignment.
-   Resolve the durable model-capacity posture at the same time. Select the
-   recommended AI Gateway path when recorded and healthy, or direct
+   Load `$agentos-harnesses`; consult relevant natural-language dispatch
+   guidance through `$agentos-memory` on every intake and record the concrete
+   resolution on the Assignment. Resolve the model-capacity guidance and exact
+   Inbox authority at the same time. Select the recommended AI Gateway path
+   when its guidance is recorded and healthy, or direct
    authentication owned by this worker. Direct per-Agent authentication remains
    the recovery path when shared capacity is degraded. After the exact login is
    authorized, deliver provider-supported device instructions through the
@@ -124,6 +129,9 @@ Use released PostgreSQL schema for durable coordination and native tools against
    selected delivery workflow, delivery target, authorized outward effects,
    merge authority and achievable Definition of Done. Keep provider-specific
    workflow details as durable prose rather than an AgentOS delivery-mode enum.
+   When no-mistakes is selected, include `$agentos-projects` in the
+   Assignment's selected Skill material so the Crewmate receives its gate
+   ownership and escalation contract.
 5. Render the worker's harness view from the authoritative Assignment brief
    using `../crewmate/BRIEF.md`. Fill every
    marker with the owning Mate, Agent, Task, Assignment, work kind, project,

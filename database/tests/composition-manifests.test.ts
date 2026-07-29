@@ -7,10 +7,12 @@ const migrationsDirectory = new URL("../migrations/", import.meta.url);
 
 const ids = {
   assignment: "50000000-0000-4000-8000-000000000091",
-  authority: "10000000-0000-4000-8000-000000000091",
+  authority: "",
+  backlogTask: "40000000-0000-4000-8000-000000000095",
   childAssignment: "50000000-0000-4000-8000-000000000092",
   childTask: "40000000-0000-4000-8000-000000000092",
-  unrelatedAuthority: "10000000-0000-4000-8000-000000000092",
+  compositionAssignment: "50000000-0000-4000-8000-000000000093",
+  compositionTask: "40000000-0000-4000-8000-000000000093",
   crewmate: "20000000-0000-4000-8000-000000000091",
   firstMate: "",
   legacyAssignment: "50000000-0000-4000-8000-000000000094",
@@ -42,7 +44,6 @@ function material(
         : "instructions.md",
   };
 }
-
 function manifest(harness = "pi") {
   return {
     version: 1,
@@ -95,7 +96,7 @@ beforeAll(async () => {
     throw new Error("Composition migration is missing");
   }
 
-  for (const file of files.filter((file) => file !== compositionMigration)) {
+  for (const file of files.filter((file) => file < compositionMigration)) {
     const migration = await import(new URL(file, migrationsDirectory).href, {
       with: { type: "text" },
     });
@@ -155,6 +156,13 @@ beforeAll(async () => {
   );
   await database.exec(migration.default);
 
+  for (const file of files.filter((file) => file > compositionMigration)) {
+    const laterMigration = await import(new URL(file, migrationsDirectory).href, {
+      with: { type: "text" },
+    });
+    await database.exec(laterMigration.default);
+  }
+
   await database.exec(`
     CREATE ROLE composition_second LOGIN;
     CREATE ROLE composition_crew LOGIN;
@@ -183,6 +191,31 @@ beforeAll(async () => {
     );
     SELECT agentos.register_agent_principal(
       '${ids.crewmate}', 'composition_crew'
+    );
+
+    INSERT INTO agentos.tasks (
+      id, project_id, created_by_agent_id, title, status, status_text
+    ) VALUES
+      (
+        '${ids.compositionTask}', '${ids.project}', '${ids.firstMate}',
+        'Review persistent Mate composition', 'active',
+        'Ready for an exact Captain decision'
+      ),
+      (
+        '${ids.backlogTask}', '${ids.project}', '${ids.firstMate}',
+        'Unaccepted composition idea', 'queued',
+        'No accountable Assignment exists'
+      );
+
+    INSERT INTO agentos.task_assignments (
+      id, task_id, agent_id, assigned_by_agent_id, assignment_role,
+      status, status_text, brief, dispatch_profile
+    ) VALUES (
+      '${ids.compositionAssignment}', '${ids.compositionTask}',
+      '${ids.firstMate}', '${ids.firstMate}', 'coordinate', 'active',
+      'Composition review is accepted',
+      'Obtain an exact Captain decision for persistent Mate composition.',
+      '{"version":1,"harness":"pi","materials":[],"settings":{}}'::jsonb
     );
   `);
 });
@@ -610,34 +643,143 @@ describe.serial("resolved Agent composition manifests", () => {
     ).rejects.toThrow("active started Task Assignment");
   });
 
-  test("replaces and repairs persistent composition only through explicit Captain authority", async () => {
-    await database.exec(`
-      INSERT INTO agentos.captain (
-        id, topic, content, source, recorded_by_agent_id
-      ) VALUES
-        (
-          '${ids.authority}', 'agent-composition-authority',
-          'First Mate may manage reviewed persistent Mate composition.',
-          'Captain approval', '${ids.firstMate}'
-        ),
-        (
-          '${ids.unrelatedAuthority}', 'captain-communication-surface',
-          'Use the selected provider for concise Captain updates.',
-          'Captain preference', '${ids.firstMate}'
+  test("replaces and repairs persistent composition only through an exact approved Captain decision", async () => {
+    const selected = manifest();
+    await expect(
+      database.query(`
+        SELECT agentos.hold_agent_composition_decision(
+          '${ids.backlogTask}',
+          '${ids.secondMate}',
+          ${json(selected)},
+          'composition.unaccepted-task',
+          'Review persistent Mate composition',
+          'Should First Mate apply this exact persistent composition?',
+          'Awaiting exact Captain approval'
         )
+      `),
+    ).rejects.toThrow("accepted Task");
+
+    const genericDecision = await database.query<{ id: string }>(`
+      SELECT agentos.hold_captain_decision(
+        '${ids.compositionTask}',
+        'composition.unrelated',
+        'Choose an unrelated communication surface',
+        'Should the Mate use the selected communication provider?',
+        'Awaiting an unrelated Captain answer'
+      )::text AS id
+    `);
+    const genericAnswer = await database.query<{ id: string }>(`
+      SELECT agentos.resolve_captain_decision(
+        '${genericDecision.rows[0]!.id}',
+        'Use the selected provider.',
+        'Unrelated choice resolved'
+      )::text AS id
     `);
 
-    const selected = manifest();
     await expect(
       database.exec(`
         SELECT agentos.replace_agent_composition(
           '${ids.secondMate}',
           ${json(selected)},
-          '${ids.unrelatedAuthority}',
-          'Treat an unrelated Captain preference as composition authority.'
+          '${genericAnswer.rows[0]!.id}',
+          'Treat an unrelated Captain answer as composition authority.'
         )
       `),
-    ).rejects.toThrow("active Captain composition authority");
+    ).rejects.toThrow("exact approved Captain composition decision");
+
+    const unresolvedDecision = await holdCompositionDecision(
+      "composition.unresolved",
+      ids.secondMate,
+      selected,
+    );
+    await expect(
+      database.exec(`
+        SELECT agentos.replace_agent_composition(
+          '${ids.secondMate}',
+          ${json(selected)},
+          '${unresolvedDecision}',
+          'Use a decision that has no Captain answer.'
+        )
+      `),
+    ).rejects.toThrow("exact approved Captain composition decision");
+
+    const rejectedDecision = await holdCompositionDecision(
+      "composition.rejected",
+      ids.secondMate,
+      selected,
+    );
+    const rejectedAnswer = await resolveCompositionDecision(
+      rejectedDecision,
+      false,
+      "Do not apply this composition.",
+    );
+    await expect(
+      database.exec(`
+        SELECT agentos.replace_agent_composition(
+          '${ids.secondMate}',
+          ${json(selected)},
+          '${rejectedAnswer}',
+          'Treat an explicit rejection as approval.'
+        )
+      `),
+    ).rejects.toThrow("exact approved Captain composition decision");
+
+    const wrongAgentDecision = await holdCompositionDecision(
+      "composition.wrong-agent",
+      ids.firstMate,
+      selected,
+    );
+    const wrongAgentAnswer = await resolveCompositionDecision(
+      wrongAgentDecision,
+      true,
+      "Approve the First Mate composition.",
+    );
+    await expect(
+      database.exec(`
+        SELECT agentos.replace_agent_composition(
+          '${ids.secondMate}',
+          ${json(selected)},
+          '${wrongAgentAnswer}',
+          'Use approval bound to another Agent.'
+        )
+      `),
+    ).rejects.toThrow("exact approved Captain composition decision");
+
+    const otherManifest = {
+      ...selected,
+      settings: { ...selected.settings, effort: "medium" },
+    };
+    const wrongManifestDecision = await holdCompositionDecision(
+      "composition.wrong-manifest",
+      ids.secondMate,
+      otherManifest,
+    );
+    const wrongManifestAnswer = await resolveCompositionDecision(
+      wrongManifestDecision,
+      true,
+      "Approve the other manifest.",
+    );
+    await expect(
+      database.exec(`
+        SELECT agentos.replace_agent_composition(
+          '${ids.secondMate}',
+          ${json(selected)},
+          '${wrongManifestAnswer}',
+          'Use approval bound to another manifest.'
+        )
+      `),
+    ).rejects.toThrow("exact approved Captain composition decision");
+
+    const approvedDecision = await holdCompositionDecision(
+      "composition.approved",
+      ids.secondMate,
+      selected,
+    );
+    ids.authority = await resolveCompositionDecision(
+      approvedDecision,
+      true,
+      "Apply the reviewed persistent Second Mate setup.",
+    );
 
     await database.exec(`
       SELECT agentos.replace_agent_composition(
@@ -681,11 +823,21 @@ describe.serial("resolved Agent composition manifests", () => {
       ...selected,
       settings: { ...selected.settings, effort: "high" },
     };
+    const repairDecision = await holdCompositionDecision(
+      "composition.repair",
+      ids.secondMate,
+      repaired,
+    );
+    const repairAuthority = await resolveCompositionDecision(
+      repairDecision,
+      true,
+      "Approve the corrected persistent composition.",
+    );
     await database.exec(`
       SELECT agentos.repair_agent_composition(
         '${ids.secondMate}',
         ${json(repaired)},
-        '${ids.authority}',
+        '${repairAuthority}',
         'Correct an incorrectly recorded effort after inspecting native state.'
       )
     `);
@@ -706,6 +858,7 @@ describe.serial("resolved Agent composition manifests", () => {
     `);
     expect(repairedRow.rows[0]?.resolved_composition).toEqual(repaired);
     expect(repairedRow.rows[0]?.metadata.composition_change).toMatchObject({
+      authority_id: repairAuthority,
       change_kind: "repair",
       previous: selected,
       reason:
@@ -713,6 +866,29 @@ describe.serial("resolved Agent composition manifests", () => {
     });
 
     await asRole("composition_second", async () => {
+      await expect(
+        database.exec(`
+          SELECT agentos.hold_agent_composition_decision(
+            '${ids.compositionTask}',
+            '${ids.secondMate}',
+            ${json(selected)},
+            'composition.child-fabricated',
+            'Fabricate persistent composition authority',
+            'A Second Mate must not create this decision.',
+            'Unauthorized'
+          )
+        `),
+      ).rejects.toThrow();
+      await expect(
+        database.exec(`
+          SELECT agentos.resolve_agent_composition_decision(
+            '${approvedDecision}',
+            true,
+            'Fabricate Captain approval.',
+            'Unauthorized'
+          )
+        `),
+      ).rejects.toThrow();
       await expect(
         database.exec(`
           SELECT agentos.replace_agent_composition(
@@ -734,9 +910,44 @@ describe.serial("resolved Agent composition manifests", () => {
           'Use authority that does not exist.'
         )
       `),
-    ).rejects.toThrow("active Captain composition authority");
+    ).rejects.toThrow("exact approved Captain composition decision");
   });
 });
+
+async function holdCompositionDecision(
+  decisionKey: string,
+  agentId: string,
+  composition: unknown,
+): Promise<string> {
+  const decision = await database.query<{ id: string }>(`
+    SELECT agentos.hold_agent_composition_decision(
+      '${ids.compositionTask}',
+      '${agentId}',
+      ${json(composition)},
+      '${decisionKey}',
+      'Review persistent Mate composition',
+      'Should First Mate apply this exact persistent composition?',
+      'Awaiting exact Captain approval'
+    )::text AS id
+  `);
+  return decision.rows[0]!.id;
+}
+
+async function resolveCompositionDecision(
+  decisionId: string,
+  approved: boolean,
+  answer: string,
+): Promise<string> {
+  const resolution = await database.query<{ id: string }>(`
+    SELECT agentos.resolve_agent_composition_decision(
+      '${decisionId}',
+      ${approved},
+      '${answer.replaceAll("'", "''")}',
+      'Captain composition decision resolved'
+    )::text AS id
+  `);
+  return resolution.rows[0]!.id;
+}
 
 async function asRole<T>(role: string, operation: () => Promise<T>): Promise<T> {
   await database.exec(`SET SESSION AUTHORIZATION ${role}`);

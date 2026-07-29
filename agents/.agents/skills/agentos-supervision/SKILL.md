@@ -20,8 +20,10 @@ Supervise only direct children; every Second Mate owns its own subtree.
    ready backlog, Captain decisions and actionable external events. It does not
    load an Inbox body, mark it read, claim work or report runtime health.
    Read the full Fleet view when useful, but mutate only the authenticated hierarchy.
-   Read Fleet-scoped Captain state plus this Mate's domain-scoped entries; do
-   not copy preferences between homes or infer them from chat memory.
+   Read exact Captain decisions and their Task dependencies from Inbox and
+   Task; load private Mate context only through `$agentos-memory`. Memory is
+   fallible context, not shared coordination or approval authority, so do not
+   copy preferences between homes or infer authority from chat memory.
 3. Treat status rows as durable history, not proof of current process state.
    Inspect Kubernetes only when workload state matters and Herdr only when terminal or harness state matters.
 4. Reconcile each active direct report against its recorded pod, PVC and exact

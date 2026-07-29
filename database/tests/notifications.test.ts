@@ -90,7 +90,6 @@ describe.serial("Fleet notifications", () => {
 
     expect(triggers.rows.map(({ table_name }) => table_name)).toEqual([
       "agents",
-      "captain",
       "external_events",
       "inbox",
       "task_assignments",
@@ -104,7 +103,6 @@ async function waitFor(predicate: () => boolean) {
   while (!predicate() && Date.now() < deadline) await Bun.sleep(5);
   expect(predicate()).toBe(true);
 }
-
 function expectedChannel(agentId: string) {
   return `agentos_mate_${agentId.replaceAll("-", "").toLowerCase()}`;
 }

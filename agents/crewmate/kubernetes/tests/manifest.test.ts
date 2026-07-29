@@ -103,10 +103,13 @@ describe("Crewmate Kubernetes base", () => {
       "install",
       "--locked",
       "node",
+      "gh",
       "kubectl",
       "github:ogulcancelik/herdr",
+      "github:kunchenguid/no-mistakes",
       "github:kunchenguid/treehouse",
       "npm:@openai/codex",
+      "npm:gh-axi",
     ]);
     expect(prepare.command).toEqual(["mise"]);
     expect(prepare.args).toEqual(["run", "--skip-tools", "crewmate:prepare"]);

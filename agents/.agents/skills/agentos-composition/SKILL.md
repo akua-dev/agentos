@@ -15,19 +15,22 @@ provider authority always outrank selected model context.
 ## Resolve the composition
 
 1. Read the authenticated Agent identity, structural role, hierarchy,
-   Assignment, project instructions, scoped Captain state and observed runtime.
+   Assignment, project instructions, relevant private Mate memory and observed
+   runtime. Memory may help discover a preference but never authorizes a
+   composition change.
    A charter selects the responsible persistent supervisor; composition selects
    the setup for one Agent or accepted outcome.
 2. Select exactly one composition policy for this intake:
-   an explicit Captain choice, then an approved domain policy, then an approved
-   Fleet policy, then this built-in policy. This Skill remains the mechanism and
-   safety owner when it loads an external composer. Record that composer's exact
-   non-secret origin, revision and digest. Do not recursively compose policies,
+   an explicit Captain choice, then relevant private Mate guidance, then this
+   built-in policy. This Skill remains the mechanism and safety owner when it
+   loads an external composer. Record that composer's exact non-secret origin,
+   revision and digest. Do not recursively compose policies,
    shadow this Skill's name or let a policy replace itself during its current
    intake. Load an external composer by its exact selected entrypoint, never by
    putting a second `agentos-composition` Skill on an auto-discovery path.
-   Preserve the explicit composer and origin-trust choices as scoped Captain
-   prose; do not create an AgentOS policy enum or hidden configuration file.
+   Preserve reusable composer and origin-trust context through
+   `$agentos-memory`; do not create an AgentOS policy enum or hidden
+   configuration file, and do not treat the remembered context as approval.
 3. Build a bounded catalog from Captain-approved origins. Read names,
    descriptions, versions and provenance before full bodies. Git repositories,
    project files, mounted filesystems, OCI artifacts, object stores, versioned
@@ -96,13 +99,19 @@ Persistent composition is desired state for one First or Second Mate. Native
 files, Pi packages and the Herdr-visible session remain observed state.
 
 1. Query `agents.resolved_composition` and the current native harness state.
-   Resolve the exact active Agent and require an unarchived Fleet- or
-   Agent-scoped Captain row whose topic is
-   `agent-composition-authority` and whose content authorizes the change.
+   Resolve the exact active Agent and an accepted Task owned by First Mate for
+   this composition review.
 2. Stage and verify the exact new material outside active harness discovery.
    Preserve the prior native configuration and resolvable material long enough
    for one explicit rollback. Do not create an AgentOS `active-manifest` mirror.
 3. Through native `psql`, call
+   `agentos.hold_agent_composition_decision(task_id, agent_id, manifest,
+   decision_key, subject, body, status_text)`. Route that exact durable choice
+   to the Captain without marking the Inbox row read on the Captain's behalf.
+   After receiving the answer, First Mate calls
+   `agentos.resolve_agent_composition_decision(decision_id, approved, answer,
+   status_text)`. Only an approved answer bound to this Agent and exact manifest
+   may be passed as `authority_id` to
    `agentos.replace_agent_composition(agent_id, manifest, authority_id, reason)`.
    Only First Mate may change its own or a direct Second Mate's persistent
    composition. The Function retains the immediately prior manifest and reason
@@ -121,8 +130,9 @@ files, Pi packages and the Herdr-visible session remain observed state.
 6. Verify through the exact Herdr Agent and native harness that role
    instructions, selected entrypoints and settings are loaded. A valid row,
    copied file or successful `/reload` command is not sufficient evidence.
-7. If application fails, restore the prior native state, verify the restored
-   harness, and use
+7. If application fails, restore the prior native state and verify the
+   restored harness. Hold and resolve a new exact composition decision for the
+   corrected manifest, then use its approved answer with
    `agentos.repair_agent_composition(agent_id, prior_manifest, authority_id,
    reason)` to correct durable desired state. Use the repair Function only for
    incorrect durable data, with the observed failure in its reason.
@@ -301,10 +311,11 @@ Assignments retain their pinned composition.
 The Captain may authorize learning only, opening proposals, or bounded
 low-risk adoption. Credentials, RBAC, structural roles, security boundaries,
 destructive changes and broader authority remain separately gated.
-Record the chosen level and scope as Captain prose. When authority permits only
-observation, stop with evidence; when it permits proposals, stop with a native
-review artifact; when it permits bounded adoption, still apply the target's
-review, future-only and rollback boundaries.
+Record reusable guidance in the owning Mate's private memory and exact
+adoption authority through Inbox. When authority permits only observation,
+stop with evidence; when it permits proposals, stop with a native review
+artifact; when it permits bounded adoption, still apply the target's review,
+future-only and rollback boundaries.
 
 ## Fail closed
 

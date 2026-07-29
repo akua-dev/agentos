@@ -308,7 +308,7 @@ describe("composition material digest", () => {
 
     try {
       await expect(digestMaterialDirectory(directory)).rejects.toThrow(
-        "changed while hashing",
+        /changed while hashing|changed path identity while reading/,
       );
     } finally {
       keepChanging = false;
