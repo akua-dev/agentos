@@ -23,5 +23,15 @@ files and are observed by the running Bun service without a Caddy, Envoy or
 other dynamic-route control plane. Provider adapters and selection semantics
 remain reviewed source delivered through the normal image lifecycle.
 
+The request and response transport boundary, including upstream identity
+encoding and stale response-header handling, is defined in
+[`ARCHITECTURE.md`](../../ARCHITECTURE.md#optional-pooled-ai-capacity). An
+upstream body-read failure records only a fixed bounded failure class, an
+`identity`/`encoded` bucket, and saturated chunk and byte counters when the
+downstream request remains active. Downstream request aborts and response-stream
+cancellations produce no failure observation. That observation never includes
+prompts, request or response bodies, credentials, URLs, headers,
+provider/routing/account/session identity, or full errors, messages or stacks.
+
 The package, executable, Kubernetes resources, Service DNS, Secret, PVC path,
 environment and client headers consistently use the `ai-gateway` identity.

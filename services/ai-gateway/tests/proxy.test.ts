@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createProxyHandler } from "../src/proxy.ts";
 import type { RouteLease } from "../src/types.ts";
 
-function request(path = "/responses", token = "fleet-token") {
+function request(path = "/responses", token = "fleet-token", signal?: AbortSignal) {
   return new Request(`http://gateway.test${path}`, {
     method: "POST",
     headers: {
@@ -12,11 +12,12 @@ function request(path = "/responses", token = "fleet-token") {
       "session-id": "session-a",
     },
     body: JSON.stringify({ model: "gpt-test", input: "hello" }),
+    signal,
   });
 }
 
 describe("authenticated raw Responses proxy", () => {
-  test("does not forward stale content encoding after Fetch decodes an upstream response", async () => {
+  test("requests an identity upstream and does not forward stale decoded content encoding", async () => {
     const upstreamBody = "decoded upstream response that must not be decompressed twice";
     const upstream = Bun.serve({
       hostname: "127.0.0.1",
@@ -29,6 +30,7 @@ describe("authenticated raw Responses proxy", () => {
           },
         }),
     });
+    let upstreamAcceptEncoding: string | null | undefined;
     const handler = createProxyHandler({
       clientToken: "fleet-token",
       acquire: async () => ({
@@ -39,7 +41,10 @@ describe("authenticated raw Responses proxy", () => {
         renew: async () => true,
         release: async () => undefined,
       }),
-      fetchImpl: (_input, init) => fetch(upstream.url, init),
+      fetchImpl: (_input, init) => {
+        upstreamAcceptEncoding = new Headers(init?.headers).get("accept-encoding");
+        return fetch(upstream.url, init);
+      },
     });
     const gateway = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: handler });
 
@@ -53,6 +58,7 @@ describe("authenticated raw Responses proxy", () => {
         body: JSON.stringify({ model: "gpt-test", input: "hello" }),
       });
 
+      expect(upstreamAcceptEncoding).toBe("identity");
       expect(response.headers.has("content-encoding")).toBe(false);
       expect(await response.text()).toBe(upstreamBody);
     } finally {
@@ -74,6 +80,282 @@ describe("authenticated raw Responses proxy", () => {
     const response = await handler(request("/responses", "wrong"));
     expect(response.status).toBe(401);
     expect(acquired).toBe(false);
+  });
+
+  test("forces identity encoding upstream and preserves a long streamed response", async () => {
+    const chunks = Array.from({ length: 256 }, (_, index) =>
+      new TextEncoder().encode(`data: ${index.toString().padStart(3, "0")}-${"x".repeat(1_016)}\n\n`),
+    );
+    const expected = chunks.map((chunk) => new TextDecoder().decode(chunk)).join("");
+    let upstream: Request | undefined;
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => undefined,
+      }),
+      fetchImpl: async (input, init) => {
+        upstream = new Request(input instanceof Request ? input.url : input.toString(), init);
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              for (const chunk of chunks) controller.enqueue(chunk);
+              controller.close();
+            },
+          }),
+          { headers: { "content-type": "text/event-stream" } },
+        );
+      },
+    });
+    const gatewayRequest = request();
+    gatewayRequest.headers.set("accept-encoding", "gzip, br");
+
+    const response = await handler(gatewayRequest);
+
+    expect(upstream?.headers.get("accept-encoding")).toBe("identity");
+    expect(await response.text()).toBe(expected);
+  });
+
+  test("classifies a Bun decoder failure from an encoded upstream", async () => {
+    const compressed = Bun.gzipSync(Buffer.from("x".repeat(100_000)));
+    const upstream = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: () =>
+        new Response(compressed.subarray(0, compressed.length - 8), {
+          headers: { "content-encoding": "gzip" },
+        }),
+    });
+    let observation: unknown;
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => undefined,
+      }),
+      fetchImpl: (_input, init) => fetch(upstream.url, init),
+      observeStreamFailure(value) {
+        observation = value;
+      },
+    });
+
+    try {
+      const response = await handler(request());
+      await expect(response.arrayBuffer()).rejects.toThrow();
+      expect(observation).toEqual({
+        event: "upstream_stream_failure",
+        upstreamEncoding: "encoded",
+        failureKind: "decode",
+        chunksForwarded: 0,
+        bytesForwarded: 0,
+      });
+    } finally {
+      upstream.stop(true);
+    }
+  });
+
+  test("preserves privacy-safe stream failure evidence when lease cleanup also fails", async () => {
+    const providerDetail = "provider route secret: error decoding response body";
+    let released = false;
+    let observation: unknown;
+    let pullCount = 0;
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => {
+          released = true;
+          throw new Error("private lease cleanup detail");
+        },
+      }),
+      fetchImpl: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              if (pullCount++ === 0) {
+                controller.enqueue(new Uint8Array([1, 2, 3, 4, 5]));
+                return;
+              }
+              controller.error(new TypeError(providerDetail));
+            },
+          }),
+          { headers: { "content-encoding": "gzip" } },
+        ),
+      observeStreamFailure(value) {
+        observation = value;
+      },
+    });
+
+    const response = await handler(request());
+    await expect(response.arrayBuffer()).rejects.toThrow(providerDetail);
+
+    expect(observation).toEqual({
+      event: "upstream_stream_failure",
+      upstreamEncoding: "encoded",
+      failureKind: "decode_candidate",
+      chunksForwarded: 1,
+      bytesForwarded: 5,
+    });
+    expect(JSON.stringify(observation)).not.toContain(providerDetail);
+    expect(released).toBe(true);
+  });
+
+  test("does not delay stream failures for an asynchronous observer", async () => {
+    let observationStarted = false;
+    let resolveObservation: (() => void) | undefined;
+    const observationPending = new Promise<void>((resolve) => {
+      resolveObservation = resolve;
+    });
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => undefined,
+      }),
+      fetchImpl: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.error(new Error("upstream stream failed"));
+            },
+          }),
+        ),
+      observeStreamFailure() {
+        observationStarted = true;
+        return observationPending;
+      },
+    });
+
+    const response = await handler(request());
+    const readOutcome = response.arrayBuffer().then(
+      () => "completed" as const,
+      () => "failed" as const,
+    );
+    const outcome = await Promise.race([
+      readOutcome,
+      Bun.sleep(100).then(() => "blocked" as const),
+    ]);
+    resolveObservation?.();
+
+    expect(outcome).toBe("failed");
+    expect(observationStarted).toBe(true);
+  });
+
+  test("does not report downstream cancellation as an upstream stream failure", async () => {
+    let markReadStarted: () => void = () => undefined;
+    const readStarted = new Promise<void>((resolve) => {
+      markReadStarted = resolve;
+    });
+    let observation: unknown;
+    let releaseCount = 0;
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => {
+          releaseCount += 1;
+        },
+      }),
+      fetchImpl: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull() {
+              markReadStarted();
+            },
+          }),
+        ),
+      observeStreamFailure(value) {
+        observation = value;
+      },
+    });
+
+    const response = await handler(request());
+    const reader = response.body?.getReader();
+    expect(reader).toBeDefined();
+    const pendingRead = reader!.read();
+    await readStarted;
+    await reader!.cancel("client disconnected");
+    await pendingRead;
+    await Bun.sleep(0);
+
+    expect(observation).toBeUndefined();
+    expect(releaseCount).toBe(1);
+  });
+
+  test("does not report request abort as an upstream stream failure", async () => {
+    let markReadStarted: () => void = () => undefined;
+    const readStarted = new Promise<void>((resolve) => {
+      markReadStarted = resolve;
+    });
+    let markReleased: () => void = () => undefined;
+    const released = new Promise<void>((resolve) => {
+      markReleased = resolve;
+    });
+    let observation: unknown;
+    const requestController = new AbortController();
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => {
+          markReleased();
+        },
+      }),
+      fetchImpl: async (_input, init) => {
+        const signal = init?.signal;
+        if (!signal) throw new Error("expected upstream abort signal");
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              signal.addEventListener("abort", () => controller.error(signal.reason), {
+                once: true,
+              });
+            },
+            pull() {
+              markReadStarted();
+            },
+          }),
+        );
+      },
+      observeStreamFailure(value) {
+        observation = value;
+      },
+    });
+
+    const response = await handler(request("/responses", "fleet-token", requestController.signal));
+    const reader = response.body?.getReader();
+    expect(reader).toBeDefined();
+    const pendingRead = reader!.read();
+    await readStarted;
+    requestController.abort();
+    await expect(pendingRead).rejects.toMatchObject({ name: "AbortError" });
+    await released;
+
+    expect(observation).toBeUndefined();
   });
 
   test("accepts and strips the dedicated Fleet client headers", async () => {
