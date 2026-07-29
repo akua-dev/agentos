@@ -61,18 +61,62 @@ export function CourseIntroduction({ firstLessonUrl }: { firstLessonUrl: string 
           The course follows each missing capability in order. Every step keeps what worked before
           it and adds one new responsibility.
         </p>
-        <ol className="mt-6 grid grid-cols-2 border-t border-l sm:grid-cols-4 xl:grid-cols-7">
-          {progression.map(([label, description], index) => (
-            <li key={label} className="min-h-24 border-r border-b p-3">
-              <span className="font-mono text-[10px] text-brand">
-                {String(index + 1).padStart(2, '0')}
-              </span>
-              <strong className="mt-4 block text-sm font-medium">{label}</strong>
-              <span className="mt-1 block text-xs leading-4 text-fd-muted-foreground">
-                {description}
-              </span>
-            </li>
-          ))}
+        <ol
+          aria-label="Progression from model to autonomous company"
+          className="relative mt-6"
+        >
+          {progression.map(([label, description], index) => {
+            const isFirst = index === 0;
+            const isFinal = index === progression.length - 1;
+
+            return (
+              <li
+                key={label}
+                className={`relative flex min-h-16 ${isFinal ? 'rounded-lg bg-brand/10' : ''}`}
+              >
+                <span
+                  className={`absolute left-4 w-px bg-fd-border ${
+                    isFirst ? 'top-8 bottom-0' : isFinal ? 'top-0 bottom-8' : 'inset-y-0'
+                  }`}
+                  aria-hidden
+                />
+                <div className="relative z-10 flex w-12 shrink-0 items-center">
+                  <span
+                    className={`flex size-8 items-center justify-center rounded-full border font-mono text-[10px] ${
+                      isFinal
+                        ? 'border-brand bg-brand font-semibold text-brand-foreground'
+                        : 'bg-fd-background text-brand'
+                    }`}
+                    aria-hidden
+                  >
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                </div>
+                <div
+                  className={`flex min-w-0 flex-1 flex-col justify-center gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6 ${
+                    isFinal ? 'py-4 pr-4' : 'border-b py-3'
+                  }`}
+                >
+                  <strong
+                    className={`text-base ${
+                      isFinal ? 'font-semibold text-brand' : 'font-medium'
+                    }`}
+                  >
+                    {label}
+                  </strong>
+                  <span
+                    className={`text-sm leading-5 ${
+                      isFinal
+                        ? 'font-medium text-fd-foreground'
+                        : 'text-fd-muted-foreground'
+                    }`}
+                  >
+                    {description}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
         </ol>
       </section>
 
