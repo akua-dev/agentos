@@ -72,4 +72,26 @@ describe("AgentOS composition preflight", () => {
     expect(first.registrations).toEqual(second.registrations);
     expect(first.registrations).not.toBe(second.registrations);
   });
+
+  test("validates Skill claims with Pi's native name rules", () => {
+    for (const skill of [
+      "Uppercase",
+      "underscore_name",
+      "-leading",
+      "trailing-",
+      "two--hyphens",
+      "s".repeat(65),
+    ]) {
+      expect(() =>
+        preflightAgentOSComposition([
+          registration("@example/skills", { skills: [skill] }),
+        ]),
+      ).toThrow("valid Pi Skill name");
+    }
+    expect(() =>
+      preflightAgentOSComposition([
+        registration("@example/skills", { skills: ["valid-pi-skill-81"] }),
+      ]),
+    ).not.toThrow();
+  });
 });

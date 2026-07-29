@@ -32,6 +32,9 @@ const singularClaimKind = {
   entries: "entry",
 } as const;
 
+const MAX_PI_SKILL_NAME_CHARACTERS = 64;
+const PI_SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export function preflightAgentOSComposition(
   registrations: readonly AgentOSRegistrationV1[],
 ): void {
@@ -52,7 +55,11 @@ export function preflightAgentOSComposition(
 
     for (const kind of claimKinds) {
       for (const name of registration.names[kind] ?? []) {
-        assertClaimName(name, singularClaimKind[kind]);
+        if (kind === "skills") {
+          assertPiSkillName(name, singularClaimKind[kind]);
+        } else {
+          assertClaimName(name, singularClaimKind[kind]);
+        }
         const key = `${kind}:${name}`;
         const prior = owners.get(key);
         if (prior) {
@@ -101,6 +108,22 @@ export function assertQualifiedName(value: unknown, label: string): asserts valu
   ) {
     throw new Error(
       `${label} must be a package-qualified name of at most 128 characters`,
+    );
+  }
+}
+
+export function assertPiSkillName(
+  value: unknown,
+  label: string,
+): asserts value is string {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > MAX_PI_SKILL_NAME_CHARACTERS ||
+    !PI_SKILL_NAME.test(value)
+  ) {
+    throw new Error(
+      `${label} must be a valid Pi Skill name of at most ${MAX_PI_SKILL_NAME_CHARACTERS} lowercase letters, numbers, and non-consecutive hyphens`,
     );
   }
 }

@@ -1,4 +1,5 @@
 export {
+  assertPiSkillName,
   assertQualifiedName,
   preflightAgentOSComposition,
   registerAgentOSRuntime,

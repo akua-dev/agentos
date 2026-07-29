@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import { resolvePersistentMateDistribution } from "./distribution.ts";
 import {
+  findPiSessionToResume,
   migratePiSessionCwd,
   readPiSession,
 } from "./pi-session.ts";
@@ -46,7 +47,7 @@ try {
   const agentCount = mates.length;
 
   if (agentCount === 0) {
-    await startMate();
+    await startMate(await findPiSessionToResume(agentCwd));
   } else if (agentCount === 1) {
     const mate = mates[0]!;
     if (await mateRunsFromCheckout(mate)) {

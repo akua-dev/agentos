@@ -3,7 +3,7 @@ import type {
   SessionStartEvent,
 } from "@earendil-works/pi-coding-agent";
 
-import { assertQualifiedName } from "./composition.ts";
+import { assertPiSkillName, assertQualifiedName } from "./composition.ts";
 
 export type AgentOSStartupContributionV1 = {
   version: 1;
@@ -24,10 +24,8 @@ export type AgentOSStartupOptions = {
 
 const MAX_CONTRIBUTIONS = 16;
 const MAX_ID_CHARACTERS = 128;
-const MAX_SKILL_CHARACTERS = 64;
 const MAX_INSTRUCTION_BYTES = 2_048;
 const MAX_TOTAL_INSTRUCTION_BYTES = 16_384;
-const PI_SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function composeAgentOSStartupPrompt(
   contributions: readonly AgentOSStartupContributionV1[],
@@ -61,11 +59,7 @@ export function composeAgentOSStartupPrompt(
         );
       }
       ids.add(contribution.id);
-      if (!isPiSkillName(contribution.skill)) {
-        throw new Error(
-          `startup contribution skill must be a valid Pi Skill name of at most ${MAX_SKILL_CHARACTERS} lowercase letters, numbers, and non-consecutive hyphens`,
-        );
-      }
+      assertPiSkillName(contribution.skill, "startup contribution skill");
       if (
         typeof contribution.instruction !== "string" ||
         contribution.instruction.length === 0
@@ -110,11 +104,7 @@ export function preflightAgentOSStartup(
   }
   const requiredSkills = new Set<string>();
   for (const skill of options.requiredSkills) {
-    if (!isPiSkillName(skill)) {
-      throw new Error(
-        `AgentOS startup required Skill must be a valid Pi Skill name of at most ${MAX_SKILL_CHARACTERS} lowercase letters, numbers, and non-consecutive hyphens`,
-      );
-    }
+    assertPiSkillName(skill, "AgentOS startup required Skill");
     if (requiredSkills.has(skill)) {
       throw new Error(`duplicate AgentOS startup required Skill "${skill}"`);
     }
@@ -160,15 +150,6 @@ export function registerAgentOSStartup(
       throw error;
     }
   });
-}
-
-function isPiSkillName(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    value.length > 0 &&
-    value.length <= MAX_SKILL_CHARACTERS &&
-    PI_SKILL_NAME.test(value)
-  );
 }
 
 function hasAvailableSkill(systemPrompt: string, skill: string): boolean {

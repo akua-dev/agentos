@@ -100,7 +100,9 @@ export async function loadPackagedRoleComposition(
     try {
       await access(roleSkillsPath);
       skillPaths.push(`resources/roles/${directory}/skills`);
-    } catch {}
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
   }
   const resources = resolveAgentOSResources({
     version: 1,

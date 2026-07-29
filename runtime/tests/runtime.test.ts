@@ -141,6 +141,7 @@ if (args[0] === "server") {
     AGENTOS_DISTRIBUTION_ROOT: defaultDistributionRoot,
     FAKE_HERDR_STATE: state,
     HERDR_SESSION: "agentos-firstmate-test",
+    PI_CODING_AGENT_DIR: join(state, "pi-agent"),
     PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
     ...overrides,
   };
@@ -207,6 +208,90 @@ describe("Mate runtime", () => {
     expect((await readCalls(state)).filter((call) => call[0] === "agent" && call[1] === "start")).toEqual([
       expectedStart,
     ]);
+  });
+
+  test("resumes the sole native Pi session when Herdr has no agent", async () => {
+    const { env, state } = await createHarness([]);
+    const persistedSession = join(
+      env.PI_CODING_AGENT_DIR!,
+      "sessions",
+      "--legacy-cwd--",
+      "session.jsonl",
+    );
+    await mkdir(join(env.PI_CODING_AGENT_DIR!, "sessions", "--legacy-cwd--"), {
+      recursive: true,
+    });
+    await writeFile(
+      persistedSession,
+      `${JSON.stringify({ cwd: env.AGENTOS_AGENT_CWD, id: "session-retained", type: "session", version: 3 })}\n`,
+      "utf8",
+    );
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const expectedStart = [
+      "agent",
+      "start",
+      "firstmate",
+      "--cwd",
+      defaultFirstMateCwd,
+      "--no-focus",
+      "--session",
+      "agentos-firstmate-test",
+      "--",
+      "pi",
+      "--no-context-files",
+      "--session",
+      persistedSession,
+    ];
+
+    await waitFor(async () =>
+      (await readCalls(state)).some((call) =>
+        call.length === expectedStart.length &&
+        call.every((argument, index) => argument === expectedStart[index]),
+      ),
+    );
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
+    expect(
+      (await readCalls(state)).filter(
+        (call) => call[0] === "agent" && call[1] === "start",
+      ),
+    ).toEqual([expectedStart]);
+  });
+
+  test("fails closed instead of creating a fresh Pi session when retained sessions are ambiguous", async () => {
+    const { env, state } = await createHarness([]);
+    const sessions = join(env.PI_CODING_AGENT_DIR!, "sessions", "--legacy-cwd--");
+    await mkdir(sessions, { recursive: true });
+    await Promise.all(
+      ["session-one.jsonl", "session-two.jsonl"].map((name, index) =>
+        writeFile(
+          join(sessions, name),
+          `${JSON.stringify({ cwd: env.AGENTOS_AGENT_CWD, id: `session-${index}`, type: "session", version: 3 })}\n`,
+          "utf8",
+        ),
+      ),
+    );
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const [exitCode, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stderr).text(),
+    ]);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("no unique session matches");
+    expect(
+      (await readCalls(state)).filter(
+        (call) => call[0] === "agent" && call[1] === "start",
+      ),
+    ).toEqual([]);
   });
 
   test("gives a persistent checkout access to release-installed dependencies", async () => {
