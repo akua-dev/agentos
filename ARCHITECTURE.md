@@ -314,6 +314,58 @@ Composition selection, application, review and improvement remain conditional
 Agent judgment taught by the composition Skill. Deterministic runtime code owns
 only the generic manifest, canonical digest and material-integrity guarantees.
 
+### Customization packages
+
+Pi's native package and resource configuration is the extension boundary for a
+deployed AgentOS Mate. AgentOS adds no second plugin registry. A reviewed Pi
+package may load additively beside the released AgentOS resources or provide a
+replacement distribution whose one selected entrypoint assembles released and
+organization-specific behavior. Pi configuration remains the observed
+loaded-resource authority; PostgreSQL composition records desired Agent setup
+without claiming native activation.
+
+A complete replacement exposes one exact Pi-discovered AgentOS entrypoint.
+First- and Second-Mate composition modules remain ordinary package modules
+outside extension discovery. The entrypoint validates the explicit deployed
+Agent role, selects exactly one composition and fails closed rather than
+guessing from the working directory or loading both roles.
+
+A replacement may reuse only public composition exports present in its exact
+AgentOS release. An unavailable export is a closed boundary, not permission to
+deep-import private implementation paths. The alternatives are an independent
+additive extension, an exact reviewed organization fork or waiting for a
+released public boundary.
+
+Packages may contribute extensions, instruction resources, Skills, prompts,
+Crewmate profiles, database materials and runtime assets. A complete
+distribution may also supply First- and Second-Mate role `mise.toml` files,
+images and native Kubernetes overlays. Package installation makes all of these
+available but grants no PostgreSQL, Kubernetes, provider or Git authority.
+
+Pi selection and process bootstrap are separate activation boundaries. Pi
+configuration plus safe `/reload` can select extensions, instructions, Skills
+and prompts. It cannot retroactively select the role Mise configuration, image,
+ServiceAccount, RBAC, mounts or Kubernetes workload that started its own
+process. Those changes use an explicit distribution root, native Mise process
+lifecycle and native Kubernetes apply and rollout while preserving and
+verifying the Mate home PVC. A release whose bootstrap paths still select its
+own role directories requires a reviewed organization fork or external
+Kubernetes overlay for that part; package presence is not proof of activation.
+
+An extension may trigger a bounded Pi turn at startup or reload and direct the
+model to one delivered Skill; the model then inspects and reconciles native
+authorities. For an authorized in-place distribution update, that Skill may
+guide a native image and Kubernetes rollout and verify the resumed Herdr and Pi
+session. The extension cannot perform first-boot selection from inside a
+process that has not started. AgentOS adds no Fleet-state watcher, synthetic
+Assignment event stream, automatic migration service or package activation
+record.
+
+`$agentos-customization` owns the conditional inspection, design, staging,
+selection, reload, verification and rollback workflow. The public
+[`CUSTOMIZATION.md`](./CUSTOMIZATION.md) page explains this product boundary
+without duplicating that procedure.
+
 ## Toolchains and worktrees
 
 Mise supplies tools to every AgentOS agent, including First Mates, Second Mates and Crewmates.
@@ -691,7 +743,12 @@ checkout while keeping operational roles out of contributor sessions:
 - `.agents/skills/` contains workflows that apply from every AgentOS checkout
   working directory: repository development, organization evaluation and
   post-evaluation improvement review;
-- `agents/.agents/skills/` contains workflows shared by First and Second Mate, including composition, delegation, private memory, supervision, runtime, authentication, database, optional pooled AI capacity, image-build, registry and ArtifactFS Scout operations;
+- `agents/.agents/skills/` contains workflows shared by First and Second Mate,
+  including composition, private memory, customization through trusted
+  additive or replacement Pi packages, delegation, supervision, runtime,
+  authentication, database,
+  optional pooled AI capacity, image-build, registry and ArtifactFS Scout
+  operations;
 - `agents/firstmate/.agents/skills/` contains First-Mate-only workflows, including bootstrap, cluster handoff and Second-Mate lifecycle;
 - `agents/secondmate/.agents/skills/` is reserved for workflows that are genuinely specific to a Second Mate;
 - a future subtree under `clis/`, `packages/` or `services/` may add its own `.agents/skills/` when development there needs a reusable workflow.
@@ -742,6 +799,7 @@ workspace. The tree reflects ownership, not deployment order:
 ├── VISION.md                         direction, priorities and non-goals
 ├── ARCHITECTURE.md                   system boundaries and repository map
 ├── BOOTSTRAP.md                      stable pointer to the bootstrap Skill
+├── CUSTOMIZATION.md                  public AgentOS customization orientation
 ├── CONTRIBUTING.md                   contributor setup and verification
 ├── AGENTS.md                         identity-neutral repository rules
 ├── .agents/skills/
@@ -856,6 +914,8 @@ workspace keeps one `bun.lock`.
 - Root `AGENTS.md` owns identity-neutral repository boundaries and instruction-placement rules.
 - `CONTRIBUTING.md` contains repository setup, development conventions and disposable-cluster smoke testing.
 - `BOOTSTRAP.md` points to the canonical First-Mate bootstrap skill without duplicating its procedure.
+- `CUSTOMIZATION.md` explains trusted AgentOS customization and points to its
+  canonical operational Skill without duplicating the procedure.
 - `docs/architecture.md` is a compatibility pointer to this document, not a second architecture source.
 - `.agents/skills/agentos-development/` contains the repository-development
   workflow shared by contributors and every Agent role working on AgentOS.
@@ -875,6 +935,10 @@ workspace keeps one `bun.lock`.
   proposals; it never replaces Fleet authority.
 - `agents/.agents/skills/agentos-composition/` owns model-directed composition
   selection, native application and observed verification.
+- `agents/.agents/skills/agentos-customization/` owns trusted package and
+  complete-distribution inspection, design, staging, native selection, reload
+  or workload rollout, verification and rollback for additive and replacement
+  AgentOS customizations.
 - `agents/firstmate/` and `agents/secondmate/` contain the two persistent role instruction surfaces, their Pi configuration and role-scoped skills.
 - `agents/crewmate/BRIEF.md` is the canonical bounded-worker contract rendered into each Assignment brief.
 - `agents/crewmate/images/` owns optional task-specific worker images; it never

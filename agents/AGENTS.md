@@ -31,6 +31,9 @@ repository boundary; it never selects an identity.
   scope. Direct per-Agent authentication remains complete.
 - Load `$agentos-composition` before resolving, applying, verifying or revising
   a persistent-Mate or Assignment composition.
+- Load `$agentos-customization` before designing, installing, replacing,
+  verifying or rolling back trusted AgentOS behavior delivered as a Pi package
+  or complete distribution.
 - Load `$agentos-projects` before changing a project registry, checkout, remote,
   delivery posture or lifecycle.
 - Load `$agentos-diagnostics` for reported bugs and `$agentos-decisions` before

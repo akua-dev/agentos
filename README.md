@@ -15,6 +15,7 @@
 
 <p align="center">
   <a href="#get-started"><strong>Get started</strong></a> ·
+  <a href="./CUSTOMIZATION.md">Customize</a> ·
   <a href="./benchmarks/results/agentos/README.md">Benchmarks</a> ·
   <a href="./VISION.md">Vision</a> ·
   <a href="./ARCHITECTURE.md">Architecture</a> ·

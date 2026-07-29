@@ -121,8 +121,9 @@ files, Pi packages and the Herdr-visible session remain observed state.
    authoritative. Apply Mise, extension, MCP, image, environment, credential
    and RBAC changes separately through their native reviewed boundaries. Do
    not replace the whole Mate image merely to satisfy one command or extension
-   requirement; an image change requires its own explicit workload selection
-   and rollout evidence.
+   requirement. Load `$agentos-customization` when that boundary installs, adds
+   or replaces Pi-package behavior. An image change requires its own explicit
+   workload selection and rollout evidence.
 5. At a safe turn boundary, use the harness's documented reload or resume
    behavior. For Pi instruction or Skill changes, `/reload` is the ordinary
    safe-boundary path. Do not interrupt a live Mate merely because desired
