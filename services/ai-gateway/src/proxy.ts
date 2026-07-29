@@ -33,11 +33,31 @@ export type FetchImplementation = (
   init?: RequestInit,
 ) => Promise<Response>;
 
+export type UpstreamEncoding = "identity" | "encoded";
+export type StreamFailureKind =
+  | "abort"
+  | "decode"
+  | "decode_candidate"
+  | "timeout"
+  | "transport"
+  | "unknown";
+
+export interface StreamFailureObservation {
+  event: "upstream_stream_failure";
+  upstreamEncoding: UpstreamEncoding;
+  failureKind: StreamFailureKind;
+  chunksForwarded: number;
+  bytesForwarded: number;
+}
+
 export interface ProxyHandlerOptions {
   clientToken: string;
   acquire(sessionKey: string | undefined, signal: AbortSignal): Promise<RouteLease | undefined>;
   fetchImpl: FetchImplementation;
   heartbeatMs?: number;
+  observeStreamFailure?(
+    observation: StreamFailureObservation,
+  ): void | Promise<void>;
 }
 
 export function createProxyHandler(options: ProxyHandlerOptions) {
@@ -55,6 +75,7 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
     if (!lease) return jsonResponse(503, { error: "no_eligible_account" });
 
     const headers = sanitizedRequestHeaders(request.headers);
+    headers.set("accept-encoding", "identity");
     headers.set("authorization", `Bearer ${lease.accessToken}`);
     let upstreamUrl: string;
     if (lease.kind === "codex_oauth") {
@@ -87,6 +108,7 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
       console.error("ai-gateway: response bookkeeping failed");
     }
 
+    const upstreamEncoding = classifyUpstreamEncoding(upstream.headers);
     const responseHeaders = new Headers(upstream.headers);
     for (const name of RESPONSE_HEADERS_TO_REMOVE) responseHeaders.delete(name);
     if (!upstream.body) {
@@ -98,7 +120,14 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
       });
     }
 
-    const body = streamWithLease(upstream.body, lease, options.heartbeatMs ?? 40_000);
+    const body = streamWithLease(
+      upstream.body,
+      lease,
+      options.heartbeatMs ?? 40_000,
+      request.signal,
+      upstreamEncoding,
+      options.observeStreamFailure ?? logStreamFailure,
+    );
     return new Response(body, {
       status: upstream.status,
       statusText: upstream.statusText,
@@ -146,9 +175,23 @@ function sanitizedRequestHeaders(input: Headers): Headers {
   return headers;
 }
 
-function streamWithLease(body: ReadableStream<Uint8Array>, lease: RouteLease, heartbeatMs: number) {
+function classifyUpstreamEncoding(headers: Headers): UpstreamEncoding {
+  const value = headers.get("content-encoding")?.trim().toLowerCase();
+  return value === undefined || value === "" || value === "identity" ? "identity" : "encoded";
+}
+
+function streamWithLease(
+  body: ReadableStream<Uint8Array>,
+  lease: RouteLease,
+  heartbeatMs: number,
+  downstreamSignal: AbortSignal,
+  upstreamEncoding: UpstreamEncoding,
+  observeStreamFailure: (observation: StreamFailureObservation) => void | Promise<void>,
+) {
   const reader = body.getReader();
   let finished = false;
+  let chunksForwarded = 0;
+  let bytesForwarded = 0;
   const timer = setInterval(() => {
     void lease.renew().catch(() => undefined);
   }, heartbeatMs);
@@ -158,29 +201,120 @@ function streamWithLease(body: ReadableStream<Uint8Array>, lease: RouteLease, he
     if (finished) return;
     finished = true;
     clearInterval(timer);
-    await lease.release();
+    try {
+      await lease.release();
+    } catch {
+      // Cleanup must never replace the provider response or original stream
+      // failure, and the private routing error is not safe to log.
+      console.error("ai-gateway: lease release failed");
+    }
   };
 
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
+      let next: Awaited<ReturnType<typeof reader.read>>;
       try {
-        const next = await reader.read();
-        if (next.done) {
-          await finish();
-          controller.close();
-          return;
-        }
-        controller.enqueue(next.value);
+        next = await reader.read();
       } catch (error) {
-        await finish();
+        const downstreamAborted = downstreamSignal.aborted;
         controller.error(error);
+        if (!downstreamAborted) {
+          const observation: StreamFailureObservation = {
+            event: "upstream_stream_failure",
+            upstreamEncoding,
+            failureKind: classifyStreamFailure(error, upstreamEncoding),
+            chunksForwarded,
+            bytesForwarded,
+          };
+          void reportStreamFailure(observeStreamFailure, observation);
+        }
+        await finish();
+        return;
       }
+
+      if (next.done) {
+        await finish();
+        try {
+          controller.close();
+        } catch {
+          await finish();
+        }
+        return;
+      }
+
+      try {
+        controller.enqueue(next.value);
+      } catch {
+        await finish();
+        return;
+      }
+      chunksForwarded = boundedAdd(chunksForwarded, 1);
+      bytesForwarded = boundedAdd(bytesForwarded, next.value.byteLength);
     },
     async cancel(reason) {
       await reader.cancel(reason).catch(() => undefined);
       await finish();
     },
   });
+}
+
+function boundedAdd(total: number, increment: number): number {
+  return Math.min(Number.MAX_SAFE_INTEGER, total + Math.min(Number.MAX_SAFE_INTEGER, increment));
+}
+
+function classifyStreamFailure(
+  error: unknown,
+  upstreamEncoding: UpstreamEncoding,
+): StreamFailureKind {
+  const terms: string[] = [];
+  let current = error;
+  for (let depth = 0; depth < 3 && current !== undefined; depth += 1) {
+    if (current instanceof Error) {
+      terms.push(current.name, current.message);
+      current = current.cause;
+      continue;
+    }
+    if (typeof current === "object" && current !== null) {
+      const record = current as Record<string, unknown>;
+      if (typeof record.name === "string") terms.push(record.name);
+      if (typeof record.message === "string") terms.push(record.message);
+      if (typeof record.code === "string") terms.push(record.code);
+      current = record.cause;
+      continue;
+    }
+    if (typeof current === "string") terms.push(current);
+    break;
+  }
+  if (terms.length === 0) {
+    try {
+      terms.push(String(error));
+    } catch {
+      // Classification is best effort; the observation never includes this value.
+    }
+  }
+  const value = terms.join(" ").toLowerCase();
+  if (/abort|cancel/.test(value)) return "abort";
+  if (/brotli|content.?encoding|decode|decompress|gzip|zlib/.test(value)) return "decode";
+  if (/timeout|timed.?out/.test(value)) return "timeout";
+  if (/connection|econn|network|socket|transport|und_err/.test(value)) return "transport";
+  return upstreamEncoding === "encoded" ? "decode_candidate" : "unknown";
+}
+
+async function reportStreamFailure(
+  observe: (observation: StreamFailureObservation) => void | Promise<void>,
+  observation: StreamFailureObservation,
+): Promise<void> {
+  try {
+    await observe(observation);
+  } catch {
+    console.error("ai-gateway: stream failure observation failed");
+  }
+}
+
+function logStreamFailure(observation: StreamFailureObservation): void {
+  console.error(
+    `ai-gateway: event=${observation.event} upstream_encoding=${observation.upstreamEncoding} failure_kind=${observation.failureKind} chunks_forwarded=${observation.chunksForwarded} bytes_forwarded=${observation.bytesForwarded}`,
+  );
 }
 
 function jsonResponse(status: number, body: Record<string, string>): Response {
