@@ -25,10 +25,10 @@ export function CourseIntroduction({ firstLessonUrl }: { firstLessonUrl: string 
     <article className="mx-auto max-w-[704px]">
       <header className="border-b pb-8">
         <p className="mb-4 font-mono text-xs font-medium text-brand">AgentOS Learn · Introduction</p>
-        <h1 className="max-w-[15ch] text-[clamp(2.5rem,5vw,4rem)] leading-[0.98] font-semibold tracking-[-0.04em] text-balance">
+        <h1 className="max-w-[19ch] text-[clamp(2.25rem,4vw,3.5rem)] leading-[1.02] font-semibold tracking-[-0.04em] text-balance">
           What is an autonomous company?
         </h1>
-        <p className="mt-6 max-w-[62ch] text-lg leading-8 text-pretty text-fd-muted-foreground">
+        <p className="mt-6 max-w-[62ch] text-base leading-7 text-pretty text-fd-muted-foreground sm:text-lg sm:leading-8">
           An autonomous company is a human-led organization in which persistent Agents turn intent
           into owned outcomes, operate within explicit authority, learn from evidence and return the
           decisions that belong to people.
