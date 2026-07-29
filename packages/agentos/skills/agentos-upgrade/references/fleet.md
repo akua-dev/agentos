@@ -57,8 +57,11 @@ and is at a safe update boundary.
 Record secret-safe evidence in First Mate's durable native Pi session. If any
 member is dirty, ambiguous, unhealthy, unbound, on an unsupported update or
 pull policy, unable to pull the digest, still performing a consequential
-mutation, has unexplained declarative/live drift or is otherwise outside the
-shared atomic boundary, stop before the first mutation and report the blocker.
+mutation, has declarative/live drift outside the one-Mate procedure's
+release-field reconciliation boundary, or is otherwise outside the shared
+atomic boundary, stop before the first mutation and report the blocker. Carry
+any reconcilable release-field drift into each member's one-Mate Preview; do not
+apply it before the run-once database result.
 
 A member already matching the target checkout and image-seed commits, desired
 and observed release image membership, installation-owned declarative source

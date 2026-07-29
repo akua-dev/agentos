@@ -45,6 +45,13 @@ Release publication, image metadata and a successful pull prove provenance and
 availability; they do not prove that this Mate's role-specific init and runtime
 paths can start.
 
+Before database inspection or mutation, materialize the verified tag commit as
+a clean, read-only native Git source root separate from the persistent active
+checkout. Record that root, its exact tag and commit, and keep the same source
+root through database preparation and preview. The selected release's database
+assets and pinned tooling must come from this root; never let
+`database:prepare` fall back to the active checkout.
+
 ## Freeze the preflight boundary
 
 Resolve the current execution boundary and exact target context, namespace,
@@ -53,6 +60,7 @@ evidence in the current durable native Pi session:
 
 - persistent checkout commit, branch or detached state, cleanliness and target
   tag;
+- read-only target-release source root, exact tag and commit;
 - image-seed commit;
 - any installation-owned Kustomize or resource source for the target, its exact
   paths, a secret-safe render, and the rendered release identity and preserved
@@ -85,10 +93,15 @@ Stop before mutation on insufficient authority, a dirty checkout, an ambiguous
 Mate or session, a scaled, extra or missing target Pod, an unbound PVC, an
 unhealthy current runtime, an unsupported update or pull policy, unverified
 pull access, an unverifiable release, unexplained checkout or image mismatch,
-or any unexplained difference between an installation-owned declarative source
-and the live workload. An unapplied staged release is drift, not an input to the
-current upgrade. Never reset, clean, overwrite or silently render and apply
-that state to make preflight pass.
+an unavailable or changed target-release source root, or a declarative/live
+difference outside the release-field reconciliation below. When an
+installation-owned declarative source exists, it is canonical for the fields it
+declares. A difference limited to the release fields permitted in Preview, or
+to preview-only source metadata, is a recorded, reconcilable drift: preserve the
+source and carry that comparison into Preview. A difference in any other
+declared wiring, an unrenderable source, or ambiguous ownership remains a hard
+stop. Never overwrite the source to match live state or apply it before the
+released database result.
 
 ## Reconcile the released database
 
@@ -102,8 +115,9 @@ procedure's recorded database result and never invoke that phase per member.
 If a Second-Mate self-update requires First Mate to execute the Fleet-owner
 database phase, wait for First Mate's exact result instead of requesting a new
 Captain approval or continuing locally. After the database result, recheck the
-named target's identity, checkout, declarative/live baseline, active work, PVC
-and native session. Stop if any earlier preflight fact no longer holds.
+named target's identity, checkout, declarative/live baseline,
+target-release source root, active work, PVC and native session. Stop if any
+earlier preflight fact no longer holds.
 
 ## Preview the reversible change
 
@@ -114,8 +128,10 @@ installation-owned declarative source exists, also preserve its exact prior
 release fields and secret-safe rendered comparison. The native session is the
 recovery record; create no upgrade-state file, shadow manifest or database row.
 
-When an installation-owned declarative source exists, change the release fields
-there and render it through its native Kustomize or resource path. When none
+When an installation-owned declarative source exists, treat it as canonical and
+change only its release fields through the native Kustomize or resource path.
+This render-and-apply path is the supported reconciliation for the recorded
+release-field drift; never copy live values back into the source. When none
 exists, build the smallest patch from the observed live workload and record
 that boundary instead of inventing a persistent source. Preview the resulting
 resource against the live API and inspect the complete structured diff. Permit

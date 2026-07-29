@@ -8,10 +8,10 @@ mechanics rather than reproducing them here.
 
 ## Inspect the exact release and Fleet
 
-1. From the same verified release tuple used for the workload update, require
-   the version-neutral database manifest, ordered `database/migrations/`
-   assets and Drizzle journal. Stop if the release database assets are absent,
-   ambiguous or from another revision.
+1. From the same verified release tuple and read-only target-release source root
+   resolved by the enclosing upgrade, require the version-neutral database
+   manifest, ordered `database/migrations/` assets and Drizzle journal. Stop if
+   the release database assets are absent, ambiguous or from another revision.
 2. Resolve the one PostgreSQL database for the current Fleet, the authenticated
    root First Mate and the Fleet-owner login that owns the released AgentOS
    schema. Inspect the server identity, current migration journal, checksums
@@ -42,9 +42,12 @@ upgrade.
 Otherwise:
 
 1. Require the authenticated root First Mate and Fleet-owner database login.
-2. Use `$agentos-database` to prepare the selected release's pinned tooling
-   through its released task and to apply the ordered pending chain through
-   Drizzle. Never invoke a migration once per Mate.
+2. From `<target-release-source-root>/database`, use `$agentos-database` to run
+   `AGENTOS_IMPLEMENTATION_ROOT=<target-release-source-root> mise run
+   database:prepare`, then use its printed path to apply the selected
+   release's pinned tooling and ordered pending chain through Drizzle. The
+   explicit root keeps preparation on the verified target release rather than
+   the active checkout. Never invoke a migration once per Mate.
 3. Verify the resulting journal and checksums, confirm
    `agentos.current_agent_id()` resolves the single active root First Mate for
    the Fleet-owner session, and run the selected release's implemented
