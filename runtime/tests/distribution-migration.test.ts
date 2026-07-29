@@ -267,6 +267,30 @@ describe("persistent Mate distribution migration", () => {
     expect(retainedAfter).toEqual(retainedBefore);
   });
 
+  test("rewrites only the Pi header cwd after a tolerated malformed preamble", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "agentos-session-preamble-"));
+    temporaryDirectories.push(sandbox);
+    const session = join(sandbox, "session.jsonl");
+    const previousCwd = join(sandbox, "previous");
+    const nextCwd = join(sandbox, "next");
+    const preamble = "\n{malformed\n";
+    const history = `${JSON.stringify({
+      message: { content: "preserve conversation", role: "user" },
+      type: "message",
+    })}\n`;
+    await writeFile(
+      session,
+      `${preamble}${JSON.stringify(sessionHeader(previousCwd))}\n${history}`,
+      "utf8",
+    );
+
+    await migratePiSessionCwd(session, nextCwd);
+
+    expect(await readFile(session, "utf8")).toBe(
+      `${preamble}${JSON.stringify(sessionHeader(nextCwd))}\n${history}`,
+    );
+  });
+
   test("keeps Pi-only selection separate from native rollout and restores native authorities", async () => {
     const previousImage =
       "ghcr.io/example/agentos@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

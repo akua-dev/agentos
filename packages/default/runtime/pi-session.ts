@@ -1,38 +1,51 @@
 import { homedir } from "node:os";
-import { readdir, readFile, rename, writeFile } from "node:fs/promises";
-import { isAbsolute } from "node:path";
-import { join } from "node:path";
+import { open, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { isAbsolute, join, resolve } from "node:path";
+import { StringDecoder } from "node:string_decoder";
+import { fileURLToPath } from "node:url";
 
 export type PiSessionContents = {
   contents: string;
   header: Record<string, unknown> & { cwd: string; type: "session" };
+  headerStart: number;
   lineBreak: number;
 };
+
+// Pi 0.81.1 uses these bounds while locating the first parsed session entry.
+// Keep them aligned with the exact peer dependency so recovery and `pi --session`
+// accept the same retained files without loading every history during discovery.
+const SESSION_HEADER_READ_BUFFER_SIZE = 4 * 1024;
+const MAX_SESSION_HEADER_SCAN_BYTES = 1024 * 1024;
 
 export async function findPiSessionToResume(
   cwd: string,
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<string | undefined> {
-  const agentDirectory =
+  const agentDirectory = normalizePiPath(
     environment.PI_CODING_AGENT_DIR ??
-    join(environment.HOME ?? homedir(), ".pi", "agent");
-  const sessionDirectory =
+      join(environment.HOME ?? homedir(), ".pi", "agent"),
+    environment,
+  );
+  const configuredSessionDirectory =
     environment.PI_CODING_AGENT_SESSION_DIR ??
-    join(agentDirectory, "sessions");
+    (await piSessionDirectorySetting(cwd, agentDirectory));
+  const sessionDirectory =
+    !configuredSessionDirectory
+      ? join(agentDirectory, "sessions")
+      : normalizePiPath(configuredSessionDirectory, environment);
   const paths = await sessionPaths(sessionDirectory);
   const candidates = [] as Array<{ path: string; cwd: string }>;
 
   for (const path of paths) {
     try {
-      const { header } = await readPiSession(path);
+      const header = await readPiSessionHeader(path);
       candidates.push({ path, cwd: header.cwd });
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (
         code === "ENOENT" ||
-        error instanceof SyntaxError ||
-        (error instanceof Error &&
-          error.message === `${path} has no valid Pi session header.`)
+        error instanceof InvalidPiSessionHeaderError ||
+        error instanceof PiSessionHeaderScanLimitError
       ) {
         continue;
       }
@@ -41,8 +54,12 @@ export async function findPiSessionToResume(
   }
 
   if (candidates.length === 0) return undefined;
-  const matching = candidates.filter((candidate) => candidate.cwd === cwd);
-  if (candidates.length === 1 && matching.length === 1) {
+  const normalizedCwd = normalizePiPath(cwd, environment);
+  const matching = candidates.filter(
+    (candidate) =>
+      normalizePiPath(candidate.cwd, environment) === normalizedCwd,
+  );
+  if (matching.length === 1) {
     return matching[0]!.path;
   }
   throw new Error(
@@ -57,12 +74,16 @@ export async function migratePiSessionCwd(
   if (!isAbsolute(cwd)) {
     throw new Error("A migrated Pi session working directory must be absolute.");
   }
-  const { contents, header, lineBreak } = await readPiSession(path);
+  const { contents, header, headerStart, lineBreak } =
+    await readPiSession(path);
   const next = `${path}.agentos-next`;
   const remainder = lineBreak === -1 ? "\n" : contents.slice(lineBreak);
   await writeFile(
     next,
-    `${JSON.stringify({ ...header, cwd })}${remainder}`,
+    `${contents.slice(0, headerStart)}${JSON.stringify({
+      ...header,
+      cwd,
+    })}${remainder}`,
     { mode: 0o600 },
   );
   await rename(next, path);
@@ -72,14 +93,181 @@ export async function readPiSession(
   path: string,
 ): Promise<PiSessionContents> {
   const contents = await readFile(path, "utf8");
-  const lineBreak = contents.indexOf("\n");
-  const firstLine = lineBreak === -1 ? contents : contents.slice(0, lineBreak);
-  const parsed = JSON.parse(firstLine) as Record<string, unknown>;
-  if (parsed.type !== "session" || typeof parsed.cwd !== "string") {
-    throw new Error(`${path} has no valid Pi session header.`);
+  let headerStart = 0;
+  while (headerStart <= contents.length) {
+    const lineBreak = contents.indexOf("\n", headerStart);
+    const line =
+      lineBreak === -1
+        ? contents.slice(headerStart)
+        : contents.slice(headerStart, lineBreak);
+    const candidate = parsePiSessionHeaderCandidate(line);
+    if (candidate.kind === "header") {
+      return {
+        contents,
+        header: candidate.header,
+        headerStart,
+        lineBreak,
+      };
+    }
+    if (candidate.kind === "invalid" || lineBreak === -1) break;
+    headerStart = lineBreak + 1;
   }
-  const header = parsed as PiSessionContents["header"];
-  return { contents, header, lineBreak };
+  throw new InvalidPiSessionHeaderError(path);
+}
+
+async function readPiSessionHeader(
+  path: string,
+): Promise<PiSessionContents["header"]> {
+  const handle = await open(path, "r");
+  try {
+    const decoder = new StringDecoder("utf8");
+    const buffer = Buffer.allocUnsafe(SESSION_HEADER_READ_BUFFER_SIZE);
+    const lineChunks: string[] = [];
+    let scannedBytes = 0;
+
+    while (scannedBytes < MAX_SESSION_HEADER_SCAN_BYTES) {
+      const readLength = Math.min(
+        buffer.length,
+        MAX_SESSION_HEADER_SCAN_BYTES - scannedBytes,
+      );
+      const { bytesRead } = await handle.read(
+        buffer,
+        0,
+        readLength,
+        null,
+      );
+      if (bytesRead === 0) {
+        lineChunks.push(decoder.end());
+        return requirePiSessionHeader(path, lineChunks.join(""));
+      }
+      scannedBytes += bytesRead;
+      const chunk = decoder.write(buffer.subarray(0, bytesRead));
+      let lineStart = 0;
+      let newline = chunk.indexOf("\n", lineStart);
+
+      while (newline !== -1) {
+        lineChunks.push(chunk.slice(lineStart, newline));
+        const candidate = parsePiSessionHeaderCandidate(
+          lineChunks.join(""),
+        );
+        if (candidate.kind === "header") return candidate.header;
+        if (candidate.kind === "invalid") {
+          throw new InvalidPiSessionHeaderError(path);
+        }
+        lineChunks.length = 0;
+        lineStart = newline + 1;
+        newline = chunk.indexOf("\n", lineStart);
+      }
+      lineChunks.push(chunk.slice(lineStart));
+    }
+
+    const probe = Buffer.allocUnsafe(1);
+    const { bytesRead } = await handle.read(probe, 0, probe.length, null);
+    if (bytesRead === 0) {
+      lineChunks.push(decoder.end());
+      return requirePiSessionHeader(path, lineChunks.join(""));
+    }
+    throw new PiSessionHeaderScanLimitError(path);
+  } finally {
+    await handle.close();
+  }
+}
+
+type PiSessionHeaderCandidate =
+  | { kind: "header"; header: PiSessionContents["header"] }
+  | { kind: "invalid" }
+  | { kind: "skip" };
+
+function parsePiSessionHeaderCandidate(
+  line: string,
+): PiSessionHeaderCandidate {
+  if (!line.trim()) return { kind: "skip" };
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(line) as Record<string, unknown>;
+  } catch {
+    return { kind: "skip" };
+  }
+  if (
+    parsed.type !== "session" ||
+    typeof parsed.id !== "string" ||
+    typeof parsed.cwd !== "string"
+  ) {
+    return { kind: "invalid" };
+  }
+  return {
+    header: parsed as PiSessionContents["header"],
+    kind: "header",
+  };
+}
+
+function requirePiSessionHeader(
+  path: string,
+  line: string,
+): PiSessionContents["header"] {
+  const candidate = parsePiSessionHeaderCandidate(line);
+  if (candidate.kind === "header") return candidate.header;
+  throw new InvalidPiSessionHeaderError(path);
+}
+
+class InvalidPiSessionHeaderError extends Error {
+  constructor(path: string) {
+    super(`${path} has no valid Pi session header.`);
+    this.name = "InvalidPiSessionHeaderError";
+  }
+}
+
+class PiSessionHeaderScanLimitError extends Error {
+  constructor(path: string) {
+    super(
+      `Pi session header exceeds ${MAX_SESSION_HEADER_SCAN_BYTES}-byte scan limit: ${path}`,
+    );
+    this.name = "PiSessionHeaderScanLimitError";
+  }
+}
+
+async function piSessionDirectorySetting(
+  cwd: string,
+  agentDirectory: string,
+): Promise<string | undefined> {
+  const [globalSetting, projectSetting] = await Promise.all([
+    readSessionDirectorySetting(join(agentDirectory, "settings.json")),
+    readSessionDirectorySetting(join(cwd, ".pi", "settings.json")),
+  ]);
+  return projectSetting ?? globalSetting;
+}
+
+async function readSessionDirectorySetting(
+  path: string,
+): Promise<string | undefined> {
+  try {
+    const settings = JSON.parse(
+      await readFile(path, "utf8"),
+    ) as Record<string, unknown>;
+    return typeof settings.sessionDir === "string"
+      ? settings.sessionDir
+      : undefined;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || error instanceof SyntaxError) return undefined;
+    throw error;
+  }
+}
+
+function normalizePiPath(
+  path: string,
+  environment: NodeJS.ProcessEnv,
+): string {
+  const home = environment.HOME ?? homedir();
+  const expanded =
+    path === "~"
+      ? home
+      : path.startsWith("~/")
+        ? join(home, path.slice(2))
+        : path;
+  return resolve(
+    expanded.startsWith("file://") ? fileURLToPath(expanded) : expanded,
+  );
 }
 
 async function sessionPaths(directory: string): Promise<string[]> {

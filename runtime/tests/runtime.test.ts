@@ -262,6 +262,117 @@ describe("Mate runtime", () => {
     ).toEqual([expectedStart]);
   });
 
+  test("resumes from Pi's configured session directory with native tilde expansion", async () => {
+    const { env, state } = await createHarness([]);
+    const home = join(state, "home");
+    const sessionDirectory = join(home, "retained-sessions");
+    const persistedSession = join(sessionDirectory, "session.jsonl");
+    await Promise.all([
+      mkdir(sessionDirectory, { recursive: true }),
+      mkdir(env.PI_CODING_AGENT_DIR!, { recursive: true }),
+    ]);
+    await Promise.all([
+      writeFile(
+        join(env.PI_CODING_AGENT_DIR!, "settings.json"),
+        `${JSON.stringify({ sessionDir: "~/retained-sessions" })}\n`,
+        "utf8",
+      ),
+      writeFile(
+        persistedSession,
+        `${JSON.stringify({ cwd: env.AGENTOS_AGENT_CWD, id: "session-configured", type: "session", version: 3 })}\n`,
+        "utf8",
+      ),
+    ]);
+    const child = Bun.spawn([process.execPath, runMate], {
+      env: { ...env, HOME: home },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    await waitFor(async () =>
+      (await readCalls(state)).some((call) =>
+        call[0] === "agent" &&
+        call[1] === "start" &&
+        call.includes(persistedSession),
+      ),
+    );
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
+  });
+
+  test("resumes when blank and malformed lines precede the native Pi header", async () => {
+    const { env, state } = await createHarness([]);
+    const sessions = join(env.PI_CODING_AGENT_DIR!, "sessions", "--legacy-cwd--");
+    const persistedSession = join(sessions, "session.jsonl");
+    await mkdir(sessions, { recursive: true });
+    await writeFile(
+      persistedSession,
+      [
+        "",
+        "{malformed",
+        JSON.stringify({
+          cwd: env.AGENTOS_AGENT_CWD,
+          id: "session-with-preamble",
+          type: "session",
+          version: 3,
+        }),
+        JSON.stringify({ message: "preserve me", type: "message" }),
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const child = Bun.spawn([process.execPath, runMate], {
+      env,
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    await waitFor(async () =>
+      (await readCalls(state)).some((call) =>
+        call[0] === "agent" &&
+        call[1] === "start" &&
+        call.includes(persistedSession),
+      ),
+    );
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
+  });
+
+  test("does not discover a Pi header beyond Pi's bounded one-megabyte scan", async () => {
+    const { env, state } = await createHarness([]);
+    const sessionDirectory = join(state, "oversized-sessions");
+    const persistedSession = join(sessionDirectory, "oversized.jsonl");
+    await mkdir(sessionDirectory, { recursive: true });
+    await writeFile(
+      persistedSession,
+      `${"{malformed\n".repeat(100_000)}${JSON.stringify({
+        cwd: env.AGENTOS_AGENT_CWD,
+        id: "session-beyond-scan-limit",
+        type: "session",
+        version: 3,
+      })}\n`,
+      "utf8",
+    );
+    const child = Bun.spawn([process.execPath, runMate], {
+      env: {
+        ...env,
+        PI_CODING_AGENT_SESSION_DIR: sessionDirectory,
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+
+    await waitFor(async () =>
+      (await readCalls(state)).some((call) =>
+        call[0] === "agent" &&
+        call[1] === "start" &&
+        !call.includes(persistedSession),
+      ),
+    );
+    child.kill("SIGTERM");
+    expect(await child.exited).toBe(0);
+  });
+
   test("fails closed instead of creating a fresh Pi session when retained sessions are ambiguous", async () => {
     const { env, state } = await createHarness([]);
     const sessions = join(env.PI_CODING_AGENT_DIR!, "sessions", "--legacy-cwd--");
