@@ -21,6 +21,8 @@ Load `$agentos-runtime` before inspecting or changing Kubernetes or Herdr.
    - switching that Mate's clean persistent AgentOS checkout to the verified
      release;
    - updating that one Mate workload to the release's immutable image; and
+   - changing only the verified stable release metadata: the StatefulSet and
+     Pod-template `app.kubernetes.io/version` labels to the requested version;
    - the single Pod replacement required to activate the image.
 4. If the Captain says only “update AgentOS,” resolve and present the newest
    stable candidate, then obtain confirmation of the exact version before
@@ -69,6 +71,9 @@ durable native harness session:
 - effective StatefulSet update strategy; require `RollingUpdate` with no
   non-zero partition, and stop before mutation for `OnDelete` or any other
   unsupported strategy;
+- effective replica count and target Pod; require exactly one desired replica
+  and exactly one healthy, non-terminating StatefulSet-owned target Pod, and
+  stop before mutation for a scaled, extra, missing or ambiguous Pod;
 - observed Pod image IDs, readiness and restart counts;
 - home PVC name, UID and bound volume;
 - Herdr session, Mate handle, pane and native harness session reference; and
@@ -146,6 +151,8 @@ Verify:
   commit;
 - the StatefulSet's current generation is observed and the replacement Pod is
   Ready;
+- exactly one StatefulSet-owned target Pod remains for the one replica, with
+  the prior Pod no longer active;
 - the replacement Pod has no unexpected container restarts;
 - the original home PVC UID and native harness session reference remain;
 - all recorded installation-specific Pod-template wiring remains.
