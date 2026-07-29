@@ -161,7 +161,8 @@ model turn merely because it was imported. Keep this descriptor limited to
 startup aggregation; tools, commands and other Pi behavior remain ordinary
 registration functions. Before attaching any Pi behavior, validate the startup
 message metadata and confirm that every contribution names a Skill declared by
-the selected distribution.
+the selected distribution. Also claim the emitted custom message type in that
+distribution's structural message names.
 
 Do not rely on Pi's duplicate-name resolution. The selected Pi build may keep
 the first registration across extensions while a later registration replaces
@@ -207,29 +208,37 @@ package. Keep the prompt bounded and route judgment to one delivered Skill:
 
 ```ts
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+  composeAgentOSStartupPrompt,
+  registerAgentOSStartup,
+  type AgentOSStartupContributionV1,
+} from "@agentos/pi";
+
+const startup: AgentOSStartupContributionV1 = {
+  version: 1,
+  id: "@example/agentos:startup",
+  skill: "example-agentos-startup",
+  instruction: "Reconcile the reviewed customization through native tools.",
+};
 
 export default function registerCustomization(pi: ExtensionAPI) {
-  pi.on("session_start", (event) => {
-    if (event.reason !== "startup" && event.reason !== "reload") return;
-
-    pi.sendMessage(
-      {
-        customType: "example-agentos-startup",
-        content:
-          "Load $example-agentos-startup and reconcile its reviewed customization.",
-        display: true,
-        details: {},
-      },
-      { triggerTurn: true, deliverAs: "followUp" },
-    );
+  registerAgentOSStartup(pi, {
+    customType: "@example/agentos:startup",
+    prompt: composeAgentOSStartupPrompt([startup]),
+    requiredSkills: [startup.skill],
   });
 }
 ```
 
-Declare the named Skill through the package's native Pi resources so it is
-available before the prompted turn. Prevent recursive or unbounded follow-ups.
-The default AgentOS startup hook is a public configurable registration
-function; a replacement may reuse it with a different prompt.
+Pi 0.81.1 emits `session_start` before extension `resources_discover` hooks.
+Declare every required startup Skill through the package manifest or native Pi
+settings so it is present in the effective pre-session Skill catalog.
+`registerAgentOSStartup` verifies that catalog before triggering the turn. A
+role-only Skill supplied only by `resources_discover` remains available after
+discovery, but it cannot be a startup contribution target. Prevent recursive
+or unbounded follow-ups. The default AgentOS startup hook is a public
+configurable registration function; a replacement may reuse it with a
+different prompt.
 
 The prompt starts a model turn. It does not prove that a migration, package,
 role or Assignment changed. Let the Skill inspect authoritative state with

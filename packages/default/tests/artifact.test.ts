@@ -335,7 +335,10 @@ describe("publishable AgentOS Pi artifacts", () => {
           join(installedDefault, "extensions", "agentos.ts"),
         ).href}?artifact=${Date.now()}`
       );
-      const fake = createFakePi();
+      const fake = createFakePi({
+        systemPrompt:
+          "<available_skills><skill><name>agentos-supervision</name></skill></available_skills>",
+      });
       await installedEntrypoint.default(fake.pi);
       const [instructions] = await fake.emit("before_agent_start", {
         type: "before_agent_start",
@@ -375,5 +378,34 @@ describe("publishable AgentOS Pi artifacts", () => {
     expect(commands).toContain("skill:agentos-supervision");
     expect(commands).toContain("skill:agentos-bootstrap");
     expect(commands).not.toContain("agentos-default-first-mate-startup");
+
+    await rm(
+      join(
+        installedDefault,
+        "resources",
+        "roles",
+        "firstmate",
+        "skills",
+      ),
+      { recursive: true, force: true },
+    );
+    const incompleteEntrypoint = await import(
+      `${pathToFileURL(
+        join(installedDefault, "extensions", "agentos.ts"),
+      ).href}?incomplete=${Date.now()}`
+    );
+    const priorIncompleteRole = process.env.AGENTOS_AGENT_ROLE;
+    process.env.AGENTOS_AGENT_ROLE = "first_mate";
+    try {
+      await expect(
+        incompleteEntrypoint.default(createFakePi().pi),
+      ).rejects.toThrow("Required First-Mate Skill directory is unavailable");
+    } finally {
+      if (priorIncompleteRole === undefined) {
+        delete process.env.AGENTOS_AGENT_ROLE;
+      } else {
+        process.env.AGENTOS_AGENT_ROLE = priorIncompleteRole;
+      }
+    }
   }, 30_000);
 });

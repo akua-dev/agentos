@@ -61,6 +61,7 @@ export function createDefaultAgentOSEntrypoint(
     registerAgentOSStartup(pi, {
       customType: composition.startup.customType,
       prompt: startupPrompt,
+      requiredSkills: startupSkillNames(composition),
     });
   };
 }
@@ -86,10 +87,21 @@ export async function loadPackagedRoleComposition(
     new URL(`../resources/roles/${directory}/skills/`, import.meta.url),
   );
   const skillPaths = ["skills"];
-  try {
-    await access(roleSkillsPath);
+  if (role === "first_mate") {
+    try {
+      await access(roleSkillsPath);
+    } catch {
+      throw new Error(
+        `Required First-Mate Skill directory is unavailable: ${roleSkillsPath}`,
+      );
+    }
     skillPaths.push(`resources/roles/${directory}/skills`);
-  } catch {}
+  } else {
+    try {
+      await access(roleSkillsPath);
+      skillPaths.push(`resources/roles/${directory}/skills`);
+    } catch {}
+  }
   const resources = resolveAgentOSResources({
     version: 1,
     baseDirectory: distributionRoot,
@@ -163,6 +175,7 @@ async function preflightDefaultRoleComposition(
   preflightAgentOSStartup({
     customType: composition.startup.customType,
     prompt: startupPrompt,
+    requiredSkills: startupSkillNames(composition),
   });
   const declaredSkills = new Set(composition.names.skills ?? []);
   const deliveredSkills = new Set(
@@ -185,7 +198,26 @@ async function preflightDefaultRoleComposition(
       throw new Error(`AgentOS skill claim "${skill}" is not delivered`);
     }
   }
+  if (
+    !(composition.names.messages ?? []).includes(
+      composition.startup.customType,
+    )
+  ) {
+    throw new Error(
+      `startup custom message type "${composition.startup.customType}" is not declared`,
+    );
+  }
   return startupPrompt;
+}
+
+function startupSkillNames(
+  composition: DefaultRoleCompositionV1,
+): string[] {
+  return [
+    ...new Set(
+      composition.startup.contributions.map(({ skill }) => skill),
+    ),
+  ];
 }
 
 function compositionClaims(

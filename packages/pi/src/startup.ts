@@ -15,6 +15,7 @@ export type AgentOSStartupContributionV1 = {
 export type AgentOSStartupOptions = {
   prompt: string;
   customType: string;
+  requiredSkills: readonly string[];
   enabled?: boolean;
   display?: boolean;
   reasons?: readonly SessionStartEvent["reason"][];
@@ -60,12 +61,7 @@ export function composeAgentOSStartupPrompt(
         );
       }
       ids.add(contribution.id);
-      if (
-        typeof contribution.skill !== "string" ||
-        contribution.skill.length === 0 ||
-        contribution.skill.length > MAX_SKILL_CHARACTERS ||
-        !PI_SKILL_NAME.test(contribution.skill)
-      ) {
+      if (!isPiSkillName(contribution.skill)) {
         throw new Error(
           `startup contribution skill must be a valid Pi Skill name of at most ${MAX_SKILL_CHARACTERS} lowercase letters, numbers, and non-consecutive hyphens`,
         );
@@ -106,6 +102,24 @@ export function preflightAgentOSStartup(
     throw new Error("AgentOS startup prompt must not be empty");
   }
   assertQualifiedName(options.customType, "AgentOS startup custom message type");
+  if (
+    !Array.isArray(options.requiredSkills) ||
+    options.requiredSkills.length === 0
+  ) {
+    throw new Error("AgentOS startup requires at least one preloaded Pi Skill");
+  }
+  const requiredSkills = new Set<string>();
+  for (const skill of options.requiredSkills) {
+    if (!isPiSkillName(skill)) {
+      throw new Error(
+        `AgentOS startup required Skill must be a valid Pi Skill name of at most ${MAX_SKILL_CHARACTERS} lowercase letters, numbers, and non-consecutive hyphens`,
+      );
+    }
+    if (requiredSkills.has(skill)) {
+      throw new Error(`duplicate AgentOS startup required Skill "${skill}"`);
+    }
+    requiredSkills.add(skill);
+  }
 }
 
 export function registerAgentOSStartup(
@@ -121,6 +135,14 @@ export function registerAgentOSStartup(
     if (triggered || !reasons.has(event.reason) || !context.isIdle()) return;
     triggered = true;
     try {
+      const systemPrompt = context.getSystemPrompt();
+      for (const skill of options.requiredSkills) {
+        if (!hasAvailableSkill(systemPrompt, skill)) {
+          throw new Error(
+            `AgentOS startup requires Pi to preload Skill "${skill}" before session_start`,
+          );
+        }
+      }
       pi.sendMessage(
         {
           customType: options.customType,
@@ -131,7 +153,27 @@ export function registerAgentOSStartup(
         { deliverAs: "followUp", triggerTurn: true },
       );
     } catch (error) {
-      options.onError?.(error);
+      if (options.onError) {
+        options.onError(error);
+        return;
+      }
+      throw error;
     }
   });
+}
+
+function isPiSkillName(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_SKILL_CHARACTERS &&
+    PI_SKILL_NAME.test(value)
+  );
+}
+
+function hasAvailableSkill(systemPrompt: string, skill: string): boolean {
+  const catalog = systemPrompt.match(
+    /<available_skills>[\s\S]*?<\/available_skills>/,
+  )?.[0];
+  return catalog?.includes(`<name>${skill}</name>`) ?? false;
 }

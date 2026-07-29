@@ -116,21 +116,27 @@ describe("AgentOS startup composition", () => {
       preflightAgentOSStartup({
         customType: "",
         prompt: "Load $example-startup.",
+        requiredSkills: ["example-startup"],
       }),
     ).toThrow("custom message type");
     expect(() =>
       preflightAgentOSStartup({
         customType: "@example/agentos:startup",
         prompt: "  ",
+        requiredSkills: ["example-startup"],
       }),
     ).toThrow("prompt must not be empty");
   });
 
   test("requests one inspectable follow-up only while Pi is idle", async () => {
-    const fake = createFakePi();
+    const fake = createFakePi({
+      systemPrompt:
+        "<available_skills><skill><name>example-startup</name></skill></available_skills>",
+    });
     registerAgentOSStartup(fake.pi, {
       customType: "@example/agentos:startup",
       prompt: "Load $example-startup and reconcile it.",
+      requiredSkills: ["example-startup"],
     });
 
     await fake.emit("session_start", { type: "session_start", reason: "startup" });
@@ -152,13 +158,39 @@ describe("AgentOS startup composition", () => {
     registerAgentOSStartup(busy.pi, {
       customType: "@example/agentos:startup",
       prompt: "Never sent",
+      requiredSkills: ["example-startup"],
     });
     await busy.emit("session_start", { type: "session_start", reason: "reload" });
     expect(busy.messages).toEqual([]);
   });
 
+  test("fails closed when Pi has not preloaded the required Skill", async () => {
+    const fake = createFakePi({
+      systemPrompt:
+        "<available_skills><skill><name>another-skill</name></skill></available_skills>",
+    });
+    registerAgentOSStartup(fake.pi, {
+      customType: "@example/agentos:startup",
+      prompt: "Load $example-startup and reconcile it.",
+      requiredSkills: ["example-startup"],
+    });
+
+    await expect(
+      fake.emit("session_start", {
+        type: "session_start",
+        reason: "startup",
+      }),
+    ).rejects.toThrow(
+      'AgentOS startup requires Pi to preload Skill "example-startup"',
+    );
+    expect(fake.messages).toEqual([]);
+  });
+
   test("does not retry a failed delivery in a loop", async () => {
-    const fake = createFakePi();
+    const fake = createFakePi({
+      systemPrompt:
+        "<available_skills><skill><name>example-startup</name></skill></available_skills>",
+    });
     let attempts = 0;
     let observed: unknown;
     fake.pi.sendMessage = () => {
@@ -171,6 +203,7 @@ describe("AgentOS startup composition", () => {
         observed = error;
       },
       prompt: "Attempt once",
+      requiredSkills: ["example-startup"],
     });
 
     await fake.emit("session_start", { type: "session_start", reason: "reload" });

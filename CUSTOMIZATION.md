@@ -115,6 +115,7 @@ export function registerAcmeAgentOS(pi: ExtensionAPI) {
   registerAgentOSStartup(pi, {
     customType: "@acme/agentos:startup",
     prompt: composeAgentOSStartupPrompt([startup]),
+    requiredSkills: [startup.skill],
   });
 
   // Ordinary Pi remains available beside AgentOS helpers.
@@ -136,6 +137,13 @@ and tell the model to load a delivered Skill. The Skill can inspect PostgreSQL
 with `psql`, render and inspect Kubernetes with `kubectl`, or use Git and
 provider tools directly. The prompt initiates judgment; it is not evidence that
 an Assignment appeared, a migration ran or a workload changed.
+
+Pi 0.81.1 emits `session_start` before extension `resources_discover` hooks.
+Therefore every `requiredSkills` entry must already be selected through Pi's
+native package manifest or settings. `registerAgentOSStartup` verifies the
+effective pre-session Skill catalog before it triggers the turn. A Skill
+available only from an extension resource hook may still be role-specific, but
+it cannot be the target of that startup turn.
 
 AgentOS deliberately supplies no synthetic Assignment event, Fleet database
 watcher, automatic migration service, package registry or global SDK singleton.

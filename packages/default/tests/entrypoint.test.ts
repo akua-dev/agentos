@@ -124,6 +124,26 @@ describe("default AgentOS entrypoint", () => {
     expect(fake.registrations).toEqual([]);
   });
 
+  test("fails closed when startup emits an undeclared message type", async () => {
+    const fake = createFakePi();
+    const composition = roleComposition("first_mate");
+    const entrypoint = createDefaultAgentOSEntrypoint({
+      getRole: () => "first_mate",
+      loadRole: async () => ({
+        ...composition,
+        startup: {
+          ...composition.startup,
+          customType: "@example/first_mate:unclaimed-startup",
+        },
+      }),
+    });
+
+    await expect(entrypoint(fake.pi)).rejects.toThrow(
+      'startup custom message type "@example/first_mate:unclaimed-startup" is not declared',
+    );
+    expect(fake.registrations).toEqual([]);
+  });
+
   for (const role of ["first_mate", "second_mate"] as const) {
     test(`selects only the ${role} ordinary composition`, async () => {
       process.env.AGENTOS_AGENT_ROLE = role;

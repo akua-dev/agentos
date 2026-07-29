@@ -5,6 +5,11 @@ package with exactly one discovered extension entrypoint and one shared Skill
 root. The entrypoint selects one ordinary First- or Second-Mate composition
 from the deployment's explicit `AGENTOS_AGENT_ROLE`.
 
+The native package manifest preloads shared Skills before `session_start`.
+Role-only Skills are added through Pi resource discovery afterward, so the
+bounded startup turn may require only a Skill that Pi already exposes in its
+effective pre-session catalog.
+
 The package composes only public `@agentos/pi` registrations. Its operational
 instructions, role-specific Skills, Mise files, Kubernetes overlays and
 Crewmate assets are normal package resources. Loading it into Pi activates only

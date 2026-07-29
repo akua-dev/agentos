@@ -38,6 +38,108 @@ describe("AgentOS resource composition", () => {
     }
   });
 
+  test("matches Pi discovery for root files, nested Skill roots, and ignores", async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "agentos-pi-native-skills-"));
+    try {
+      await Promise.all([
+        mkdir(resolve(root, "nested", "valid"), { recursive: true }),
+        mkdir(resolve(root, "nested", "arbitrary"), { recursive: true }),
+        mkdir(resolve(root, "ignored"), { recursive: true }),
+      ]);
+      await Promise.all([
+        writeFile(
+          resolve(root, "root-skill.md"),
+          [
+            "---",
+            "name: root-skill",
+            "description: A root Markdown Skill.",
+            "---",
+          ].join("\n"),
+          "utf8",
+        ),
+        writeFile(
+          resolve(root, "nested", "valid", "SKILL.md"),
+          [
+            "---",
+            "name: nested-skill",
+            "description: A nested Skill root.",
+            "---",
+          ].join("\n"),
+          "utf8",
+        ),
+        writeFile(
+          resolve(root, "nested", "arbitrary", "not-a-skill.md"),
+          [
+            "---",
+            "name: must-not-load",
+            "description: Nested arbitrary Markdown is not a Pi Skill.",
+            "---",
+          ].join("\n"),
+          "utf8",
+        ),
+        writeFile(
+          resolve(root, "ignored", "SKILL.md"),
+          [
+            "---",
+            "name: ignored-skill",
+            "description: Pi ignore rules hide this Skill.",
+            "---",
+          ].join("\n"),
+          "utf8",
+        ),
+        writeFile(resolve(root, ".ignore"), "ignored/\n", "utf8"),
+      ]);
+
+      expect(await discoverAgentOSSkillNames([root])).toEqual([
+        "nested-skill",
+        "root-skill",
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects native Skill diagnostics and distinct duplicate owners", async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "agentos-pi-invalid-skills-"));
+    try {
+      await Promise.all([
+        mkdir(resolve(root, "missing-description"), { recursive: true }),
+        mkdir(resolve(root, "first"), { recursive: true }),
+        mkdir(resolve(root, "second"), { recursive: true }),
+      ]);
+      await writeFile(
+        resolve(root, "missing-description", "SKILL.md"),
+        ["---", "name: incomplete-skill", "---"].join("\n"),
+        "utf8",
+      );
+      await expect(discoverAgentOSSkillNames([root])).rejects.toThrow(
+        "description is required",
+      );
+
+      await rm(resolve(root, "missing-description"), {
+        recursive: true,
+        force: true,
+      });
+      for (const owner of ["first", "second"]) {
+        await writeFile(
+          resolve(root, owner, "SKILL.md"),
+          [
+            "---",
+            "name: duplicate-skill",
+            `description: The ${owner} owner.`,
+            "---",
+          ].join("\n"),
+          "utf8",
+        );
+      }
+      await expect(discoverAgentOSSkillNames([root])).rejects.toThrow(
+        'name "duplicate-skill" collision',
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("resolves only package-contained role resource paths", async () => {
     const baseDirectory = resolve(import.meta.dir, "fixtures", "distribution");
     const resources = resolveAgentOSResources({

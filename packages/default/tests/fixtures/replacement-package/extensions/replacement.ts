@@ -29,5 +29,6 @@ export default function registerReplacementAgentOS(
   registerAgentOSStartup(pi, {
     customType: "@example/agentos-replacement:startup",
     prompt: composeAgentOSStartupPrompt([replacementStartup]),
+    requiredSkills: [replacementStartup.skill],
   });
 }

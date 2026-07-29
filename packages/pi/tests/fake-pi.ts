@@ -5,7 +5,9 @@ import type {
 
 type Handler = (event: any, context: ExtensionContext) => unknown;
 
-export function createFakePi(options: { idle?: boolean } = {}) {
+export function createFakePi(
+  options: { idle?: boolean; systemPrompt?: string } = {},
+) {
   const handlers = new Map<string, Handler[]>();
   const registrations: Array<{ kind: string; name?: string }> = [];
   const messages: Array<{
@@ -13,6 +15,7 @@ export function createFakePi(options: { idle?: boolean } = {}) {
     options?: Record<string, unknown>;
   }> = [];
   const context = {
+    getSystemPrompt: () => options.systemPrompt ?? "Pi base.",
     isIdle: () => options.idle ?? true,
   } as ExtensionContext;
   const pi = {

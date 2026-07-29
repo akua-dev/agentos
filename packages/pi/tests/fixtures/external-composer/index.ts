@@ -41,5 +41,6 @@ export function registerExampleAgentOS(pi: ExtensionAPI) {
   registerAgentOSStartup(pi, {
     customType: "@example/composer:startup",
     prompt: composeAgentOSStartupPrompt([contribution]),
+    requiredSkills: [contribution.skill],
   });
 }

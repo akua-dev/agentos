@@ -1,7 +1,8 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { parse } from "yaml";
-import { readFile, readdir, stat } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import {
+  loadSkills,
+  type ExtensionAPI,
+} from "@earendil-works/pi-coding-agent";
+import { isAbsolute, relative, resolve } from "node:path";
 
 export type AgentOSResourceInputV1 = {
   version: 1;
@@ -21,25 +22,24 @@ export type AgentOSResourcesV1 = {
 export async function discoverAgentOSSkillNames(
   paths: readonly string[],
 ): Promise<string[]> {
-  const names = new Set<string>();
-  for (const path of paths) {
-    const resolved = resolve(path);
-    let stats;
-    try {
-      stats = await stat(resolved);
-    } catch {
-      throw new Error(`AgentOS skill resource path is unavailable: ${resolved}`);
-    }
-    const files = stats.isDirectory()
-      ? await discoverSkillFiles(resolved)
-      : resolved.endsWith(".md")
-        ? [resolved]
-        : [];
-    for (const file of files) {
-      names.add(await readSkillName(file));
-    }
+  const result = loadSkills({
+    cwd: process.cwd(),
+    agentDir: process.cwd(),
+    skillPaths: paths.map((path) => resolve(path)),
+    includeDefaults: false,
+  });
+  if (result.diagnostics.length > 0) {
+    throw new Error(
+      [
+        "AgentOS Skill resources are not compatible with Pi:",
+        ...result.diagnostics.map(
+          (diagnostic) =>
+            `${diagnostic.path}: ${diagnostic.message}`,
+        ),
+      ].join("\n"),
+    );
   }
-  return [...names].sort();
+  return result.skills.map(({ name }) => name).sort();
 }
 
 export function resolveAgentOSResources(
@@ -118,35 +118,4 @@ function compactResources(resources: AgentOSResourcesV1) {
       ? { themePaths: [...resources.themePaths] }
       : {}),
   };
-}
-
-async function discoverSkillFiles(directory: string): Promise<string[]> {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const skillFile = entries.find(
-    (entry) => entry.isFile() && entry.name === "SKILL.md",
-  );
-  if (skillFile) return [join(directory, skillFile.name)];
-
-  const files: string[] = [];
-  for (const entry of entries) {
-    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await discoverSkillFiles(path)));
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
-      files.push(path);
-    }
-  }
-  return files;
-}
-
-async function readSkillName(path: string): Promise<string> {
-  const content = await readFile(path, "utf8");
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  const frontmatter = match?.[1];
-  if (frontmatter === undefined) return basename(dirname(path));
-  const metadata = parse(frontmatter);
-  return typeof metadata?.name === "string" && metadata.name.trim()
-    ? metadata.name
-    : basename(dirname(path));
 }

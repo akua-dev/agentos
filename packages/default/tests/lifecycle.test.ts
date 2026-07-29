@@ -8,7 +8,10 @@ import { roleComposition } from "./entrypoint.test.ts";
 
 describe("default AgentOS lifecycle composition", () => {
   test("injects selected identity and sends one aggregated startup turn", async () => {
-    const fake = createFakePi();
+    const fake = createFakePi({
+      systemPrompt:
+        "<available_skills><skill><name>agentos-supervision</name></skill></available_skills>",
+    });
     const entrypoint = createDefaultAgentOSEntrypoint({
       getRole: () => "first_mate",
       loadRole: async () => roleComposition("first_mate"),
