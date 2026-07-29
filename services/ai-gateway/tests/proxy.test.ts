@@ -161,7 +161,7 @@ describe("authenticated raw Responses proxy", () => {
     }
   });
 
-  test("reports only bounded privacy-safe dimensions when an upstream stream fails", async () => {
+  test("preserves privacy-safe stream failure evidence when lease cleanup also fails", async () => {
     const providerDetail = "provider route secret: error decoding response body";
     let released = false;
     let observation: unknown;
@@ -176,6 +176,7 @@ describe("authenticated raw Responses proxy", () => {
         renew: async () => true,
         release: async () => {
           released = true;
+          throw new Error("private lease cleanup detail");
         },
       }),
       fetchImpl: async () =>

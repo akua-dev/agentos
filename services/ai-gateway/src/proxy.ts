@@ -199,7 +199,13 @@ function streamWithLease(
     if (finished) return;
     finished = true;
     clearInterval(timer);
-    await lease.release();
+    try {
+      await lease.release();
+    } catch {
+      // Cleanup must never replace the provider response or original stream
+      // failure, and the private routing error is not safe to log.
+      console.error("ai-gateway: lease release failed");
+    }
   };
 
   return new ReadableStream<Uint8Array>({
