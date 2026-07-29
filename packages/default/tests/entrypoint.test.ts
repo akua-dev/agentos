@@ -5,7 +5,7 @@ import {
   createDefaultAgentOSEntrypoint,
   type DefaultRoleCompositionV1,
 } from "../composition/shared.ts";
-import type { AgentOSRegistrationV1 } from "@agentos/pi";
+import type { AgentOSRegistrationV1 } from "@akua-dev/agentos-pi";
 import { createFakePi } from "../../pi/tests/fake-pi.ts";
 
 const originalRole = process.env.AGENTOS_AGENT_ROLE;

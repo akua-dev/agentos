@@ -8,7 +8,7 @@ an ordinary Pi package, not a privileged loader.
   discovery.
 - Select exactly one persistent role from `AGENTOS_AGENT_ROLE`. Missing or
   unknown roles fail before any AgentOS registration.
-- Compose released behavior only through public `@agentos/pi` exports.
+- Compose released behavior only through public `@akua-dev/agentos-pi` exports.
   Fallible resource and collision preflight completes before handlers, tools
   or commands attach.
 - Operational role identity lives in explicit injected resources. Files named

@@ -21,7 +21,7 @@ export function createAgentOSBackgroundTasksRegistration(
 ): AgentOSRegistrationV1 {
   return {
     version: 1,
-    id: "@agentos/pi:background-tasks",
+    id: "@akua-dev/agentos-pi:background-tasks",
     names: {
       version: 1,
       tools: [
@@ -45,7 +45,7 @@ export function createAgentOSMateMemoryRegistration(
 ): AgentOSRegistrationV1 {
   return {
     version: 1,
-    id: "@agentos/pi:mate-memory",
+    id: "@akua-dev/agentos-pi:mate-memory",
     names: {
       version: 1,
       tools: ["set_mate_memory_state", "memory_delete_topic"],
@@ -68,7 +68,7 @@ export function createAgentOSOpenAIServerCompactionRegistration(
   const registration = createOpenAIServerCompactionExtension(dependencies);
   return {
     version: 1,
-    id: "@agentos/pi:openai-server-compaction",
+    id: "@akua-dev/agentos-pi:openai-server-compaction",
     names: { version: 1 },
     register: registration,
   };
@@ -79,7 +79,7 @@ export function createAgentOSSupervisionGuardRegistration(
 ): AgentOSRegistrationV1 {
   return {
     version: 1,
-    id: "@agentos/pi:supervision-guard",
+    id: "@akua-dev/agentos-pi:supervision-guard",
     names: {
       version: 1,
       messages: [

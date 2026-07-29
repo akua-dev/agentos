@@ -1,5 +1,5 @@
 {
-  "name": "@agentos/pi",
+  "name": "@akua-dev/agentos-pi",
   "version": "0.1.0",
   "description": "Inert public composition helpers for AgentOS behavior hosted by Pi",
   "type": "module",

@@ -125,8 +125,8 @@ RUN bun install \
       --no-progress \
       --production \
       --filter @agentos/root \
-      --filter @agentos/default \
-      --filter @agentos/pi \
+      --filter @akua-dev/agentos-default \
+      --filter @akua-dev/agentos-pi \
       --filter @agentos/composition-verify \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
@@ -154,8 +154,8 @@ RUN bun install \
       --frozen-lockfile \
       --ignore-scripts \
       --no-progress \
-      --filter @agentos/pi \
-  && bun run --filter @agentos/pi build
+      --filter @akua-dev/agentos-pi \
+  && bun run --filter @akua-dev/agentos-pi build
 
 FROM agentos-base
 

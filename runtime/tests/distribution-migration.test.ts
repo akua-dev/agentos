@@ -303,7 +303,7 @@ describe("persistent Mate distribution migration", () => {
     const piOnlySelection = {
       packages: [
         {
-          source: "@agentos/default@0.1.0",
+          source: "@akua-dev/agentos-default@0.1.0",
           autoload: false,
           extensions: [],
           skills: ["skills/agentos-supervision"],

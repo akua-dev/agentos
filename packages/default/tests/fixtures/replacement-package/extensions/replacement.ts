@@ -4,7 +4,7 @@ import {
   registerAgentOSRuntime,
   registerAgentOSStartup,
   type AgentOSStartupContributionV1,
-} from "@agentos/pi";
+} from "@akua-dev/agentos-pi";
 
 import { replacementRegistration } from "../registration.ts";
 

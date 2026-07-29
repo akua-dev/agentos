@@ -1,4 +1,4 @@
-import type { AgentOSRegistrationV1 } from "@agentos/pi";
+import type { AgentOSRegistrationV1 } from "@akua-dev/agentos-pi";
 
 export const replacementRegistration: AgentOSRegistrationV1 = {
   version: 1,

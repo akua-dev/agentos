@@ -3,7 +3,7 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-describe("@agentos/default module load", () => {
+describe("@akua-dev/agentos-default module load", () => {
   test("is inert before Pi invokes its exported factory", async () => {
     const home = await mkdtemp(join(tmpdir(), "agentos-default-import-"));
     const priorHome = process.env.HOME;

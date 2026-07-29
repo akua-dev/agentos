@@ -3,22 +3,22 @@
 AgentOS is a Pi-native composition, not a second plugin framework. An
 organization can install an ordinary Pi package beside the released behavior or
 select a complete replacement distribution. The package can use every native Pi
-extension API and, when useful, the public `@agentos/pi` helpers.
+extension API and, when useful, the public `@akua-dev/agentos-pi` helpers.
 
 The released packages have distinct jobs:
 
 | Package | Boundary |
 | --- | --- |
-| `@agentos/pi` | Inert public TypeScript registrations, defaults, structural contracts and collision preflight |
-| `@agentos/default` | The replaceable released entrypoint, role compositions, instructions, Skills, Mise, Kubernetes and Crewmate resources |
+| `@akua-dev/agentos-pi` | Inert public TypeScript registrations, defaults, structural contracts and collision preflight |
+| `@akua-dev/agentos-default` | The replaceable released entrypoint, role compositions, instructions, Skills, Mise, Kubernetes and Crewmate resources |
 
-Importing `@agentos/pi` has no side effects. Loading `@agentos/default` activates
+Importing `@akua-dev/agentos-pi` has no side effects. Loading `@akua-dev/agentos-default` activates
 only the Pi resources selected by Pi. Neither action changes PostgreSQL,
 Kubernetes, Herdr, Git, a PVC, credentials or provider state.
 
 ## Add or replace
 
-An **additive package** loads beside `@agentos/default`. Use it for independent
+An **additive package** loads beside `@akua-dev/agentos-default`. Use it for independent
 tools, commands, hooks or Skills that do not overlap a released owner.
 
 A **replacement package** excludes the default executable entrypoint with Pi's
@@ -64,7 +64,7 @@ distribution will compose the package:
     "skills": ["./skills"]
   },
   "peerDependencies": {
-    "@agentos/pi": "^0.1.0",
+    "@akua-dev/agentos-pi": "^0.1.0",
     "@earendil-works/pi-ai": "0.81.1",
     "@earendil-works/pi-coding-agent": "0.81.1"
   }
@@ -82,7 +82,7 @@ import {
   registerAgentOSStartup,
   type AgentOSRegistrationV1,
   type AgentOSStartupContributionV1,
-} from "@agentos/pi";
+} from "@akua-dev/agentos-pi";
 
 export const runtime: AgentOSRegistrationV1 = {
   version: 1,

@@ -6,7 +6,7 @@ import {
   registerAgentOSStartup,
   type AgentOSRegistrationV1,
   type AgentOSStartupContributionV1,
-} from "@agentos/pi";
+} from "@akua-dev/agentos-pi";
 
 export const contribution: AgentOSStartupContributionV1 = {
   version: 1,

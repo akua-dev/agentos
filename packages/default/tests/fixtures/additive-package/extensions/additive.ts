@@ -1,4 +1,4 @@
-import { registerAgentOSRuntime } from "@agentos/pi";
+import { registerAgentOSRuntime } from "@akua-dev/agentos-pi";
 
 import { additiveRegistration } from "../registration.ts";
 

@@ -1,5 +1,5 @@
 {
-  "name": "@agentos/default",
+  "name": "@akua-dev/agentos-default",
   "version": "0.1.0",
   "description": "The released replaceable AgentOS distribution for Pi",
   "type": "module",
@@ -11,7 +11,7 @@
     "skills": ["./skills"]
   },
   "dependencies": {
-    "@agentos/pi": "0.1.0"
+    "@akua-dev/agentos-pi": "0.1.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "0.81.1"

@@ -10,10 +10,10 @@ import { createFakePi } from "./fake-pi.ts";
 describe("released AgentOS Pi registrations", () => {
   test("exports every released behavior as a replaceable registration", () => {
     expect(defaultAgentOSRuntime.map(({ id }) => id)).toEqual([
-      "@agentos/pi:background-tasks",
-      "@agentos/pi:mate-memory",
-      "@agentos/pi:openai-server-compaction",
-      "@agentos/pi:supervision-guard",
+      "@akua-dev/agentos-pi:background-tasks",
+      "@akua-dev/agentos-pi:mate-memory",
+      "@akua-dev/agentos-pi:openai-server-compaction",
+      "@akua-dev/agentos-pi:supervision-guard",
     ]);
     expect(() => preflightAgentOSComposition(defaultAgentOSRuntime)).not.toThrow();
   });
@@ -43,7 +43,7 @@ describe("released AgentOS Pi registrations", () => {
 
   test("lets a distribution replace one behavior without copying the rest", () => {
     const withoutCompaction = defaultAgentOSRuntime.filter(
-      ({ id }) => id !== "@agentos/pi:openai-server-compaction",
+      ({ id }) => id !== "@akua-dev/agentos-pi:openai-server-compaction",
     );
     expect(withoutCompaction).toHaveLength(3);
     expect(() => preflightAgentOSComposition(withoutCompaction)).not.toThrow();

@@ -85,7 +85,7 @@ package dependencies. If a needed AgentOS export does not exist, choose an
 independent extension, an exact reviewed AgentOS fork or stop. Documentation is
 not proof that an import exists.
 
-The released `@agentos/pi` package is the public composed-consumption boundary.
+The released `@akua-dev/agentos-pi` package is the public composed-consumption boundary.
 Declare its supported range as a `peerDependency` and use a compatible
 `devDependency` to compile and test the package. Let the final distribution
 resolve and pin the concrete version.
@@ -126,7 +126,7 @@ each overlapping behavior; never use extension load order or last-writer-wins
 registration as an override mechanism.
 
 Several independently loaded extensions may call
-`@agentos/pi` functions. Public AgentOS composition functions must remain inert
+`@akua-dev/agentos-pi` functions. Public AgentOS composition functions must remain inert
 until explicitly invoked, stay stateless, accept `pi` explicitly and use plain
 structural values so separate Pi package module roots do not need shared
 singletons, symbols or `instanceof` identity.
@@ -212,7 +212,7 @@ import {
   composeAgentOSStartupPrompt,
   registerAgentOSStartup,
   type AgentOSStartupContributionV1,
-} from "@agentos/pi";
+} from "@akua-dev/agentos-pi";
 
 const startup: AgentOSStartupContributionV1 = {
   version: 1,
@@ -326,7 +326,7 @@ owns the verified native lifecycle.
    extension.
 2. Install the replacement package.
 3. Use the exact Pi build's package filters to exclude
-   `@agentos/default`'s executable entrypoint. Retain released Skills only when
+   `@akua-dev/agentos-default`'s executable entrypoint. Retain released Skills only when
    the intended composition selects them independently. Verify the effective
    catalog before reload and fail closed unless exactly one owner remains for
    every replaced behavior.
@@ -401,7 +401,7 @@ After install or rollback:
   do not deep-import internals.
 - Default executable entrypoint remains selected or exactly one replacement
   owner cannot be proven: correct the native Pi package filters before reload.
-- Incompatible `@agentos/pi` peer range or startup contribution version: fail
+- Incompatible `@akua-dev/agentos-pi` peer range or startup contribution version: fail
   composition before registration.
 - Duplicate package-qualified identifier or Pi resource name: fail composition;
   do not choose an owner by extension order.

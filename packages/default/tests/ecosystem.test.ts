@@ -7,7 +7,7 @@ import {
   preflightAgentOSComposition,
   registerAgentOSRuntime,
   type AgentOSRegistrationV1,
-} from "@agentos/pi";
+} from "@akua-dev/agentos-pi";
 
 import { createFakePi } from "../../pi/tests/fake-pi.ts";
 import { additiveRegistration } from "./fixtures/additive-package/registration.ts";

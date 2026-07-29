@@ -21,7 +21,7 @@ import {
   relative,
 } from "node:path";
 
-import { createMateMemoryStore } from "@agentos/pi";
+import { createMateMemoryStore } from "@akua-dev/agentos-pi";
 
 import {
   isPersistentMateRole,

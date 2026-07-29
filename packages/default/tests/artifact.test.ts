@@ -149,13 +149,13 @@ describe("publishable AgentOS Pi artifacts", () => {
           private: true,
           workspaces: ["composer"],
           dependencies: {
-            "@agentos/default": `file:${defaultTarball}`,
-            "@agentos/pi": `file:${piTarball}`,
+            "@akua-dev/agentos-default": `file:${defaultTarball}`,
+            "@akua-dev/agentos-pi": `file:${piTarball}`,
             "@earendil-works/pi-ai": "0.81.1",
             "@earendil-works/pi-coding-agent": "0.81.1",
           },
           overrides: {
-            "@agentos/pi": `file:${piTarball}`,
+            "@akua-dev/agentos-pi": `file:${piTarball}`,
           },
           devDependencies: {
             "@types/bun": "1.3.14",
@@ -188,14 +188,14 @@ describe("publishable AgentOS Pi artifacts", () => {
     const installedPi = join(
       installation,
       "node_modules",
-      "@agentos",
-      "pi",
+      "@akua-dev",
+      "agentos-pi",
     );
     const installedDefault = join(
       installation,
       "node_modules",
-      "@agentos",
-      "default",
+      "@akua-dev",
+      "agentos-default",
     );
     const piManifest = JSON.parse(
       await readFile(join(installedPi, "package.json"), "utf8"),
@@ -209,7 +209,9 @@ describe("publishable AgentOS Pi artifacts", () => {
       extensions: ["./extensions/agentos.ts"],
       skills: ["./skills"],
     });
-    expect(defaultManifest.dependencies).toEqual({ "@agentos/pi": "0.1.0" });
+    expect(defaultManifest.dependencies).toEqual({
+      "@akua-dev/agentos-pi": "0.1.0",
+    });
     await Promise.all(
       [
         join(installedPi, "dist", "index.js"),

@@ -71,8 +71,8 @@ Pi is AgentOS's extension host. A trusted organization package can add ordinary
 Pi behavior beside the released crew or replace the complete AgentOS
 distribution: role instructions, Skills, startup behavior, First- and
 Second-Mate Mise and Kubernetes resources, and Crewmate setups. The public
-`@agentos/pi` library exposes inert composition helpers while
-`@agentos/default` is the replaceable released distribution.
+`@akua-dev/agentos-pi` library exposes inert composition helpers while
+`@akua-dev/agentos-default` is the replaceable released distribution.
 
 Loading a package never implies that a database migration or workload rollout
 happened. Pi, PostgreSQL, Kubernetes, Herdr, Git, PVCs and providers remain

@@ -15,7 +15,7 @@ import {
   createMemoryActivityStore,
   redact,
   shouldDream,
-} from "@agentos/pi";
+} from "@akua-dev/agentos-pi";
 
 const temporaryDirectories: string[] = [];
 

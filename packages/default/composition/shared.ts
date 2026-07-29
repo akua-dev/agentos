@@ -20,7 +20,7 @@ import {
   type AgentOSRegistrationV1,
   type AgentOSResourcesV1,
   type AgentOSStartupContributionV1,
-} from "@agentos/pi";
+} from "@akua-dev/agentos-pi";
 
 export type DefaultAgentOSRole = "first_mate" | "second_mate";
 
@@ -116,17 +116,17 @@ export async function loadPackagedRoleComposition(
 
   const runtime = [
     ...defaultAgentOSRuntime.filter(
-      ({ id }) => id !== "@agentos/pi:supervision-guard",
+      ({ id }) => id !== "@akua-dev/agentos-pi:supervision-guard",
     ),
     createAgentOSSupervisionGuardRegistration({ startupRecovery: false }),
   ];
-  const startupCustomType = `@agentos/default:${role}:startup`;
+  const startupCustomType = `@akua-dev/agentos-default:${role}:startup`;
   return {
     version: 1,
     instructions: [
       {
         version: 1,
-        id: `@agentos/default:${role}:identity`,
+        id: `@akua-dev/agentos-default:${role}:identity`,
         content: instructions,
       },
     ],
@@ -142,7 +142,7 @@ export async function loadPackagedRoleComposition(
       contributions: [
         {
           version: 1,
-          id: `@agentos/default:${role}:supervision`,
+          id: `@akua-dev/agentos-default:${role}:supervision`,
           skill: "agentos-supervision",
           instruction:
             "Reconcile this Mate's durable work, recovery hints, direct reports and required native continuity waits before accepting new work.",
@@ -228,7 +228,7 @@ function compositionClaims(
 ): AgentOSRegistrationV1 {
   return {
     version: 1,
-    id: `@agentos/default:${role}:resources`,
+    id: `@akua-dev/agentos-default:${role}:resources`,
     names,
     register() {},
   };

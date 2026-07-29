@@ -1,6 +1,6 @@
-# `@agentos/default`
+# `@akua-dev/agentos-default`
 
-`@agentos/default` is the released AgentOS distribution. It is an ordinary Pi
+`@akua-dev/agentos-default` is the released AgentOS distribution. It is an ordinary Pi
 package with exactly one discovered extension entrypoint and one shared Skill
 root. The entrypoint selects one ordinary First- or Second-Mate composition
 from the deployment's explicit `AGENTOS_AGENT_ROLE`.
@@ -10,7 +10,7 @@ Role-only Skills are added through Pi resource discovery afterward, so the
 bounded startup turn may require only a Skill that Pi already exposes in its
 effective pre-session catalog.
 
-The package composes only public `@agentos/pi` registrations. Its operational
+The package composes only public `@akua-dev/agentos-pi` registrations. Its operational
 instructions, role-specific Skills, Mise files, Kubernetes overlays and
 Crewmate assets are normal package resources. Loading it into Pi activates only
 Pi behavior and resources; it does not apply those native runtime assets or
@@ -24,6 +24,6 @@ or all role resources.
 
 The initial compatibility matrix is:
 
-| `@agentos/default` | `@agentos/pi` | Pi coding agent |
+| `@akua-dev/agentos-default` | `@akua-dev/agentos-pi` | Pi coding agent |
 | --- | --- | --- |
 | `0.1.0` | `0.1.0` | `0.81.1` |

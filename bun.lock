@@ -5,7 +5,7 @@
     "": {
       "name": "@agentos/root",
       "dependencies": {
-        "@agentos/pi": "workspace:*",
+        "@akua-dev/agentos-pi": "workspace:*",
         "ajv": "8.20.0",
         "yaml": "2.9.0",
         "zod": "4.4.3",
@@ -63,10 +63,10 @@
       },
     },
     "packages/default": {
-      "name": "@agentos/default",
+      "name": "@akua-dev/agentos-default",
       "version": "0.1.0",
       "dependencies": {
-        "@agentos/pi": "0.1.0",
+        "@akua-dev/agentos-pi": "0.1.0",
       },
       "devDependencies": {
         "@earendil-works/pi-coding-agent": "0.81.1",
@@ -76,7 +76,7 @@
       },
     },
     "packages/pi": {
-      "name": "@agentos/pi",
+      "name": "@akua-dev/agentos-pi",
       "version": "0.1.0",
       "dependencies": {
         "yaml": "2.9.0",
@@ -116,13 +116,13 @@
 
     "@agentos/database": ["@agentos/database@workspace:database"],
 
-    "@agentos/default": ["@agentos/default@workspace:packages/default"],
+    "@akua-dev/agentos-default": ["@akua-dev/agentos-default@workspace:packages/default"],
 
     "@agentos/github-app-token": ["@agentos/github-app-token@workspace:clis/github-app-token"],
 
     "@agentos/pg-listen": ["@agentos/pg-listen@workspace:clis/pg-listen"],
 
-    "@agentos/pi": ["@agentos/pi@workspace:packages/pi"],
+    "@akua-dev/agentos-pi": ["@akua-dev/agentos-pi@workspace:packages/pi"],
 
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.91.1", "", { "dependencies": { "json-schema-to-ts": "^3.1.1" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw=="],
 
