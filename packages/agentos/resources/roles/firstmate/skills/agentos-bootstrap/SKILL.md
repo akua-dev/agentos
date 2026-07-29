@@ -83,7 +83,7 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
 
 ## Upgrade or remove an installation
 
-Treat both operations as a new reconciliation: inspect first, resolve the exact
+Treat removal as a new reconciliation: inspect first, resolve the exact
 installed release, image digest, database migration journal, retained PVC,
 persistent AgentOS checkout and active work, then explain the proposed state
 change. Never overwrite a dirty or divergent checkout, strand an Assignment or
