@@ -1,0 +1,52 @@
+---
+title: Watch without becoming the loop
+description: Inspect durable status, live sessions and provider artifacts without demanding constant narration.
+courseId: operate-first-fleet
+courseTitle: Operate your first Fleet
+courseOrder: 3
+lessonId: watch-without-being-loop
+lessonOrder: 5
+estimatedMinutes: 8
+canonical:
+  - label: Supervision procedure
+    path: agents/.agents/skills/agentos-supervision/SKILL.md
+  - label: Runtime procedure
+    path: agents/.agents/skills/agentos-runtime/SKILL.md
+---
+
+## The mental model
+
+Visibility does not require a progress message every few minutes. Constant reporting consumes the
+same human attention autonomy is supposed to return.
+
+Use the authority that owns the question:
+
+- PostgreSQL: who owns what, which decisions are open?
+- Kubernetes: is the intended workload healthy?
+- Herdr: what is the exact native session doing?
+- Git/provider: what was committed, checked and opened for review?
+
+First Mate supervises through durable reconciliation and narrow wake paths. It stays silent during
+ordinary waiting and reports material outcomes.
+
+## Worked example: inspect onboarding
+
+The onboarding worker is active. First Mate reports no new decision because none exists. You want
+detail, so you attach to the named Herdr Agent and see a compatibility test failing.
+
+That terminal view gives direct process evidence. It does not mark an Inbox row read or change the
+Assignment. If you give a correction in the attached terminal, the worker treats it as
+authoritative human steering and reconciles the change durably.
+
+Later, the provider pull request becomes the durable review artifact. You do not need First Mate to
+copy every CI log into chat.
+
+## What changes at this layer?
+
+- Humans can inspect deeply without relaying every internal message.
+- Sparse reporting focuses attention on outcomes and decisions.
+- Native terminals remain available instead of being hidden by a dashboard.
+- Observability stays separate from authority.
+
+Next, [steer work that is already
+moving](/learn/03-operate-first-fleet/steer-moving-work).

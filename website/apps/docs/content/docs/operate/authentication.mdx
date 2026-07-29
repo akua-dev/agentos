@@ -1,0 +1,30 @@
+---
+title: Authentication
+description: Keep credentials inside the owning Agent boundary and choose identity deliberately.
+canonical:
+  - label: Authentication procedure
+    path: agents/.agents/skills/agentos-auth/SKILL.md
+  - label: GitHub App token helper
+    path: clis/github-app-token
+---
+
+Use the authentication procedure for model-provider or source-provider login, rotation, recovery,
+revocation and quota identity changes.
+
+Direct per-Agent provider login is a complete minimal topology. Credentials belong inside the
+owning persistent runtime and approved secret mechanism. They never belong in Git, prompts,
+command arguments, persisted Task requests, generated artifacts or logs.
+
+## Choose the principal
+
+A human personal identity may be appropriate for a local experiment. A team GitHub App can provide
+a narrower organizational source-provider principal when its installation, repository scope and
+token materialization have been deliberately configured. The scoped helper mints and materializes
+the token without turning it into a general credential broker.
+
+Login permission is not delivery or merge authority. Verify the effective provider identity and
+scope through the native harness or provider interface, and ask before browser login, credential
+creation, rotation or revocation unless exact standing authority covers it.
+
+Expired or ambiguous credentials fail closed. Do not move another Agent’s token into the current
+home to make a blocked Assignment pass.

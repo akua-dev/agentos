@@ -1,0 +1,30 @@
+---
+title: Development workflow
+description: Use the reviewed Bun/Mise workspace, isolate changes and deliver through review.
+canonical:
+  - label: Contributor guide
+    path: CONTRIBUTING.md
+  - label: AgentOS development Skill
+    path: .agents/skills/agentos-development/SKILL.md
+---
+
+AgentOS is one Bun workspace with tools selected through Mise.
+
+```console
+git clone https://github.com/akua-dev/agentos.git
+cd agentos
+mise install --locked
+bun run check
+```
+
+Inspect the worktree before editing and preserve unrelated changes. Use an isolated worktree for
+feature work. Keep the change inside the smallest owning component and write observable behavior
+tests before implementation.
+
+Runtime automation is Bun and TypeScript. Do not add repository-owned shell scripts, hide programs
+inside shell-backed Mise tasks, wrap native authorities in an AgentOS CLI or introduce a daemon,
+controller or shadow store without an explicitly reviewed design that requires it.
+
+Generally useful work goes to `akua-dev/agentos`; organization-specific behavior belongs in that
+organization’s fork or private surface. The project’s selected delivery workflow owns validation,
+push and pull-request creation. Merge and deployment remain separate authority.

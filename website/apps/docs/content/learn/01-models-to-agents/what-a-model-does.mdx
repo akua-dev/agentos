@@ -1,0 +1,59 @@
+---
+title: What a model does
+description: Generation can be intelligent and useful without independently owning an outcome.
+courseId: models-to-agents
+courseTitle: From models to Agents
+courseOrder: 1
+lessonId: what-a-model-does
+lessonOrder: 1
+estimatedMinutes: 6
+canonical:
+  - label: AgentOS vision
+    path: VISION.md
+---
+
+## The mental model
+
+A model receives context and predicts an output. The output can explain, plan, classify, write code
+or combine ideas in ways that feel like reasoning. But the model call itself has no durable goal,
+no independent clock and no responsibility for what happens after the response.
+
+Generation is not ownership. If you ask for a launch plan, the model can generate an excellent
+one. It does not notice tomorrow that a dependency slipped, contact the owner, revise the sequence
+and return proof that the launch became ready—unless another system preserves the goal and calls it
+again.
+
+```text
+context + instructions
+        ↓
+      model
+        ↓
+generated output
+```
+
+The distinction matters because fluent output tempts us to attribute organizational properties to
+a single inference. Intelligence in a response does not create continuity, authority or
+accountability.
+
+## Worked example: one launch paragraph
+
+You ask:
+
+> Draft a launch plan for a new onboarding flow. Include risks and a small first release.
+
+The model produces milestones, a staged rollout and a risk list. That is useful generation. You
+still decide whether the plan is accepted, preserve it somewhere durable, create work, find owners
+and notice when reality changes.
+
+If the browser closes, the model has not failed its Assignment—there was no Assignment. It
+completed an inference.
+
+## What changes at this layer?
+
+- Natural language becomes a programmable input and output surface.
+- The system can generate plans and artifacts from context.
+- The human still carries the goal, continuity and every consequence.
+- No durable actor exists yet.
+
+Next, [chat makes generation conversational](/learn/01-models-to-agents/chat-is-conversation).
+Technical terms are collected in the [AgentOS glossary](/docs/reference/glossary).

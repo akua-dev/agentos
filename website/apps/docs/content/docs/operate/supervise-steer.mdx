@@ -1,0 +1,30 @@
+---
+title: Supervise and steer
+description: Reconcile durable work with live runtime state and correct moving work precisely.
+canonical:
+  - label: Supervision procedure
+    path: agents/.agents/skills/agentos-supervision/SKILL.md
+  - label: Runtime procedure
+    path: agents/.agents/skills/agentos-runtime/SKILL.md
+---
+
+At session start, after recovery and while delegated work is active, a Mate reconstructs its
+current picture from durable state. Conversation memory is only a cache.
+
+PostgreSQL supplies current bearings, unresolved Inbox items and active direct-child Assignments.
+Kubernetes is consulted when workload state matters; Herdr when native session state matters; Git
+when delivery matters. Supervision stays on direct reports rather than sweeping the entire Fleet.
+
+## Waiting without polling the organization
+
+A targeted `pg-listen` wait is the normal coordination wake, but it carries routing metadata only.
+The Mate registers the listener, catches up from durable state and re-arms the one-shot wait after
+handling it. Native Herdr or Kubernetes waits are added only for concrete live risks PostgreSQL
+cannot signal.
+
+Direct steering can make sense before an Agent travels far down an obsolete path. Send one concise
+correction to the exact native session, then reconcile it into durable work. Steering is not proof
+that the Inbox was read or that the Assignment changed.
+
+Ordinary waiting stays silent. Elapsed time and empty checks are not progress reports. The
+supervision Skill owns wake selection, receipt handling, direct-report classification and recovery.

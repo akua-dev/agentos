@@ -1,0 +1,27 @@
+---
+title: Repository map
+description: Find the smallest component that owns the behavior you need to change.
+canonical:
+  - label: Annotated repository layout
+    path: ARCHITECTURE.md
+  - label: Root development boundary
+    path: AGENTS.md
+---
+
+| Path | Ownership |
+| --- | --- |
+| `agents/` | identities, shared Skills and role-owned workload assets |
+| `runtime/` | shared runtime preparation, Herdr integration, memory and Kubernetes base |
+| `database/` | versioned SQL, behavior tests and optional database operand |
+| `clis/` | narrow deterministic commands |
+| `services/` | optional deployable services such as the Fleet AI Gateway |
+| `benchmarks/` | public specification, scenarios, schemas and evidence |
+| `release/` | deterministic stable artifact rendering |
+| `website/` | public landing, Docs and Learn application |
+
+Place permanent identity and safety in the closest `AGENTS.md`. Put conditional judgment in one
+Skill, deterministic behavior in TypeScript or SQL, and contributor procedure in
+`CONTRIBUTING.md`. Documentation may orient and link; it does not duplicate the contract.
+
+Read every nearer `AGENTS.md` before changing its subtree. A sibling role file is a specification
+when inspected, not a way to assume that identity.

@@ -1,0 +1,59 @@
+---
+title: Give the company its first outcome
+description: State what should become true and let the Fleet establish durable ownership.
+courseId: operate-first-fleet
+courseTitle: Operate your first Fleet
+courseOrder: 3
+lessonId: give-first-outcome
+lessonOrder: 3
+estimatedMinutes: 8
+canonical:
+  - label: Delegation procedure
+    path: agents/.agents/skills/agentos-delegation/SKILL.md
+  - label: Project procedure
+    path: agents/.agents/skills/agentos-projects/SKILL.md
+---
+
+## The mental model
+
+Speak in outcomes, not internal workflows. First Mate resolves the project, existing charter,
+delivery posture and authority before accepting or routing the work.
+
+Compare:
+
+> Open three agents. Have one inspect the form, one write tests and one patch the handler.
+
+with:
+
+> Add server-side validation to onboarding and deliver it through this repository’s existing pull
+> request checks. Do not merge.
+
+The second request preserves room for the Fleet to investigate, form the smallest useful crew and
+adapt to evidence.
+
+## Worked example: one reviewed repository change
+
+Use a real but bounded project outcome. First Mate checks the project registry and discovers there
+is no matching Second-Mate charter. It accepts a Task and creates one ship Crewmate Assignment in
+an isolated worktree.
+
+The brief includes:
+
+- the desired result;
+- repository and delivery workflow;
+- acceptance evidence;
+- excluded authority, including merge;
+- relevant context without credentials.
+
+You can inspect the Task and Assignment in PostgreSQL, the worker in Kubernetes/Herdr and the
+eventual branch in Git. The chain of custody is visible before completion.
+
+## What changes at this layer?
+
+- Human intent becomes durable accepted work.
+- One Agent becomes accountable for one active outcome.
+- The worker chooses routine steps inside the brief.
+- The Captain retains consequential authority.
+
+Next, [form the right crew](/learn/03-operate-first-fleet/form-right-crew). The operating reference
+is [Delegate an outcome](/docs/operate/delegate-outcome).

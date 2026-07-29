@@ -1,0 +1,33 @@
+---
+title: Kubernetes resources
+description: Role-owned workload assets and their runtime responsibilities.
+canonical:
+  - label: Shared runtime base
+    path: runtime/kubernetes
+  - label: First Mate resources
+    path: agents/firstmate/kubernetes
+  - label: Second Mate resources
+    path: agents/secondmate/kubernetes
+  - label: Crewmate resources
+    path: agents/crewmate/kubernetes
+---
+
+| Resource area | Responsibility |
+| --- | --- |
+| `runtime/kubernetes/base` | Shared StatefulSet and runtime container shape |
+| `runtime/kubernetes/mate` | Persistent-Mate specialization |
+| `agents/firstmate/kubernetes` | Namespace, service, identity, bindings and First-Mate patch |
+| `agents/secondmate/kubernetes` | Persistent domain-leader workload and identity |
+| `agents/crewmate/kubernetes` | Bounded worker workload and identity |
+| `database/kubernetes/cloudnative-pg` | Minimal optional self-hosted database operand |
+| `services/ai-gateway/kubernetes` | Optional gateway Service, StatefulSet and NetworkPolicy |
+
+Kustomize composes the reviewed resources; documentation does not reproduce complete manifests.
+Render before apply and inspect the result against the target cluster.
+
+The minimal self-hosted database shape is one instance with no reviewed HA or backup policy. The
+database Skill discovers compatible current CloudNativePG and PostgreSQL releases; those external
+versions are not encoded as AgentOS release metadata.
+
+First Mate’s cluster-admin overlay is explicit and separately approved. Base ServiceAccounts do
+not imply universal runtime control.

@@ -1,0 +1,54 @@
+---
+title: Connect real-world signals
+description: Reconcile durable provider evidence into owned work without turning every event into a Task.
+courseId: build-autonomous-company
+courseTitle: Build your autonomous company
+courseOrder: 4
+lessonId: connect-real-world-signals
+lessonOrder: 3
+estimatedMinutes: 9
+canonical:
+  - label: External event architecture
+    path: ARCHITECTURE.md
+  - label: External event schema
+    path: database/migrations/0000_initial_fleet_schema.sql
+---
+
+## The mental model
+
+Reality must reach the company: support messages, provider issues, CI, production alerts and
+business signals. Durable ingestion is only the beginning. An authorized reconciliation Agent
+decides whether the evidence maps to existing intent, deserves new accepted work or requires no
+action.
+
+```text
+signal → durable evidence → bounded claim → reconciliation → Task or no-op
+```
+
+Deduplication prevents webhook retries from becoming duplicate organizational work. Claims let one
+Agent reason without holding a database transaction. Failure releases the claim with useful state.
+
+## Worked example: support webhook
+
+A support provider emits three deliveries for the same customer defect. The integration ingests
+one privacy-safe external-event identity and preserves provider evidence. The support Second Mate
+claims it and finds an existing checkout Task already covers the outcome.
+
+It links the evidence and completes reconciliation without creating a second Task. The provider
+remains the source for the customer conversation; PostgreSQL owns the Fleet ownership decision.
+
+<Callout title="Possible extension">
+Argo Events could receive webhooks and Argo Workflows could run deterministic preprocessing or
+human approval gates. ACP, A2A or a Buzz-like surface could carry interactive communication. These
+are explored integration directions, not shipped AgentOS components. Any adoption must preserve
+the current authority and durable-reconciliation contract.
+</Callout>
+
+## What changes at this layer?
+
+- The company can react to external reality without polling every provider in chat.
+- Durable evidence survives missed wakes.
+- Reconciliation prevents duplicate or unowned work.
+- Integration technology remains replaceable.
+
+Next, [design human attention](/learn/04-build-autonomous-company/design-human-attention).

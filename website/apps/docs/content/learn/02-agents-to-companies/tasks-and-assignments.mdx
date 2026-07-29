@@ -1,0 +1,57 @@
+---
+title: Tasks and Assignments
+description: A Task preserves stable intent while an Assignment names the active accountable owner.
+courseId: agents-to-companies
+courseTitle: From Agents to companies
+courseOrder: 2
+lessonId: tasks-and-assignments
+lessonOrder: 3
+estimatedMinutes: 8
+canonical:
+  - label: Durable coordination
+    path: database/migrations/0005_durable_coordination_contracts.sql
+  - label: Atomic acceptance
+    path: database/migrations/0012_atomic_task_acceptance.sql
+---
+
+## The mental model
+
+AgentOS separates two lifecycles:
+
+- a **Task** is stable accepted intent;
+- an **Assignment** is one bounded attempt owned by one accountable Agent.
+
+This lets ownership change without erasing history. There is one active accountable owner, not
+several sessions with overlapping claims.
+
+```text
+Task: checkout rejects expired addresses
+  ├─ Assignment 1: establish causal boundary → completed report
+  └─ Assignment 2: implement and deliver → active
+```
+
+Atomic acceptance creates the Task and first Assignment together when new intent is claimed. A
+handoff ends the current Assignment and creates the next one through a released Function. Direct
+row edits do not reconstruct those invariants.
+
+## Worked example: diagnosis before implementation
+
+The checkout outcome first receives a scout Assignment. The scout reproduces the defect and proves
+that a timezone conversion truncates the validity date. It changes no project source and returns a
+report.
+
+First Mate then hands the Task to a ship Crewmate with the implementation boundary and selected
+delivery workflow. The Task identity remains stable; the active owner and permitted outcome change.
+
+If the ship worker disappears, supervision recovers the same Assignment and worktree. It does not
+create a second active owner merely to make progress visible.
+
+## What changes at this layer?
+
+- Stable intent and active execution no longer overwrite one another.
+- One active accountable owner prevents duplicate work.
+- Handoffs preserve reports, authority and history.
+- Completion can be tested against the Assignment’s selected artifact.
+
+Read the exact concept reference in [Tasks and Assignments](/docs/concepts/tasks-assignments).
+Next, meet [a crew, not a swarm](/learn/02-agents-to-companies/crew-not-swarm).

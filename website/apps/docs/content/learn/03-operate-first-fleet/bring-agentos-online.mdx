@@ -1,0 +1,57 @@
+---
+title: Bring AgentOS online
+description: Use the two-stage bootstrap to establish one persistent First Mate with explicit approvals.
+courseId: operate-first-fleet
+courseTitle: Operate your first Fleet
+courseOrder: 3
+lessonId: bring-agentos-online
+lessonOrder: 1
+estimatedMinutes: 9
+canonical:
+  - label: Public bootstrap handoff
+    path: BOOTSTRAP.md
+  - label: Bootstrap procedure
+    path: agents/firstmate/.agents/skills/agentos-bootstrap/SKILL.md
+---
+
+## The mental model
+
+Bootstrap transfers trust from a temporary coding Agent to one persistent First Mate. The
+temporary Agent inspects and explains; the cluster First Mate becomes the long-lived operational
+owner.
+
+Give the coding Agent you already use one prompt:
+
+```text
+Read https://github.com/akua-dev/agentos/blob/main/BOOTSTRAP.md.
+Help me bring AgentOS online — check my setup first, ask before changing anything.
+```
+
+The handoff loads the versioned bootstrap procedure. It asks before login, cluster creation, cost,
+installation and RBAC. It reconciles an existing First Mate or home instead of creating a
+competitor.
+
+## Worked example: a disposable first Fleet
+
+You have a local Kubernetes context and want to learn without changing a shared production
+cluster. The temporary Agent:
+
+1. confirms the exact context and whether it is truly disposable;
+2. resolves a stable AgentOS release;
+3. shows the workload and authority changes;
+4. asks before applying them;
+5. establishes the minimal persistent First Mate;
+6. hands stage two to that First Mate for database and Fleet reconciliation.
+
+The exact commands depend on the selected release and environment. A copied tutorial command is not
+authority to mutate the current cluster.
+
+## What changes at this layer?
+
+- One persistent Agent becomes responsible for the Fleet.
+- The home and native session survive the temporary bootstrap chat.
+- Approvals occur at real trust and cost boundaries.
+- The selected release, not website prose, owns the procedure.
+
+Read [Get started](/docs/start/get-started) when you are ready to run it. Next, [meet your First
+Mate](/learn/03-operate-first-fleet/meet-first-mate).

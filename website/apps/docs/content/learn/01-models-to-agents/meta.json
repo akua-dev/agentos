@@ -1,0 +1,12 @@
+{
+  "title": "From models to Agents",
+  "pages": [
+    "what-a-model-does",
+    "chat-is-conversation",
+    "copilots-enter-workflow",
+    "tools-let-model-act",
+    "agent-owns-outcome",
+    "harnesses-make-agents-durable",
+    "long-running-work-needs-evidence"
+  ]
+}

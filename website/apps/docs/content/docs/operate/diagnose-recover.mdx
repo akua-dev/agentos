@@ -1,0 +1,31 @@
+---
+title: Diagnose and recover
+description: Establish causality, inspect native authorities and preserve accepted work.
+canonical:
+  - label: Diagnostic procedure
+    path: agents/.agents/skills/agentos-diagnostics/SKILL.md
+  - label: Runtime procedure
+    path: agents/.agents/skills/agentos-runtime/SKILL.md
+  - label: Supervision procedure
+    path: agents/.agents/skills/agentos-supervision/SKILL.md
+---
+
+For a reported software defect, diagnose before authorizing a fix. A scout establishes a
+falsifiable cause, controls alternatives and returns evidence. Project implementation begins only
+after that report supports a bounded ship outcome.
+
+For Fleet trouble, first decide which authority can prove or disprove the symptom:
+
+- PostgreSQL for identity, ownership and durable communication;
+- Kubernetes for workload and effective authorization;
+- Herdr for the native terminal and harness session;
+- PVC state for home and unfinished work;
+- Git and provider state for delivered code.
+
+A stale status row is not live-process evidence. A running Pod is not proof the correct harness
+session is working. A terminal label is not Agent identity.
+
+Recovery reuses the same Agent identity, home and Assignment. It never creates a duplicate Agent to
+avoid diagnosis or destroys unlanded work. Inspect narrowly, preserve contradictory evidence and
+stop at the first unverified boundary. The runtime and supervision Skills own the current recovery
+primitive for the selected release.

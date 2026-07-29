@@ -1,0 +1,57 @@
+---
+title: Copilots enter the workflow
+description: Instructions, retrieval and integrations improve assistance without transferring responsibility.
+courseId: models-to-agents
+courseTitle: From models to Agents
+courseOrder: 1
+lessonId: copilots-enter-workflow
+lessonOrder: 3
+estimatedMinutes: 7
+canonical:
+  - label: AgentOS source-of-truth rules
+    path: ARCHITECTURE.md
+---
+
+## The mental model
+
+A copilot brings the conversation closer to real work. It can retrieve repository files, apply
+standing instructions, inspect an issue and suggest a patch in the editor. The model sees better
+context and the human spends less effort moving information.
+
+Assistance is not delegation. A copilot can propose a code change while the human remains the
+active loop: choosing the file, accepting edits, running checks, interpreting failure and deciding
+when the result is ready.
+
+Three additions are common:
+
+- **instructions** shape recurring behavior;
+- **retrieval** grounds output in relevant current material;
+- **integrations** expose external systems.
+
+None of them makes the copied context authoritative. Git still owns the source, the issue provider
+owns the issue and current tests own their observed result.
+
+## Worked example: suggest a validation patch
+
+The copilot retrieves the onboarding handler and its tests. It notices that the handler trusts a
+client-side address check and proposes server-side validation.
+
+That is much better than a context-free answer. Yet several questions remain yours:
+
+- Is this the actual causal boundary or a plausible guess?
+- Does the repository require a particular test and review workflow?
+- May the system modify source, commit or open a pull request?
+- What evidence would make the outcome complete?
+
+Until those are delegated, the copilot is an excellent pair—not an accountable worker.
+
+## What changes at this layer?
+
+- The model receives relevant working context automatically.
+- Stable instructions reduce repeated prompting.
+- Suggestions can appear directly where work happens.
+- The human still owns diagnosis, action, recovery and completion.
+
+Next, [tools let a model act](/learn/01-models-to-agents/tools-let-model-act).
+See [native authorities](/docs/concepts/native-authorities) for why retrieved context remains
+separate from truth.

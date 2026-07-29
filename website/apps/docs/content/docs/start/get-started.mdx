@@ -1,0 +1,43 @@
+---
+title: Get started
+description: Use the reviewed bootstrap prompt with the coding Agent you already have.
+canonical:
+  - label: Bootstrap handoff
+    path: BOOTSTRAP.md
+  - label: Product quickstart
+    path: README.md
+  - label: Bootstrap procedure
+    path: agents/firstmate/.agents/skills/agentos-bootstrap/SKILL.md
+---
+
+You do not need to clone AgentOS or install a custom CLI. Copy this into the coding Agent you
+already use:
+
+```text
+Read https://github.com/akua-dev/agentos/blob/main/BOOTSTRAP.md.
+Help me bring AgentOS online — check my setup first, ask before changing anything.
+```
+
+The bootstrap handoff tells that temporary Agent how to inspect the current environment, explain
+real choices and load the released First-Mate bootstrap procedure. It must ask before any action
+that costs money or trust, including login, cluster creation, installation and RBAC changes.
+
+## What you need
+
+- a coding Agent that can read a public URL;
+- a Kubernetes context, or willingness to evaluate a disposable option;
+- a browser for provider login when the selected harness requires it.
+
+You do not need Docker, Helm, PostgreSQL or this repository installed locally merely to begin.
+
+## What success looks like
+
+Stage one establishes a persistent First Mate with its home and native session. Stage two lets that
+First Mate reconcile and complete the Fleet from inside the cluster. You approve each
+consequential boundary. When the First Mate is ready, continue with [Verify the
+Fleet](/docs/start/verify-fleet).
+
+<Callout title="Procedure boundary">
+This page describes the public entrypoint. The versioned bootstrap Skill linked above owns the
+ordered procedure, validations and recovery behavior for the selected AgentOS release.
+</Callout>

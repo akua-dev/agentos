@@ -1,0 +1,35 @@
+---
+title: Adopt one project
+description: Keep the repository and provider workflow authoritative while the Fleet owns outcomes.
+canonical:
+  - label: Project procedure
+    path: agents/.agents/skills/agentos-projects/SKILL.md
+  - label: Architecture
+    path: ARCHITECTURE.md
+---
+
+Start with one existing repository and one outcome that can end in a reviewable artifact. AgentOS
+does not require a migration: the remote repository, issues, board, CI and pull-request workflow
+remain where they are.
+
+First Mate uses the project procedure to resolve or register the project, its checkout and its
+selected delivery posture. A ship Assignment works in an isolated worktree and ends in the durable
+artifact that posture requires—normally a committed branch and review artifact for a remote-backed
+project. Merge remains a separate human authority unless an exact standing decision already covers
+it.
+
+## A useful first outcome
+
+Choose something small enough to inspect but real enough to cross the full chain of custody:
+
+> Add server-side validation for the onboarding form and deliver it through this repository’s
+> existing pull-request checks.
+
+That outcome can become a Task, one active Assignment, a bounded worker, a commit, test evidence
+and a review artifact. It exposes ownership and recovery behavior without granting broad
+production authority.
+
+The selected project workflow owns the complete procedure. This page does not replace its Skill or
+the repository’s own `AGENTS.md`.
+
+Next: [delegate an outcome](/docs/operate/delegate-outcome).

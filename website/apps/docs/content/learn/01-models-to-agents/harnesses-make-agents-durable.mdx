@@ -1,0 +1,57 @@
+---
+title: Harnesses make Agents durable
+description: Sessions, context, Skills, memory, sandboxing and recovery turn a loop into an operable worker.
+courseId: models-to-agents
+courseTitle: From models to Agents
+courseOrder: 1
+lessonId: harnesses-make-agents-durable
+lessonOrder: 6
+estimatedMinutes: 8
+canonical:
+  - label: Harness procedure
+    path: agents/.agents/skills/agentos-harnesses/SKILL.md
+  - label: Composition architecture
+    path: ARCHITECTURE.md
+---
+
+## The mental model
+
+The model supplies inference. The harness supplies the operating environment around it:
+
+- a native session and turn lifecycle;
+- context loading and compaction;
+- tools and sandbox;
+- authentication and permissions;
+- instructions and conditional Skills;
+- model and reasoning selection;
+- memory and recovery surfaces.
+
+Pi and Codex are harnesses with different native behavior. AgentOS does not pretend their settings
+are interchangeable, and an AgentOS Agent is not defined by either one.
+
+Instructions answer “who am I and what is always true?” Skills answer “what judgment applies in
+this situation?” Deterministic code owns mechanics. Private memory recalls fallible context. None
+of those sources should absorb the responsibilities of the others.
+
+## Worked example: resume after loss
+
+The onboarding Agent has edited two files and a long test is running. Its process disappears.
+
+A durable harness boundary makes it possible to find the same home, worktree and native session
+reference, restore useful context and continue the same outcome. Recovery must also re-read current
+Git and test state. A conversational summary saying “validation was almost done” cannot prove which
+files exist or whether the test passed.
+
+If context pressure caused compaction rather than process loss, the same principle applies:
+conversation memory is a cache. Reload current project instructions and authoritative state before
+acting.
+
+## What changes at this layer?
+
+- The Agent has an operable runtime, not merely a loop in sample code.
+- Context, tools and permissions can be composed for the outcome.
+- Process or context loss can be recovered without inventing a new owner.
+- The harness still does not provide organization among several Agents.
+
+Next, [long-running work needs evidence](/learn/01-models-to-agents/long-running-work-needs-evidence).
+See [Choose a harness](/docs/operate/harnesses) for AgentOS’s release boundary.

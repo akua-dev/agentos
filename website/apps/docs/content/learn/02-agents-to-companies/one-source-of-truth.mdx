@@ -1,0 +1,50 @@
+---
+title: One honest source of truth per concern
+description: Connect native authorities instead of mirroring them into one convenient fiction.
+courseId: agents-to-companies
+courseTitle: From Agents to companies
+courseOrder: 2
+lessonId: one-source-of-truth
+lessonOrder: 7
+estimatedMinutes: 7
+canonical:
+  - label: System boundaries
+    path: ARCHITECTURE.md
+---
+
+## The mental model
+
+A company crosses systems whose truths cannot be collapsed honestly:
+
+- the support provider owns the customer message;
+- PostgreSQL owns Task, Assignment and decision state;
+- Kubernetes owns the running workload;
+- Herdr owns the native terminal session;
+- the PVC owns unfinished home state;
+- Git and its provider own delivered source.
+
+AgentOS connects them. It does not copy everything into PostgreSQL, ClickHouse or a universal event
+log and then pretend the copy can authorize action.
+
+## Worked example: reconcile the checkout fix
+
+The support event says a customer saw a defect. PostgreSQL says the Fleet accepted one Task and the
+payments worker owns its active Assignment. Kubernetes says the worker Pod was replaced. Herdr
+says the new process resumed the existing native session. Git says the fix is committed, and the
+provider says pull request 128 is open.
+
+Each statement has its own evidence. If PostgreSQL says the Assignment is active while Git shows
+the pull request merged, supervision has a reconciliation problem. It should not overwrite Git
+history or mark work complete based on one stale row.
+
+Unified observability can make events searchable, but read access to telemetry never becomes
+organizational authority.
+
+## What changes at this layer?
+
+- Contradictory evidence becomes diagnosable instead of hidden.
+- Standard systems remain inspectable and replaceable.
+- AgentOS avoids a shadow control plane.
+- Recovery can query the authority that owns each missing fact.
+
+Next, [persistence is the product](/learn/02-agents-to-companies/persistence-is-product).

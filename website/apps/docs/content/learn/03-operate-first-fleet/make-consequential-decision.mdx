@@ -1,0 +1,56 @@
+---
+title: Make a consequential decision
+description: Answer one exact choice and release only the work that choice authorizes.
+courseId: operate-first-fleet
+courseTitle: Operate your first Fleet
+courseOrder: 3
+lessonId: make-consequential-decision
+lessonOrder: 7
+estimatedMinutes: 8
+canonical:
+  - label: Decision procedure
+    path: agents/.agents/skills/agentos-decisions/SKILL.md
+  - label: Decision database contracts
+    path: database/migrations/0005_durable_coordination_contracts.sql
+---
+
+## The mental model
+
+A consequential question is a durable speech act with a stable key, exact body and explicit
+dependencies. The originating investigation can finish while the decision remains open.
+
+First Mate presents the human meaning:
+
+- what became known;
+- which options are real;
+- what each option changes;
+- the exact choice requested.
+
+It does not expose internal hold IDs unless needed for diagnosis.
+
+## Worked example: scope merge authority
+
+The onboarding pull request is green. The project normally requires a human merge. You decide:
+
+> Approve merge of this exact onboarding validation pull request after its current required checks
+> remain green. This does not grant standing merge authority.
+
+The exact answer is recorded. Only dependent work for that decision is released. A different pull
+request, a later force-push or a production deploy is outside the scope.
+
+Alternatively, you can record a narrow standing rule for a well-understood repeatable class. The
+rule must name its constraints and consequences. Vague “handle routine changes” language is not a
+safe authority contract.
+
+Reading, acknowledging or discussing the question does not resolve it. The released database
+Function couples the answer with local Task state.
+
+## What changes at this layer?
+
+- Human choices become exact durable inputs to execution.
+- Dependencies unblock atomically with resolution.
+- Authority scope can be inspected later.
+- Permission cannot be mistaken for approval.
+
+Next, [recover an interrupted
+worker](/learn/03-operate-first-fleet/recover-interrupted-worker).

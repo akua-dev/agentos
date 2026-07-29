@@ -4,12 +4,19 @@
   "description": "AgentOS runtime, optional services, executable primitives, and database workspace",
   "private": true,
   "type": "module",
-  "workspaces": ["clis/*", "database", "packages/*", "services/*"],
+  "workspaces": ["clis/*", "database", "packages/*", "services/*", "website/apps/docs"],
   "scripts": {
     "build": "bun run --filter @akua-dev/agentos build",
-    "test": "bun run build && bun test .",
+    "test": "bun run build && bun test . ./agents/.pi/background-tasks ./agents/.pi/supervision-guard ./agents/.pi/openai-server-compaction ./agents/.pi/mate-memory --path-ignore-patterns='website/apps/docs/**' && bun run site:test",
     "typecheck": "tsc --project tsconfig.json",
-    "check": "bun run test && bun run typecheck"
+    "check": "bun run test && bun run typecheck && bun run site:lint && bun run site:typecheck",
+    "site:dev": "bun run --cwd website/apps/docs dev",
+    "site:test": "bun run --cwd website/apps/docs test",
+    "site:lint": "bun run --cwd website/apps/docs lint",
+    "site:typecheck": "bun run --cwd website/apps/docs types:check",
+    "site:build": "bun run --cwd website/apps/docs build",
+    "site:build:worker": "bun run --cwd website/apps/docs build:worker",
+    "site:preview:worker": "bun run --cwd website/apps/docs preview:worker"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "0.81.1",

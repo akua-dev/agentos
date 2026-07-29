@@ -1,0 +1,56 @@
+---
+title: Improve from failure
+description: Freeze evidence, find the smallest cause and change one reviewed source of truth.
+courseId: build-autonomous-company
+courseTitle: Build your autonomous company
+courseOrder: 4
+lessonId: improve-from-failure
+lessonOrder: 6
+estimatedMinutes: 8
+canonical:
+  - label: Improvement review
+    path: .agents/skills/agentos-improvement-review/SKILL.md
+  - label: Evaluation Skill
+    path: .agents/skills/agentos-evaluation/SKILL.md
+---
+
+## The mental model
+
+Evaluation and improvement are separate. Freeze the failing run before changing the system; then
+turn one reproducible weakness into the smallest reviewed improvement.
+
+```text
+observe → freeze → explain cause → regression test → smallest change → rerun
+```
+
+Choose the source that owns the behavior:
+
+- identity and permanent safety: nearest `AGENTS.md`;
+- conditional judgment: one Skill;
+- deterministic invariant: SQL or TypeScript;
+- project fact: project instruction surface;
+- private preference: Mate memory.
+
+Duplicating the same rule across all five creates drift rather than learning.
+
+## Worked example: support event was duplicated
+
+The baseline creates two Tasks for repeated webhook delivery. Freeze provider IDs, ingestion rows,
+claims and resulting Tasks. The cause is not “the Agent was careless”; the released ingestion
+contract allowed two event identities for the same provider key.
+
+Write a database behavior test that reproduces the duplicate, change the versioned SQL invariant
+and verify both the original and a held-out provider retry shape. Do not patch the symptom by
+telling every Agent “remember not to duplicate support events.”
+
+If the actual cause is reconciliation judgment rather than deterministic identity, change the
+owning Skill and test the behavior through a scenario.
+
+## What changes at this layer?
+
+- Failure becomes durable organizational input.
+- Root causes are separated from model blame.
+- Improvements stay small, reviewable and regression-tested.
+- History remains honest.
+
+Next, [keep the company sovereign](/learn/04-build-autonomous-company/keep-company-sovereign).

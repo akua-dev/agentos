@@ -1,0 +1,29 @@
+---
+title: Work with projects
+description: Preserve the repository, provider and selected delivery workflow as authorities.
+canonical:
+  - label: Project lifecycle procedure
+    path: agents/.agents/skills/agentos-projects/SKILL.md
+  - label: Delegation procedure
+    path: agents/.agents/skills/agentos-delegation/SKILL.md
+---
+
+Load the project procedure before registering, cloning, creating, changing or removing a project.
+PostgreSQL owns the Fleet registry entry; native Git and the provider own source, branches and
+review artifacts.
+
+Project-specific work occurs in a bounded Crewmate worktree. The closest project `AGENTS.md`,
+Mise configuration and delivery workflow remain authoritative. A remote-backed ship Assignment
+normally authorizes its task-branch commit, push and review-artifact creation—but never a
+default-branch push or merge.
+
+## Delivery posture
+
+The selected workflow defines what “review-ready” means. It may include a project validation
+system such as no-mistakes, ordinary provider pull requests or a local-only committed branch.
+AgentOS does not stack a second mandatory review gate merely because work passed through a Fleet.
+When rigor is insufficient, propose changing the selected posture explicitly.
+
+Do not delete a worktree or retire its Agent until active work is complete or deliberately handed
+off and every change is durably landed. A clean directory is not proof of delivery; Git and the
+provider are.

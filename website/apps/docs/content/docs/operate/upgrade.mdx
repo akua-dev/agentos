@@ -1,0 +1,30 @@
+---
+title: Upgrade AgentOS
+description: Reconcile an immutable release without losing the Mate home or loaded instructions.
+canonical:
+  - label: Bootstrap and upgrade procedure
+    path: agents/firstmate/.agents/skills/agentos-bootstrap/SKILL.md
+  - label: Dogfood and release guidance
+    path: CONTRIBUTING.md
+---
+
+An upgrade is a reconciliation of source, loaded instructions, database migrations and immutable
+runtime images—not a `git pull` inside a running Pod.
+
+Prefer a newer stable release with its fixed-name manifest and immutable tag. For an explicitly
+chosen preview, use an exact Git commit, a locally rendered manifest and an immutable OCI digest.
+Read intervening changes, inspect the server-side manifest diff and preserve a known recovery
+boundary before mutation.
+
+## Three states to compare
+
+1. the persistent writable AgentOS checkout;
+2. the instruction set the current harness actually loaded;
+3. the image digest running every container in the Mate Pod.
+
+Updating the checkout does not reload a harness. Reload Markdown or Skills at a safe turn boundary
+and require visible confirmation. Executable, operating-system or Kubernetes changes require an
+image rollout, one Mate at a time, with the same preserved PVC and session identity.
+
+Never use `kubectl cp`, a mutable image tag, uncommitted source, namespace recreation or PVC
+deletion as an upgrade shortcut. The versioned bootstrap Skill owns the exact stable workflow.

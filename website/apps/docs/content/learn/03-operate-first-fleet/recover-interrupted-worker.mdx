@@ -1,0 +1,56 @@
+---
+title: Recover an interrupted worker
+description: Reconcile identity, workload, home, session and Git without duplicating accepted work.
+courseId: operate-first-fleet
+courseTitle: Operate your first Fleet
+courseOrder: 3
+lessonId: recover-interrupted-worker
+lessonOrder: 8
+estimatedMinutes: 9
+canonical:
+  - label: Supervision procedure
+    path: agents/.agents/skills/agentos-supervision/SKILL.md
+  - label: Runtime procedure
+    path: agents/.agents/skills/agentos-runtime/SKILL.md
+  - label: Published recovery evidence
+    path: benchmarks/results/agentos
+---
+
+## The mental model
+
+Recovery starts with falsifiable observations, not a restart command. Identify what disappeared and
+which sources still preserve the outcome.
+
+1. PostgreSQL: same active Assignment and Agent?
+2. Kubernetes: intended Pod missing, replaced or unhealthy?
+3. PVC: same retained home?
+4. Herdr: exact named Agent and native session?
+5. Git/worktree: accepted changes preserved?
+
+Use the selected release’s recovery primitive. Do not create a second Agent, delete a home or use
+force as a shortcut.
+
+## Worked example: controlled interruption
+
+The onboarding worker has a committed implementation and an uncommitted test adjustment. Its Pod
+is deliberately deleted in a disposable evaluation environment.
+
+Supervision detects the workload transition, confirms the Assignment is still active, preserves
+the PVC and re-establishes the reviewed runtime. The harness resumes the same worktree, reads the
+current diff and continues the failing test.
+
+The evidence bundle records time to detection, time to useful work, preserved files, duplicate
+effects and human repair. If any of those observations is missing, the result says `unknown`.
+
+A replacement Pod reaching Ready is necessary but insufficient. Recovery is complete when the
+same owned outcome is usefully continuing with preserved state and correct authority.
+
+## What changes at this layer?
+
+- Failure becomes a reconciled lifecycle event rather than a lost chat.
+- Accepted work remains singular and accountable.
+- Recovery quality can be benchmarked.
+- Destructive repair is separated from routine replacement.
+
+Next, [deliver through the project’s
+workflow](/learn/03-operate-first-fleet/deliver-project-workflow).

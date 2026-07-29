@@ -1,0 +1,60 @@
+---
+title: Measure the organization
+description: Evaluate outcomes, attention, recovery, safety and missing evidence across the whole lifecycle.
+courseId: build-autonomous-company
+courseTitle: Build your autonomous company
+courseOrder: 4
+lessonId: measure-organization
+lessonOrder: 5
+estimatedMinutes: 9
+canonical:
+  - label: Benchmark specification
+    path: benchmarks/SPEC.md
+  - label: Evaluation Skill
+    path: .agents/skills/agentos-evaluation/SKILL.md
+---
+
+## The mental model
+
+Agent activity is not organizational performance. Count verified human outcomes and the human
+attention, time, retries, tokens, duplication, recovery and risk used to deliver them.
+
+Useful dimensions include:
+
+- outcome effectiveness and acceptance evidence;
+- Captain decisions, clarifications and repair interventions;
+- elapsed time and tool/model consumption;
+- duplicated work and retry behavior;
+- interruption detection and return to useful work;
+- authority, safety and chain of custody;
+- missing telemetry and explicit limitations.
+
+One composite score can hide failure. Publish the dimensions and the failed or incomplete attempts
+that shaped improvement.
+
+## Worked example: support-domain baseline
+
+Run five declared support-to-review scenarios:
+
+1. new reproducible defect;
+2. duplicate provider delivery;
+3. existing Task match;
+4. controlled worker interruption;
+5. consequence requiring a Captain decision.
+
+For each, freeze the exact subject and evidence. Measure whether an accepted review artifact
+exists, how many human turns were consumed, whether the wake path survived, and whether any access
+or authority boundary was violated.
+
+If token telemetry is missing, record `unknown`. Do not report zero or omit the dimension to make
+the company appear efficient.
+
+## What changes at this layer?
+
+- Autonomy becomes evidence rather than demo theater.
+- Human attention is treated as an explicit cost.
+- Recovery and safety are first-class performance.
+- The company can compare reviewed improvements over time.
+
+Read the [benchmark reference](/docs/reference/benchmarks). Next, [improve from
+failure](/learn/04-build-autonomous-company/improve-from-failure).
