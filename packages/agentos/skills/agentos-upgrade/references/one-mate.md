@@ -162,7 +162,13 @@ If the replacement fails readiness or session recovery, preserve the failed-Pod
 evidence. Restore the prior checkout reference and immutable images for the same
 Mate only under the recovery owner's authority. A rollback requiring another
 Pod replacement needs separate authority; the original upgrade instruction
-does not grant it.
+does not grant it. After an authorized restore, verify the prior checkout and
+image-seed commits, every desired image reference and observed image ID against
+the prior release's platform members, the prior version and source metadata,
+StatefulSet generation and readiness, the original home PVC UID and native Pi
+session reference, and all recorded installation-specific Pod-template wiring
+before reporting recovery. If any restored-runtime check is unverified, report
+that boundary and the exact live state instead of declaring rollback complete.
 
 Report the first unverified boundary. Do not add credentials, change RBAC,
 apply a migration, update another Mate, create a replacement Agent or perform

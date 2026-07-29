@@ -60,7 +60,8 @@ and final report, remove it from the mutation sequence and do not restart it.
 
 ## Choose and publish the serial order
 
-If no member needs mutation, report the verified no-op Fleet result and stop.
+If no member needs mutation, keep the frozen roster and proceed to the
+consolidated report below without restarting any member.
 
 When any Second Mate needs mutation, choose one healthy idle Second Mate at a
 safe turn boundary as canary. If none is safe, wait or ask the Captain rather
@@ -99,14 +100,14 @@ required authority.
 When First Mate needs mutation, first verify that every preceding result is
 recorded and the frozen-roster boundary remains consistent, then apply its
 one-Mate operation last. If First Mate is a verified no-op, keep the current
-session and proceed to consolidated verification.
+session and continue through the same report boundary.
 
-After a self-update, the resumed First-Mate native Pi session must verify its
-own atomic operation. Load the frozen roster and recorded member results, then
-reconcile each member's current Kubernetes, Git, PVC and native-session
-evidence. Report one consolidated result containing the exact release, every
-verified update and no-op, every deferred member, and the first failure or
-unverified boundary.
+After that atomic-operation or no-op branch, the current or resumed
+First-Mate native Pi session must verify the branch result, load the frozen
+roster and recorded member results, and reconcile each member's current
+Kubernetes, Git, PVC and native-session evidence. Report one consolidated
+result containing the exact release, every verified update and no-op, every
+deferred member, and the first failure or unverified boundary.
 
 Only after this report may First Mate return to ordinary supervision and
 re-arm its normal waits. The native Pi session is the rollout record; create no

@@ -71,6 +71,7 @@ async function pack(packageDirectory: string, destination: string) {
 async function piCommands(
   roleDirectory: string,
   agentDirectory: string,
+  role?: "first_mate" | "second_mate",
 ): Promise<string[]> {
   const child = Bun.spawn(
     [
@@ -86,7 +87,7 @@ async function piCommands(
       cwd: roleDirectory,
       env: {
         ...process.env,
-        AGENTOS_AGENT_ROLE: "first_mate",
+        AGENTOS_AGENT_ROLE: role,
         PI_CODING_AGENT_DIR: agentDirectory,
       },
       stdin: "pipe",
@@ -435,12 +436,28 @@ describe("publishable AgentOS Pi artifacts", () => {
         "firstmate",
       ),
       join(sandbox, "pi-agent"),
+      "first_mate",
     );
     expect(commands).toContain("background-commands");
     expect(commands).toContain("memory");
     expect(commands).toContain("skill:agentos-supervision");
     expect(commands).toContain("skill:agentos-bootstrap");
     expect(commands).toContain("skill:agentos-upgrade");
+    const secondMateCommands = await piCommands(
+      join(
+        installedAgentOS,
+        "resources",
+        "roles",
+        "secondmate",
+      ),
+      join(sandbox, "second-mate-pi-agent"),
+      "second_mate",
+    );
+    expect(secondMateCommands).toContain("background-commands");
+    expect(secondMateCommands).toContain("memory");
+    expect(secondMateCommands).toContain("skill:agentos-supervision");
+    expect(secondMateCommands).toContain("skill:agentos-upgrade");
+    expect(secondMateCommands).not.toContain("skill:agentos-bootstrap");
     const replacementProject = join(sandbox, "replacement-project");
     await mkdir(join(replacementProject, ".pi"), { recursive: true });
     await writeFile(
