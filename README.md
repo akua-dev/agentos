@@ -70,8 +70,8 @@ a CLI, Docker, Helm, or a PostgreSQL install.
 Pi is AgentOS's extension host. A trusted organization package can add ordinary
 Pi behavior beside the released crew or replace the complete AgentOS
 distribution: role instructions, Skills, startup behavior, First- and
-Second-Mate Mise and Kubernetes resources, and Crewmate setups. The public
-The single `@akua-dev/agentos` package exposes an inert public API and the
+Second-Mate Mise and Kubernetes resources, and Crewmate setups. The single
+`@akua-dev/agentos` package exposes an inert public API and the
 replaceable released Pi extension, Skills and role resources.
 
 Loading a package never implies that a database migration or workload rollout

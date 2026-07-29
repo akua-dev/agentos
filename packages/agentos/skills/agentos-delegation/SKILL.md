@@ -126,17 +126,17 @@ Use released PostgreSQL schema for durable coordination and native tools against
    selected delivery workflow, delivery target, authorized outward effects,
    merge authority and achievable Definition of Done. Keep provider-specific
    workflow details as durable prose rather than an AgentOS delivery-mode enum.
-   When no-mistakes is selected, include `$agentos-projects` in the
-   Assignment's selected Skill material so the Crewmate receives its gate
-   ownership and escalation contract.
+   When no-mistakes is selected, ensure the chosen Crewmate setup makes
+   `$agentos-projects` available and name it in the brief so the Crewmate
+   receives its gate ownership and escalation contract.
 5. Render the worker's harness view from the authoritative Assignment brief
    using `../../crewmates/default/BRIEF.md`. Fill every
    marker with the owning Mate, Agent, Task, Assignment, work kind, project,
    primary checkout, workspace kind, isolated workspace, outcome, acceptance
    criteria, constraints, delivery workflow, delivery target, authorized
    outward effects, merge authority, Definition of Done, selected harness,
-   instructions, Skills, runtime settings and capability requirements. Use
-   explicit `None` values when no optional material or requirement was selected.
+   instruction entrypoints, Skills, runtime settings and capability
+   requirements. Use explicit `None` values when no optional item is selected.
    Reject an unresolved marker or contradictory ship contract. Copy it to the Agent-owned
    `AGENTOS_BRIEF_PATH` before harness launch and regenerate it from PostgreSQL
    after loss; the PVC file is not a second authority. Put longer supporting
@@ -150,12 +150,10 @@ Use released PostgreSQL schema for durable coordination and native tools against
 7. Create the dedicated workload from `../../crewmates/default/kubernetes/base` through a
    reviewed per-Agent Kustomize overlay and native kubectl, then start the
    selected harness through the pod-local Herdr CLI only after the complete
-   rendered brief and selected Assignment resources have been delivered to the
-   child home. Construct the selected harness's exact native Skill and
-   instruction loading view, and
-   verify its observed catalog; a bundle path or discovery link alone is not
-   proof that the worker received it. Before launch, provision and verify the
-   selected
+   rendered brief and required runtime inputs have reached the child home.
+   Confirm the selected Crewmate setup's native Skill catalog and required
+   instruction entrypoints; a configured path or catalog entry alone is not
+   proof that the worker loaded them. Before launch, provision and verify the selected
    direct credential or standing-authorized ai-gateway client boundary without
    copying another Agent's provider auth.
    Confirm its Agent identity, Task Assignment, PVC, pod and Herdr session without treating terminal text as durable state.

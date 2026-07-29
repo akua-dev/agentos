@@ -81,10 +81,7 @@ pi
 pi --model <provider/model>
 pi --thinking <native-level>
 pi --model <provider/model> --thinking <native-level>
-pi --approve --no-skills \
-  --skill <absolute-project-skill-root> \
-  --skill <absolute-assignment-skill-directory> \
-  --append-system-prompt <absolute-assignment-instructions-file>
+pi --approve
 ```
 
 Use bare `pi` when no explicit model or thinking choice exists. Before passing a
@@ -106,17 +103,14 @@ Pi has no separate command-approval bypass in this reviewed path. First and
 Second Mate load only the resources selected by their reviewed distribution
 package and run directly inside their dedicated Pods. For an inspected Assignment worktree,
 `--approve` resolves Pi's project-resource trust boundary; it is not a command
-approval. For a Crewmate, `--no-skills` plus repeatable explicit `--skill`
-paths makes the Assignment catalog bounded while still allowing reviewed
-project-owned Skill roots. Repeat `--append-system-prompt` for selected
-instruction entrypoints. Do not copy those resources into the worktree or Pi
-settings.
+approval. A Crewmate setup selects its own native instruction and Skill roots.
+Do not copy those resources into the worktree or Pi settings.
 
-Before interactive launch, the same native loading arguments may be used with
-Pi's RPC mode and `get_commands`. Require every selected `skill:<id>` to report
-the expected explicit bundle path and reject an unselected Assignment path.
-This checks discovery without a model turn; the live Herdr session still proves
-that the intended worker received and used the brief.
+Before interactive launch, use Pi's RPC mode and `get_commands` to inspect its
+effective native resource catalog. Require expected Skills to resolve from the
+selected package or project roots and reject unintended roots. This checks
+discovery without a model turn; the live Herdr session still proves that the
+intended worker received and used the brief.
 
 For live resource changes, `/reload` reloads Pi's keybindings, extensions,
 skills, prompt templates, themes and context files without replacing the
@@ -170,17 +164,13 @@ Do this before `herdr agent start`; a visible trust chooser means dispatch is
 still blocked. `codex exec --skip-git-repo-check` is useful for a verified
 headless probe, not a replacement for the persistent interactive Crewmate.
 
-Codex does not expose a native Assignment `--skill` flag. Before launch, use
-its documented user Skill discovery location in the Crewmate's dedicated home:
-replace `$HOME/.agents/skills` with an exact, preverified directory of links
-whose names are the selected Skill material IDs and whose targets are their
-directories in the immutable Assignment bundle. Retain the previous directory
-for rollback and refuse startup if any entry or resolved target differs. Do not
-copy material, edit the project checkout or leave stale Assignment links.
-Repository `.agents/skills`, `/etc/codex/skills` and Codex-bundled Skills remain
-their own authorities. Put `$<material-id>` for every selected Assignment Skill
-in the initial brief, then inspect Codex's native `/skills` catalog and exact
-session before accepting loading as observed.
+Codex has no AgentOS-specific Skill loader. Its documented user, repository,
+administrator and bundled Skill locations remain separate native authorities.
+Select a Crewmate setup whose native discovery supplies every required Skill,
+name those Skills in the brief, then inspect Codex's native `/skills` catalog
+and exact session before accepting loading as observed. Do not copy Skills into
+the project checkout, create an AgentOS discovery layer or treat a brief
+reference as proof that a Skill loaded.
 
 Before a deliberate exit, read the exact Herdr Agent and retain its
 `agent_session` ID. Exit Codex with `/quit`; if the ID was not already known,
@@ -201,8 +191,8 @@ herdr agent start <handle> --cwd <worktree> --no-focus \
 ```
 
 Pass the complete brief as one argument or durable file according to the
-harness's verified interface. Include the resolved native context-loading
-arguments described above; Herdr does not discover Assignment Skills. Inspect
+harness's verified interface. Supply only the selected harness's native
+context-loading arguments; Herdr neither discovers nor loads resources. Inspect
 `herdr agent get` after launch. Native
 harness stderr and exit status stay visible to the supervising Mate; do not
 hide provider failures behind an AgentOS queue or wrapper. Launch is complete

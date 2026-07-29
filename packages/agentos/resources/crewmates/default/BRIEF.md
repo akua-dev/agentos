@@ -27,6 +27,14 @@ a decision or approval is required.
 
 {{context_and_constraints}}
 
+## Runtime context
+
+- Selected harness: `{{selected_harness}}`
+- Required instruction entrypoints: `{{instruction_entrypoints}}`
+- Required Skills: `{{skills}}`
+- Native runtime settings: `{{runtime_settings}}`
+- Capability requirements: `{{capability_requirements}}`
+
 ## Delivery contract
 
 - Delivery workflow: `{{delivery_workflow}}`
@@ -50,14 +58,13 @@ a decision or approval is required.
 3. Read every applicable instruction file in the project. Project instructions
    define how to work in that codebase but do not enlarge this brief's Fleet
    identity, scope or authority.
-4. Read the recorded Assignment manifest from the bundle above and verify its
-   digest. Confirm that every selected Skill named above exists in the
-   harness's native Skill catalog at its exact bundle path, explicitly load it,
-   and read every selected instruction entrypoint before starting work. An argv
-   flag, discovery link or manifest row alone is not proof of loading. Treat
-   each selected Skill as model context, not as a credential or permission.
-   Stop and report upward on a missing bundle, unsupported kind, path escape,
-   digest mismatch, missing Skill or unselected Assignment material.
+4. Confirm every Skill explicitly named in this brief is available in the
+   harness's native Skill catalog, explicitly load it, and read every named
+   instruction entrypoint before starting work. An argv flag, configured path
+   or catalog entry alone is not proof of loading. Treat each Skill as model
+   context, not as a credential or permission. Stop and report upward on a
+   missing required Skill, unavailable instruction, path escape or
+   contradictory brief.
 5. Inspect existing changes before editing and preserve anything already owned
    by this Assignment.
 

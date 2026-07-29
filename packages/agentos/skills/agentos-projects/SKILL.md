@@ -66,8 +66,8 @@ observe failure before updating local Task state, and retain full remote URLs.
 If readiness expires after implementation, preserve the committed branch and
 active Assignment while reporting the concrete blocker.
 
-For a no-mistakes ship, include this Skill in the Crewmate's selected Skill
-set. The same Crewmate that implements and commits the change owns
+For a no-mistakes ship, choose a Crewmate setup that supplies this Skill and
+name it in the brief. The same Crewmate that implements and commits the change owns
 every `no-mistakes axi run` and `no-mistakes axi respond` call until the next
 gate or terminal outcome. The native pipeline owns review, fixes, tests,
 documentation, lint, rebase, task-branch push, pull-request creation and CI:
