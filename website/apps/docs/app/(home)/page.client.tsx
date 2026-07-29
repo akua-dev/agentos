@@ -80,7 +80,7 @@ export function Hero() {
 }
 
 const bootstrapPrompt =
-  'Read https://github.com/akua-dev/agentos/blob/main/BOOTSTRAP.md.\\nHelp me bring AgentOS online — check my setup first, ask before changing anything.';
+  'Read https://github.com/akua-dev/agentos/blob/main/BOOTSTRAP.md.\nHelp me bring AgentOS online — check my setup first, ask before changing anything.';
 
 export function CreateAppAnimation(props: ComponentProps<'div'>) {
   const tickTime = 18;
