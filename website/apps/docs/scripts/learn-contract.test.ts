@@ -2,27 +2,31 @@ import { describe, expect, it } from 'vitest';
 import { learningRoutes } from './learn-contract';
 
 describe('learningRoutes', () => {
-  it('defines exactly four courses and 33 chapters', () => {
-    expect(learningRoutes).toHaveLength(33);
-    expect(new Set(learningRoutes.map((route) => route.course)).size).toBe(4);
+  it('defines three activation-first courses and ten chapters', () => {
+    expect(learningRoutes).toHaveLength(10);
+    expect([...new Set(learningRoutes.map((route) => route.course))]).toEqual([
+      'Run your first outcome',
+      'Grow the company',
+      'Stay in control',
+    ]);
   });
 
   it('keeps stable unique paths, lesson IDs and global positions', () => {
-    expect(new Set(learningRoutes.map((route) => route.path)).size).toBe(33);
-    expect(new Set(learningRoutes.map((route) => route.lessonId)).size).toBe(33);
+    expect(new Set(learningRoutes.map((route) => route.path)).size).toBe(10);
+    expect(new Set(learningRoutes.map((route) => route.lessonId)).size).toBe(10);
     expect(learningRoutes.map((route) => route.position)).toEqual(
-      Array.from({ length: 33 }, (_, index) => index + 1),
+      Array.from({ length: 10 }, (_, index) => index + 1),
     );
   });
 
-  it('begins at models and ends at sovereignty', () => {
+  it('begins with a working Fleet and ends with a controlled upgrade', () => {
     expect(learningRoutes[0]).toMatchObject({
-      path: '/learn/01-models-to-agents/what-a-model-does',
-      title: 'What a model does',
+      path: '/learn/01-first-outcome/bring-agentos-online',
+      title: 'Bring AgentOS online',
     });
     expect(learningRoutes.at(-1)).toMatchObject({
-      path: '/learn/04-build-autonomous-company/keep-company-sovereign',
-      title: 'Keep the company sovereign',
+      path: '/learn/03-stay-in-control/upgrade-without-losing-control',
+      title: 'Upgrade without losing control',
     });
   });
 });

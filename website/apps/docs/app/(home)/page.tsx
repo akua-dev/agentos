@@ -319,7 +319,7 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
             Stop being the loop. Stay at the helm.
           </h2>
           <p className="mx-auto mb-8 max-w-[680px] text-pretty">
-            Bring one Fleet online, or learn the model first through four guided courses and 33
+            Bring one Fleet online first, then grow it through three focused parts and ten
             practical chapters.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
@@ -366,10 +366,10 @@ Human still carries the goal.`}
                 human still preserves continuity and decides every next step.
               </p>
               <Link
-                href="/learn/01-models-to-agents/what-a-model-does"
+                href="/learn/01-first-outcome/bring-agentos-online"
                 className="mt-7 inline-flex items-center gap-2 font-medium text-brand hover:underline"
               >
-                Learn from the beginning <ArrowRight className="size-4" />
+                Bring AgentOS online <ArrowRight className="size-4" />
               </Link>
             </div>
           </div>
@@ -395,10 +395,10 @@ Human still carries the goal.`}
                 sandbox, permissions and recovery.
               </p>
               <Link
-                href="/learn/01-models-to-agents/agent-owns-outcome"
+                href="/learn/01-first-outcome/give-fleet-outcome"
                 className="mt-7 inline-flex items-center gap-2 font-medium text-brand hover:underline"
               >
-                Understand the Agent layer <ArrowRight className="size-4" />
+                Give the Fleet an outcome <ArrowRight className="size-4" />
               </Link>
             </div>
           </div>
@@ -424,10 +424,10 @@ authority · attention · recovery
                 supervision, human attention and recovery.
               </p>
               <Link
-                href="/learn/02-agents-to-companies/parallel-agents-not-company"
+                href="/learn/02-grow-company/add-durable-domain"
                 className="mt-7 inline-flex items-center gap-2 font-medium text-brand hover:underline"
               >
-                Cross the company boundary <ArrowRight className="size-4" />
+                Add a durable domain <ArrowRight className="size-4" />
               </Link>
             </div>
           </div>

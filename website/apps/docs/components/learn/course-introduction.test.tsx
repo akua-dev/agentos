@@ -9,30 +9,39 @@ afterEach(() => {
 });
 
 describe('CourseIntroduction', () => {
-  it('defines the destination before starting the numbered course', () => {
+  it('offers the first working Fleet before teaching the conceptual progression', () => {
     render(
-      <CourseIntroduction firstLessonUrl="/learn/01-models-to-agents/what-a-model-does" />,
+      <CourseIntroduction firstLessonUrl="/learn/01-first-outcome/bring-agentos-online" />,
     );
 
     expect(
       screen.getByRole('heading', { name: 'What is an autonomous company?' }),
     ).toBeTruthy();
     expect(screen.getByText(/human-led organization/i)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /get a working Fleet first/i })).toBeTruthy();
+    expect(screen.getByText(/first useful win/i)).toBeTruthy();
+    const startLink = screen.getByRole('link', { name: /bring AgentOS online/i });
+    expect(startLink.getAttribute('href')).toBe(
+      '/learn/01-first-outcome/bring-agentos-online',
+    );
     expect(screen.getByRole('heading', { name: 'From one answer to a company' })).toBeTruthy();
-    expect(screen.getByText('Model')).toBeTruthy();
-    expect(screen.getByText('Autonomous company')).toBeTruthy();
     expect(
       screen.getByRole('heading', { name: 'What you will be able to run' }),
     ).toBeTruthy();
     expect(screen.getByText(/persistent First Mate/i)).toBeTruthy();
-    expect(screen.getByRole('link', { name: /begin with models/i }).getAttribute('href')).toBe(
-      '/learn/01-models-to-agents/what-a-model-does',
-    );
+
+    const progressionHeading = screen.getByRole('heading', {
+      name: 'From one answer to a company',
+    });
+    expect(
+      startLink.compareDocumentPosition(progressionHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('exposes the model-to-company progression as one ordered sequence', () => {
     render(
-      <CourseIntroduction firstLessonUrl="/learn/01-models-to-agents/what-a-model-does" />,
+      <CourseIntroduction firstLessonUrl="/learn/01-first-outcome/bring-agentos-online" />,
     );
 
     const progression = screen.getByRole('list', {

@@ -45,6 +45,9 @@ export function buildCurriculum(records: readonly LearnPageRecord[]): Curriculum
     requirePositiveInteger(record.courseOrder, 'courseOrder');
     requirePositiveInteger(record.lessonOrder, 'lessonOrder');
     requirePositiveInteger(record.estimatedMinutes, 'estimatedMinutes');
+    if (record.estimatedMinutes > 5) {
+      throw new Error(`Chapter must take five minutes or less: ${record.lessonId}`);
+    }
     if (!record.url.startsWith('/learn/') || record.url === '/learn/') {
       throw new Error(`Invalid lesson URL: ${record.url}`);
     }

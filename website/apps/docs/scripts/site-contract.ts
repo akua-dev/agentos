@@ -56,7 +56,11 @@ export const routeExpectations: readonly RouteExpectation[] = [
   {
     path: '/learn',
     status: 200,
-    includes: ['What is an autonomous company?', 'What you will be able to run'],
+    includes: [
+      'What is an autonomous company?',
+      'Get a working Fleet first',
+      'What you will be able to run',
+    ],
     excludes: ['Fumadocs Blog'],
   },
   {
@@ -75,7 +79,7 @@ export const routeExpectations: readonly RouteExpectation[] = [
     (route): RouteExpectation => ({
       path: route.path,
       status: 200,
-      includes: [route.title, 'What changes at this layer?', 'Canonical sources'],
+      includes: [route.title, 'Canonical sources'],
       excludes: ['Fumadocs'],
     }),
   ),
@@ -92,27 +96,27 @@ export const routeExpectations: readonly RouteExpectation[] = [
     status: 200,
     includes: [
       '/docs/start/get-started',
-      '/learn/01-models-to-agents/what-a-model-does',
-      '/learn/04-build-autonomous-company/keep-company-sovereign',
+      '/learn/01-first-outcome/bring-agentos-online',
+      '/learn/03-stay-in-control/upgrade-without-losing-control',
     ],
     excludes: ['/showcase', '/blog/why-docs'],
   },
   {
     path: '/llms.txt',
     status: 200,
-    includes: ['## Documentation', '## Learn', 'Keep the company sovereign'],
+    includes: ['## Documentation', '## Learn', 'Upgrade without losing control'],
     excludes: ['Fumadocs UI'],
   },
   {
     path: '/llms-full.txt',
     status: 200,
-    includes: ['What a model does', 'Keep the company sovereign', 'Canonical sources:'],
+    includes: ['Bring AgentOS online', 'Upgrade without losing control', 'Canonical sources:'],
     excludes: ['raw.githubusercontent.com/fuma-nama'],
   },
   {
     path: '/api/search?query=sovereign',
     status: 200,
-    includes: ['keep-company-sovereign', 'Learn'],
+    includes: ['upgrade-without-losing-control', 'Learn'],
     excludes: ['Fumadocs'],
   },
   ...[

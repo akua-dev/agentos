@@ -16,7 +16,7 @@ const pages: LearnPageRecord[] = [
     courseOrder: 2,
     lessonId: 'third',
     lessonOrder: 1,
-    estimatedMinutes: 7,
+    estimatedMinutes: 5,
   },
   {
     title: 'Second',
@@ -52,7 +52,7 @@ describe('buildCurriculum', () => {
     ]);
     expect(curriculum.courses.map((course) => [course.id, course.estimatedMinutes])).toEqual([
       ['one', 9],
-      ['two', 7],
+      ['two', 5],
     ]);
   });
 
@@ -88,6 +88,7 @@ describe('buildCurriculum', () => {
     ['non-integer order', { ...pages[0], courseOrder: 1.5 }],
     ['zero lesson order', { ...pages[0], lessonOrder: 0 }],
     ['non-positive time', { ...pages[0], estimatedMinutes: -1 }],
+    ['chapter longer than five minutes', { ...pages[0], estimatedMinutes: 6 }],
   ])('rejects %s', (_label, invalid) => {
     expect(() => buildCurriculum([invalid])).toThrow();
   });

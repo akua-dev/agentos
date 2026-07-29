@@ -55,7 +55,8 @@ export function LearnLayout({
             <>
               <LearnProgressSummary validLessonIds={lessonIds} />
               <p className="mt-3 text-xs leading-5 text-fd-muted-foreground">
-                The introduction is unnumbered. Progress counts the 33 short chapters.
+                The introduction is unnumbered. Progress counts the {lessonIds.length}{' '}
+                {lessonIds.length === 1 ? 'chapter' : 'chapters'}.
               </p>
             </>
           )}

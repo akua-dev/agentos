@@ -1,0 +1,71 @@
+---
+title: Deliver and recover the outcome
+description: Finish in the project’s durable artifact and preserve ownership through ordinary failure.
+courseId: first-outcome
+courseTitle: Run your first outcome
+courseOrder: 1
+lessonId: deliver-and-recover
+lessonOrder: 5
+estimatedMinutes: 5
+canonical:
+  - label: Project procedure
+    path: packages/agentos/skills/agentos-projects/SKILL.md
+  - label: Runtime and recovery architecture
+    path: ARCHITECTURE.md
+  - label: Published recovery evidence
+    path: benchmarks/results/agentos
+---
+
+## Deliver through the project
+
+AgentOS adopts a project; it does not replace the project’s instructions, tests, Git remote or
+review workflow. A remote-backed ship Assignment normally ends with:
+
+- a clean committed task branch;
+- proportionate project verification;
+- a pushed branch and the selected review artifact;
+- a concise evidence report.
+
+Merge remains separate unless an exact decision covers it. A worker saying “done” or leaving a
+clean terminal is not delivery evidence.
+
+The onboarding worker completes compatibility tests and opens pull request 128. First Mate can now
+report:
+
+> Onboarding validation is review-ready at pull request 128. Required checks passed. The public API
+> remains unchanged. Merge is still yours.
+
+## Let the process fail without losing the outcome
+
+Before delivery, suppose the worker Pod is replaced while its worktree contains a committed
+implementation and an unfinished test adjustment. Recovery reconciles the same responsibility
+across the native authorities:
+
+```text
+Task + Assignment + Agent → PostgreSQL
+home + worktree + memory  → PVC
+live workload             → Kubernetes
+native session            → Herdr
+delivered source          → Git and provider
+```
+
+Supervision does not create a second active Assignment or delete the home. It restores the
+reviewed runtime, reuses the retained state, reads the current Git diff and continues the same
+outcome.
+
+A replacement Pod reaching Ready is necessary but insufficient. Recovery is real when the same
+owned outcome is usefully continuing, changes survived, effects did not duplicate and authority
+remains correct.
+
+## Your first company loop
+
+You have now used the whole loop once:
+
+```text
+human intent → durable ownership → bounded execution
+→ targeted decision → reviewed artifact → recoverable history
+```
+
+That is already more than a collection of Agent sessions. The next step is not “more Agents.” It
+is one continuing responsibility that deserves a durable domain. Continue with
+[Add one durable domain](/learn/02-grow-company/add-durable-domain).

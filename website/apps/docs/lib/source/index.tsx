@@ -160,7 +160,7 @@ const learn = defineDocs({
       courseOrder: z.number().int().positive(),
       lessonId: z.string().min(1),
       lessonOrder: z.number().int().positive(),
-      estimatedMinutes: z.number().int().positive(),
+      estimatedMinutes: z.number().int().positive().max(5),
       canonical: z.array(canonicalSourceSchema).default([]),
       video: z
         .object({

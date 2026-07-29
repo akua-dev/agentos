@@ -12,12 +12,11 @@ const progression = [
 ] as const;
 
 const outcomes = [
-  'A persistent First Mate that survives a closed laptop, a replaced Pod and a resumed session.',
-  'Tasks and Assignments that show exactly who owns every accepted outcome.',
-  'Second Mates and Crewmates that take bounded work without becoming an unaccountable swarm.',
-  'Human decision gates at the boundaries where cost, risk and consequences live.',
-  'External signals that become durable, routed work instead of notification noise.',
-  'A sovereign foundation built from Kubernetes, PostgreSQL and Git—each used as itself.',
+  'A persistent First Mate and one real outcome with durable ownership.',
+  'A bounded crew you can inspect and steer through native project artifacts.',
+  'Human decisions routed to the right people only when consequences require them.',
+  'External signals, shared learning and recovery that survive individual sessions.',
+  'An upgradeable, sovereign foundation built from Kubernetes, PostgreSQL and Git.',
 ] as const;
 
 export function CourseIntroduction({ firstLessonUrl }: { firstLessonUrl: string }) {
@@ -35,7 +34,56 @@ export function CourseIntroduction({ firstLessonUrl }: { firstLessonUrl: string 
         </p>
       </header>
 
-      <section id="what-makes-it-a-company" className="scroll-mt-24 py-10">
+      <section id="first-win" className="scroll-mt-24 py-10">
+        <div className="rounded-xl border border-brand/25 bg-brand/5 p-5 sm:p-6">
+          <p className="font-mono text-xs font-medium tracking-wide text-brand uppercase">
+            Start here
+          </p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-[-0.025em] text-balance">
+            Get a working Fleet first
+          </h2>
+          <p className="mt-4 max-w-[60ch] leading-7 text-fd-foreground/90">
+            Your first useful win is not memorizing every layer below. Start the reviewed
+            bootstrap with the coding Agent you already use. While it checks your environment and
+            asks for the approvals that matter, continue through the course with a real system to
+            connect each concept to.
+          </p>
+          <p className="mt-3 max-w-[60ch] text-sm leading-6 text-fd-muted-foreground">
+            The first five chapters take you from installation to one review-ready outcome. The
+            remaining five teach you to grow and upgrade that working company without losing
+            control.
+          </p>
+          <Link
+            href={firstLessonUrl}
+            className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-full bg-brand px-5 py-2.5 font-medium text-brand-foreground transition-colors hover:bg-brand-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            Bring AgentOS online
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        </div>
+      </section>
+
+      <section id="outcome" className="scroll-mt-24 pb-10">
+        <h2 className="text-2xl font-semibold tracking-[-0.025em] text-balance">
+          What you will be able to run
+        </h2>
+        <p className="mt-3 max-w-[62ch] leading-7 text-fd-muted-foreground">
+          By the end, you will have a path from one working Fleet to a real organization—not a
+          collection of disconnected chats.
+        </p>
+        <ul className="mt-6 border-t">
+          {outcomes.map((outcome) => (
+            <li key={outcome} className="grid grid-cols-[20px_1fr] gap-3 border-b py-3.5 text-sm">
+              <span className="font-mono text-brand" aria-hidden>
+                +
+              </span>
+              <span className="leading-6">{outcome}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section id="what-makes-it-a-company" className="scroll-mt-24 border-t py-10">
         <h2 className="text-2xl font-semibold tracking-[-0.025em] text-balance">
           An Agent is not yet a company
         </h2>
@@ -58,8 +106,8 @@ export function CourseIntroduction({ firstLessonUrl }: { firstLessonUrl: string 
           From one answer to a company
         </h2>
         <p className="mt-3 max-w-[62ch] leading-7 text-fd-muted-foreground">
-          The course follows each missing capability in order. Every step keeps what worked before
-          it and adds one new responsibility.
+          This is the mental map, not a prerequisite list. The course introduces each layer only
+          when your working Fleet needs it.
         </p>
         <ol
           aria-label="Progression from model to autonomous company"
@@ -120,32 +168,13 @@ export function CourseIntroduction({ firstLessonUrl }: { firstLessonUrl: string 
         </ol>
       </section>
 
-      <section id="outcome" className="scroll-mt-24 pb-10">
-        <h2 className="text-2xl font-semibold tracking-[-0.025em] text-balance">
-          What you will be able to run
-        </h2>
-        <p className="mt-3 max-w-[62ch] leading-7 text-fd-muted-foreground">
-          By the end, you will understand the whole operating model and have a path to a real
-          AgentOS Fleet—not a collection of disconnected chats.
-        </p>
-        <ul className="mt-6 border-t">
-          {outcomes.map((outcome) => (
-            <li key={outcome} className="grid grid-cols-[20px_1fr] gap-3 border-b py-3.5 text-sm">
-              <span className="font-mono text-brand" aria-hidden>
-                +
-              </span>
-              <span className="leading-6">{outcome}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
       <section id="how-to-use-course" className="scroll-mt-24 border-t pt-8">
         <h2 className="text-2xl font-semibold tracking-[-0.025em] text-balance">
-          Learn the model. Use Docs for the exact mechanics.
+          Build first. Learn each layer when it becomes useful.
         </h2>
         <p className="mt-4 leading-7 text-fd-foreground/90">
-          These chapters are short and sequential. Learn explains why each layer exists;{' '}
+          Ten short chapters form one path: run the first outcome, grow it into a company, then
+          upgrade it without surrendering control. Learn explains why each layer exists;{' '}
           <Link href="/docs" className="font-medium text-brand hover:underline">
             Documentation
           </Link>{' '}
@@ -155,7 +184,7 @@ export function CourseIntroduction({ firstLessonUrl }: { firstLessonUrl: string 
           href={firstLessonUrl}
           className="mt-8 inline-flex min-h-11 items-center gap-2 rounded-full bg-brand px-5 py-2.5 font-medium text-brand-foreground transition-colors hover:bg-brand-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
-          Begin with models
+          Start the first chapter
           <ArrowRight className="size-4" aria-hidden />
         </Link>
       </section>

@@ -78,11 +78,20 @@ describe('auditSite', () => {
 
   it('defines the complete Landing, Docs, Learn, discovery, and removal contract', () => {
     const paths = routeExpectations.map((expectation) => expectation.path);
-    expect(paths).toHaveLength(104);
+    expect(paths).toHaveLength(81);
     expect(paths).toContain('/docs/operate/supervise-steer');
-    expect(paths).toContain('/learn/04-build-autonomous-company/keep-company-sovereign');
+    expect(paths).toContain('/learn/03-stay-in-control/upgrade-without-losing-control');
     expect(paths).toContain('/api/search?query=sovereign');
     expect(paths).toContain('/showcase');
+  });
+
+  it('does not require Learn chapter structure on documentation routes', () => {
+    const docsExpectation = routeExpectations.find(
+      (expectation) => expectation.path === '/docs/start/get-started',
+    );
+
+    expect(docsExpectation?.includes).toEqual(['Get started', 'Canonical sources']);
+    expect(docsExpectation?.includes).not.toContain('What changes at this layer?');
   });
 
   it('accepts a missing copied product route', async () => {
