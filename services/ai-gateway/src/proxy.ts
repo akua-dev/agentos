@@ -210,16 +210,9 @@ function streamWithLease(
 
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
+      let next: ReadableStreamReadResult<Uint8Array>;
       try {
-        const next = await reader.read();
-        if (next.done) {
-          await finish();
-          controller.close();
-          return;
-        }
-        controller.enqueue(next.value);
-        chunksForwarded = boundedAdd(chunksForwarded, 1);
-        bytesForwarded = boundedAdd(bytesForwarded, next.value.byteLength);
+        next = await reader.read();
       } catch (error) {
         const observation: StreamFailureObservation = {
           event: "upstream_stream_failure",
@@ -231,7 +224,27 @@ function streamWithLease(
         controller.error(error);
         void reportStreamFailure(observeStreamFailure, observation);
         await finish();
+        return;
       }
+
+      if (next.done) {
+        await finish();
+        try {
+          controller.close();
+        } catch {
+          await finish();
+        }
+        return;
+      }
+
+      try {
+        controller.enqueue(next.value);
+      } catch {
+        await finish();
+        return;
+      }
+      chunksForwarded = boundedAdd(chunksForwarded, 1);
+      bytesForwarded = boundedAdd(bytesForwarded, next.value.byteLength);
     },
     async cancel(reason) {
       await reader.cancel(reason).catch(() => undefined);

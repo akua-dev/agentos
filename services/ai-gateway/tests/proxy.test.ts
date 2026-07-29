@@ -256,6 +256,51 @@ describe("authenticated raw Responses proxy", () => {
     expect(observationStarted).toBe(true);
   });
 
+  test("does not report downstream cancellation as an upstream stream failure", async () => {
+    let markReadStarted: () => void = () => undefined;
+    const readStarted = new Promise<void>((resolve) => {
+      markReadStarted = resolve;
+    });
+    let observation: unknown;
+    let releaseCount = 0;
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => {
+          releaseCount += 1;
+        },
+      }),
+      fetchImpl: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull() {
+              markReadStarted();
+            },
+          }),
+        ),
+      observeStreamFailure(value) {
+        observation = value;
+      },
+    });
+
+    const response = await handler(request());
+    const reader = response.body?.getReader();
+    expect(reader).toBeDefined();
+    const pendingRead = reader!.read();
+    await readStarted;
+    await reader!.cancel("client disconnected");
+    await pendingRead;
+    await Bun.sleep(0);
+
+    expect(observation).toBeUndefined();
+    expect(releaseCount).toBe(1);
+  });
+
   test("accepts and strips the dedicated Fleet client headers", async () => {
     let upstream: Request | undefined;
     const handler = createProxyHandler({
