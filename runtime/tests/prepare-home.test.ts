@@ -116,7 +116,7 @@ if (args.join(" ") === "integration install pi") {
     ]);
 
     const checkout = join(home, "projects", "agentos");
-    const distributionRoot = join(checkout, "packages", "default");
+    const distributionRoot = join(checkout, "packages", "agentos");
     const roleDirectory = join(
       distributionRoot,
       "resources",
@@ -258,7 +258,7 @@ if (args.join(" ") === "integration install pi") {
     const logDirectory = join(sandbox, "logs");
     const checkout = join(home, "projects", "agentos");
     const oldRole = join(checkout, "agents", "firstmate");
-    const distributionRoot = join(checkout, "packages", "default");
+    const distributionRoot = join(checkout, "packages", "agentos");
     const roleDirectory = join(
       distributionRoot,
       "resources",

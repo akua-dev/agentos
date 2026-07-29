@@ -5,7 +5,7 @@
     "": {
       "name": "@agentos/root",
       "dependencies": {
-        "@akua-dev/agentos-pi": "workspace:*",
+        "@akua-dev/agentos": "workspace:*",
         "ajv": "8.20.0",
         "yaml": "2.9.0",
         "zod": "4.4.3",
@@ -15,17 +15,6 @@
         "@earendil-works/pi-coding-agent": "0.81.1",
         "@types/bun": "1.3.14",
         "typescript": "7.0.2",
-      },
-    },
-    "clis/composition-verify": {
-      "name": "@agentos/composition-verify",
-      "version": "0.0.0",
-      "bin": {
-        "composition-verify": "./composition-verify.ts",
-      },
-      "dependencies": {
-        "ajv": "8.20.0",
-        "yaml": "2.9.0",
       },
     },
     "clis/github-app-token": {
@@ -62,21 +51,8 @@
         "@electric-sql/pglite": "0.5.4",
       },
     },
-    "packages/default": {
-      "name": "@akua-dev/agentos-default",
-      "version": "0.1.0",
-      "dependencies": {
-        "@akua-dev/agentos-pi": "0.1.0",
-      },
-      "devDependencies": {
-        "@earendil-works/pi-coding-agent": "0.81.1",
-      },
-      "peerDependencies": {
-        "@earendil-works/pi-coding-agent": "0.81.1",
-      },
-    },
-    "packages/pi": {
-      "name": "@akua-dev/agentos-pi",
+    "packages/agentos": {
+      "name": "@akua-dev/agentos",
       "version": "0.1.0",
       "dependencies": {
         "yaml": "2.9.0",
@@ -112,17 +88,13 @@
   "packages": {
     "@agentos/ai-gateway": ["@agentos/ai-gateway@workspace:services/ai-gateway"],
 
-    "@agentos/composition-verify": ["@agentos/composition-verify@workspace:clis/composition-verify"],
-
     "@agentos/database": ["@agentos/database@workspace:database"],
-
-    "@akua-dev/agentos-default": ["@akua-dev/agentos-default@workspace:packages/default"],
 
     "@agentos/github-app-token": ["@agentos/github-app-token@workspace:clis/github-app-token"],
 
     "@agentos/pg-listen": ["@agentos/pg-listen@workspace:clis/pg-listen"],
 
-    "@akua-dev/agentos-pi": ["@akua-dev/agentos-pi@workspace:packages/pi"],
+    "@akua-dev/agentos": ["@akua-dev/agentos@workspace:packages/agentos"],
 
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.91.1", "", { "dependencies": { "json-schema-to-ts": "^3.1.1" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw=="],
 

@@ -1,1 +1,1 @@
-export * from "../packages/default/runtime/pi-session.ts";
+export * from "../packages/agentos/runtime/pi-session.ts";

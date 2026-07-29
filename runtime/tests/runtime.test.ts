@@ -26,7 +26,7 @@ const repository = new URL("../..", import.meta.url).pathname.replace(
 const mateRuntime = join(repository, "runtime");
 const runMate = join(mateRuntime, "run-mate.ts");
 const health = join(mateRuntime, "health.ts");
-const defaultDistributionRoot = join(repository, "packages", "default");
+const defaultDistributionRoot = join(repository, "packages", "agentos");
 const defaultFirstMateCwd = join(
   defaultDistributionRoot,
   "resources",
@@ -476,9 +476,9 @@ describe("Mate runtime", () => {
     const releaseRoot = "/opt/agentos-test";
     const { env, state } = await createHarness([], {
       AGENTOS_AGENT_CWD:
-        "/home/agent/projects/agentos/packages/default/resources/roles/firstmate",
+        "/home/agent/projects/agentos/packages/agentos/resources/roles/firstmate",
       AGENTOS_DISTRIBUTION_ROOT:
-        "/home/agent/projects/agentos/packages/default",
+        "/home/agent/projects/agentos/packages/agentos",
       AGENTOS_RELEASE_ROOT: releaseRoot,
       NODE_PATH: "",
     });
@@ -516,7 +516,7 @@ describe("Mate runtime", () => {
       "utf8",
     );
     const persistentCheckout = join(releaseRoot, "persistent-checkout");
-    const distributionRoot = join(persistentCheckout, "packages", "default");
+    const distributionRoot = join(persistentCheckout, "packages", "agentos");
     const firstMateCwd = join(
       distributionRoot,
       "resources",
@@ -626,7 +626,7 @@ describe("Mate runtime", () => {
       persistedSession,
       [
         JSON.stringify({
-          cwd: "/opt/agentos/packages/default/resources/roles/firstmate",
+          cwd: "/opt/agentos/packages/agentos/resources/roles/firstmate",
           id: "session-1",
           type: "session",
           version: 3,
@@ -670,7 +670,7 @@ describe("Mate runtime", () => {
     expect(relocatedSession).not.toBe(persistedSession);
     expect(JSON.parse((await readFile(persistedSession, "utf8")).split("\n")[0]!))
       .toEqual({
-        cwd: "/opt/agentos/packages/default/resources/roles/firstmate",
+        cwd: "/opt/agentos/packages/agentos/resources/roles/firstmate",
         id: "session-1",
         type: "session",
         version: 3,
@@ -706,7 +706,7 @@ describe("Mate runtime", () => {
     });
     const persistedSession = join(state, "legacy-session.jsonl");
     const previousCwd =
-      "/opt/agentos/packages/default/resources/roles/firstmate";
+      "/opt/agentos/packages/agentos/resources/roles/firstmate";
     await Promise.all([
       mkdir(env.PI_CODING_AGENT_DIR!, { recursive: true }),
       writeFile(
@@ -763,7 +763,7 @@ describe("Mate runtime", () => {
   test("keeps a native recovery path when relocated Mate startup fails", async () => {
     const paneId = "w1:p1";
     const previousCwd =
-      "/opt/agentos/packages/default/resources/roles/firstmate";
+      "/opt/agentos/packages/agentos/resources/roles/firstmate";
     const { env, state } = await createHarness([], {
       FAKE_HERDR_FAIL_START: "1",
     });

@@ -1,3 +1,3 @@
 #!/usr/bin/env bun
 
-import "../packages/default/runtime/health.ts";
+import "../packages/agentos/runtime/health.ts";

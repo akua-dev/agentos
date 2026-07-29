@@ -1,3 +1,3 @@
 #!/usr/bin/env bun
 
-import "../packages/default/runtime/prepare-home.ts";
+import "../packages/agentos/runtime/prepare-home.ts";

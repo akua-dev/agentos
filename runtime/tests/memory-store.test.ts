@@ -15,7 +15,7 @@ import { join } from "node:path";
 import {
   createMateMemoryStore,
   type TopicWrite,
-} from "@akua-dev/agentos-pi";
+} from "@akua-dev/agentos";
 
 const temporaryDirectories: string[] = [];
 

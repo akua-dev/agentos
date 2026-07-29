@@ -1,3 +1,3 @@
 #!/usr/bin/env bun
 
-import "../packages/default/runtime/run-mate.ts";
+import "../packages/agentos/runtime/run-mate.ts";

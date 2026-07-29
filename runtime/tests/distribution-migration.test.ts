@@ -28,7 +28,7 @@ const repository = new URL("../..", import.meta.url).pathname.replace(
 const firstMateWithDatabase = join(
   repository,
   "packages",
-  "default",
+  "agentos",
   "resources",
   "roles",
   "firstmate",
@@ -297,13 +297,13 @@ describe("persistent Mate distribution migration", () => {
     const customImage =
       "ghcr.io/example/acme-agentos@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const defaultRoot =
-      "/home/agent/projects/agentos/packages/default";
+      "/home/agent/projects/agentos/packages/agentos";
     const customRoot =
       "/home/agent/projects/agentos/packages/acme-agentos";
     const piOnlySelection = {
       packages: [
         {
-          source: "@akua-dev/agentos-default@0.1.0",
+          source: "@akua-dev/agentos@0.1.0",
           autoload: false,
           extensions: [],
           skills: ["skills/agentos-supervision"],

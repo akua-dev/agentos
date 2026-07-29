@@ -1,1 +1,1 @@
-export * from "../packages/default/runtime/distribution.ts";
+export * from "../packages/agentos/runtime/distribution.ts";

@@ -3,7 +3,7 @@
 This subtree contains Kubernetes mechanics shared by persistent Agents plus
 compatibility entrypoints for the default distribution's executable lifecycle.
 The default lifecycle implementations and distribution-owned runtime assets
-live under `../packages/default/runtime/`. This subtree is not an agent role
+live under `../packages/agentos/runtime/`. This subtree is not an agent role
 and it is not an in-cluster CLI. Read the runtime boundary in
 `../ARCHITECTURE.md` before changing its ownership.
 

@@ -1,37 +1,35 @@
 # Customize AgentOS
 
-AgentOS is a Pi-native composition, not a second plugin framework. An
-organization can install an ordinary Pi package beside the released behavior or
-select a complete replacement distribution. The package can use every native Pi
-extension API and, when useful, the public `@akua-dev/agentos-pi` helpers.
+AgentOS uses Pi's native package system as its extension boundary. An
+organization can load an ordinary Pi package beside the released behavior or
+select a replacement package that owns the AgentOS entrypoint.
 
-The released packages have distinct jobs:
+There is one released npm package:
 
 | Package | Boundary |
 | --- | --- |
-| `@akua-dev/agentos-pi` | Inert public TypeScript registrations, defaults, structural contracts and collision preflight |
-| `@akua-dev/agentos-default` | The replaceable released entrypoint, role compositions, instructions, Skills, Mise, Kubernetes and Crewmate resources |
+| `@akua-dev/agentos` | Inert public TypeScript API plus the released Pi extension, Skills, role resources, runtime programs and Crewmate assets |
 
-Importing `@akua-dev/agentos-pi` has no side effects. Loading `@akua-dev/agentos-default` activates
-only the Pi resources selected by Pi. Neither action changes PostgreSQL,
-Kubernetes, Herdr, Git, a PVC, credentials or provider state.
+Importing the root API has no side effects. Pi activates behavior only when its
+settings select the package extension or Skills. Neither action changes
+PostgreSQL, Kubernetes, Herdr, Git, a PVC, credentials or provider state.
 
-## Add or replace
+## Add or replace behavior
 
-An **additive package** loads beside `@akua-dev/agentos-default`. Use it for independent
+An **additive package** loads beside `@akua-dev/agentos`. Use it for independent
 tools, commands, hooks or Skills that do not overlap a released owner.
 
-A **replacement package** excludes the default executable entrypoint with Pi's
-native package filters and supplies its own single entrypoint. It may retain
-selected default Skills independently. Use explicit name claims and preflight
-every known tool, command, Skill, custom message and persisted entry before
-attaching behavior; extension load order is not an override mechanism.
+A **replacement package** is selected instead of the released AgentOS
+extension and supplies its own entrypoint. It may still depend on
+`@akua-dev/agentos` and call public registration functions; importing those
+functions does not activate the released extension. Released Skills can be
+selected independently when they remain useful.
 
-A **complete distribution** additionally owns First- and Second-Mate
-instructions, role-specific Skills, native Mise tasks, Kubernetes resources,
-Crewmate definitions, images and adjacent database or runtime materials.
-Changing a released identity, authorization schema or core guarantee is allowed,
-but the result must be identified and tested as a custom AgentOS distribution.
+A **complete role replacement** also owns First- and Second-Mate instructions,
+role-specific Skills, native Mise tasks, Kubernetes resources, Crewmate setups,
+images and adjacent database or runtime materials. Changing a released
+identity, authorization schema or core guarantee produces a custom AgentOS
+distribution and must be identified and tested as such.
 
 ## Build on the public seam
 
@@ -45,13 +43,13 @@ acme-agentos/
 │   └── standalone.ts
 ├── src/
 │   └── index.ts
-└── skills/
-    └── acme-startup/
-        └── SKILL.md
+├── skills/
+│   └── acme-startup/
+│       └── SKILL.md
+└── resources/
 ```
 
-Declare the supported library and Pi versions as peers when another
-distribution will compose the package:
+Declare supported AgentOS and Pi versions as peers:
 
 ```json
 {
@@ -64,27 +62,27 @@ distribution will compose the package:
     "skills": ["./skills"]
   },
   "peerDependencies": {
-    "@akua-dev/agentos-pi": "^0.1.0",
+    "@akua-dev/agentos": "^0.1.0",
     "@earendil-works/pi-ai": "0.81.1",
     "@earendil-works/pi-coding-agent": "0.81.1"
   }
 }
 ```
 
-Registration functions receive Pi explicitly and remain normal TypeScript:
+Registration functions receive Pi explicitly and remain ordinary TypeScript:
 
 ```ts
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
-  composeAgentOSStartupPrompt,
+  buildAgentOSStartupPrompt,
   registerAgentOSInstructions,
   registerAgentOSRuntime,
   registerAgentOSStartup,
   type AgentOSRegistrationV1,
   type AgentOSStartupContributionV1,
-} from "@akua-dev/agentos-pi";
+} from "@akua-dev/agentos";
 
-export const runtime: AgentOSRegistrationV1 = {
+const runtime: AgentOSRegistrationV1 = {
   version: 1,
   id: "@acme/agentos:runtime",
   names: {
@@ -102,7 +100,7 @@ export const runtime: AgentOSRegistrationV1 = {
   },
 };
 
-export const startup: AgentOSStartupContributionV1 = {
+const startup: AgentOSStartupContributionV1 = {
   version: 1,
   id: "@acme/agentos:startup",
   skill: "acme-startup",
@@ -118,41 +116,42 @@ export function registerAcmeAgentOS(pi: ExtensionAPI) {
   registerAgentOSRuntime(pi, [runtime]);
   registerAgentOSStartup(pi, {
     customType: "@acme/agentos:startup",
-    prompt: composeAgentOSStartupPrompt([startup]),
+    prompt: buildAgentOSStartupPrompt([startup]),
     requiredSkills: [startup.skill],
   });
 
-  // Ordinary Pi remains available beside AgentOS helpers.
-  pi.on("tool_result", (event) => {
-    // Observe only what this package explicitly owns.
+  pi.on("tool_result", (_event) => {
+    // Ordinary Pi APIs remain available.
   });
 }
 ```
 
-Choose one mode for a reusable behavior: load its standalone adapter, or import
-its registration into a distribution entrypoint. Never do both. Cross-package
-contracts are plain structural values; they do not depend on a shared singleton,
-class, symbol or `instanceof` identity.
+Choose one loading path for each behavior: select its standalone adapter, or
+import its registration function into another selected entrypoint. Never do
+both. Several extensions may import AgentOS functions because the root API is
+inert and stateless.
+
+Use package-qualified identifiers and preflight every known tool, command,
+Skill, custom message and persisted entry before registration. When ordering
+matters or responsibilities overlap, select one owner and one explicit call
+order. Extension load order is not an override mechanism.
 
 ## Let the model reconcile native state
 
-An extension may react to `session_start` or reload, send one bounded follow-up,
-and tell the model to load a delivered Skill. The Skill can inspect PostgreSQL
-with `psql`, render and inspect Kubernetes with `kubectl`, or use Git and
-provider tools directly. The prompt initiates judgment; it is not evidence that
-an Assignment appeared, a migration ran or a workload changed.
+An extension may react to `session_start`, send one bounded follow-up and tell
+the model to load a delivered Skill. The Skill can inspect PostgreSQL with
+`psql`, Kubernetes with `kubectl`, or Git and provider state through their
+native tools. The prompt initiates judgment; it is not evidence that an
+Assignment appeared, a migration ran or a workload changed.
 
 Pi 0.81.1 emits `session_start` before extension `resources_discover` hooks.
-Therefore every `requiredSkills` entry must already be selected through Pi's
-native package manifest or settings. `registerAgentOSStartup` verifies the
-effective pre-session Skill catalog before it triggers the turn. A Skill
-available only from an extension resource hook may still be role-specific, but
-it cannot be the target of that startup turn.
+Every startup Skill must therefore already be selected through the package
+manifest or Pi settings. AgentOS validates that effective pre-session catalog
+before triggering the turn.
 
 AgentOS deliberately supplies no synthetic Assignment event, Fleet database
-watcher, automatic migration service, package registry or global SDK singleton.
-An extension that needs Assignment data uses its available native tools or an
-independently reviewed client explicitly.
+watcher, automatic migration service, second package registry or global SDK
+singleton.
 
 ## Pi selection and process bootstrap are separate
 
@@ -161,13 +160,12 @@ instructions, Skills and prompt resources. It cannot retroactively change the
 Mise task, image, ServiceAccount, RBAC, Secret mounts or Kubernetes workload
 that started the process.
 
-A complete distribution therefore provides exact role directories, while the
-deployment selects them before startup:
+A complete distribution therefore provides exact role directories:
 
 ```text
 distribution/
 ├── extensions/agentos.ts
-├── composition/
+├── src/roles/
 ├── skills/
 └── resources/
     ├── roles/
@@ -183,17 +181,13 @@ distribution/
 ```
 
 Persistent Mate workloads set `AGENTOS_DISTRIBUTION_ROOT` explicitly and set
-`AGENTOS_AGENT_CWD` to that distribution's exact selected role directory. The
-role's `.pi/settings.json` uses Pi's native package configuration for additive
-or replacement selection. Persistent Pi launches with `--no-context-files`, so
-only the selected extension injects operational identity; repository
-`AGENTS.md` files continue to govern source changes.
+`AGENTOS_AGENT_CWD` to the exact selected role directory. Native Kubernetes and
+Mise apply pre-process changes while retaining the Mate home PVC. Pi settings
+select the extension and Skills.
 
-Roll out native changes with the distribution's reviewed immutable image and
-Kustomize resources while retaining the Mate home PVC. Rollback restores the
-prior image and overlay. Pi-only rollback restores the prior package selection
-and reloads. Neither rollback claims to reverse a separate database or
-Kubernetes change.
+Pi-only rollback restores the prior package selection and reloads. Workload
+rollback restores the prior image and Kubernetes resources. Neither claims to
+reverse a separate database or provider change.
 
 ## Use the canonical workflow
 
@@ -205,8 +199,6 @@ replacement Pi package for this AgentOS Fleet.
 ```
 
 The canonical
-[`agentos-customization` Skill](packages/default/skills/agentos-customization/SKILL.md)
-owns inspection, compatibility, staging, authorization, native selection,
-reload or rollout, observable verification and rollback. Pack and test the
-publishable artifact against the exact supported Pi build before live
-selection; source-checkout tests alone do not prove a usable package.
+[`agentos-customization` Skill](packages/agentos/skills/agentos-customization/SKILL.md)
+owns inspection, staging, authorization, native selection, reload or rollout,
+observable verification and rollback.
