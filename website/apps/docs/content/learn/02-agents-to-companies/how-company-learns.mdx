@@ -6,7 +6,7 @@ courseTitle: From Agents to companies
 courseOrder: 2
 lessonId: how-company-learns
 lessonOrder: 9
-estimatedMinutes: 8
+estimatedMinutes: 3
 canonical:
   - label: Memory procedure
     path: packages/agentos/skills/agentos-memory/SKILL.md
@@ -16,7 +16,7 @@ canonical:
     path: .agents/skills/agentos-improvement-review/SKILL.md
 ---
 
-## The mental model
+## Learning has trust boundaries
 
 Learning has several layers:
 
@@ -26,28 +26,21 @@ Learning has several layers:
 - evaluation freezes behavior evidence;
 - improvement changes the smallest owning source and retests it.
 
-Memory is not Fleet authority. A remembered preference cannot override current SQL, Git, provider
-state or human approval.
+Memory is not authority. A remembered preference cannot override current SQL, Git, provider state
+or human approval.
 
-## Worked example: learn from checkout recovery
+## Improve from frozen evidence
 
 The interrupted checkout worker resumed successfully, but the evaluation reveals that its first
 supervision wait had already completed and was not re-armed. The run remains frozen with that
 failure.
 
-The improvement review finds the smallest cause in the supervision contract, writes a regression
-test and changes the owning Skill. It reruns the original scenario and a held-out recovery
-scenario. Only then does the behavior become shared organizational guidance.
+Improvement finds the smallest cause in the supervision contract, writes a regression test and
+changes the owning Skill. It reruns the original and a held-out recovery scenario before the
+behavior becomes shared guidance.
 
 Separately, the payments Second Mate may remember that this project’s compatibility suite often
 reveals date-normalization assumptions. That context can shape a future brief, but the current
 tests still decide whether the fact applies.
-
-## What changes at this layer?
-
-- Useful context can survive without pretending to be current truth.
-- Failure becomes evidence instead of reputation damage to hide.
-- Shared behavior changes pass through review and regression testing.
-- The organization can improve without rewriting history.
 
 Continue to Course 3: [Bring AgentOS online](/learn/03-operate-first-fleet/bring-agentos-online).

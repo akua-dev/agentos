@@ -6,7 +6,7 @@ courseTitle: Build your autonomous company
 courseOrder: 4
 lessonId: compose-right-agent
 lessonOrder: 2
-estimatedMinutes: 8
+estimatedMinutes: 3
 canonical:
   - label: Agent provisioning contract
     path: database/migrations/0004_provision_agents.sql
@@ -14,7 +14,7 @@ canonical:
     path: packages/agentos/skills/agentos-harnesses/SKILL.md
 ---
 
-## The mental model
+## Compose only what the outcome needs
 
 An Agent’s composition is the smallest reviewed bundle that lets it own its outcome:
 
@@ -27,11 +27,12 @@ identity instructions
 + evidence of the resolved bundle
 ```
 
-Always-applicable role and safety belong in the nearest `AGENTS.md`. Conditional judgment belongs
-in one Skill. Deterministic mechanics belong in TypeScript or SQL. The harness owns its native
-settings instead of AgentOS flattening every option into a universal schema.
+Persistent Mate role and safety belong in the selected role instructions. Project-intrinsic rules
+belong in the nearest `AGENTS.md`; conditional judgment belongs in one Skill; deterministic
+mechanics belong in TypeScript or SQL. The harness owns its native settings instead of AgentOS
+flattening every option into one schema.
 
-## Worked example: support engineering composition
+## Support engineering needs two compositions
 
 The support-domain Second Mate needs:
 
@@ -41,18 +42,11 @@ The support-domain Second Mate needs:
 - project registry and provider capabilities for the web repository;
 - a persistent verified Mate harness.
 
-Its bounded diagnostic Crewmate needs a different composition: project instructions, read-heavy
-source access and a report contract, but no source write or production capability. A later ship
-Crewmate receives an isolated worktree and delivery tools.
+Its diagnostic Crewmate needs project instructions, read-heavy source access and a report contract,
+but no source-write or production capability. A later ship Crewmate receives an isolated worktree
+and delivery tools.
 
 More capabilities do not make an Agent better. They increase the consequences of a mistaken next
 step and the burden of proving authority.
-
-## What changes at this layer?
-
-- Agent behavior becomes reviewable by concern.
-- Persistent role and bounded outcome receive different bundles.
-- Capability follows the outcome instead of a global super-agent.
-- Harness portability is tested rather than assumed.
 
 Next, [connect real-world signals](/learn/04-build-autonomous-company/connect-real-world-signals).

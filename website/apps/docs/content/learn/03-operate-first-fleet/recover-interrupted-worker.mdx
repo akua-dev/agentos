@@ -1,12 +1,12 @@
 ---
-title: Recover an interrupted worker
+title: Recover interrupted work
 description: Reconcile identity, workload, home, session and Git without duplicating accepted work.
 courseId: operate-first-fleet
 courseTitle: Operate your first Fleet
 courseOrder: 3
 lessonId: recover-interrupted-worker
 lessonOrder: 8
-estimatedMinutes: 9
+estimatedMinutes: 3
 canonical:
   - label: Supervision procedure
     path: packages/agentos/skills/agentos-supervision/SKILL.md
@@ -16,7 +16,7 @@ canonical:
     path: benchmarks/results/agentos
 ---
 
-## The mental model
+## Observe before repairing
 
 Recovery starts with falsifiable observations, not a restart command. Identify what disappeared and
 which sources still preserve the outcome.
@@ -30,7 +30,7 @@ which sources still preserve the outcome.
 Use the selected release’s recovery primitive. Do not create a second Agent, delete a home or use
 force as a shortcut.
 
-## Worked example: controlled interruption
+## A controlled interruption
 
 The onboarding worker has a committed implementation and an uncommitted test adjustment. Its Pod
 is deliberately deleted in a disposable evaluation environment.
@@ -44,13 +44,6 @@ effects and human repair. If any of those observations is missing, the result sa
 
 A replacement Pod reaching Ready is necessary but insufficient. Recovery is complete when the
 same owned outcome is usefully continuing with preserved state and correct authority.
-
-## What changes at this layer?
-
-- Failure becomes a reconciled lifecycle event rather than a lost chat.
-- Accepted work remains singular and accountable.
-- Recovery quality can be benchmarked.
-- Destructive repair is separated from routine replacement.
 
 Next, [deliver through the project’s
 workflow](/learn/03-operate-first-fleet/deliver-project-workflow).

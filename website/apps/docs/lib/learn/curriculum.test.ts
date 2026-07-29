@@ -16,7 +16,7 @@ const pages: LearnPageRecord[] = [
     courseOrder: 2,
     lessonId: 'third',
     lessonOrder: 1,
-    estimatedMinutes: 7,
+    estimatedMinutes: 3,
   },
   {
     title: 'Second',
@@ -27,7 +27,7 @@ const pages: LearnPageRecord[] = [
     courseOrder: 1,
     lessonId: 'second',
     lessonOrder: 2,
-    estimatedMinutes: 5,
+    estimatedMinutes: 2,
   },
   {
     title: 'First',
@@ -38,7 +38,7 @@ const pages: LearnPageRecord[] = [
     courseOrder: 1,
     lessonId: 'first',
     lessonOrder: 1,
-    estimatedMinutes: 4,
+    estimatedMinutes: 2,
   },
 ];
 
@@ -51,8 +51,8 @@ describe('buildCurriculum', () => {
       ['third', 3],
     ]);
     expect(curriculum.courses.map((course) => [course.id, course.estimatedMinutes])).toEqual([
-      ['one', 9],
-      ['two', 7],
+      ['one', 4],
+      ['two', 3],
     ]);
   });
 
@@ -90,5 +90,11 @@ describe('buildCurriculum', () => {
     ['non-positive time', { ...pages[0], estimatedMinutes: -1 }],
   ])('rejects %s', (_label, invalid) => {
     expect(() => buildCurriculum([invalid])).toThrow();
+  });
+
+  it('rejects a chapter longer than three minutes', () => {
+    expect(() => buildCurriculum([{ ...pages[0], estimatedMinutes: 4 }])).toThrow(
+      'estimatedMinutes must be between 2 and 3',
+    );
   });
 });

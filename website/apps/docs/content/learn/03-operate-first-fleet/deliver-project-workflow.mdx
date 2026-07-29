@@ -1,12 +1,12 @@
 ---
-title: Deliver through the project’s workflow
+title: Deliver through the project
 description: End ship work in the repository’s selected durable artifact and keep merge separate.
 courseId: operate-first-fleet
 courseTitle: Operate your first Fleet
 courseOrder: 3
 lessonId: deliver-project-workflow
 lessonOrder: 9
-estimatedMinutes: 8
+estimatedMinutes: 3
 canonical:
   - label: Project procedure
     path: packages/agentos/skills/agentos-projects/SKILL.md
@@ -14,7 +14,7 @@ canonical:
     path: packages/agentos/skills/agentos-delegation/SKILL.md
 ---
 
-## The mental model
+## The project owns delivery
 
 AgentOS adopts a project; it does not replace the project’s delivery contract. The closest
 instructions, reviewed tools, tests, Git remote and provider workflow remain authoritative.
@@ -30,7 +30,7 @@ A remote-backed ship Assignment normally ends with:
 Merge is separate unless an exact decision covers it. A local-only project still needs its
 declared clean committed branch; an uncommitted worktree is not review-ready.
 
-## Worked example: pull request 128
+## Pull request 128
 
 The recovered onboarding worker completes compatibility tests and runs the project’s selected
 no-mistakes workflow. That workflow reviews the diff, runs the required checks, pushes the task
@@ -43,12 +43,5 @@ First Mate reports:
 
 The worktree is retained until Git and the provider prove the change is durably landed or a
 deliberate handoff preserves it. A clean terminal or worker claim does not prove delivery.
-
-## What changes at this layer?
-
-- Fleet work becomes an ordinary project artifact.
-- Existing review and CI remain intact.
-- Delivery authority and merge authority stay distinct.
-- Cleanup follows landing evidence.
 
 Next, [upgrade a running Fleet](/learn/03-operate-first-fleet/upgrade-running-fleet).

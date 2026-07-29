@@ -6,7 +6,7 @@ courseTitle: Build your autonomous company
 courseOrder: 4
 lessonId: improve-from-failure
 lessonOrder: 6
-estimatedMinutes: 8
+estimatedMinutes: 3
 canonical:
   - label: Improvement review
     path: .agents/skills/agentos-improvement-review/SKILL.md
@@ -14,7 +14,7 @@ canonical:
     path: .agents/skills/agentos-evaluation/SKILL.md
 ---
 
-## The mental model
+## Freeze before changing
 
 Evaluation and improvement are separate. Freeze the failing run before changing the system; then
 turn one reproducible weakness into the smallest reviewed improvement.
@@ -25,15 +25,16 @@ observe → freeze → explain cause → regression test → smallest change →
 
 Choose the source that owns the behavior:
 
-- identity and permanent safety: nearest `AGENTS.md`;
+- persistent Mate identity and permanent safety: selected role instructions;
+- project-intrinsic rules: nearest `AGENTS.md`;
 - conditional judgment: one Skill;
 - deterministic invariant: SQL or TypeScript;
 - project fact: project instruction surface;
 - private preference: Mate memory.
 
-Duplicating the same rule across all five creates drift rather than learning.
+Duplicating one rule across those sources creates drift rather than learning.
 
-## Worked example: support event was duplicated
+## A duplicated support event
 
 The baseline creates two Tasks for repeated webhook delivery. Freeze provider IDs, ingestion rows,
 claims and resulting Tasks. The cause is not “the Agent was careless”; the released ingestion
@@ -45,12 +46,5 @@ telling every Agent “remember not to duplicate support events.”
 
 If the actual cause is reconciliation judgment rather than deterministic identity, change the
 owning Skill and test the behavior through a scenario.
-
-## What changes at this layer?
-
-- Failure becomes durable organizational input.
-- Root causes are separated from model blame.
-- Improvements stay small, reviewable and regression-tested.
-- History remains honest.
 
 Next, [keep the company sovereign](/learn/04-build-autonomous-company/keep-company-sovereign).

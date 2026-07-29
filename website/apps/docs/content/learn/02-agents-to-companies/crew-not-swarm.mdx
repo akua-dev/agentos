@@ -6,7 +6,7 @@ courseTitle: From Agents to companies
 courseOrder: 2
 lessonId: crew-not-swarm
 lessonOrder: 4
-estimatedMinutes: 7
+estimatedMinutes: 2
 canonical:
   - label: First Mate identity
     path: packages/agentos/resources/roles/firstmate/instructions.md
@@ -14,7 +14,7 @@ canonical:
     path: packages/agentos/resources/roles/secondmate/instructions.md
 ---
 
-## The mental model
+## One accountable path
 
 AgentOS uses a crew hierarchy:
 
@@ -23,32 +23,24 @@ Captain → First Mate → Second Mate → Crewmate
 ```
 
 Captain is the human role and may be held by a person or team. First Mate is the regular company
-interface. A Second Mate owns one persistent domain. A Crewmate owns one bounded ship or scout
+interface. A Second Mate owns a persistent domain. A Crewmate owns one bounded ship or scout
 Assignment.
 
-Each Agent reports through one direct supervision edge. Parents form and supervise their own
-subtree; ancestors do not reach around them for routine work. Humans should not need to know which
-internal Second Mate to tag—the company routes intent.
+Each Agent reports through one direct edge. Parents supervise their subtree; ancestors do not reach
+around them for routine work. Humans do not need to know which internal Mate to tag—the company
+routes intent.
 
-## Worked example: route the checkout Task
+## Route the checkout Task
 
-The Fleet already has a Second Mate chartered for payments reliability. First Mate routes the
-accepted Task to that domain. The Second Mate creates a scout Crewmate for diagnosis, evaluates the
-report and later creates a ship Crewmate for delivery.
+The Fleet has a Second Mate chartered for payments reliability. First Mate routes the accepted Task
+to that domain. The Second Mate creates a scout for diagnosis, evaluates its report and forms a ship
+Crewmate for delivery.
 
-The checkout worker does not open a competing Captain conversation. It reports the migration risk
-to the Second Mate, which sends the material decision upward. First Mate presents the consequence
-in ordinary company language.
+The worker does not open a competing Captain conversation. It reports migration risk to its parent;
+the material decision moves upward and First Mate presents it in company language.
 
 If no durable domain exists, First Mate can create a bounded Crewmate directly. A Second Mate is
 not mandatory ceremony for every Task.
-
-## What changes at this layer?
-
-- Ownership gains an accountable supervision path.
-- Domain context can persist without making one root Agent do every job.
-- Reports and escalations move upward; outcomes move downward.
-- Human communication can stay company-facing while internal routing changes.
 
 Next, [authority belongs where consequences
 live](/learn/02-agents-to-companies/authority-at-consequences).

@@ -6,7 +6,7 @@ courseTitle: From Agents to companies
 courseOrder: 2
 lessonId: persistence-is-product
 lessonOrder: 8
-estimatedMinutes: 8
+estimatedMinutes: 3
 canonical:
   - label: Runtime and recovery architecture
     path: ARCHITECTURE.md
@@ -14,7 +14,7 @@ canonical:
     path: packages/agentos/skills/agentos-runtime/SKILL.md
 ---
 
-## The mental model
+## Processes are replaceable
 
 Long-lived organization cannot depend on one process remaining alive. Agent identity, accepted
 work, home state and delivered evidence have different persistence mechanisms:
@@ -27,16 +27,16 @@ native session → Herdr
 landed delivery → Git
 ```
 
-Pod loss is not work loss. It is a condition that supervision reconciles across those authorities.
+Pod loss is not work loss. It is a condition supervision reconciles across those authorities.
 
-## Worked example: the worker disappears
+## Recover the same worker
 
 The checkout worker has a commit-in-progress and failing compatibility test when its Pod is
-controlledly replaced. The home PVC remains.
+replaced. Its home PVC remains.
 
-Recovery does not create a new Agent and second active Assignment. It verifies the intended Agent
-identity, reuses the same home, restores the reviewed runtime shape, finds the worktree and resumes
-the native harness. The worker reads current Git and test state before continuing.
+Recovery does not create a new Agent or second Assignment. It verifies identity, reuses the home,
+restores the reviewed runtime, finds the worktree and resumes the native harness. The worker reads
+current Git and test state before continuing.
 
 A truthful recovery report names:
 
@@ -47,12 +47,5 @@ A truthful recovery report names:
 - any human repair.
 
 A green Pod alone proves none of these.
-
-## What changes at this layer?
-
-- Runtime processes become replaceable without discarding organizational identity.
-- Unfinished work can continue instead of restarting from a summary.
-- Recovery has observable acceptance criteria.
-- The company can remain accountable across ordinary infrastructure failure.
 
 Next, learn [how a company learns](/learn/02-agents-to-companies/how-company-learns).

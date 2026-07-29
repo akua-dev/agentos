@@ -1,12 +1,12 @@
 ---
-title: Authority belongs where consequences live
+title: Authority follows consequences
 description: Native permission and human approval are independent gates on action.
 courseId: agents-to-companies
 courseTitle: From Agents to companies
 courseOrder: 2
 lessonId: authority-at-consequences
 lessonOrder: 5
-estimatedMinutes: 8
+estimatedMinutes: 3
 canonical:
   - label: Captain decision procedure
     path: packages/agentos/skills/agentos-decisions/SKILL.md
@@ -14,7 +14,7 @@ canonical:
     path: database/migrations/0001_agent_authorization.sql
 ---
 
-## The mental model
+## Permission is not approval
 
 Consequential action requires two things:
 
@@ -24,15 +24,15 @@ native system permits action
 organization authorizes consequence
 ```
 
-A GitHub token may permit merge while the Captain has authorized only branch push and review
-creation. A Kubernetes Role may permit Pod deletion while interrupting an active worker remains a
-human decision. Permission is capability; it is not standing approval.
+A GitHub token may permit merge while the Captain authorized only branch push and review creation.
+A Kubernetes Role may permit Pod deletion while interrupting an active worker remains a human
+decision. Native capability is not organizational approval.
 
 Authority can become less interruptive through exact standing decisions. “Merge reviewed
 dependency patch releases after green CI” can cover a narrow routine class. It does not become
 “merge anything.”
 
-## Worked example: migration risk
+## Stop at the new consequence
 
 The payments scout proves the checkout fix needs a database constraint in production. The current
 Assignment can implement and open a pull request, but production migration changes operational
@@ -43,17 +43,12 @@ The Fleet preserves:
 > Approve a maintenance-window constraint migration for checkout validity, or keep delivery blocked
 > while the team selects a compatibility path?
 
-Dependent work links to that choice. Reading the question does not resolve it. When the Captain
-answers, the exact reply and Task dependency update happen atomically.
+Dependent work links to the choice. Reading the question does not resolve it. The Captain’s exact
+answer and coupled Task update happen atomically.
 
-The worker’s production credential—if it even has one—cannot answer the question.
-
-## What changes at this layer?
-
-- Consequences are gated at their native and organizational boundaries.
-- Durable exact decisions replace inference from silence or report prose.
-- Standing authority can reduce routine interruptions without becoming vague autonomy.
-- Destructive, irreversible and security-sensitive actions remain human.
+The worker’s production credential—if it has one—cannot answer the question. Destructive,
+irreversible and security-sensitive consequences remain human unless exact standing authority says
+otherwise.
 
 Next, [attention is the operating
 problem](/learn/02-agents-to-companies/attention-operating-problem).

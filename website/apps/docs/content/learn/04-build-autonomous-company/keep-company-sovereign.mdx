@@ -6,7 +6,7 @@ courseTitle: Build your autonomous company
 courseOrder: 4
 lessonId: keep-company-sovereign
 lessonOrder: 7
-estimatedMinutes: 9
+estimatedMinutes: 3
 canonical:
   - label: AgentOS vision
     path: VISION.md
@@ -14,18 +14,17 @@ canonical:
     path: ARCHITECTURE.md
 ---
 
-## The mental model
+## Own the state; replace the interface
 
 Sovereignty means people control the technology they create and depend on. The company’s durable
 identity, work, homes and delivered source live in standard systems the operator can inspect,
 self-host and replace.
 
-AgentOS builds on Kubernetes because workloads, authorization and storage remain explicit.
-PostgreSQL holds durable organizational coordination. Herdr exposes native sessions. Git and
-providers hold delivery. A user interface, protocol or automation engine can be replaced without
-becoming the only place the company knows itself.
+Kubernetes keeps workloads, authorization and storage explicit. PostgreSQL holds durable
+coordination. Herdr exposes native sessions. Git and providers hold delivery. No interface becomes
+the only place the company knows itself.
 
-## Worked example: replace the company surface
+## Replace the company surface
 
 The support company begins with Discord as its human surface. Later it adopts a self-hosted
 Buzz-like interface with searchable event history and ACP-connected harness sessions.
@@ -35,18 +34,10 @@ submits intent to the same First-Mate boundary, reads approved organizational pr
 routes exact decisions. If it disappears, PostgreSQL and native authorities still preserve work.
 
 <Callout title="Possible extension">
-Buzz, Nostr, ACP, A2A, Argo, Electric, ClickHouse, OpenTelemetry and Fleetview are useful design
-references or possible integrations. AgentOS does not currently ship them as core components.
-Adopt one only when it improves a proven boundary without introducing hidden authority or a
-mandatory hosted dependency.
+Buzz, Nostr, ACP, A2A, Argo, Electric, ClickHouse and OpenTelemetry are possible integrations, not
+shipped core components. Adopt one only when it improves a proven boundary without creating hidden
+authority or a mandatory hosted dependency.
 </Callout>
 
-## What changes at this layer?
-
-- The organization can be reproduced from owned durable systems and reviewed source.
-- Interfaces remain replaceable rather than becoming proprietary authority.
-- Self-hosting is an architectural capability, not a marketing checkbox.
-- Human intent and boundaries remain the root of autonomy.
-
-You have completed the course. Return to the [course map](/learn), open the [technical
+You have completed the course. Review the [course introduction](/learn), open the [technical
 documentation](/docs), or [bring AgentOS online](/docs/start/get-started).

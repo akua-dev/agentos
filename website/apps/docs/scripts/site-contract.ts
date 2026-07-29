@@ -83,7 +83,7 @@ export const routeExpectations: readonly RouteExpectation[] = [
     (route): RouteExpectation => ({
       path: route.path,
       status: 200,
-      includes: [route.title, 'What changes at this layer?', 'Canonical sources'],
+      includes: [route.title, 'Canonical sources'],
       excludes: ['Fumadocs'],
     }),
   ),

@@ -1,12 +1,12 @@
 ---
-title: Upgrade a running Fleet
+title: Upgrade the running Fleet
 description: Align source revision, loaded instructions, migrations and immutable runtime images safely.
 courseId: operate-first-fleet
 courseTitle: Operate your first Fleet
 courseOrder: 3
 lessonId: upgrade-running-fleet
 lessonOrder: 10
-estimatedMinutes: 9
+estimatedMinutes: 3
 canonical:
   - label: Bootstrap and upgrade procedure
     path: packages/agentos/resources/roles/firstmate/skills/agentos-bootstrap/SKILL.md
@@ -14,7 +14,7 @@ canonical:
     path: CONTRIBUTING.md
 ---
 
-## The mental model
+## A Fleet has several versions
 
 A running Fleet has several version states:
 
@@ -29,7 +29,7 @@ Changing one does not magically change the others. A Git checkout can be current
 uses older loaded instructions. A new Skill can be loaded while old runtime TypeScript remains in
 the image.
 
-## Worked example: adopt a newer release
+## Adopt a newer release
 
 First Mate discovers a newer stable AgentOS release while fetching remotes read-only. It reports
 the available revision without changing its dirty checkout or restarting itself.
@@ -47,13 +47,6 @@ With approval, the upgrade procedure:
 A Markdown-only preview can update the reviewed checkout and invoke a safe harness reload. An
 executable change needs the exact image. Neither path uses `kubectl cp`, a mutable tag or
 uncommitted source.
-
-## What changes at this layer?
-
-- The Fleet can improve without discarding identity or work.
-- Loaded behavior is treated as runtime state.
-- Stable and preview revisions have explicit provenance.
-- Upgrade remains a consequential, observable reconciliation.
 
 Continue to Course 4: [Start with one
 domain](/learn/04-build-autonomous-company/start-with-one-domain).

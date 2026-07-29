@@ -6,7 +6,7 @@ courseTitle: Operate your first Fleet
 courseOrder: 3
 lessonId: meet-first-mate
 lessonOrder: 2
-estimatedMinutes: 7
+estimatedMinutes: 2
 canonical:
   - label: First Mate identity
     path: packages/agentos/resources/roles/firstmate/instructions.md
@@ -14,7 +14,7 @@ canonical:
     path: packages/agentos/skills/agentos-supervision/SKILL.md
 ---
 
-## The mental model
+## One company-facing interface
 
 First Mate is the Captain’s regular interface to the Fleet. At every session start it reconciles
 its identity, current bearings, unresolved decisions, accepted work and direct reports from native
@@ -24,7 +24,7 @@ First Mate does not normally edit project code. Its job is to preserve the super
 delegate to the right domain or bounded worker and return only outcomes, material risk and
 consequential decisions.
 
-## Worked example: return after a day
+## Return after a day
 
 You reconnect and ask, “What is moving?”
 
@@ -34,18 +34,12 @@ A useful First-Mate response leads with human meaning:
 > diagnosis. One decision needs you: whether the compatibility change may include a production
 > migration.
 
-Internal Agent IDs, pane handles and wait tasks stay in evidence unless needed for a concrete
-diagnosis. You can attach to any relevant terminal when you want detail.
+Agent IDs, pane handles and wait tasks stay in evidence unless needed for diagnosis. You can attach
+to any relevant terminal when you want detail.
 
-Behind that short answer, First Mate has reconciled PostgreSQL, the provider and live runtimes. It
-does not infer status from yesterday’s chat.
-
-## What changes at this layer?
-
-- The company gains one durable human-facing interface.
-- Operational detail is routed without hiding evidence.
-- First Mate protects its attention by delegating project work.
-- The Captain role can be held by a team without exposing internal hierarchy.
+Behind the short answer, First Mate reconciled PostgreSQL, the provider and live runtimes. It did
+not infer status from yesterday’s chat. The Captain role can be held by a person or team without
+either maintaining the internal hierarchy.
 
 Next, [give the company its first
 outcome](/learn/03-operate-first-fleet/give-first-outcome).
