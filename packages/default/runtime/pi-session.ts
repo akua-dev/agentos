@@ -22,12 +22,14 @@ export async function findPiSessionToResume(
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<string | undefined> {
   const agentDirectory = normalizePiPath(
-    environment.PI_CODING_AGENT_DIR ??
-      join(environment.HOME ?? homedir(), ".pi", "agent"),
+    environment.PI_CODING_AGENT_DIR ||
+      join(environment.HOME || homedir(), ".pi", "agent"),
     environment,
   );
+  const environmentSessionDirectory =
+    environment.PI_CODING_AGENT_SESSION_DIR;
   const configuredSessionDirectory =
-    environment.PI_CODING_AGENT_SESSION_DIR ??
+    environmentSessionDirectory ||
     (await piSessionDirectorySetting(cwd, agentDirectory));
   const sessionDirectory =
     !configuredSessionDirectory
@@ -57,6 +59,7 @@ export async function findPiSessionToResume(
   const normalizedCwd = normalizePiPath(cwd, environment);
   const matching = candidates.filter(
     (candidate) =>
+      candidate.cwd !== "" &&
       normalizePiPath(candidate.cwd, environment) === normalizedCwd,
   );
   if (matching.length === 1) {
@@ -182,21 +185,26 @@ function parsePiSessionHeaderCandidate(
   line: string,
 ): PiSessionHeaderCandidate {
   if (!line.trim()) return { kind: "skip" };
-  let parsed: Record<string, unknown>;
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(line) as Record<string, unknown>;
+    parsed = JSON.parse(line) as unknown;
   } catch {
     return { kind: "skip" };
   }
+  if (!parsed) return { kind: "skip" };
+  if (typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { kind: "invalid" };
+  }
+  const entry = parsed as Record<string, unknown>;
   if (
-    parsed.type !== "session" ||
-    typeof parsed.id !== "string" ||
-    typeof parsed.cwd !== "string"
+    entry.type !== "session" ||
+    typeof entry.id !== "string" ||
+    typeof entry.cwd !== "string"
   ) {
     return { kind: "invalid" };
   }
   return {
-    header: parsed as PiSessionContents["header"],
+    header: entry as PiSessionContents["header"],
     kind: "header",
   };
 }
@@ -234,22 +242,44 @@ async function piSessionDirectorySetting(
     readSessionDirectorySetting(join(agentDirectory, "settings.json")),
     readSessionDirectorySetting(join(cwd, ".pi", "settings.json")),
   ]);
-  return projectSetting ?? globalSetting;
+  return (projectSetting.defined ? projectSetting : globalSetting).value;
 }
+
+type SessionDirectorySetting = {
+  defined: boolean;
+  value: string | undefined;
+};
 
 async function readSessionDirectorySetting(
   path: string,
-): Promise<string | undefined> {
+): Promise<SessionDirectorySetting> {
   try {
-    const settings = JSON.parse(
-      await readFile(path, "utf8"),
-    ) as Record<string, unknown>;
-    return typeof settings.sessionDir === "string"
-      ? settings.sessionDir
-      : undefined;
+    const settings = JSON.parse(await readFile(path, "utf8")) as unknown;
+    if (
+      !settings ||
+      typeof settings !== "object" ||
+      Array.isArray(settings)
+    ) {
+      throw new Error(`${path} has invalid Pi settings.`);
+    }
+    if (!Object.hasOwn(settings, "sessionDir")) {
+      return { defined: false, value: undefined };
+    }
+    const sessionDirectory = (
+      settings as Record<string, unknown>
+    ).sessionDir;
+    if (!sessionDirectory) {
+      return { defined: true, value: undefined };
+    }
+    if (typeof sessionDirectory !== "string") {
+      throw new Error(`${path} has an invalid Pi sessionDir setting.`);
+    }
+    return { defined: true, value: sessionDirectory };
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
-    if (code === "ENOENT" || error instanceof SyntaxError) return undefined;
+    if (code === "ENOENT" || error instanceof SyntaxError) {
+      return { defined: false, value: undefined };
+    }
     throw error;
   }
 }
@@ -258,7 +288,7 @@ function normalizePiPath(
   path: string,
   environment: NodeJS.ProcessEnv,
 ): string {
-  const home = environment.HOME ?? homedir();
+  const home = environment.HOME || homedir();
   const expanded =
     path === "~"
       ? home

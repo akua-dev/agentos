@@ -284,7 +284,11 @@ describe("Mate runtime", () => {
       ),
     ]);
     const child = Bun.spawn([process.execPath, runMate], {
-      env: { ...env, HOME: home },
+      env: {
+        ...env,
+        HOME: home,
+        PI_CODING_AGENT_SESSION_DIR: "",
+      },
       stderr: "pipe",
       stdout: "pipe",
     });
@@ -310,6 +314,8 @@ describe("Mate runtime", () => {
       [
         "",
         "{malformed",
+        "null",
+        "false",
         JSON.stringify({
           cwd: env.AGENTOS_AGENT_CWD,
           id: "session-with-preamble",
