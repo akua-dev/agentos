@@ -1,5 +1,28 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_POSTHOG_HOST, initializePostHog } from './posthog';
+import {
+  DEFAULT_POSTHOG_HOST,
+  DEFAULT_POSTHOG_PROJECT_TOKEN,
+  initializePostHog,
+  resolvePostHogProjectToken,
+} from './posthog';
+
+describe('resolvePostHogProjectToken', () => {
+  it('uses the public CNAP project token for production builds', () => {
+    expect(resolvePostHogProjectToken(undefined, 'production')).toBe(
+      DEFAULT_POSTHOG_PROJECT_TOKEN,
+    );
+  });
+
+  it('keeps development disabled without an explicit token', () => {
+    expect(resolvePostHogProjectToken(undefined, 'development')).toBeUndefined();
+  });
+
+  it('prefers a configured project token', () => {
+    expect(resolvePostHogProjectToken('  phc_override  ', 'production')).toBe(
+      'phc_override',
+    );
+  });
+});
 
 describe('initializePostHog', () => {
   it('does not initialize analytics without a project token', () => {

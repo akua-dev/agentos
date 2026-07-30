@@ -35,13 +35,15 @@ localhost during development.
 
 Anonymous website analytics use PostHog's cookieless mode, honor Do Not Track,
 disable session recording and send through CNAP's first-party
-`https://ph.akua.dev` endpoint. Analytics stays completely disabled when
-`NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` is absent. Set
-`NEXT_PUBLIC_POSTHOG_HOST` only to override the first-party endpoint.
+`https://ph.akua.dev` endpoint. Production builds use CNAP's public PostHog
+project token by default. Set `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` only to
+override that project, and `NEXT_PUBLIC_POSTHOG_HOST` only to override the
+first-party endpoint. Development stays disabled when no token override is
+present.
 
 Both PostHog values are public browser configuration, not server secrets.
-Configure them as Cloudflare Workers Builds environment variables because
-Next.js embeds `NEXT_PUBLIC_*` values while building the client bundle;
+When overriding them in Cloudflare Workers Builds, remember that Next.js
+embeds `NEXT_PUBLIC_*` values while building the client bundle;
 `wrangler.jsonc` runtime variables cannot configure an already-built bundle.
 
 The `agentos-site` production trigger in Cloudflare Workers Builds uses:

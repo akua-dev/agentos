@@ -1,7 +1,13 @@
 import posthog from 'posthog-js';
-import { initializePostHog } from '@/lib/analytics/posthog';
+import {
+  initializePostHog,
+  resolvePostHogProjectToken,
+} from '@/lib/analytics/posthog';
 
 initializePostHog(posthog, {
-  projectToken: process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN,
+  projectToken: resolvePostHogProjectToken(
+    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN,
+    process.env.NODE_ENV,
+  ),
   host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
 });

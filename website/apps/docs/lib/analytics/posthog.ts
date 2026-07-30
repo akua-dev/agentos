@@ -1,6 +1,8 @@
 import type { PostHogConfig } from 'posthog-js';
 
 export const DEFAULT_POSTHOG_HOST = 'https://ph.akua.dev';
+export const DEFAULT_POSTHOG_PROJECT_TOKEN =
+  'phc_pctNY25BoznqonkxmCXtbJKg3GpIHl4Ib1efrDOJRup';
 
 export interface PostHogEnvironment {
   projectToken?: string;
@@ -9,6 +11,18 @@ export interface PostHogEnvironment {
 
 export interface PostHogClient {
   init(token: string, config: Partial<PostHogConfig>): unknown;
+}
+
+export function resolvePostHogProjectToken(
+  configuredToken: string | undefined,
+  nodeEnvironment: string | undefined,
+): string | undefined {
+  const token = configuredToken?.trim();
+
+  if (token) return token;
+  if (nodeEnvironment === 'production') return DEFAULT_POSTHOG_PROJECT_TOKEN;
+
+  return undefined;
 }
 
 export function initializePostHog(
