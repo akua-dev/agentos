@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -70,6 +70,7 @@ async function validate(
       [
         "docker",
         "run",
+        "--pull=never",
         "--rm",
         "-e",
         "K8S_NODE_NAME=test-node",
@@ -97,6 +98,19 @@ async function validate(
 }
 
 describe("Collector configuration", () => {
+  beforeAll(async () => {
+    const child = Bun.spawn(["docker", "pull", "--quiet", collectorImage], {
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect({ exitCode, stderr }, stdout).toEqual({ exitCode: 0, stderr: "" });
+  }, 60_000);
+
   for (const directory of [
     "base",
     "overlays/remote",
