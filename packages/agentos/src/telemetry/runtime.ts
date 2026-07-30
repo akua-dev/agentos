@@ -18,6 +18,7 @@ import {
 import {
   AGENTOS_AI_METRICS,
   AGENTOS_AI_TELEMETRY_CONTRACT_VERSION,
+  type AgentOSAICompactionPath,
   type AgentOSAIModelFamily,
   type AgentOSAIProviderFamily,
   type AgentOSAIRequestKind,
@@ -46,6 +47,7 @@ export interface AgentOSOperationInput {
 export interface AgentOSProviderAttemptInput {
   requestKind: AgentOSAIRequestKind;
   streamMode: AgentOSAIStreamMode;
+  compactionPath?: AgentOSAICompactionPath;
   routeSlot?: string;
   retryCount?: number;
 }
@@ -240,6 +242,12 @@ function startProviderAttempt(options: {
       "agentos.ai.request.attempt_id": attemptId,
       "agentos.ai.request.kind": options.attemptInput.requestKind,
       "agentos.ai.stream.mode": options.attemptInput.streamMode,
+      ...(options.attemptInput.compactionPath
+        ? {
+            "agentos.ai.compaction.path":
+              options.attemptInput.compactionPath,
+          }
+        : {}),
       ...(options.attemptInput.routeSlot
         ? { "agentos.ai.route.slot": options.attemptInput.routeSlot }
         : {}),

@@ -1,4 +1,5 @@
 import {
+  AGENTOS_AI_COMPACTION_PATHS,
   AGENTOS_AI_ERROR_CLASSES,
   AGENTOS_AI_MODEL_FAMILIES,
   AGENTOS_AI_PROVIDER_FAMILIES,
@@ -62,6 +63,10 @@ const rules: Readonly<Record<string, AttributeRule>> = Object.freeze({
   "agentos.ai.request.kind": {
     signals: allSignals,
     value: { kind: "enum", values: AGENTOS_AI_REQUEST_KINDS },
+  },
+  "agentos.ai.compaction.path": {
+    signals: allSignals,
+    value: { kind: "enum", values: AGENTOS_AI_COMPACTION_PATHS },
   },
   "agentos.ai.status_class": {
     signals: allSignals,

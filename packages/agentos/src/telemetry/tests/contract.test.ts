@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AGENTOS_AI_COMPACTION_PATHS,
   AGENTOS_AI_ERROR_CLASSES,
   AGENTOS_AI_REQUEST_KINDS,
   AGENTOS_AI_ROUTES,
@@ -25,6 +26,10 @@ describe("AgentOS AI telemetry contract v1", () => {
       "memory_extract",
       "memory_consolidate",
       "extension",
+    ]);
+    expect(AGENTOS_AI_COMPACTION_PATHS).toEqual([
+      "portable_summary",
+      "native_server",
     ]);
     expect(AGENTOS_AI_STATUS_CLASSES).toEqual([
       "success",
@@ -80,6 +85,7 @@ describe("AgentOS AI telemetry contract v1", () => {
       "agentos.ai.runtime": "pi",
       "agentos.ai.route": "ai_gateway",
       "agentos.ai.request.kind": "main",
+      "agentos.ai.compaction.path": "native_server",
       "agentos.ai.status_class": "success",
       "agentos.ai.error.class": "none",
       "agentos.ai.stream.outcome": "completed",
@@ -102,6 +108,7 @@ describe("AgentOS AI telemetry contract v1", () => {
 
     expect(span).toEqual({
       "agentos.ai.error.class": "none",
+      "agentos.ai.compaction.path": "native_server",
       "agentos.ai.model.family": "gpt-5",
       "agentos.ai.provider.request_id": "req_safe_opaque",
       "agentos.ai.request.attempt_id": "018f-safe-opaque",
@@ -114,6 +121,7 @@ describe("AgentOS AI telemetry contract v1", () => {
     });
     expect(metric).toEqual({
       "agentos.ai.error.class": "none",
+      "agentos.ai.compaction.path": "native_server",
       "agentos.ai.model.family": "gpt-5",
       "agentos.ai.request.kind": "main",
       "agentos.ai.route": "ai_gateway",
@@ -136,6 +144,7 @@ describe("AgentOS AI telemetry contract v1", () => {
           "agentos.ai.runtime": "pi-or-secret",
           "agentos.ai.route": "provider-account@example.test",
           "agentos.ai.request.kind": "arbitrary-extension-name",
+          "agentos.ai.compaction.path": "request-body",
           "agentos.ai.model.family": "SEED_PROMPT",
           "agentos.ai.route.slot": "../provider-private",
           "agentos.ai.request.attempt_id": "x".repeat(129),
