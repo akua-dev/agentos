@@ -112,6 +112,7 @@ COPY services/ai-gateway/package.json services/ai-gateway/package.json
 COPY services/otel-collector/package.json services/otel-collector/package.json
 COPY vendor/codex-router/packages/core/package.json vendor/codex-router/packages/core/package.json
 COPY vendor/codex-router/packages/codex/package.json vendor/codex-router/packages/codex/package.json
+COPY vendor/codex-router/packages/bun/package.json vendor/codex-router/packages/bun/package.json
 COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
 COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
 
