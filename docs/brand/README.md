@@ -20,6 +20,7 @@ depend on an installed font and use identical geometry in every colorway.
 | [`agentos-wordmark-on-light.svg`](./agentos-wordmark-on-light.svg) | Complete `1600 × 480` light presentation lockup |
 | [`agentos-wordmark-bone.svg`](./agentos-wordmark-bone.svg) | Transparent wordmark for a sufficiently dark field |
 | [`agentos-wordmark-ink.svg`](./agentos-wordmark-ink.svg) | Transparent wordmark for a sufficiently light field |
+| [`agentos-browser-icon.svg`](./agentos-browser-icon.svg) | Browser-only utility source; never use as a standalone AgentOS mark |
 
 The approved palette is:
 
@@ -58,6 +59,11 @@ Use the wordmark at no less than `120px` wide in digital layouts. No standalone
 small-format symbol or monogram is defined. If a surface cannot fit the full
 wordmark legibly, use the plain product name in that surface's ordinary text
 style.
+
+The favicon is the sole exception to the no-small-format-symbol rule. It uses
+an ordinary Geist Sans `A` because browser chrome cannot fit the product name.
+It is not part of the AgentOS wordmark and must not be reused as a logo, avatar,
+product icon or interface ornament.
 
 ## Do and do not
 
