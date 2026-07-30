@@ -43,7 +43,11 @@ async function run(
 }
 
 async function copyProductionInstallInputs(destination: string) {
+  const rootPackage = JSON.parse(
+    await readFile(join(repository, "package.json"), "utf8"),
+  );
   const files = [
+    "package.json",
     "bun.lock",
     "clis/github-app-token/package.json",
     "clis/github-app-token/github-app-token.ts",
@@ -52,6 +56,9 @@ async function copyProductionInstallInputs(destination: string) {
     "database/package.json",
     "packages/agentos/package.json",
     "services/ai-gateway/package.json",
+    ...(rootPackage.workspaces.includes("website/apps/docs")
+      ? ["website/apps/docs/package.json"]
+      : []),
   ];
   await Promise.all(
     files.map(async (file) => {
@@ -59,21 +66,6 @@ async function copyProductionInstallInputs(destination: string) {
       await mkdir(dirname(output), { recursive: true });
       await copyFile(join(repository, file), output);
     }),
-  );
-  const rootPackage = JSON.parse(
-    await readFile(join(repository, "package.json"), "utf8"),
-  );
-  rootPackage.workspaces = [
-    "clis/github-app-token",
-    "clis/pg-listen",
-    "database",
-    "packages/agentos",
-    "services/ai-gateway",
-  ];
-  await writeFile(
-    join(destination, "package.json"),
-    `${JSON.stringify(rootPackage, null, 2)}\n`,
-    "utf8",
   );
 }
 
