@@ -107,8 +107,8 @@ Use Cloudflare and Git directly; no AgentOS deployment state exists outside
 those systems.
 
 ```console
-bunx --bun wrangler deployments list
-bunx --bun wrangler versions view <active-version-id> --json
+bun x --bun wrangler deployments list
+bun x --bun wrangler versions view <active-version-id> --json
 git fetch origin main
 git rev-parse origin/main
 curl --silent --show-error --head https://agentos.akua.dev/
@@ -124,8 +124,8 @@ revision. Roll back to that immutable Worker version, including the revision
 in the reason:
 
 ```console
-bunx --bun wrangler versions view <target-version-id> --json
-bunx --bun wrangler rollback <target-version-id> --message "Rollback to Git revision <full-git-sha>" --yes
+bun x --bun wrangler versions view <target-version-id> --json
+bun x --bun wrangler rollback <target-version-id> --message "Rollback to Git revision <full-git-sha>" --yes
 ```
 
 Afterward, repeat the deployment, version and response-header inspection. A

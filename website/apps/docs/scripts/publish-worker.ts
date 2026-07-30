@@ -25,15 +25,16 @@ export function publishWorker(mode: PublicationMode): void {
   console.log(
     `Publishing ${mode} Worker version from Git revision ${provenance.gitSha}.`,
   );
-  run('bunx', [
+  run(process.execPath, [
+    'x',
     '--bun',
     'opennextjs-cloudflare',
     'populateCache',
     'remote',
   ]);
   run(
-    'bunx',
-    ['--bun', 'wrangler', ...args],
+    process.execPath,
+    ['x', '--bun', 'wrangler', ...args],
     mode === 'production'
       ? { ...process.env, OPEN_NEXT_DEPLOY: 'true' }
       : process.env,

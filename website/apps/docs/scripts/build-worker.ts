@@ -32,8 +32,8 @@ export function buildWorker(): void {
   };
 
   run(
-    'bunx',
-    ['opennextjs-cloudflare', 'build'],
+    process.execPath,
+    ['x', 'opennextjs-cloudflare', 'build'],
     buildEnvironment,
   );
   writeProvenanceArtifact(appDirectory, provenance);
