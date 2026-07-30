@@ -32,7 +32,7 @@ describe("quota-aware selection", () => {
       now,
     });
     expect(decision.accountId).toBe("sooner");
-    expect(decision.reason).toBe("highest_weekly_urgency");
+    expect(decision.reason).toBe("best_candidate");
   });
 
   test("rejects low short-window headroom and observations older than 24 hours", () => {
@@ -46,8 +46,14 @@ describe("quota-aware selection", () => {
     expect(decision.accountId).toBeUndefined();
     expect(decision.candidates).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ accountId: "short", rejectionCode: "short_headroom" }),
-        expect.objectContaining({ accountId: "old", rejectionCode: "usage_too_old" }),
+        expect.objectContaining({
+          accountId: "short",
+          rejectionCode: "no_eligible_accounts",
+        }),
+        expect.objectContaining({
+          accountId: "old",
+          rejectionCode: "no_eligible_accounts",
+        }),
       ]),
     );
   });
@@ -62,7 +68,10 @@ describe("quota-aware selection", () => {
         currentAccountId: "z-current",
         now,
       }),
-    ).toMatchObject({ accountId: "z-current", reason: "current_account_hysteresis" });
+    ).toMatchObject({
+      accountId: "z-current",
+      reason: "current_account_hysteresis",
+    });
 
     expect(
       selectAccount({

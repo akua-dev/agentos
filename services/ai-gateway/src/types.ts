@@ -26,6 +26,7 @@ export interface Candidate {
   usage?: UsageSnapshot;
   needsReauth: boolean;
   block?: AccountBlock;
+  activeReservations?: number;
 }
 
 export interface CandidateExplanation {
