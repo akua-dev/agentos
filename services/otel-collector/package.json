@@ -5,6 +5,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "bun test kubernetes/tests"
+    "test": "bun test kubernetes/tests tests"
   }
 }

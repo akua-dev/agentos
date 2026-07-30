@@ -112,7 +112,10 @@ describe("Collector configuration", () => {
   test("applies the privacy processors to every signal", async () => {
     const config = await renderConfig("overlays/remote");
     const parsed = Bun.YAML.parse(config) as {
-      processors: Record<string, unknown>;
+      processors: Record<
+        string,
+        { actions?: Array<{ key: string; action: string }>; attributes?: Array<{ key: string; action: string }> }
+      >;
       service: {
         pipelines: Record<
           string,
@@ -134,5 +137,18 @@ describe("Collector configuration", () => {
     }
     expect(parsed.processors["attributes/privacy"]).toBeDefined();
     expect(parsed.processors["resource/privacy"]).toBeDefined();
+    const spanForbidden = new Set(
+      parsed.processors["attributes/privacy"]?.actions?.map(
+        ({ key }) => key,
+      ),
+    );
+    const resourceForbidden = new Set(
+      parsed.processors["resource/privacy"]?.attributes?.map(
+        ({ key }) => key,
+      ),
+    );
+    for (const key of spanForbidden) {
+      expect(resourceForbidden).toContain(key);
+    }
   });
 });

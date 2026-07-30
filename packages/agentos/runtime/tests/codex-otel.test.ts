@@ -208,7 +208,8 @@ describe("Codex native OTEL bridge", () => {
     expect(await readFile(path, "utf8")).toBe(original);
   });
 
-  if (process.env.AGENTOS_CODEX_VALIDATION_BIN) {
+  const validationBin = process.env.AGENTOS_CODEX_VALIDATION_BIN;
+  if (validationBin) {
     test("is accepted by the Fleet-pinned Codex configuration loader", async () => {
       const path = await fixture();
       await reconcileCodexOtelConfig(path, {
@@ -220,7 +221,7 @@ describe("Codex native OTEL bridge", () => {
       });
       const child = Bun.spawn(
         [
-          process.env.AGENTOS_CODEX_VALIDATION_BIN,
+          validationBin,
           "debug",
           "models",
         ],
