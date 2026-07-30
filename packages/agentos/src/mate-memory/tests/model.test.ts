@@ -3,9 +3,77 @@ import { describe, expect, test } from "bun:test";
 import {
   relevantSelectionMessage,
   resolveRelevantTopicIds,
+  selectRelevantTopics,
 } from "../model.ts";
+import { createTelemetryRecorder } from "../../telemetry/tests/fake-telemetry.ts";
 
 describe("Mate memory relevance selection", () => {
+  test("attributes the selector call without recording memory content", async () => {
+    const recorded = createTelemetryRecorder();
+    const selected = await selectRelevantTopics({
+      prompt: "SEED_PROMPT private human request",
+      startup: {
+        index: "# Memory index",
+        pinned: [],
+        inventory: [
+          {
+            relativePath: "topics/private-project.md",
+            type: "project",
+            scope: "private",
+            modified: "2026-07-28T12:00:00.000Z",
+            pinned: false,
+          },
+        ],
+        degraded: [],
+      },
+      model: {
+        provider: "openai-codex",
+        id: "gpt-5.6-sol",
+        baseUrl: "http://ai-gateway:8787",
+      } as never,
+      modelRegistry: {
+        getApiKeyAndHeaders: async () => ({
+          ok: true,
+          apiKey: "sk-seeded-secret",
+          headers: {},
+        }),
+      } as never,
+      telemetry: recorded.telemetry,
+      completeImpl: async () =>
+        ({
+          role: "assistant",
+          content: [{ type: "text", text: '{"ids":["topic-0"]}' }],
+          usage: { input: 4, output: 2 },
+          stopReason: "stop",
+        }) as never,
+    });
+
+    expect(selected).toEqual(["topics/private-project.md"]);
+    expect(recorded.operations[0]?.attempts).toEqual([
+      {
+        input: {
+          requestKind: "extension",
+          streamMode: "streaming",
+        },
+        outcome: {
+          inputTokens: 4,
+          outputTokens: 2,
+          status: 200,
+          streamOutcome: "completed",
+        },
+      },
+    ]);
+    expect(JSON.stringify(recorded.operations)).not.toContain(
+      "SEED_PROMPT",
+    );
+    expect(JSON.stringify(recorded.operations)).not.toContain(
+      "sk-seeded-secret",
+    );
+    expect(JSON.stringify(recorded.operations)).not.toContain(
+      "private-project",
+    );
+  });
+
   test("redacts the human request before building the selector message", () => {
     const message = relevantSelectionMessage({
       prompt: "Use password: hunter2 and sk-proj-secret-value",

@@ -15,9 +15,11 @@ import {
   createMaintenanceTools,
   isEligibleHumanInput,
   MateMemoryMaintenance,
+  runIsolatedMaintenanceAgent,
   type MaintenanceAgentRunner,
   type MaintenanceRunRequest,
 } from "../maintenance.ts";
+import { createTelemetryRecorder } from "../../telemetry/tests/fake-telemetry.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -38,6 +40,64 @@ async function fixture() {
 }
 
 describe("Mate memory automatic maintenance", () => {
+  test("attributes every extraction model step without recording maintenance content", async () => {
+    const recorded = createTelemetryRecorder();
+    const result = await runIsolatedMaintenanceAgent({
+      agentDir: "/mate/.pi/agent",
+      cwd: "/workspace",
+      kind: "extraction",
+      pauseGeneration: 0,
+      mutationEpoch: 0,
+      model: {
+        provider: "openai-codex",
+        id: "gpt-5.6-sol",
+        baseUrl: "http://ai-gateway:8787",
+      } as never,
+      modelRegistry: {
+        getApiKeyAndHeaders: async () => ({
+          ok: true,
+          apiKey: "sk-seeded-secret",
+          headers: {},
+        }),
+      } as never,
+      systemPrompt: "SEED_PROMPT private maintenance system prompt",
+      prompt: "SEED_PROMPT private memory body",
+      tools: [],
+      telemetry: recorded.telemetry,
+      completeImpl: async () =>
+        ({
+          content: [{ type: "text", text: '{"action":"done"}' }],
+          usage: { input: 8, output: 3 },
+          stopReason: "stop",
+        }) as never,
+    });
+
+    expect(result).toEqual({
+      summary: "maintenance completed",
+      touchedPaths: [],
+    });
+    expect(recorded.operations[0]?.attempts).toEqual([
+      {
+        input: {
+          requestKind: "memory_extract",
+          streamMode: "streaming",
+        },
+        outcome: {
+          inputTokens: 8,
+          outputTokens: 3,
+          status: 200,
+          streamOutcome: "completed",
+        },
+      },
+    ]);
+    expect(JSON.stringify(recorded.operations)).not.toContain(
+      "SEED_PROMPT",
+    );
+    expect(JSON.stringify(recorded.operations)).not.toContain(
+      "sk-seeded-secret",
+    );
+  });
+
   test("accepts only substantive direct human input", () => {
     expect(isEligibleHumanInput("remember this please", "interactive")).toBe(
       true,

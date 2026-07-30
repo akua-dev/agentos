@@ -12,12 +12,14 @@ import {
   type AgentOSTelemetry,
 } from "./runtime.ts";
 import type {
-  AgentOSAIModelFamily,
-  AgentOSAIProviderFamily,
-  AgentOSAIRoute,
   AgentOSAISessionState,
   AgentOSAIStreamOutcome,
 } from "./contract.ts";
+import {
+  agentOSModelFamily,
+  agentOSProviderFamily,
+  agentOSRouteForModel,
+} from "./auxiliary.ts";
 
 export interface AgentOSObservabilityDependencies {
   telemetry?: AgentOSTelemetry | Promise<AgentOSTelemetry>;
@@ -56,10 +58,10 @@ export function registerAgentOSObservability(
     operation = (await telemetry).startOperation({
       runtime: "pi",
       runtimeVersion,
-      route: routeForModel(model),
+      route: model ? agentOSRouteForModel(model) : "direct",
       sessionState: sessionState(context),
-      modelFamily: modelFamily(model?.id),
-      providerFamily: providerFamily(model?.provider),
+      modelFamily: agentOSModelFamily(model?.id),
+      providerFamily: agentOSProviderFamily(model?.provider),
     });
     operationResult = {};
     return operation;
@@ -134,34 +136,6 @@ export function registerAgentOSObservability(
   pi.on("session_shutdown", () => {
     finishOperation();
   });
-}
-
-function routeForModel(
-  model:
-    | {
-        baseUrl?: string;
-      }
-    | undefined,
-): AgentOSAIRoute {
-  const baseUrl = model?.baseUrl?.toLowerCase() ?? "";
-  return baseUrl.includes("ai-gateway") ? "ai_gateway" : "direct";
-}
-
-function modelFamily(modelId: string | undefined): AgentOSAIModelFamily {
-  const normalized = modelId?.toLowerCase() ?? "";
-  if (normalized.startsWith("gpt-5")) return "gpt-5";
-  if (normalized.startsWith("gpt-4.1")) return "gpt-4.1";
-  if (/^o[0-9]/.test(normalized)) return "o-series";
-  return "other";
-}
-
-function providerFamily(
-  provider: string | undefined,
-): AgentOSAIProviderFamily {
-  const normalized = provider?.toLowerCase() ?? "";
-  return normalized.includes("openai") || normalized.includes("codex")
-    ? "openai"
-    : "other";
 }
 
 function sessionState(context: ExtensionContext): AgentOSAISessionState {
