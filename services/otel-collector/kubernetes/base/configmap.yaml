@@ -70,6 +70,42 @@ data:
             action: delete
           - key: enduser.id
             action: delete
+          - key: authorization
+            action: delete
+          - key: cookie
+            action: delete
+          - key: http.request.body
+            action: delete
+          - key: http.response.body
+            action: delete
+          - key: http.request.header.authorization
+            action: delete
+          - key: http.request.header.cookie
+            action: delete
+          - key: http.response.header.set_cookie
+            action: delete
+          - key: gen_ai.prompt
+            action: delete
+          - key: gen_ai.completion
+            action: delete
+          - key: gen_ai.input.messages
+            action: delete
+          - key: gen_ai.output.messages
+            action: delete
+          - key: tool.arguments
+            action: delete
+          - key: tool.result
+            action: delete
+          - key: error.message
+            action: delete
+          - key: exception.message
+            action: delete
+          - key: exception.stacktrace
+            action: delete
+          - key: provider.account.id
+            action: delete
+          - key: provider.account.email
+            action: delete
       attributes/privacy:
         actions:
           - key: authorization

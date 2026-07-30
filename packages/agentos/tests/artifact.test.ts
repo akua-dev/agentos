@@ -263,6 +263,47 @@ describe("publishable AgentOS Pi artifacts", () => {
         ),
         join(installedAgentOS, "runtime", "create-image-seed.ts"),
         join(installedAgentOS, "skills", "agentos-customization", "SKILL.md"),
+        join(
+          installedAgentOS,
+          "skills",
+          "agentos-observability",
+          "SKILL.md",
+        ),
+        join(
+          installedAgentOS,
+          "skills",
+          "agentos-observability",
+          "agents",
+          "openai.yaml",
+        ),
+        join(
+          installedAgentOS,
+          "skills",
+          "agentos-observability",
+          "references",
+          "control-matrix.md",
+        ),
+        join(
+          installedAgentOS,
+          "skills",
+          "agentos-observability",
+          "references",
+          "dashboards.md",
+        ),
+        join(
+          installedAgentOS,
+          "skills",
+          "agentos-observability",
+          "references",
+          "alerts.md",
+        ),
+        join(
+          installedAgentOS,
+          "skills",
+          "agentos-observability",
+          "references",
+          "runbooks.md",
+        ),
         join(installedAgentOS, "skills", "agentos-upgrade", "SKILL.md"),
         join(
           installedAgentOS,
@@ -457,6 +498,7 @@ describe("publishable AgentOS Pi artifacts", () => {
     expect(commands).toContain("background-commands");
     expect(commands).toContain("memory");
     expect(commands).toContain("skill:agentos-supervision");
+    expect(commands).toContain("skill:agentos-observability");
     expect(commands).toContain("skill:agentos-bootstrap");
     expect(commands).toContain("skill:agentos-upgrade");
     const secondMateCommands = await piCommands(
@@ -472,6 +514,7 @@ describe("publishable AgentOS Pi artifacts", () => {
     expect(secondMateCommands).toContain("background-commands");
     expect(secondMateCommands).toContain("memory");
     expect(secondMateCommands).toContain("skill:agentos-supervision");
+    expect(secondMateCommands).toContain("skill:agentos-observability");
     expect(secondMateCommands).toContain("skill:agentos-upgrade");
     expect(secondMateCommands).not.toContain("skill:agentos-bootstrap");
     const replacementProject = join(sandbox, "replacement-project");
