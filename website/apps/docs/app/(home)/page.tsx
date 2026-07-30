@@ -15,6 +15,10 @@ import {
 } from 'lucide-react';
 import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
 import { cn } from '@/lib/cn';
+import {
+  agentOsStructuredData,
+  serializeStructuredData,
+} from '@/lib/structured-data';
 import { Marquee } from '@/app/(home)/marquee';
 import { AgnosticBackground, CreateAppAnimation, Hero, Writing } from './page.client';
 
@@ -96,7 +100,14 @@ const principles = [
 
 export default function Page() {
   return (
-    <main className="pt-4 pb-6 text-landing-foreground dark:text-landing-foreground-dark md:pb-12">
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeStructuredData(agentOsStructuredData),
+        }}
+      />
+      <main className="pt-4 pb-6 text-landing-foreground dark:text-landing-foreground-dark md:pb-12">
       <section className="relative mx-auto flex h-[72vh] max-h-[900px] min-h-[620px] w-full max-w-[1400px] overflow-hidden rounded-2xl border bg-origin-border">
         <Hero />
         <div className="z-2 flex size-full flex-col px-5 py-10 max-md:items-center max-md:text-center md:p-12">
@@ -359,7 +370,8 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
           </div>
         </section>
       </div>
-    </main>
+      </main>
+    </>
   );
 }
 
