@@ -6,7 +6,12 @@ const withAnalyzer = createBundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 });
 
+const workerBuildBranch = process.env.WORKERS_CI_BRANCH?.trim() ?? '';
+
 const config: NextConfig = {
+  env: {
+    NEXT_PUBLIC_POSTHOG_BUILD_BRANCH: workerBuildBranch,
+  },
   reactStrictMode: true,
   experimental: {
     globalNotFound: true,
