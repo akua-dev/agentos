@@ -592,6 +592,13 @@ are sourced from Secrets and never rendered in ConfigMaps or diagnostics.
 Codex does not enable exporters from these variables by itself, so AgentOS
 atomically reconciles its native `[otel]` configuration from the same surface
 and forces `log_user_prompt=false`.
+Compatibility is verified against the Fleet-pinned `codex-cli 0.144.5` and
+reviewed upstream source commit
+`9a46fd33a0ac62e7d700f2667e1b643c50c4970a`. Codex continues to own its native
+spans, metrics, logs and W3C propagation; AgentOS does not fork or wrap its
+provider client. The bridge preserves unrelated user configuration and maps
+`OTEL_SDK_DISABLED=true` to `none` for all three native exporters, including
+the otherwise default analytics metrics path.
 
 Collector persistent sending queues retain accepted batches only until remote
 delivery or bounded queue eviction. The optional local diagnostic archive is

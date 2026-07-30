@@ -27,6 +27,7 @@ import {
   isPersistentMateRole,
   resolvePersistentMateDistribution,
 } from "./distribution.ts";
+import { reconcileCodexOtelConfig } from "./codex-otel.ts";
 
 const home = requiredEnvironment("HOME");
 const releaseRoot = withoutTrailingSlash(
@@ -41,6 +42,8 @@ const herdrConfig =
   join(home, ".config", "herdr", "config.toml");
 const agentRole = requiredEnvironment("AGENTOS_AGENT_ROLE");
 const usesPi = isPersistentMateRole(agentRole);
+const usesCodex = agentRole === "crewmate";
+const codexHome = process.env.CODEX_HOME ?? join(home, ".codex");
 const mateDistribution = usesPi
   ? resolvePersistentMateDistribution(process.env)
   : undefined;
@@ -61,6 +64,7 @@ await Promise.all(
     join(home, "projects"),
     dirname(herdrConfig),
     ...(usesPi ? [piExtensionDirectory] : []),
+    ...(usesCodex ? [codexHome] : []),
   ].map((directory) => mkdir(directory, { recursive: true, mode: 0o700 })),
 );
 
@@ -95,6 +99,9 @@ if (!(await exists(herdrConfig))) {
 }
 
 if (usesPi) await reconcileSelectedPiDefaults();
+if (usesCodex) {
+  await reconcileCodexOtelConfig(join(codexHome, "config.toml"), process.env);
+}
 
 await $`mise trust ${systemConfig}`;
 if (usesPi) {
