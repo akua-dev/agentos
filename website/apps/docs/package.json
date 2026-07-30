@@ -6,7 +6,7 @@
   "scripts": {
     "brand:generate": "bun ./scripts/generate-brand-assets.ts",
     "build": "next build",
-    "build:worker": "bun ./scripts/build-worker.ts",
+    "build:worker": "opennextjs-cloudflare build && bun ./scripts/finalize-worker-build.ts",
     "types:check": "next typegen && tsc --noEmit",
     "clean": "rimraf .next",
     "deploy": "bun run build:worker && bun run deploy:worker",

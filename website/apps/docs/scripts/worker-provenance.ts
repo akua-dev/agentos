@@ -116,6 +116,20 @@ export function writeProvenanceArtifact(
   appDirectory: string,
   provenance: WorkerProvenance,
 ): void {
+  const middleware = readFileSync(
+    join(appDirectory, '.open-next', 'middleware', 'handler.mjs'),
+    'utf8',
+  );
+  const embeddedRevision = middleware.match(
+    /["']key["']\s*:\s*["']X-AgentOS-Git-SHA["']\s*,\s*["']value["']\s*:\s*["']([0-9a-f]{40})["']/i,
+  )?.[1]?.toLowerCase();
+
+  if (embeddedRevision !== provenance.gitSha) {
+    throw new Error(
+      `Generated Worker does not embed Git revision ${provenance.gitSha} in X-AgentOS-Git-SHA.`,
+    );
+  }
+
   writeFileSync(
     provenanceArtifactPath(appDirectory),
     `${JSON.stringify(provenance, null, 2)}\n`,

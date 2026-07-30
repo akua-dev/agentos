@@ -25,19 +25,24 @@ bun run site:deploy
 ```
 
 `site:upload:worker` and `site:deploy:worker` operate on an existing
-OpenNext build. `site:deploy` builds and deploys in one command. The Worker
-build finishes with a native Wrangler dry run and fails if its compressed
-upload exceeds Cloudflare Workers' 3 MiB free-plan limit. Workers Builds skips
-that redundant dry run because its immediately following native upload enforces
-the same limit; repository CI still runs the dry-run contract before merge.
+OpenNext build. `site:deploy` builds and deploys in one command. The build
+script runs OpenNext as its top-level command, then finalizes the generated
+artifact. This keeps Cloudflare's build lifecycle attached directly to the
+adapter instead of nesting it below a custom process coordinator.
 
-The build binds the OpenNext artifact to the exact 40-character Git revision
-that produced it. Publishing fails if that artifact came from tracked,
-uncommitted changes, if the checkout changed after the build, or if
-`WORKERS_CI_COMMIT_SHA` disagrees with Git. Production and preview versions
-receive native Wrangler `tag` and `message` annotations containing the full
-revision. Rendered responses expose the same revision in
-`X-AgentOS-Git-SHA`.
+Outside Workers Builds, finalization runs a native Wrangler dry run and fails
+if the compressed upload exceeds Cloudflare Workers' 3 MiB free-plan limit.
+Workers Builds skips that redundant dry run because its immediately following
+native upload enforces the same limit; repository CI still runs the dry-run
+contract before merge.
+
+The production build reads Git directly and embeds its exact 40-character
+revision in `X-AgentOS-Git-SHA`. Finalization verifies that value in the
+generated OpenNext Worker before recording publishable provenance. Publishing
+fails if that artifact came from tracked, uncommitted changes, if the checkout
+changed after the build, or if `WORKERS_CI_COMMIT_SHA` disagrees with Git.
+Production and preview versions receive native Wrangler `tag` and `message`
+annotations containing the full revision.
 
 Publishing lets OpenNext prepare its cache, then invokes Wrangler directly
 with discrete arguments. This keeps Git metadata out of OpenNext's

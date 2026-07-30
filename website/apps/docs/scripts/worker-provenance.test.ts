@@ -1,3 +1,12 @@
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assertDeployableProvenance,
@@ -5,6 +14,7 @@ import {
   createWorkerCommand,
   parseProvenanceArtifact,
   resolveBuildProvenance,
+  writeProvenanceArtifact,
   type GitSourceState,
   type WorkerProvenance,
 } from './worker-provenance';
@@ -82,6 +92,45 @@ describe('Worker build provenance', () => {
         sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       }),
     ).toThrow('was built from');
+  });
+
+  it('persists provenance only for a Worker that embeds the same revision', () => {
+    const appDirectory = mkdtempSync(
+      join(tmpdir(), 'agentos-worker-provenance-'),
+    );
+    const middlewareDirectory = join(
+      appDirectory,
+      '.open-next',
+      'middleware',
+    );
+    const middlewarePath = join(middlewareDirectory, 'handler.mjs');
+    mkdirSync(middlewareDirectory, { recursive: true });
+
+    try {
+      writeFileSync(
+        middlewarePath,
+        '{"key":"X-AgentOS-Git-SHA","value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
+      );
+      expect(() =>
+        writeProvenanceArtifact(appDirectory, provenance),
+      ).toThrow('does not embed Git revision');
+
+      writeFileSync(
+        middlewarePath,
+        `{"key":"X-AgentOS-Git-SHA","value":"${gitSha}"}`,
+      );
+      writeProvenanceArtifact(appDirectory, provenance);
+      expect(
+        JSON.parse(
+          readFileSync(
+            join(appDirectory, '.open-next', 'agentos-provenance.json'),
+            'utf8',
+          ),
+        ),
+      ).toEqual(provenance);
+    } finally {
+      rmSync(appDirectory, { recursive: true, force: true });
+    }
   });
 });
 

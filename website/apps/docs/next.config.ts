@@ -1,58 +1,70 @@
 import createBundleAnalyzer from '@next/bundle-analyzer';
 import { createMDX } from 'fumadocs-mdx/next';
+import { fileURLToPath } from 'node:url';
+import { PHASE_PRODUCTION_BUILD } from 'next/constants';
 import type { NextConfig } from 'next';
+import {
+  readGitSourceState,
+  resolveBuildProvenance,
+} from './scripts/worker-provenance';
 
 const withAnalyzer = createBundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 });
 
-const workerBuildBranch = process.env.WORKERS_CI_BRANCH?.trim() ?? '';
-const workerBuildGitSha = process.env.AGENTOS_BUILD_GIT_SHA?.trim().toLowerCase();
-
-if (workerBuildGitSha && !/^[0-9a-f]{40}$/.test(workerBuildGitSha)) {
-  throw new Error(
-    'AGENTOS_BUILD_GIT_SHA must be a full 40-character Git SHA.',
-  );
-}
-
-const config: NextConfig = {
-  env: {
-    NEXT_PUBLIC_POSTHOG_BUILD_BRANCH: workerBuildBranch,
-  },
-  async headers() {
-    if (!workerBuildGitSha) return [];
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'X-AgentOS-Git-SHA',
-            value: workerBuildGitSha,
-          },
-        ],
-      },
-    ];
-  },
-  reactStrictMode: true,
-  experimental: {
-    globalNotFound: true,
-  },
-  logging: {
-    fetches: {
-      fullUrl: true,
-    },
-  },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'avatars.githubusercontent.com',
-        port: '',
-      },
-    ],
-  },
-};
-
+const appDirectory = fileURLToPath(new URL('.', import.meta.url));
 const withMDX = createMDX();
 
-export default withAnalyzer(withMDX(config));
+export default function createNextConfig(phase: string): NextConfig {
+  const provenance =
+    phase === PHASE_PRODUCTION_BUILD
+      ? resolveBuildProvenance(
+          process.env,
+          readGitSourceState(appDirectory),
+        )
+      : undefined;
+  const workerBuildBranch =
+    provenance?.gitBranch ??
+    process.env.WORKERS_CI_BRANCH?.trim() ??
+    '';
+
+  const config: NextConfig = {
+    env: {
+      NEXT_PUBLIC_POSTHOG_BUILD_BRANCH: workerBuildBranch,
+    },
+    async headers() {
+      if (!provenance) return [];
+      return [
+        {
+          source: '/:path*',
+          headers: [
+            {
+              key: 'X-AgentOS-Git-SHA',
+              value: provenance.gitSha,
+            },
+          ],
+        },
+      ];
+    },
+    reactStrictMode: true,
+    experimental: {
+      globalNotFound: true,
+    },
+    logging: {
+      fetches: {
+        fullUrl: true,
+      },
+    },
+    images: {
+      remotePatterns: [
+        {
+          protocol: 'https',
+          hostname: 'avatars.githubusercontent.com',
+          port: '',
+        },
+      ],
+    },
+  };
+
+  return withAnalyzer(withMDX(config));
+}

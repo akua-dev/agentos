@@ -3,7 +3,7 @@ import {
   assertWorkerFitsFreePlan,
   parseCompressedWorkerSize,
 } from './worker-size';
-import { shouldVerifyWorkerSize } from './build-worker';
+import { shouldVerifyWorkerSize } from './finalize-worker-build';
 
 describe('Cloudflare Worker size contract', () => {
   it('reads the compressed upload size reported by Wrangler', () => {
