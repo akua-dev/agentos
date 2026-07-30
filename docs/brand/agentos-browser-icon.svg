@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">AgentOS browser icon</title>
+  <rect width="512" height="512" rx="96" fill="#080A0E"/>
+  <path
+    fill="#F2F0E9"
+    transform="translate(72 440) scale(.518)"
+    d="M155 0L19 0L275-710L434-710L690 0L554 0L495-168L214-168L155 0ZM355-579L252-279L457-279L355-579Z"
+  />
+</svg>
