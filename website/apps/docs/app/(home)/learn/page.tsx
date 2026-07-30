@@ -1,14 +1,15 @@
-import type { Metadata } from 'next';
 import type { TOCItemType } from 'fumadocs-core/toc';
 import { CourseIntroduction } from '@/components/learn/course-introduction';
 import { LearnLayout } from '@/components/learn/learn-layout';
 import { getCurriculum } from '@/lib/learn/curriculum.server';
+import { createMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata = createMetadata({
   title: 'What is an autonomous company?',
   description:
     'Begin the AgentOS course with the operating model and outcome of a sovereign autonomous company.',
-};
+  path: '/learn',
+});
 
 const introductionToc: TOCItemType[] = [
   { title: 'Get a working Fleet first', url: '#first-win', depth: 2 },

@@ -1,6 +1,10 @@
 import './global.css';
-import type { Viewport } from 'next';
-import { baseUrl, createMetadata } from '@/lib/metadata';
+import type { Metadata, Viewport } from 'next';
+import {
+  createMetadata,
+  defaultDescription,
+  defaultTitle,
+} from '@/lib/metadata';
 import { Body } from '@/app/layout.client';
 import { Provider } from './provider';
 import type { ReactNode } from 'react';
@@ -9,14 +13,19 @@ import { TreeContextProvider } from 'fumadocs-ui/contexts/tree';
 import { source } from '@/lib/source';
 import { NextProvider } from 'fumadocs-core/framework/next';
 
-export const metadata = createMetadata({
+const homepageMetadata = createMetadata({
+  title: defaultTitle,
+  description: defaultDescription,
+  path: '/',
+});
+
+export const metadata: Metadata = {
+  ...homepageMetadata,
   title: {
     template: '%s | AgentOS',
-    default: 'AgentOS',
+    default: defaultTitle,
   },
-  description: 'The open-source company harness.',
-  metadataBase: baseUrl,
-});
+};
 
 const geist = Geist({
   variable: '--font-sans',

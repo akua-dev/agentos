@@ -1,12 +1,13 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2, CircleOff, Timer, UserRoundCheck } from 'lucide-react';
+import { createMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata = createMetadata({
   title: 'AgentOS benchmarks',
   description:
     'Public evidence for AgentOS outcomes, human attention, recovery, portability and failure.',
-};
+  path: '/benchmarks',
+});
 
 const metrics = [
   { icon: CheckCircle2, value: '3 of 5', label: 'declared quickstart attempts passed' },
