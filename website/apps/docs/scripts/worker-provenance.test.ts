@@ -107,7 +107,7 @@ describe('Worker version publication', () => {
       '--tag',
       `git-${gitSha}`,
       '--message',
-      `Git revision ${gitSha}; branch ${gitBranch}`,
+      `git-sha-${gitSha}_branch-git-chore-cloudflare-provenance`,
     ]);
   });
 
@@ -118,9 +118,21 @@ describe('Worker version publication', () => {
       '--tag',
       `git-${gitSha}`,
       '--message',
-      `Git revision ${gitSha}; branch ${gitBranch}`,
+      `git-sha-${gitSha}_branch-git-chore-cloudflare-provenance`,
       '--preview-alias',
       'git-chore-cloudflare-provenance',
     ]);
+  });
+
+  it('keeps every passthrough value safe for OpenNext shell forwarding', () => {
+    const command = createWorkerCommand('preview', {
+      ...provenance,
+      gitBranch: 'feat/provenance; echo unsafe',
+    });
+
+    expect(command).toContain(
+      `git-sha-${gitSha}_branch-git-feat-provenance-echo-unsafe`,
+    );
+    expect(command.every((value) => /^[a-zA-Z0-9_-]+$/.test(value))).toBe(true);
   });
 });
