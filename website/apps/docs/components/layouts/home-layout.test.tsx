@@ -90,4 +90,35 @@ describe('home layout', () => {
     expect(documentationIndex).toBeGreaterThan(learnIndex);
     expect(links[documentationIndex]?.getAttribute('href')).toBe('/docs');
   });
+
+  it('puts the Akua Discord link immediately before GitHub', () => {
+    render(
+      <FrameworkProvider
+        Link={({ href, children, ...props }) => (
+          <a href={href} {...props}>
+            {children}
+          </a>
+        )}
+        usePathname={() => '/'}
+        useParams={() => ({})}
+        useRouter={() => ({ push: () => {}, refresh: () => {} })}
+      >
+        <Layout params={Promise.resolve({})}>
+          <p>Content</p>
+        </Layout>
+      </FrameworkProvider>,
+    );
+
+    const links = screen.getAllByRole('link');
+    const discordIndex = links.findIndex(
+      (link) => link.getAttribute('aria-label') === 'Discord',
+    );
+    const githubIndex = links.findIndex(
+      (link) => link.getAttribute('aria-label') === 'GitHub',
+    );
+
+    expect(discordIndex).toBeGreaterThanOrEqual(0);
+    expect(links[discordIndex]?.getAttribute('href')).toBe('https://akua.dev/discord');
+    expect(githubIndex).toBe(discordIndex + 1);
+  });
 });

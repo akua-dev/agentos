@@ -41,6 +41,10 @@ disabled unless `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` explicitly overrides the
 project. Set `NEXT_PUBLIC_POSTHOG_HOST` only to override the first-party
 endpoint. Development stays disabled when no token override is present.
 
+The selected PostHog project must enable the stateful **Cookieless server hash
+mode** under **Project Settings → Web analytics**. PostHog accepts the browser
+requests but ignores their events while that project setting is disabled.
+
 Both PostHog values are public browser configuration, not server secrets.
 When overriding them in Cloudflare Workers Builds, remember that Next.js
 embeds `NEXT_PUBLIC_*` values while building the client bundle;
