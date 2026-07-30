@@ -26,7 +26,7 @@ afterEach(async () => {
 
 async function run(
   command: string[],
-  options: { cwd: string; env?: Record<string, string> },
+  options: { cwd: string; env?: NodeJS.ProcessEnv },
 ) {
   const child = Bun.spawn(command, {
     cwd: options.cwd,
