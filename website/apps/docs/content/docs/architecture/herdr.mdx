@@ -1,0 +1,28 @@
+---
+title: Herdr and native sessions
+description: Inspect and steer real harness terminals without inventing a second session protocol.
+canonical:
+  - label: Herdr distribution boundary
+    path: ARCHITECTURE.md
+  - label: Runtime procedure
+    path: packages/agentos/skills/agentos-runtime/SKILL.md
+---
+
+Herdr exposes the terminal and harness-runtime authority for AgentOS Pods. It lets an operator or
+supervisor inspect one named Agent, attach to its terminal and use supported status or output waits
+against the existing native session.
+
+Herdr is not durable Fleet coordination. A pane can show a request without proving PostgreSQL
+receipt; a status can say `working` without proving the current Assignment is correct. Durable
+Inbox and Assignment rows stay separate.
+
+## Direct steering
+
+When a human attaches to a live Agent and corrects its direction, that intervention is
+authoritative human input. The Mate responds in the session and reconciles the material change
+into Fleet state. For ordinary downward delivery, the parent commits the Inbox row first and sends
+only a concise doorbell rather than duplicating the body in the terminal.
+
+Herdr waits are one-shot observations. After completion, query the named authority and decide
+whether the predicate still deserves a replacement. AgentOS uses the public CLI/socket boundary;
+it does not ship a private shadow protocol.

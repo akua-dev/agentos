@@ -1,0 +1,15 @@
+{
+  "title": "Architecture",
+  "pages": [
+    "index",
+    "agents-runtime",
+    "delegation-supervision",
+    "postgresql",
+    "external-events",
+    "kubernetes",
+    "herdr",
+    "toolchains-worktrees",
+    "bootstrap",
+    "security-chain-of-custody"
+  ]
+}

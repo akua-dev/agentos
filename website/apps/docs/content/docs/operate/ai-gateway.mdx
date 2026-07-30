@@ -1,0 +1,30 @@
+---
+title: Fleet AI Gateway
+description: Optional pooled model capacity without making a proxy mandatory for AgentOS.
+canonical:
+  - label: AI Gateway procedure
+    path: packages/agentos/skills/agentos-ai-gateway/SKILL.md
+  - label: AI Gateway service
+    path: services/ai-gateway
+---
+
+The Fleet AI Gateway is optional pooled capacity for reviewed Codex subscription accounts with an
+explicit OpenAI API-key fallback. Direct per-Agent authentication remains a complete AgentOS
+topology.
+
+Use the owning procedure before selecting, installing, authenticating, recovering, rotating or
+retiring the gateway. It keeps server-owned provider OAuth and quota-aware routing inside a
+deliberate service boundary. Client Agents receive only the scoped connection material intended
+for them.
+
+## What it does not own
+
+The gateway does not create Agent identity, Assignments, human authority or provider-neutral model
+semantics. It is not a universal LLM abstraction and does not make one account’s quota an
+organizational permission.
+
+Inspect accounts, health, routing state and observed provider failures through the service’s
+current interfaces. A `401` and a `429` have different causes; recovery does not silently swap
+identities or introduce an API-key fallback that was never approved.
+
+Because the feature is optional, every core Docs path remains understandable without it.

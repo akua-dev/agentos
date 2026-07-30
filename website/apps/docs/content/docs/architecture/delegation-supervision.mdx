@@ -1,0 +1,36 @@
+---
+title: Delegation and supervision
+description: Move outcomes down one hierarchy edge and evidence back up.
+canonical:
+  - label: Delegation and supervision architecture
+    path: ARCHITECTURE.md
+  - label: Delegation procedure
+    path: packages/agentos/skills/agentos-delegation/SKILL.md
+  - label: Supervision procedure
+    path: packages/agentos/skills/agentos-supervision/SKILL.md
+---
+
+Delegation and supervision are paired contracts. A Mate accepts or routes intent, creates a bounded
+Assignment and delivers it through one direct hierarchy edge. The child returns material progress,
+blockers, decisions and completion through that same edge.
+
+```text
+Captain intent
+  → First Mate
+    → charter-matched Second Mate
+      → bounded Crewmate
+    ← evidence and decisions
+  ← outcome and human choice
+```
+
+Each supervisor reconciles only direct reports. This avoids a root Agent polling every worker and
+prevents ancestors from reaching around the accountable parent. Targeted PostgreSQL notifications
+wake the right Mate; durable rows carry the meaning.
+
+A ship brief owns a delivery artifact. A scout brief owns a causal or investigative report and an
+exact decision inventory. Handoffs preserve previous Assignment history rather than changing the
+owner in place.
+
+Supervision combines durable state with narrow native runtime evidence. It remains silent while
+ordinary work progresses and intervenes when evidence shows a blocker, stale plan, lost runtime or
+authority boundary.

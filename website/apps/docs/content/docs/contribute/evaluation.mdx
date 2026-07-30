@@ -1,0 +1,30 @@
+---
+title: Evaluate an organization
+description: Freeze sanitized evidence against the public AgentOS benchmark before improving it.
+canonical:
+  - label: Evaluation Skill
+    path: .agents/skills/agentos-evaluation/SKILL.md
+  - label: Benchmark specification
+    path: benchmarks/SPEC.md
+---
+
+Use the evaluation Skill to measure Quickstart, Fleet delivery, composition integrity, recovery,
+human attention, efficiency, robustness, safety or accountability.
+
+Evaluation selects a scenario, pins the exact subject and environment, observes the declared run
+and produces a sanitized evidence bundle. It records failed and incomplete attempts, unknown
+telemetry and limitations. It does not change the organization while measuring it.
+
+## Why freeze first
+
+Suppose a Fleet stalls after its useful supervision waits are consumed. Repairing the Skill during
+the run would erase the evidence needed to distinguish the original failure from the improved
+behavior. Instead:
+
+1. end and classify the run;
+2. sanitize and freeze the complete evidence bundle;
+3. verify its schema and chain of custody;
+4. begin a separate improvement review.
+
+The benchmark is public and portable. It can evaluate an Agent organization that does not use
+AgentOS, provided the evidence satisfies the same contract.

@@ -1,0 +1,13 @@
+{
+  "title": "Reference",
+  "pages": [
+    "index",
+    "database",
+    "commands",
+    "kubernetes",
+    "configuration",
+    "releases",
+    "benchmarks",
+    "glossary"
+  ]
+}

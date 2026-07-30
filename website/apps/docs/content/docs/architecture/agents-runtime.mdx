@@ -1,0 +1,32 @@
+---
+title: Agents and runtime Pods
+description: Separate durable Agent identity from replaceable Kubernetes processes.
+canonical:
+  - label: Agents and runtime Pods
+    path: ARCHITECTURE.md
+  - label: Runtime implementation
+    path: packages/agentos/runtime
+---
+
+An Agent is a durable organizational identity. Its current Pod and harness process are replaceable
+runtime realizations of that identity.
+
+Persistent First and Second Mates use StatefulSet-derived workloads with stable homes. Crewmates
+are bounded to one Assignment but still preserve home and worktree state long enough to survive
+runtime replacement and complete delivery. Kubernetes names what is running; PostgreSQL names who
+owns work; Herdr names the live native session.
+
+```text
+PostgreSQL Agent identity
+        │
+        ├── Kubernetes workload
+        ├── PVC home + worktrees + private memory
+        └── Herdr Agent → native harness session
+```
+
+These references must agree before mutation. A pane title, old Pod name or chat transcript cannot
+substitute for authenticated Agent identity. Runtime preparation clones the image’s immutable
+AgentOS seed into the writable persistent home without hard links, preserving configured remotes.
+
+Replacement reuses the same identity and home. The release’s runtime procedure owns the exact
+provisioning and recovery shape.

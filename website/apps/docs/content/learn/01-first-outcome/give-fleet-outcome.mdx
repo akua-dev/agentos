@@ -1,0 +1,65 @@
+---
+title: Give the Fleet a real outcome
+description: Turn one bounded request into durable ownership instead of prescribing an internal workflow.
+courseId: first-outcome
+courseTitle: Run your first outcome
+courseOrder: 1
+lessonId: give-fleet-outcome
+lessonOrder: 2
+estimatedMinutes: 4
+canonical:
+  - label: Delegation procedure
+    path: packages/agentos/skills/agentos-delegation/SKILL.md
+  - label: Project procedure
+    path: packages/agentos/skills/agentos-projects/SKILL.md
+---
+
+## Ask for the result, not an Agent choreography
+
+First Mate is your regular interface to the Fleet. Tell it what should become true, how success is
+judged and where authority stops.
+
+Avoid this:
+
+> Open three agents. Have one inspect the form, one write tests and one patch the handler.
+
+Prefer this:
+
+> Add server-side validation to onboarding and deliver it through this repository’s existing pull
+> request checks. Preserve the public API. Do not merge.
+
+The second request gives the Fleet room to investigate and form the smallest useful crew while
+keeping the outcome and boundary exact.
+
+## Watch intent become ownership
+
+First Mate resolves the project, its current instructions and delivery posture before accepting
+the work. AgentOS then separates two durable concepts:
+
+- a **Task** records the accepted outcome;
+- an **Assignment** records the one Agent accountable for active work on it.
+
+For this repository-sized change, First Mate can create one bounded ship Crewmate in an isolated
+worktree. It does not need a permanent department, and First Mate should not become the code
+worker merely because the patch looks small.
+
+The brief carries the desired result, acceptance evidence, project workflow and excluded
+authority. It carries no credentials. The worker chooses routine implementation steps inside that
+boundary.
+
+This is where an Agent differs from a chat or copilot. A chat proposes an answer. A copilot helps
+inside your active workflow. An Agent owns returning evidence that the accepted outcome is ready.
+The harness and AgentOS preserve that responsibility beyond a single response.
+
+## Check the chain of custody
+
+You should be able to answer:
+
+1. What outcome did the Fleet accept?
+2. Which Agent owns it now?
+3. Which authority can prove the worker is running?
+4. What artifact will prove delivery?
+5. Which action still belongs to a human?
+
+For the onboarding change, the final proof will be a reviewed project artifact, while merge
+remains yours. Next, [watch and steer the work](/learn/01-first-outcome/watch-and-steer).

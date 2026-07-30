@@ -1,0 +1,31 @@
+---
+title: Toolchains and worktrees
+description: Reproducible Fleet tools and isolated project delivery on persistent storage.
+canonical:
+  - label: Toolchains and worktrees architecture
+    path: ARCHITECTURE.md
+  - label: Contributor workflow
+    path: CONTRIBUTING.md
+  - label: Reviewed toolchain
+    path: mise.toml
+---
+
+AgentOS selects its reviewed runtime toolchain through Mise. Commands are invoked by their ordinary
+native names; Agents do not install parallel global copies or hide programs in shell-backed task
+strings.
+
+The target project may add or override tools through its own nearer Mise configuration. That
+project toolchain applies inside the isolated worktree without replacing the Fleet baseline.
+
+## Worktree ownership
+
+Persistent Mates inspect project checkouts read-only. Bounded Crewmates implement or investigate in
+isolated Treehouse/Git worktrees stored under the Agent home. This separates simultaneous outcomes
+and lets Pod recovery resume the same filesystem state.
+
+Ship work ends in the selected durable Git artifact. Scout work may use a scratch worktree or an
+explicit ArtifactFS workspace for large read-heavy exploration, but it never ships from that
+scratch context.
+
+Cleanup follows delivery, never precedes it. Removing a worktree because the Pod disappeared can
+destroy the only unlanded evidence of accepted work.

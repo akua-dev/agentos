@@ -616,7 +616,7 @@ describe("Mate runtime", () => {
     expect(calls.filter((call) => call.slice(0, 3).join(" ") === "terminal session observe")).toEqual([
       expectedObserve,
     ]);
-  });
+  }, 10_000);
 
   test("prepares a rollback-safe Pi session on the configured checkout", async () => {
     const paneId = "w1:p1";

@@ -1,0 +1,33 @@
+---
+title: Authority and decisions
+description: Keep consequential choices exact, durable and separate from native permission.
+canonical:
+  - label: Captain decision procedure
+    path: packages/agentos/skills/agentos-decisions/SKILL.md
+  - label: Authorization migration
+    path: database/migrations/0001_agent_authorization.sql
+  - label: Runtime authorization migration
+    path: database/migrations/0002_runtime_mutation_authorization.sql
+---
+
+Authority has two independent dimensions:
+
+1. the native system permits an action;
+2. the organization has human authority for this consequence.
+
+A Kubernetes Role may permit a restart while the Captain has not approved interrupting an active
+worker. A GitHub token may permit merge while the project still requires an exact human decision.
+AgentOS never treats capability as consent.
+
+## Decisions are durable speech acts
+
+A question that can change execution is recorded durably, linked to dependent work and preserved
+until the exact answer is resolved. Delivery, receipt, reading and resolution are distinct. A
+Captain can read a question before a crash; that does not manufacture an answer.
+
+Standing authority can cover a precise routine class of actions. Destructive, irreversible and
+security-sensitive consequences still return to people. Narrow wording is a feature: “merge this
+reviewed dependency update after green CI” does not authorize unrelated merges.
+
+The decision Skill owns the current procedure and coupled state transition. Reports may summarize
+the choice, but prose is not the source of truth.

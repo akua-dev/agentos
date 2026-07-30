@@ -1,0 +1,34 @@
+---
+title: Tasks and Assignments
+description: Stable accepted intent separated from the one active accountable owner.
+canonical:
+  - label: Architecture
+    path: ARCHITECTURE.md
+  - label: Durable coordination migrations
+    path: database/migrations
+  - label: Delegation procedure
+    path: packages/agentos/skills/agentos-delegation/SKILL.md
+---
+
+A **Task** preserves accepted intent. It answers: what outcome did the organization agree to
+carry? That identity survives reassignment, recovery and changes in execution strategy.
+
+An **Assignment** binds a Task’s current bounded outcome to an accountable Agent. AgentOS enforces
+one active accountable owner rather than allowing several sessions to believe they all own the
+same work.
+
+## Example
+
+A provider issue reports that checkout accepts an expired address. Reconciliation creates or
+links one Task for the accepted intent. First Mate creates the first Assignment for a diagnosis.
+After the causal report, a ship Assignment may be handed to a different Crewmate while the Task
+continues to represent the same human outcome.
+
+```text
+Task: checkout must reject expired addresses
+  Assignment 1: reproduce and establish cause → complete
+  Assignment 2: implement and deliver fix → active owner: checkout-worker
+```
+
+The history is not overwritten when an owner changes. Completion requires the selected durable
+delivery artifact and evidence; setting a status without that outcome is not delivery.

@@ -1,0 +1,30 @@
+---
+title: Ask for a decision
+description: Preserve consequential questions and exact answers without inferring from prose.
+canonical:
+  - label: Captain decision procedure
+    path: packages/agentos/skills/agentos-decisions/SKILL.md
+  - label: Decision database behavior
+    path: database/migrations/0008_inbox_speech_act_vocabulary.sql
+---
+
+Use a Captain decision when accepted work cannot safely continue without a human choice. A good
+request states the outcome, real options, consequence and exact choice required.
+
+The question lives as a durable Inbox speech act linked to dependent Tasks. A scout or review
+attests the complete set of unresolved decisions before completion. Reports may summarize them,
+but PostgreSQL owns whether each choice remains open.
+
+## Read is not resolved
+
+Delivery, receipt, reading and resolution are separate. Suppose the Captain opens:
+
+> Production checkout has an unreviewed schema dependency. Approve a maintenance-window migration,
+> or keep the pull request blocked?
+
+The session crashes after displaying it. On recovery, the row can be marked received or read while
+remaining unresolved. The Fleet must not infer approval from visibility, silence or report text.
+
+When the Captain answers, the released Function records the exact append-only reply, closes the
+decision and removes the linked Task dependency in one short transaction. A conflicting second
+answer fails closed and needs explicit follow-up.

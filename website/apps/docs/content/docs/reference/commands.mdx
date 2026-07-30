@@ -1,0 +1,21 @@
+---
+title: AgentOS commands
+description: The small deterministic CLI surface actually shipped by this repository.
+canonical:
+  - label: CLI implementations
+    path: clis
+---
+
+AgentOS prefers native tools: `psql`, `kubectl`, Herdr, Git and provider CLIs. It adds a repository
+command only when a narrow deterministic primitive is genuinely missing.
+
+<CommandReference />
+
+`pg-listen` registers one PostgreSQL `LISTEN`, emits readiness, waits for one notification and
+exits. It never queries Inbox or decides what work matters.
+
+`github-app-token` mints and safely materializes one scoped installation token. It does not become
+a general secret broker or authority grant.
+
+Run these commands only through the selected release and reviewed Mise environment. Their built-in
+help and implementation are authoritative for flags.

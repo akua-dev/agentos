@@ -1,0 +1,33 @@
+---
+title: External events and reconciliation
+description: Turn provider signals into accountable Fleet work without making notifications authoritative.
+canonical:
+  - label: External event architecture
+    path: ARCHITECTURE.md
+  - label: External event SQL
+    path: database/migrations/0000_initial_fleet_schema.sql
+---
+
+External systems produce signals: a support report, provider issue, CI failure or production alert.
+AgentOS can durably ingest evidence and let an authorized reconciliation Agent claim, refresh,
+complete or release a bounded batch.
+
+The event row is not automatically a Task. Reconciliation decides whether external evidence maps
+to existing intent, creates new accepted work or needs no Fleet action. This avoids turning every
+webhook into duplicate organizational work.
+
+```text
+provider event
+  → durable ingestion + deduplication
+  → authorized claim
+  → reconcile against existing Tasks and authority
+  → complete or release claim
+```
+
+Claims are time-bounded concurrency control around durable rows. Agent reasoning never holds a
+database transaction open. A provider or reasoning failure releases the claim with useful status
+so another attempt can continue.
+
+Argo Events, support connectors or a custom event bus may be possible extensions, but they are not
+shipped AgentOS components. The current contract is the released PostgreSQL schema plus the native
+provider interface.

@@ -1,0 +1,36 @@
+---
+title: Release artifacts
+description: Stable manifests, immutable source and exact image provenance.
+canonical:
+  - label: Release guidance
+    path: CONTRIBUTING.md
+  - label: Manifest renderer
+    path: release/kubernetes
+  - label: Release workflow
+    path: .github/workflows/release.yml
+---
+
+A stable AgentOS release binds an immutable Git tag, OCI image digest and fixed-name Kubernetes
+manifest assets. The release renderer produces the manifest from reviewed repository resources;
+generated output is inspected, never hand-edited.
+
+Development and dogfood runs may use an exact Git commit plus immutable image digest without
+claiming to be an official release. A branch name, mutable tag or uncommitted checkout is not a
+release identity.
+
+## Runtime evidence
+
+Record:
+
+- selected release or exact commit;
+- manifest source and rendered diff;
+- image digest expected and observed for every container;
+- database migration journal;
+- persistent PVC identity;
+- loaded harness instruction revision.
+
+Stable release publication occurs only after the release workflow builds, verifies, signs and
+attaches the required artifacts. Release immutability prevents replacing an existing tag or asset.
+
+CloudNativePG, PostgreSQL and other external dependency versions describe an installation, not the
+AgentOS release itself.

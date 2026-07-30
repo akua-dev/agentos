@@ -1,0 +1,30 @@
+---
+title: Choose a harness
+description: Select and operate only launch shapes verified by the chosen AgentOS release.
+canonical:
+  - label: Harness procedure
+    path: packages/agentos/skills/agentos-harnesses/SKILL.md
+  - label: Agent provisioning contract
+    path: database/migrations/0004_provision_agents.sql
+---
+
+Use the harness procedure before choosing, configuring, launching, inspecting, resuming or changing
+an Agent harness, model or reasoning effort.
+
+First and Second Mates currently use the persistent harness shape selected by the release. Bounded
+workers may use Pi, Codex or another harness only when that exact release verifies the combination.
+An AgentOS Agent is a durable identity and accountable actor; it is not synonymous with a Pi
+session.
+
+## Selection questions
+
+- Does the outcome need a persistent Mate or a bounded worker?
+- Which harness and model are verified by the selected AgentOS release?
+- What authentication and quota boundary applies?
+- Which native settings belong to the harness rather than AgentOS?
+- How will Herdr expose and resume the exact native session?
+- What evidence proves launch and recovery?
+
+Composition supplies the desired identity, Skills and capability needs. The harness remains the
+authority for its own opaque settings. Missing support is reported as a capability gap rather than
+papered over with an invented adapter.

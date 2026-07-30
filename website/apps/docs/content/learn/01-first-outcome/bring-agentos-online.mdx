@@ -1,0 +1,61 @@
+---
+title: Bring AgentOS online
+description: Start the reviewed bootstrap now and learn the stack against a Fleet that is becoming real.
+courseId: first-outcome
+courseTitle: Run your first outcome
+courseOrder: 1
+lessonId: bring-agentos-online
+lessonOrder: 1
+estimatedMinutes: 4
+canonical:
+  - label: Public bootstrap handoff
+    path: BOOTSTRAP.md
+  - label: Bootstrap procedure
+    path: packages/agentos/resources/roles/firstmate/skills/agentos-bootstrap/SKILL.md
+---
+
+## Do this first
+
+You do not need to understand the whole architecture or install an AgentOS CLI. Give the coding
+Agent you already use this prompt:
+
+```text
+Read https://github.com/akua-dev/agentos/blob/main/BOOTSTRAP.md.
+Help me bring AgentOS online — check my setup first, ask before changing anything.
+```
+
+The temporary Agent checks your environment, resolves the released procedure and explains the
+real choices. It must ask before login, cluster creation, cost, installation or RBAC changes.
+Those pauses are intentional: bootstrap transfers trust into a persistent system.
+
+<Callout title="Keep reading while it checks">
+The next chapters do not depend on memorizing commands. Let the bootstrap inspect your setup, then
+continue. When it needs a consequential choice, answer that exact choice and return here.
+</Callout>
+
+## What is coming online?
+
+A model predicts useful output. Chat carries context. Tools let that model create effects. An
+**Agent** begins when a model, tools and instructions accept responsibility for an outcome. A
+**harness** gives that Agent a native session and a way to preserve unfinished work.
+
+AgentOS adds the organizational layer around those parts:
+
+- Kubernetes owns workloads, authorization and storage;
+- PostgreSQL owns durable organizational coordination;
+- Herdr exposes the native Agent session;
+- a retained home preserves the First Mate across process replacement.
+
+Stage one establishes one persistent First Mate. Stage two lets that First Mate reconcile the
+database and the rest of the Fleet from inside the cluster. The temporary bootstrap chat can then
+disappear without becoming the organization.
+
+## Know when the first win is real
+
+Do not stop at “a Pod is Ready.” Verify that the intended First Mate has one durable identity, one
+retained home and one working native session. Re-running bootstrap should reconcile that same Mate,
+not create a competitor.
+
+You now have the company interface through which the rest of the course becomes practical. Read
+[Get started](/docs/start/get-started) for the current operating reference, then give the Fleet
+[one real outcome](/learn/01-first-outcome/give-fleet-outcome).

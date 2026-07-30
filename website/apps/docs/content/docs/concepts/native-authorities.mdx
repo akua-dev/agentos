@@ -1,0 +1,32 @@
+---
+title: Native authorities
+description: One honest source of truth per concern, connected without shadow state.
+canonical:
+  - label: System boundaries
+    path: ARCHITECTURE.md
+---
+
+AgentOS composes standard systems and leaves each one authoritative:
+
+| Concern | Authority |
+| --- | --- |
+| Human planning and intervention | Captain-selected tracker and provider workflow |
+| Fleet identity, Tasks, Assignments, Inbox and decisions | PostgreSQL |
+| Running workloads and effective RBAC | Kubernetes |
+| Native terminal and harness session | Herdr |
+| Agent home, unfinished work and private memory | PVC |
+| Delivered source and review artifact | Git and its provider |
+
+No single row or dashboard can truthfully replace all of them. PostgreSQL may say an Assignment is
+active while Kubernetes says its Pod is gone; that disagreement is a recovery condition, not a
+reason to overwrite either source.
+
+## Connect, do not mirror
+
+Provider intent can be reconciled into durable Fleet work without copying the provider’s entire
+world into PostgreSQL. A targeted wake can tell an Agent to query its Inbox without placing the
+message body in the notification. A pull request can close the delivery loop without storing Git
+history in a universal event table.
+
+This boundary keeps the company inspectable and replaceable. Use `psql`, `kubectl`, Herdr, Git and
+provider tools through their native interfaces.

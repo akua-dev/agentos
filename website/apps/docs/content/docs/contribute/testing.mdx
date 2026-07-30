@@ -1,0 +1,30 @@
+---
+title: Testing and verification
+description: Prove behavior through public interfaces before describing a change as complete.
+canonical:
+  - label: Contributor verification
+    path: CONTRIBUTING.md
+  - label: Root workspace scripts
+    path: package.json
+---
+
+The repository-wide entrypoint is:
+
+```console
+bun run check
+```
+
+It exercises the reviewed workspace checks. A focused component may add type checks, unit tests,
+manifest rendering, migration behavior tests or production builds. Run proportionate focused
+checks while iterating, then the full boundary before delivery.
+
+Test observable behavior through public interfaces. Do not add tests that only search an
+implementation file for selected strings. SQL constraints need allowed and forbidden transaction
+tests; Kubernetes resources need rendered manifest assertions; CLIs need process-level behavior;
+the website needs route, accessibility and production-runtime checks.
+
+Before claiming success, run fresh verification and inspect its exit status. A prior green run does
+not cover later edits. Preserve exact commands and useful failure output in delivery evidence.
+
+Destructive lifecycle tests belong only in an explicitly disposable Kubernetes boundary. A shared
+cluster, namespace or PVC is never assumed disposable.

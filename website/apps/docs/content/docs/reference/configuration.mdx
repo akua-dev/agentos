@@ -1,0 +1,33 @@
+---
+title: Configuration and environment
+description: Current configuration surfaces without exposing or duplicating secret values.
+canonical:
+  - label: Root toolchain
+    path: mise.toml
+  - label: Runtime implementation
+    path: packages/agentos/runtime
+  - label: Agent resources
+    path: packages/agentos/resources
+---
+
+AgentOS configuration lives beside the authority that consumes it:
+
+- root and project Mise files select reviewed tools;
+- Kubernetes manifests and overlays select workload shape and references;
+- Agent composition selects instructions, Skills, harness and capabilities;
+- harness-native settings remain in the harness’s own format;
+- PostgreSQL rows hold durable organizational state;
+- approved Kubernetes Secrets, home files or login mechanisms hold credentials.
+
+Environment-variable names appear in the owning implementation or manifest. Values do not belong
+in Git, documentation, prompts, command arguments, Task requests, artifacts or logs.
+
+## Safe inspection
+
+Inspect whether a variable or file reference exists without printing its secret. Confirm which
+container, Agent identity and release owns it. A value present in one Pod is not authority to copy
+it into another Agent’s home.
+
+Do not introduce a parallel `.env` contract for convenience. The website’s local `.env` is ignored
+and never part of a release. Production website secrets, if any are later required, belong in the
+Cloudflare Worker environment and are documented by name only.

@@ -1,0 +1,30 @@
+---
+title: Improve from evidence
+description: Turn one frozen failure into the smallest reviewed and regression-tested change.
+canonical:
+  - label: Improvement review Skill
+    path: .agents/skills/agentos-improvement-review/SKILL.md
+  - label: Evaluation Skill
+    path: .agents/skills/agentos-evaluation/SKILL.md
+---
+
+Start an improvement review only after the evaluation bundle is frozen. Measurement and mutation
+are separate runs.
+
+The review identifies one reproducible weakness: wrong tool use, repeated trial and error, stale
+instructions, runtime failure, authority violation or another observable Fleet defect. It finds
+the smallest owning source and changes that source of truth rather than appending the same rule to
+several docs.
+
+## Improvement loop
+
+1. reproduce the failure from frozen evidence;
+2. name the violated contract and smallest cause;
+3. write a regression test through the public behavior;
+4. change the owning SQL, TypeScript, Skill or instruction;
+5. review the diff and rerun the original plus held-out scenario;
+6. publish evidence including remaining limitations.
+
+Memory can suggest a pattern, but shared behavior changes require this reviewed path. A new wrapper
+or daemon is not the default fix when an existing native interface or source contract owns the
+problem.

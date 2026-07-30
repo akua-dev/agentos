@@ -1,0 +1,35 @@
+---
+title: Verify the Fleet
+description: Confirm that bootstrap produced a persistent, inspectable and recoverable First Mate.
+canonical:
+  - label: Bootstrap procedure
+    path: packages/agentos/resources/roles/firstmate/skills/agentos-bootstrap/SKILL.md
+  - label: Contributor verification
+    path: CONTRIBUTING.md
+---
+
+A successful bootstrap is more than a running Pod. The exact checks belong to the released
+bootstrap procedure, but the observable outcome is stable:
+
+- Kubernetes reports the intended First-Mate workload healthy.
+- The Agent home is backed by the intended persistent volume.
+- Herdr exposes the native harness session.
+- The Mate can reach its reviewed PostgreSQL coordination boundary.
+- Its loaded identity and Skills come from the intended release.
+- No approval boundary was silently widened during installation.
+
+## Verify through native authorities
+
+Use Kubernetes for workload truth, Herdr for session truth, PostgreSQL for durable Fleet truth and
+the Agent PVC for home state. A chat message that says “ready” is useful evidence only after these
+authorities agree.
+
+For a development Fleet, also distinguish three revisions: the writable AgentOS checkout, the
+immutable image seed and the running image digest. Markdown or Skill changes need a safe harness
+reload; executable or image changes need a reviewed immutable image rollout.
+
+If a boundary cannot be verified, report it as unknown instead of treating absence of evidence as
+success. The bootstrap Skill owns reconciliation from a partial stage.
+
+Next: [adopt one project](/docs/start/adopt-project) or learn [persistence and
+recovery](/docs/concepts/persistence-recovery).

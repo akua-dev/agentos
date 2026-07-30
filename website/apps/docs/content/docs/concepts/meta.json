@@ -1,0 +1,16 @@
+{
+  "title": "Concepts",
+  "pages": [
+    "index",
+    "autonomous-companies",
+    "models-agents-harnesses",
+    "crew",
+    "tasks-assignments",
+    "authority-decisions",
+    "organizational-attention",
+    "native-authorities",
+    "persistence-recovery",
+    "composition",
+    "memory-learning"
+  ]
+}

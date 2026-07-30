@@ -1,0 +1,31 @@
+---
+title: Models, Agents and harnesses
+description: Separate generation, delegated responsibility and the runtime that makes it durable.
+canonical:
+  - label: Vision
+    path: VISION.md
+  - label: Harness procedure
+    path: packages/agentos/skills/agentos-harnesses/SKILL.md
+---
+
+A **model** transforms input context into generated output. It does not independently preserve a
+goal, operate tools or own the consequences of completion.
+
+A **chatbot** adds conversational turns. A **copilot** adds instructions, retrieval and workflow
+integrations while the human still carries the goal. A tool-using **Agent** crosses the delegation
+threshold when it can own a bounded outcome through a reason–act–observe loop and return evidence.
+
+A **harness** makes that Agent operable. It owns session lifecycle, context assembly, tool access,
+permissions, sandboxing, model selection and recovery. Pi and Codex are distinct harnesses; an
+AgentOS Assignment is not inherently a Pi session.
+
+## Example
+
+“Suggest a validation check” can be answered by a copilot. “Ship onboarding validation through
+this project’s reviewed workflow” is a bounded Agent outcome. The harness may resume context,
+invoke Git and tests, and expose the session. AgentOS adds the durable owner, supervision and
+authority boundary around that Agent.
+
+Only harnesses and launch shapes verified by the selected AgentOS release should be described as
+supported. Harness-native settings remain opaque inputs rather than a schema AgentOS pretends to
+own.

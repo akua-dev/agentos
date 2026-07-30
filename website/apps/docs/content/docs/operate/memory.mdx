@@ -1,0 +1,31 @@
+---
+title: Agent memory
+description: Recall and maintain private Mate context without confusing it with authority.
+canonical:
+  - label: Memory procedure
+    path: packages/agentos/skills/agentos-memory/SKILL.md
+  - label: Memory runtime
+    path: packages/agentos/src/mate-memory
+---
+
+Use Mate memory when the Captain or First Mate asks an Agent to remember, correct, forget, pin,
+pause or resume stable context, or when automatic extraction reports a conflict.
+
+Memory lives in the persistent Mate home. The owning Mate maintains it through the released memory
+tools and stale-write guard. Another Mate may propose a learning through the hierarchy, but it
+does not directly edit the target’s PVC.
+
+## Preference example
+
+The Captain says:
+
+> Remember that decisions for this Fleet should reach our engineering company surface, not an
+> internal Agent thread.
+
+The Mate records that as private context. On later decisions it can apply the preference and First
+Mate can route internally. The memory does not grant permission to send data, resolve a decision
+or bypass current instructions. PostgreSQL still says which choices are open; the live company
+surface still determines where delivery is possible.
+
+Memory maintenance is observable and correctable. A conflicting explicit instruction wins over an
+older memory, and uncertain extraction is reported. Memory never grants authority.

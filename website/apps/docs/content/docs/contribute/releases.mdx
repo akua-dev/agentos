@@ -1,0 +1,31 @@
+---
+title: Release model
+description: Build immutable artifacts from a clean exact revision and publish only after verification.
+canonical:
+  - label: Release procedure
+    path: CONTRIBUTING.md
+  - label: Release implementation
+    path: release
+  - label: Release workflow
+    path: .github/workflows/release.yml
+---
+
+Stable releases are cut from a clean reviewed revision. The workflow builds the AgentOS image,
+resolves its immutable digest, renders fixed-name Kubernetes manifests, verifies assets and signs
+the release before publication.
+
+Do not reuse a tag, replace an asset or hand-edit generated manifests. Repository release
+immutability makes the tag and attached artifacts a durable distribution boundary.
+
+## Preview versus stable
+
+An exact Git commit plus immutable image digest is sufficient for a deliberate development or
+dogfood preview. It is not represented as an official AgentOS release. Every participating Mate
+must use the same intended source, loaded instruction set and runtime digest.
+
+Roll executable changes one Mate at a time, preserve PVCs and native sessions, and keep the
+previous digest available for recovery. Markdown and Skill changes may use a safe harness reload
+after the checkout reaches the reviewed commit.
+
+Publishing, deploying and merging remain separate actions. A pull request that prepares release
+support does not authorize any of them.

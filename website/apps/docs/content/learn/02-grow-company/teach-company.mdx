@@ -1,0 +1,61 @@
+---
+title: Teach the company
+description: Put private context, shared guidance and deterministic behavior in their proper trust boundaries.
+courseId: grow-company
+courseTitle: Grow the company
+courseOrder: 2
+lessonId: teach-company
+lessonOrder: 3
+estimatedMinutes: 4
+canonical:
+  - label: Memory procedure
+    path: packages/agentos/skills/agentos-memory/SKILL.md
+  - label: AgentOS repository development boundary
+    path: AGENTS.md
+  - label: Improvement review
+    path: .agents/skills/agentos-improvement-review/SKILL.md
+---
+
+## Learning is not one database
+
+The company retains different kinds of knowledge at different trust levels:
+
+- Mate memory recalls fallible private preferences and context;
+- project instructions preserve project-intrinsic facts through normal review;
+- Fleet guidance captures reviewed organizational judgment;
+- SQL or TypeScript enforces deterministic invariants;
+- evaluation freezes evidence of what actually happened.
+
+Memory is useful precisely because it can remain lightweight and personal. It is not Fleet
+authority and cannot override current database state, Git, provider evidence or human approval.
+
+## Remember a Captain preference
+
+Suppose the Captain tells First Mate:
+
+> Remember that decisions needing our team should be posted in the decisions forum, not a private
+> message.
+
+First Mate can preserve that as its private operating preference and recall it when presenting a
+future decision. A support Second Mate does not need a duplicate copy: it routes the decision
+upward and First Mate applies the human-facing preference.
+
+If that forum becomes a mandatory organizational integration with deterministic delivery
+guarantees, move the behavior into the reviewed owner of that contract. Do not rely on fallible
+memory to implement a safety boundary.
+
+## Change the source that owns the lesson
+
+When the support domain learns something, ask what kind of fact it is:
+
+- “This Captain prefers the decisions forum” → private Mate memory.
+- “This repository requires compatibility tests” → project instructions.
+- “Repeated support deliveries share one provider identity” → database invariant.
+- “Escalate when customer-data access is required” → domain identity or Skill.
+- “This run duplicated work” → frozen evaluation evidence.
+
+Copying the same sentence into every prompt, memory file and Skill creates drift rather than
+learning. One reviewed source owns the behavior; other surfaces may point to it.
+
+Next, turn evidence into a deliberate improvement loop in
+[Measure and improve](/learn/02-grow-company/measure-and-improve).
