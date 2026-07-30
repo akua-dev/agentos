@@ -10,6 +10,29 @@ afterEach(() => {
 });
 
 describe('home layout', () => {
+  it('preserves the shared content frame for the header', () => {
+    const { container } = render(
+      <FrameworkProvider
+        Link={({ href, children, ...props }) => (
+          <a href={href} {...props}>
+            {children}
+          </a>
+        )}
+        usePathname={() => '/learn'}
+        useParams={() => ({})}
+        useRouter={() => ({ push: () => {}, refresh: () => {} })}
+      >
+        <Layout params={Promise.resolve({})}>
+          <p>Content</p>
+        </Layout>
+      </FrameworkProvider>,
+    );
+
+    const shell = container.querySelector<HTMLElement>('#nd-home-layout');
+
+    expect(shell?.style.getPropertyValue('--fd-layout-width')).toBe('');
+  });
+
   it('uses one accessible AgentOS wordmark with light and dark variants', () => {
     render(
       <FrameworkProvider

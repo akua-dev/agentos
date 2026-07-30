@@ -25,7 +25,7 @@ export function CurriculumNavigation({
         className={cn(
           'mb-3.5 grid h-7 grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-[13px] leading-4 transition-colors',
           selection.kind === 'introduction'
-            ? 'bg-brand/12 font-medium text-brand'
+            ? 'bg-brand/12 font-medium text-brand-strong'
             : 'text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground',
         )}
       >
@@ -52,12 +52,11 @@ export function CurriculumNavigation({
                     href={lesson.url}
                     onClick={onNavigate}
                     aria-current={selected ? 'page' : undefined}
-                    aria-label={`${lesson.lessonOrder}. ${lesson.title}`}
                     title={lesson.title}
                     className={cn(
                       'grid h-7 grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md px-2 text-[13px] leading-4 transition-colors',
                       selected
-                        ? 'bg-brand/12 font-medium text-brand'
+                        ? 'bg-brand/12 font-medium text-brand-strong'
                         : 'text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground',
                     )}
                   >
