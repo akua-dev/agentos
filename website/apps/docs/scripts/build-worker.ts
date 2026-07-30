@@ -8,6 +8,12 @@ import {
 
 const appDirectory = fileURLToPath(new URL('..', import.meta.url));
 
+export function shouldVerifyWorkerSize(
+  environment: Readonly<Record<string, string | undefined>>,
+): boolean {
+  return environment.WORKERS_CI !== '1';
+}
+
 function run(command: string, args: readonly string[], environment = process.env): void {
   const result = spawnSync(command, [...args], {
     cwd: appDirectory,
@@ -37,7 +43,13 @@ export function buildWorker(): void {
     buildEnvironment,
   );
   writeProvenanceArtifact(appDirectory, provenance);
-  run(process.execPath, ['./scripts/worker-size.ts']);
+  if (shouldVerifyWorkerSize(process.env)) {
+    run(process.execPath, ['./scripts/worker-size.ts']);
+  } else {
+    console.log(
+      'Workers Builds will enforce the compressed-size limit during the immediate upload; skipped the redundant Wrangler dry run.',
+    );
+  }
 
   const sourceState = provenance.sourceDirty ? 'dirty, not publishable' : 'clean';
   console.log(

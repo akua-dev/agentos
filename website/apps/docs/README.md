@@ -27,7 +27,9 @@ bun run site:deploy
 `site:upload:worker` and `site:deploy:worker` operate on an existing
 OpenNext build. `site:deploy` builds and deploys in one command. The Worker
 build finishes with a native Wrangler dry run and fails if its compressed
-upload exceeds Cloudflare Workers' 3 MiB free-plan limit.
+upload exceeds Cloudflare Workers' 3 MiB free-plan limit. Workers Builds skips
+that redundant dry run because its immediately following native upload enforces
+the same limit; repository CI still runs the dry-run contract before merge.
 
 The build binds the OpenNext artifact to the exact 40-character Git revision
 that produced it. Publishing fails if that artifact came from tracked,
