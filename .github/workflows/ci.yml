@@ -35,9 +35,42 @@ jobs:
       - name: Run repository checks
         run: bun run check
 
+      - name: Build the Cloudflare Worker
+        run: bun run site:build:worker
+
+      - name: Verify the Worker build preserved the checkout
+        run: git diff --exit-code
+
       - name: Render digest-pinned release manifests
         run: >-
           bun run release/kubernetes/render.ts
           --image ghcr.io/akua-dev/agentos@sha256:0000000000000000000000000000000000000000000000000000000000000000
           --version 0.0.0-ci
           --output dist/release
+
+  website-preview:
+    name: website preview
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the locked toolchain
+        uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
+        with:
+          cache: false
+
+      - name: Verify the Cloudflare preview revision
+        env:
+          AGENTOS_EXPECTED_GIT_SHA: ${{ github.event.pull_request.head.sha }}
+          AGENTOS_PREVIEW_BRANCH: ${{ github.event.pull_request.head.ref }}
+          AGENTOS_PRODUCTION_URL: https://agentos.akua.dev/
+          AGENTOS_WORKERS_PREVIEW_SUFFIX: ${{ vars.AGENTOS_WORKERS_PREVIEW_SUFFIX }}
+        run: bun website/apps/docs/scripts/verify-worker-preview.ts
