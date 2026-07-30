@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   assertDeployableProvenance,
@@ -16,7 +16,7 @@ function publicationMode(value: string | undefined): PublicationMode {
   throw new Error('Publication mode must be preview or production.');
 }
 
-export function publishWorker(mode: PublicationMode): void {
+export async function publishWorker(mode: PublicationMode): Promise<void> {
   const provenance = readProvenanceArtifact(appDirectory);
   const gitSource = readGitSourceState(appDirectory);
   assertDeployableProvenance(provenance, gitSource);
@@ -25,14 +25,14 @@ export function publishWorker(mode: PublicationMode): void {
   console.log(
     `Publishing ${mode} Worker version from Git revision ${provenance.gitSha}.`,
   );
-  run(process.execPath, [
+  await run(process.execPath, [
     'x',
     '--bun',
     'opennextjs-cloudflare',
     'populateCache',
     'remote',
   ]);
-  run(
+  await run(
     process.execPath,
     ['x', '--bun', 'wrangler', ...args],
     mode === 'production'
@@ -41,27 +41,35 @@ export function publishWorker(mode: PublicationMode): void {
   );
 }
 
-function run(
+async function run(
   command: string,
   args: readonly string[],
   environment = process.env,
-): void {
-  const result = spawnSync(command, [...args], {
-    cwd: appDirectory,
-    env: environment,
-    stdio: 'inherit',
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const subprocess = spawn(command, [...args], {
+      cwd: appDirectory,
+      env: environment,
+      stdio: 'inherit',
+    });
+    subprocess.once('error', reject);
+    subprocess.once('close', (exitCode, signal) => {
+      if (exitCode === 0) {
+        resolve();
+        return;
+      }
+      reject(
+        new Error(
+          `${command} ${args.join(' ')} exited with ${exitCode === null ? `signal ${signal ?? 'unknown'}` : `code ${exitCode}`}.`,
+        ),
+      );
+    });
   });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(
-      `${command} ${args.join(' ')} exited with code ${result.status ?? 'unknown'}.`,
-    );
-  }
 }
 
 if (import.meta.main) {
   try {
-    publishWorker(publicationMode(process.argv[2]));
+    await publishWorker(publicationMode(process.argv[2]));
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
