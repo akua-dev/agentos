@@ -8,7 +8,7 @@ import { CanonicalSources } from '@/components/canonical-source';
 import { getMDXComponents } from '@/components/mdx';
 import { getCurriculum } from '@/lib/learn/curriculum.server';
 import { findLesson, getLessonNeighbors } from '@/lib/learn/curriculum';
-import { createMetadata } from '@/lib/metadata';
+import { createMetadata, createNotFoundMetadata } from '@/lib/metadata';
 import { learnSource } from '@/lib/source';
 
 export const revalidate = false;
@@ -67,11 +67,7 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { slug } = await props.params;
   const page = learnSource.getPage(slug);
-  if (!page)
-    return {
-      title: 'Lesson not found',
-      robots: { index: false, follow: false },
-    };
+  if (!page) return createNotFoundMetadata('Lesson not found');
   return createMetadata({
     title: page.data.title,
     description: page.data.description ?? 'Learn AgentOS',

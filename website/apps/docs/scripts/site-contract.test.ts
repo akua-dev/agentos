@@ -1,5 +1,52 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createServer } from 'node:net';
+import { fileURLToPath } from 'node:url';
 import { auditSite, routeExpectations, type RouteExpectation } from './site-contract';
+
+const appDirectory = fileURLToPath(new URL('..', import.meta.url));
+const renderedRoutePaths = [
+  '/does-not-exist',
+  '/docs/does-not-exist',
+  '/learn/does-not-exist',
+] as const;
+
+async function findAvailablePort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Could not determine test port');
+  const port = address.port;
+
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+
+  return port;
+}
+
+async function waitForSite(baseUrl: string, process: ChildProcess): Promise<void> {
+  const deadline = Date.now() + 120_000;
+
+  while (Date.now() < deadline) {
+    if (process.exitCode !== null) throw new Error('Next development server exited early');
+
+    try {
+      const response = await fetch(new URL('/does-not-exist', baseUrl), {
+        signal: AbortSignal.timeout(1_000),
+      });
+      if (response.status === 404) return;
+    } catch {}
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error('Timed out waiting for Next development server');
+}
 
 function createFetch(
   responses: Readonly<Record<string, { status: number; body?: string; location?: string }>>,
@@ -78,7 +125,7 @@ describe('auditSite', () => {
 
   it('defines the complete Landing, Docs, Learn, discovery, and removal contract', () => {
     const paths = routeExpectations.map((expectation) => expectation.path);
-    expect(paths).toHaveLength(86);
+    expect(paths).toHaveLength(88);
     expect(paths).toContain('/favicon.ico');
     expect(paths).toContain('/icon.png');
     expect(paths).toContain('/apple-icon.png');
@@ -89,6 +136,8 @@ describe('auditSite', () => {
     expect(paths).toContain('/learn/03-stay-in-control/upgrade-without-losing-control');
     expect(paths).toContain('/api/search?query=sovereign');
     expect(paths).toContain('/does-not-exist');
+    expect(paths).toContain('/docs/does-not-exist');
+    expect(paths).toContain('/learn/does-not-exist');
     expect(paths).toContain('/showcase');
   });
 
@@ -119,23 +168,51 @@ describe('auditSite', () => {
 
     expect(result).toEqual({ checked: 1, failures: [] });
   });
+});
 
-  it('requires global 404 HTML to omit inherited homepage SEO metadata', async () => {
-    const notFound = routeExpectations.find(
-      (expectation) => expectation.path === '/does-not-exist',
+describe('rendered site contract', () => {
+  let siteBaseUrl: string;
+  let siteProcess: ChildProcess | undefined;
+
+  beforeAll(async () => {
+    const configuredBaseUrl = process.env.AGENTOS_SITE_BASE_URL;
+    if (configuredBaseUrl) {
+      siteBaseUrl = configuredBaseUrl;
+      return;
+    }
+
+    const port = await findAvailablePort();
+    siteBaseUrl = `http://127.0.0.1:${port}`;
+    siteProcess = spawn(
+      process.execPath,
+      [
+        fileURLToPath(new URL('../node_modules/next/dist/bin/next', import.meta.url)),
+        'dev',
+        '--hostname',
+        '127.0.0.1',
+        '--port',
+        String(port),
+      ],
+      { cwd: appDirectory, stdio: 'ignore' },
+    );
+    await waitForSite(siteBaseUrl, siteProcess);
+  }, 120_000);
+
+  afterAll(() => {
+    siteProcess?.kill('SIGTERM');
+  });
+
+  it('audits rendered global and route-local 404 metadata HTML', async () => {
+    const expectations = routeExpectations.filter((expectation) =>
+      renderedRoutePaths.includes(expectation.path as (typeof renderedRoutePaths)[number]),
     );
 
-    expect(notFound).toBeDefined();
+    expect(expectations).toHaveLength(renderedRoutePaths.length);
+    const result = await auditSite(siteBaseUrl, expectations);
 
-    const result = await auditSite('https://agentos.example', [notFound!], {
-      fetch: createFetch({
-        '/does-not-exist': {
-          status: 404,
-          body: '<meta name="robots" content="noindex, nofollow">',
-        },
-      }),
+    expect(result).toEqual({
+      checked: renderedRoutePaths.length,
+      failures: [],
     });
-
-    expect(result).toEqual({ checked: 1, failures: [] });
-  });
+  }, 120_000);
 });

@@ -25,6 +25,19 @@ interface SiteAuditDependencies {
   fetch: typeof fetch;
 }
 
+const notFoundRouteExpectation = (path: string): RouteExpectation => ({
+  path,
+  status: 404,
+  includes: ['noindex'],
+  excludes: [
+    '<link rel="canonical"',
+    '<meta property="og:url"',
+    '<meta name="twitter:',
+    'index, follow',
+    'index,follow',
+  ],
+});
+
 export const routeExpectations: readonly RouteExpectation[] = [
   {
     path: '/',
@@ -92,12 +105,9 @@ export const routeExpectations: readonly RouteExpectation[] = [
       excludes: [],
     }),
   ),
-  {
-    path: '/does-not-exist',
-    status: 404,
-    includes: ['noindex'],
-    excludes: ['<link rel="canonical"', '<meta property="og:url"', 'index, follow'],
-  },
+  notFoundRouteExpectation('/does-not-exist'),
+  notFoundRouteExpectation('/docs/does-not-exist'),
+  notFoundRouteExpectation('/learn/does-not-exist'),
   ...documentationRoutes.slice(1).map(
     (route): RouteExpectation => ({
       path: route.path,

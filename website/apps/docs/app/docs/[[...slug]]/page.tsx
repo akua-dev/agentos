@@ -4,7 +4,7 @@ import { type ComponentProps, type FC } from 'react';
 import * as Twoslash from 'fumadocs-twoslash/ui';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { TypeTable } from 'fumadocs-ui/components/type-table';
-import { createMetadata } from '@/lib/metadata';
+import { createMetadata, createNotFoundMetadata } from '@/lib/metadata';
 import { source } from '@/lib/source';
 import { Mermaid } from '@/components/mdx/mermaid-lazy';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
@@ -115,11 +115,7 @@ function DocsCategory({ url }: { url: string }) {
 export async function generateMetadata(props: PageProps<'/docs/[[...slug]]'>): Promise<Metadata> {
   const { slug = [] } = await props.params;
   const page = source.getPage(slug);
-  if (!page)
-    return {
-      title: 'Not Found',
-      robots: { index: false, follow: false },
-    };
+  if (!page) return createNotFoundMetadata();
 
   const description = page.data.description ?? 'AgentOS documentation';
 
