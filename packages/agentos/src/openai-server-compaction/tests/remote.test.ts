@@ -113,7 +113,13 @@ describe("OpenAI server compaction transport", () => {
         summary: "portable",
         firstKeptEntryId: "m1",
         tokensBefore: 100,
-        details: nativeCompactionDetails("openai-codex", "gpt-5.4", result.output, result.usage),
+        details: nativeCompactionDetails(
+          "openai-codex",
+          "openai-codex-responses",
+          "gpt-5.4",
+          result.output,
+          result.usage,
+        ),
       },
       {
         type: "message",
@@ -124,7 +130,13 @@ describe("OpenAI server compaction transport", () => {
       },
     ];
 
-    expect(rewriteResponsesPayload({ model: "gpt-5.4", input: [] }, entries, "openai-codex", "gpt-5.4"))
+    expect(rewriteResponsesPayload(
+      { model: "gpt-5.4", input: [] },
+      entries,
+      "openai-codex",
+      "openai-codex-responses",
+      "gpt-5.4",
+    ))
       .toEqual({
         model: "gpt-5.4",
         input: [
