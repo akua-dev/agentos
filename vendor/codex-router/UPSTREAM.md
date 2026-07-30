@@ -3,8 +3,8 @@
 This directory contains the portable `core` and `codex` packages from
 [`akua-dev/codex-router`](https://github.com/akua-dev/codex-router).
 
-- Upstream commit: `75bed6131c91422cc56ef46b06d4fe2e6cf6f459`
-- Package source commit: `76912ddc91d3c1ced0f6a86273bf80ba7bf91db8`
+- Upstream commit: `a1d020607cdde212efd57b00ed96a43caa51a6bc`
+- Upstream review: [`akua-dev/codex-router#1`](https://github.com/akua-dev/codex-router/pull/1)
 - Imported paths: `packages/core`, `packages/codex`
 - License: MIT; see [`LICENSE`](./LICENSE)
 

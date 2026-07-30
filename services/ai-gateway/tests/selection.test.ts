@@ -48,11 +48,11 @@ describe("quota-aware selection", () => {
       expect.arrayContaining([
         expect.objectContaining({
           accountId: "short",
-          rejectionCode: "no_eligible_accounts",
+          rejectionCode: "short_headroom",
         }),
         expect.objectContaining({
           accountId: "old",
-          rejectionCode: "no_eligible_accounts",
+          rejectionCode: "usage_too_old",
         }),
       ]),
     );
