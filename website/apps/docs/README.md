@@ -25,9 +25,28 @@ bun run site:deploy
 ```
 
 `site:upload:worker` and `site:deploy:worker` operate on an existing
-OpenNext build. `site:deploy` builds and deploys in one command. The Worker
-build finishes with a native Wrangler dry run and fails if its compressed
-upload exceeds Cloudflare Workers' 3 MiB free-plan limit.
+OpenNext build. `site:deploy` builds and deploys in one command. The build
+script runs OpenNext as its top-level command, then finalizes the generated
+artifact. This keeps Cloudflare's build lifecycle attached directly to the
+adapter instead of nesting it below a custom process coordinator.
+
+Outside Workers Builds, finalization runs a native Wrangler dry run and fails
+if the compressed upload exceeds Cloudflare Workers' 3 MiB free-plan limit.
+Workers Builds skips that redundant dry run because its immediately following
+native upload enforces the same limit; repository CI still runs the dry-run
+contract before merge.
+
+The production build reads Git directly and embeds its exact 40-character
+revision in `X-AgentOS-Git-SHA`. Finalization verifies that value in the
+generated OpenNext Worker before recording publishable provenance. Publishing
+fails if that artifact came from tracked, uncommitted changes, if the checkout
+changed after the build, or if `WORKERS_CI_COMMIT_SHA` disagrees with Git.
+Production and preview versions receive native Wrangler `tag` and `message`
+annotations containing the full revision.
+
+Publishing lets OpenNext prepare its cache, then invokes Wrangler directly
+with discrete arguments. This keeps Git metadata out of OpenNext's
+shell-backed passthrough while retaining the adapter's cache behavior.
 
 Set `NEXT_PUBLIC_SITE_URL` to the public origin when building for a different
 host. It defaults to `https://agentos.akua.dev` for production builds and to
@@ -71,9 +90,50 @@ Configure the optional preview trigger for every non-production branch with:
 That keeps preview builds on OpenNext's `versions upload` path instead of
 letting Workers Builds fall back to a plain Wrangler upload.
 
+Set the public GitHub Actions repository variable
+`AGENTOS_WORKERS_PREVIEW_SUFFIX` to the Worker hostname suffix shown by
+Wrangler, without a protocol or branch alias, for example
+`agentos-site.<workers-subdomain>.workers.dev`. Pull requests from branches in
+this repository then receive a **website preview** check. It waits for the
+branch alias, verifies that `X-AgentOS-Git-SHA` equals the pull-request head
+revision, confirms the production hostname is not serving that revision, and
+links the preview from the check summary. Fork pull requests do not receive
+the preview check because their branches are outside the configured
+Cloudflare Git source.
+
 `wrangler.jsonc` is the source of truth for the Worker name, entry point,
 compatibility settings and asset binding. Cloudflare keeps the Git build and
 deploy commands on the Workers Builds trigger: Wrangler has no deploy-command
 field, and Workers Builds does not honor Wrangler's custom `build.command`.
 Keep the trigger values above aligned with the package scripts rather than
 adding an ineffective custom-build block to Wrangler.
+
+## Inspect and roll back a deployment
+
+Use Cloudflare and Git directly; no AgentOS deployment state exists outside
+those systems.
+
+```console
+bun x --bun wrangler deployments list
+bun x --bun wrangler versions view <active-version-id> --json
+git fetch origin main
+git rev-parse origin/main
+curl --silent --show-error --head https://agentos.akua.dev/
+```
+
+The active version's native `tag` and `message`, the response's
+`X-AgentOS-Git-SHA`, and `origin/main` must name the same full revision after a
+production build. Cloudflare Workers Builds also records the Git revision for
+the version in its build details.
+
+Before rolling back, inspect the target version and record its annotated Git
+revision. Roll back to that immutable Worker version, including the revision
+in the reason:
+
+```console
+bun x --bun wrangler versions view <target-version-id> --json
+bun x --bun wrangler rollback <target-version-id> --message "Rollback to Git revision <full-git-sha>" --yes
+```
+
+Afterward, repeat the deployment, version and response-header inspection. A
+rollback changes the active Cloudflare artifact; it does not rewrite Git.

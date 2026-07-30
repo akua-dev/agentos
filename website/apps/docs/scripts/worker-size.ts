@@ -24,8 +24,8 @@ export function assertWorkerFitsFreePlan(compressedSizeKiB: number): void {
 
 export async function verifyWorkerSize(): Promise<number> {
   const wrangler = spawnSync(
-    'bunx',
-    ['--bun', 'wrangler', 'deploy', '--dry-run'],
+    process.execPath,
+    ['x', '--bun', 'wrangler', 'deploy', '--dry-run'],
     {
       cwd: new URL('..', import.meta.url),
       encoding: 'utf8',
