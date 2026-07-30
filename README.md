@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/agentos-company-harness.png" alt="AgentOS — the open-source company harness" width="1200">
+  <img width="1128" height="617"  alt="AgentOS — the open-source company harness" src="https://github.com/user-attachments/assets/d62e7c11-4cb9-48d7-876a-fffa763cbd10" />
 </p>
 
 <h1 align="center">AgentOS</h1>
