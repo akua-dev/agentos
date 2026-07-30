@@ -1,3 +1,13 @@
+import { randomUUID } from "node:crypto";
+import {
+  mkdir,
+  readFile,
+  rename,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import type { Api, Model, TSchema } from "@earendil-works/pi-ai";
 import {
   isCompactionArtifact,
@@ -12,6 +22,7 @@ import {
   TerminalEventSchema,
   parseResponseItems,
   parseResponseUsage,
+  type JsonObject,
   type ProviderEvent,
   type ResponseUsage,
 } from "./schemas.ts";
@@ -56,10 +67,12 @@ export type ServerCompactionRequest = {
   input: ResponseItem[];
   instructions?: string;
   tools: OpenAICompactionTool[];
-  reasoning?: OpenAICompactionReasoning;
+  reasoning?: JsonObject;
+  text?: JsonObject;
   signal?: AbortSignal;
   timeoutMs?: number;
   fetchImpl?: FetchLike;
+  codexInstallationId?: () => string | Promise<string>;
 };
 
 export class OpenAICompactionHttpError extends Error {
@@ -135,6 +148,58 @@ function isCodexModel(
   return model.provider === "openai-codex";
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function canonicalUuid(value: string): string | undefined {
+  const trimmed = value.trim();
+  return UUID_PATTERN.test(trimmed) ? trimmed.toLowerCase() : undefined;
+}
+
+function defaultCodexHome(): string {
+  const configured = process.env.CODEX_HOME?.trim();
+  return configured ? resolve(configured) : join(homedir(), ".codex");
+}
+
+export async function resolveCodexInstallationId(
+  codexHome = defaultCodexHome(),
+): Promise<string> {
+  const installationPath = join(codexHome, "installation_id");
+  try {
+    await mkdir(codexHome, { recursive: true });
+    const existing = await readFile(installationPath, "utf8").catch(
+      () => undefined,
+    );
+    const canonical = existing
+      ? canonicalUuid(existing)
+      : undefined;
+    if (canonical) return canonical;
+
+    const installationId = randomUUID();
+    const temporaryPath = join(
+      codexHome,
+      `.installation_id.${process.pid}.${randomUUID()}.tmp`,
+    );
+    try {
+      await writeFile(temporaryPath, installationId, {
+        encoding: "utf8",
+        flag: "wx",
+        mode: 0o644,
+      });
+      await rename(temporaryPath, installationPath);
+    } finally {
+      await unlink(temporaryPath).catch(() => undefined);
+    }
+    const persisted = canonicalUuid(
+      await readFile(installationPath, "utf8"),
+    );
+    return persisted ?? installationId;
+  } catch {
+    // Installation identity is affinity metadata; failure must not block AI.
+    return randomUUID();
+  }
+}
+
 function normalizedTimeout(value: number | undefined): number {
   if (value === undefined || !Number.isFinite(value) || value <= 0) return DEFAULT_TIMEOUT_MS;
   return Math.min(Math.floor(value), MAX_TIMEOUT_MS);
@@ -203,7 +268,10 @@ function awaitWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T>
   });
 }
 
-function requestHeaders(params: ServerCompactionRequest, endpoint: string): Headers {
+async function requestHeaders(
+  params: ServerCompactionRequest,
+  endpoint: string,
+): Promise<Headers> {
   const headers = new Headers(params.headers);
   if (params.apiKey) headers.set("authorization", `Bearer ${params.apiKey}`);
   if (!caseInsensitiveHeader(headers, "authorization")) {
@@ -225,15 +293,32 @@ function requestHeaders(params: ServerCompactionRequest, endpoint: string): Head
     headers.delete("openai-beta");
     headers.delete("originator");
     headers.delete("session-id");
+    headers.delete("thread-id");
+    headers.delete("x-client-request-id");
+    headers.delete("x-codex-installation-id");
+    headers.delete("x-codex-window-id");
     return headers;
   }
 
   if (params.model.provider === "openai-codex") {
     headers.set("originator", "pi");
     headers.set("OpenAI-Beta", "responses=experimental");
+    const installationId = canonicalUuid(
+      await (
+        params.codexInstallationId ??
+        resolveCodexInstallationId
+      )(),
+    );
+    if (installationId) {
+      headers.set("x-codex-installation-id", installationId);
+    } else {
+      headers.delete("x-codex-installation-id");
+    }
     if (params.sessionId) {
       headers.set("session-id", params.sessionId);
+      headers.set("thread-id", params.sessionId);
       headers.set("x-client-request-id", params.sessionId);
+      headers.set("x-codex-window-id", `${params.sessionId}:0`);
     }
     const hostname = new URL(endpoint).hostname;
     if (hostname === "chatgpt.com" && !headers.has("chatgpt-account-id")) {
@@ -483,11 +568,12 @@ export async function requestServerCompaction(
       include: ["reasoning.encrypted_content"],
       ...(params.sessionId ? { prompt_cache_key: params.sessionId } : {}),
       ...(params.reasoning ? { reasoning: params.reasoning } : {}),
+      ...(params.text ? { text: params.text } : {}),
     };
     const response = await awaitWithAbort(
       (params.fetchImpl ?? fetch)(endpoint, {
         method: "POST",
-        headers: requestHeaders(params, endpoint),
+        headers: await requestHeaders(params, endpoint),
         body: JSON.stringify(body),
         signal: deadline.signal,
       }),

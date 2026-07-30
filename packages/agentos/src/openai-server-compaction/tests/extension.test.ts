@@ -7,7 +7,11 @@ import type {
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
-import { createOpenAIServerCompactionExtension } from "../extension.ts";
+import {
+  createOpenAIServerCompactionExtension,
+  generateBestEffortLocalSummary,
+} from "../extension.ts";
+import { OpenAICompactionHttpError } from "../remote.ts";
 import { nativeCompactionDetails } from "../session.ts";
 import { createTelemetryRecorder } from "../../telemetry/tests/fake-telemetry.ts";
 
@@ -115,6 +119,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
     expect(recorded.operations[0]?.attempts).toEqual([
       {
         input: {
+          compactionPath: "portable_summary",
           requestKind: "compaction",
           streamMode: "streaming",
         },
@@ -127,6 +132,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
       },
       {
         input: {
+          compactionPath: "native_server",
           requestKind: "compaction",
           streamMode: "streaming",
         },
@@ -194,6 +200,30 @@ describe("AgentOS OpenAI server-compaction extension", () => {
     expect(warnings).toEqual(["OpenAI server compaction unavailable; using Pi's portable summary."]);
   });
 
+  test("records native HTTP status while portable fallback succeeds", async () => {
+    const recorded = createTelemetryRecorder();
+    const handlers = harness({
+      telemetry: recorded.telemetry,
+      runLocalCompaction: async () => local,
+      runServerCompaction: async () => {
+        throw new OpenAICompactionHttpError(503);
+      },
+    });
+
+    await expect(
+      handlers.get("session_before_compact")?.(event, context()),
+    ).resolves.toEqual({ compaction: local });
+    expect(recorded.operations[0]?.attempts[1]?.outcome).toEqual({
+      status: 503,
+      error: expect.objectContaining({
+        name: "OpenAICompactionHttpError",
+        status: 503,
+      }),
+      streamOutcome: "upstream_error",
+    });
+    expect(recorded.operations[0]?.outcome).toEqual({ status: 200 });
+  });
+
   test("lets Pi handle compaction when the portable summary fails", async () => {
     const handlers = harness({
       runLocalCompaction: async () => {
@@ -207,9 +237,15 @@ describe("AgentOS OpenAI server-compaction extension", () => {
   });
 
   test("forwards model headers and keeps resolved authentication headers authoritative", async () => {
+    const recorded = createTelemetryRecorder();
+    let localRequest: any;
     let request: any;
     const handlers = harness({
-      runLocalCompaction: async () => local,
+      telemetry: recorded.telemetry,
+      runLocalCompaction: async (value) => {
+        localRequest = value;
+        return local;
+      },
       runServerCompaction: async (value) => {
         request = value;
         return { output: [{ type: "compaction", encrypted_content: "opaque" }] };
@@ -240,10 +276,24 @@ describe("AgentOS OpenAI server-compaction extension", () => {
       "X-AI-Gateway-Token": "fleet-token",
       authorization: "Bearer resolved-header",
       "X-Resolved": "yes",
+      traceparent: expect.stringMatching(
+        /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
+      ),
+      "x-agentos-request-attempt-id": "attempt-3",
     });
+    expect(localRequest.auth.headers).toEqual({
+      "X-AI-Gateway-Token": "fleet-token",
+      authorization: "Bearer resolved-header",
+      "X-Resolved": "yes",
+      traceparent: expect.stringMatching(
+        /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
+      ),
+      "x-agentos-request-attempt-id": "attempt-2",
+    });
+    expect(localRequest.auth.headers).not.toBe(request.headers);
   });
 
-  test("forwards Pi custom compaction instructions to the native request", async () => {
+  test("keeps portable custom instructions out of the native request", async () => {
     let request: { instructions?: string } | undefined;
     const handlers = harness({
       runLocalCompaction: async () => local,
@@ -258,7 +308,230 @@ describe("AgentOS OpenAI server-compaction extension", () => {
       context(),
     );
 
-    expect(request?.instructions).toBe("system\n\nKeep the deployment caveat.");
+    expect(request?.instructions).toBe("system");
+  });
+
+  test("normalizes native prompt input before transport", async () => {
+    let request: any;
+    const artifact = {
+      type: "compaction" as const,
+      encrypted_content: "opaque-normalized",
+    };
+    const entries: SessionEntry[] = [
+      {
+        type: "message",
+        id: "m1",
+        parentId: null,
+        timestamp: "2026-01-01T00:00:00.000Z",
+        message: { role: "user", content: "old", timestamp: 1 },
+      },
+      {
+        type: "compaction",
+        id: "c1",
+        parentId: "m1",
+        timestamp: "2026-01-01T00:00:01.000Z",
+        summary: "portable",
+        firstKeptEntryId: "m1",
+        tokensBefore: 100,
+        details: nativeCompactionDetails(
+          "openai-codex",
+          "openai-codex-responses",
+          "gpt-5.4",
+          [
+            { type: "ghost_snapshot", state: "remove" } as any,
+            {
+              type: "function_call",
+              call_id: "call-1",
+              name: "read",
+              arguments: "{}",
+            },
+            artifact,
+          ],
+        ),
+      },
+    ];
+    const handlers = harness({
+      runLocalCompaction: async () => local,
+      runServerCompaction: async (value) => {
+        request = value;
+        return { output: [artifact] };
+      },
+    });
+
+    await handlers.get("session_before_compact")?.(
+      { ...event, branchEntries: entries },
+      context(),
+    );
+
+    expect(request.input).toEqual([
+      {
+        type: "function_call",
+        call_id: "call-1",
+        name: "read",
+        arguments: "{}",
+      },
+      {
+        type: "function_call_output",
+        call_id: "call-1",
+        output: "aborted",
+      },
+      artifact,
+    ]);
+  });
+
+  test("reuses validated request shape only for the same session and model", async () => {
+    const requests: any[] = [];
+    const handlers = harness({
+      runLocalCompaction: async () => local,
+      runServerCompaction: async (value) => {
+        requests.push(value);
+        return {
+          output: [{ type: "compaction", encrypted_content: "opaque" }],
+        };
+      },
+    });
+    const ctx = context();
+
+    handlers.get("before_provider_request")?.(
+      {
+        type: "before_provider_request",
+        payload: {
+          model: "gpt-5.4",
+          input: [],
+          reasoning: { effort: "low", summary: "detailed" },
+          text: { verbosity: "low" },
+        },
+      },
+      ctx,
+    );
+    await handlers.get("session_before_compact")?.(event, ctx);
+    await handlers.get("session_before_compact")?.(event, ctx);
+
+    expect(requests[0]).toMatchObject({
+      reasoning: { effort: "low", summary: "detailed" },
+      text: { verbosity: "low" },
+    });
+    expect(requests[1]?.text).toBeUndefined();
+    expect(requests[1]?.reasoning).toEqual({
+      effort: "high",
+      summary: "auto",
+    });
+
+    handlers.get("before_provider_request")?.(
+      {
+        type: "before_provider_request",
+        payload: {
+          model: "gpt-5.4",
+          input: [],
+          reasoning: "invalid",
+          text: ["invalid"],
+        },
+      },
+      ctx,
+    );
+    await handlers.get("session_before_compact")?.(
+      event,
+      context({
+        model: { ...model(), id: "gpt-5.5" } as any,
+      }),
+    );
+    expect(requests[2]?.text).toBeUndefined();
+    expect(requests[2]?.reasoning).toEqual({
+      effort: "high",
+      summary: "auto",
+    });
+  });
+
+  test("clears request shape at every session lifecycle boundary", async () => {
+    const resets = [
+      ["session_start", { type: "session_start", reason: "reload" }],
+      [
+        "session_before_switch",
+        { type: "session_before_switch", reason: "resume" },
+      ],
+      [
+        "session_before_fork",
+        { type: "session_before_fork", entryId: "m1", position: "at" },
+      ],
+      [
+        "session_before_tree",
+        {
+          type: "session_before_tree",
+          preparation: {},
+          signal: new AbortController().signal,
+        },
+      ],
+      [
+        "session_tree",
+        { type: "session_tree", newLeafId: "m1", oldLeafId: "m0" },
+      ],
+      [
+        "session_compact",
+        { type: "session_compact", reason: "manual" },
+      ],
+      ["model_select", { type: "model_select", source: "user" }],
+      ["session_shutdown", { type: "session_shutdown", reason: "reload" }],
+    ] as const;
+
+    for (const [name, resetEvent] of resets) {
+      let request: any;
+      const handlers = harness({
+        runLocalCompaction: async () => local,
+        runServerCompaction: async (value) => {
+          request = value;
+          return {
+            output: [
+              { type: "compaction", encrypted_content: `opaque-${name}` },
+            ],
+          };
+        },
+      });
+      const ctx = context();
+      handlers.get("before_provider_request")?.(
+        {
+          type: "before_provider_request",
+          payload: {
+            model: "gpt-5.4",
+            input: [],
+            text: { verbosity: "low" },
+          },
+        },
+        ctx,
+      );
+      await handlers.get(name)?.(resetEvent, ctx);
+      await handlers.get("session_before_compact")?.(event, ctx);
+      expect(request?.text, name).toBeUndefined();
+    }
+  });
+
+  test("registration is inert and installs only in-memory handlers", () => {
+    let providerCalls = 0;
+    const handlers = harness({
+      runLocalCompaction: async () => {
+        providerCalls += 1;
+        return local;
+      },
+      runServerCompaction: async () => {
+        providerCalls += 1;
+        return {
+          output: [{ type: "compaction", encrypted_content: "opaque" }],
+        };
+      },
+    });
+
+    expect(providerCalls).toBe(0);
+    expect([...handlers.keys()].sort()).toEqual([
+      "before_provider_request",
+      "model_select",
+      "session_before_compact",
+      "session_before_fork",
+      "session_before_switch",
+      "session_before_tree",
+      "session_compact",
+      "session_shutdown",
+      "session_start",
+      "session_tree",
+    ]);
   });
 
   test("replays persisted native state through Pi's existing provider request", () => {
@@ -310,5 +583,142 @@ describe("AgentOS OpenAI server-compaction extension", () => {
         { type: "message", role: "user", content: [{ type: "input_text", text: "new" }] },
       ],
     });
+  });
+
+  test("builds the portable summary from every message in the branch", async () => {
+    let completionContext: any;
+    let completionOptions: any;
+    const result = await generateBestEffortLocalSummary(
+      {
+        event: {
+          ...event,
+          customInstructions: "Keep the deployment caveat.",
+          branchEntries: [
+            {
+              type: "message",
+              id: "m1",
+              parentId: null,
+              timestamp: "2026-01-01T00:00:00.000Z",
+              message: { role: "user", content: "old goal", timestamp: 1 },
+            },
+            {
+              type: "compaction",
+              id: "c1",
+              parentId: "m1",
+              timestamp: "2026-01-01T00:00:01.000Z",
+              summary: "must not replace the branch",
+              firstKeptEntryId: "m1",
+              tokensBefore: 50,
+            },
+            {
+              type: "message",
+              id: "m2",
+              parentId: "c1",
+              timestamp: "2026-01-01T00:00:02.000Z",
+              message: { role: "user", content: "new decision", timestamp: 2 },
+            },
+          ],
+        } as SessionBeforeCompactEvent,
+        model: model() as never,
+        auth: {
+          apiKey: "resolved-token",
+          headers: { "x-attempt": "portable" },
+          env: { OPENAI_API_KEY: "scoped-token" },
+        },
+        thinkingLevel: "high",
+      },
+      {
+        complete: async (_model, completion, options) => {
+          completionContext = completion;
+          completionOptions = options;
+          return {
+            role: "assistant",
+            content: [{ type: "text", text: " full branch summary " }],
+            usage: {
+              input: 10,
+              output: 4,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 14,
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+                total: 0,
+              },
+            },
+            stopReason: "stop",
+            timestamp: 3,
+          } as never;
+        },
+        compact: async () => {
+          throw new Error("Pi fallback must not run");
+        },
+        now: () => 42,
+      },
+    );
+
+    expect(result).toEqual({
+      summary: "full branch summary",
+      firstKeptEntryId: "m1",
+      tokensBefore: 100,
+    });
+    const prompt = completionContext.messages[0].content[0].text;
+    expect(prompt).toContain("old goal");
+    expect(prompt).toContain("new decision");
+    expect(prompt).toContain("Additional summarization instructions:");
+    expect(prompt).toContain("Keep the deployment caveat.");
+    expect(prompt).not.toContain("must not replace the branch");
+    expect(completionContext.messages[0].timestamp).toBe(42);
+    expect(completionOptions).toMatchObject({
+      apiKey: "resolved-token",
+      headers: { "x-attempt": "portable" },
+      maxTokens: 4096,
+      signal: event.signal,
+      env: { OPENAI_API_KEY: "scoped-token" },
+    });
+  });
+
+  test("falls back to Pi compaction when full-branch summarization fails", async () => {
+    let compactArguments: unknown[] | undefined;
+    const result = await generateBestEffortLocalSummary(
+      {
+        event: {
+          ...event,
+          customInstructions: "Keep the caveat.",
+        },
+        model: model() as never,
+        auth: {
+          apiKey: "resolved-token",
+          headers: { "x-attempt": "portable" },
+          env: { OPENAI_API_KEY: "scoped-token" },
+        },
+        thinkingLevel: "high",
+      },
+      {
+        complete: async () => {
+          throw new Error("portable request failed");
+        },
+        compact: async (...args) => {
+          compactArguments = args;
+          return local;
+        },
+        now: () => 42,
+      },
+    );
+
+    expect(result).toBe(local);
+    expect(compactArguments).toEqual([
+      event.preparation,
+      model(),
+      "resolved-token",
+      { "x-attempt": "portable" },
+      "Keep the caveat.",
+      event.signal,
+      "high",
+      undefined,
+      { OPENAI_API_KEY: "scoped-token" },
+    ]);
   });
 });
