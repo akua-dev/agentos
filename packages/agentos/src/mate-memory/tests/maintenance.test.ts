@@ -42,6 +42,8 @@ async function fixture() {
 describe("Mate memory automatic maintenance", () => {
   test("attributes every extraction model step without recording maintenance content", async () => {
     const recorded = createTelemetryRecorder();
+    let forwardedHeaders: Record<string, string> | undefined;
+    const authHeaders = { "x-original": "preserved" };
     const result = await runIsolatedMaintenanceAgent({
       agentDir: "/mate/.pi/agent",
       cwd: "/workspace",
@@ -57,19 +59,21 @@ describe("Mate memory automatic maintenance", () => {
         getApiKeyAndHeaders: async () => ({
           ok: true,
           apiKey: "sk-seeded-secret",
-          headers: {},
+          headers: authHeaders,
         }),
       } as never,
       systemPrompt: "SEED_PROMPT private maintenance system prompt",
       prompt: "SEED_PROMPT private memory body",
       tools: [],
       telemetry: recorded.telemetry,
-      completeImpl: async () =>
-        ({
+      completeImpl: async (_model, _context, options) => {
+        forwardedHeaders = options?.headers;
+        return ({
           content: [{ type: "text", text: '{"action":"done"}' }],
           usage: { input: 8, output: 3 },
           stopReason: "stop",
-        }) as never,
+        }) as never;
+      },
     });
 
     expect(result).toEqual({
@@ -80,7 +84,7 @@ describe("Mate memory automatic maintenance", () => {
       {
         input: {
           requestKind: "memory_extract",
-          streamMode: "streaming",
+          streamMode: "non_streaming",
         },
         outcome: {
           inputTokens: 8,
@@ -96,6 +100,12 @@ describe("Mate memory automatic maintenance", () => {
     expect(JSON.stringify(recorded.operations)).not.toContain(
       "sk-seeded-secret",
     );
+    expect(forwardedHeaders).toMatchObject({
+      "x-original": "preserved",
+      traceparent: expect.any(String),
+      "x-agentos-request-attempt-id": expect.any(String),
+    });
+    expect(authHeaders).toEqual({ "x-original": "preserved" });
   });
 
   test("accepts only substantive direct human input", () => {

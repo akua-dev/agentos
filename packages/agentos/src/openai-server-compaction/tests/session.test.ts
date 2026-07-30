@@ -197,6 +197,45 @@ describe("native compaction session replay", () => {
     ).toEqual({ model: "gpt-5.4", input: [...output, expect.any(Object)] });
   });
 
+  test("clears pending messages at an empty assistant turn boundary", () => {
+    const artifact = { type: "compaction" as const, encrypted_content: "opaque" };
+    const native = nativeCompactionDetails(
+      "openai",
+      "openai-responses",
+      "gpt-5.4",
+      [artifact],
+    );
+    const entries = [
+      compaction("compact", "old", "portable summary", native),
+      message("discarded", "compact", "discarded"),
+      assistant(
+        "empty-other-provider",
+        "discarded",
+        "",
+        "openai-responses",
+        "openai-codex",
+        "gpt-5.4",
+      ),
+      message("kept", "empty-other-provider", "kept"),
+      assistant(
+        "matching",
+        "kept",
+        "matching response",
+        "openai-responses",
+        "openai",
+        "gpt-5.4",
+      ),
+    ];
+
+    expect(
+      buildCompactionInput(entries, "openai", "openai-responses", "gpt-5.4"),
+    ).toEqual([
+      artifact,
+      { type: "message", role: "user", content: [{ type: "input_text", text: "kept" }] },
+      { type: "message", role: "assistant", content: [{ type: "output_text", text: "matching response", annotations: [] }], status: "completed" },
+    ]);
+  });
+
   test("never reuses an older artifact across a newer local compaction or model mismatch", () => {
     const artifact = { type: "compaction" as const, encrypted_content: "opaque" };
     const native = nativeCompactionDetails(

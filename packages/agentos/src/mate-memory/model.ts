@@ -72,8 +72,10 @@ export const selectRelevantTopics: RelevantTopicSelector = async (input) => {
   );
   const attempt = operation.startProviderAttempt({
     requestKind: "extension",
-    streamMode: "streaming",
+    streamMode: "non_streaming",
   });
+  const headers = { ...auth.headers };
+  attempt.inject(headers);
   let attemptEnded = false;
   try {
     const response = await (input.completeImpl ?? complete)(
@@ -90,7 +92,7 @@ export const selectRelevantTopics: RelevantTopicSelector = async (input) => {
       },
       {
         apiKey: auth.apiKey,
-        headers: auth.headers,
+        headers,
         env: auth.env,
         signal: input.signal,
         temperature: 0,

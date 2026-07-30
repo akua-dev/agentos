@@ -48,6 +48,10 @@ spec:
               value: crewmate
             - name: AGENTOS_AGENT_ROLE
               value: crewmate
+            - name: AGENTOS_AI_RUNTIME
+              value: codex
+            - name: AGENTOS_AI_RUNTIME_VERSION
+              value: 0.144.5
             - name: AGENTOS_ASSIGNMENT_ID
               value: 00000000-0000-4000-8000-000000000005
             - name: AGENTOS_BRIEF_PATH

@@ -4,9 +4,6 @@
   "description": "AgentOS runtime, optional services, executable primitives, and database workspace",
   "private": true,
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
   "workspaces": [
     "clis/*",
     "database",
@@ -43,8 +40,6 @@
     "@akua-dev/agentos": "workspace:*",
     "@earendil-works/pi-ai": "0.81.1",
     "@earendil-works/pi-coding-agent": "0.81.1",
-    "@akua-dev/codex-router-core": "workspace:*",
-    "effect": "4.0.0-beta.102",
     "ajv": "8.20.0",
     "yaml": "2.9.0",
     "zod": "4.4.3"

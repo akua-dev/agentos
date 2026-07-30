@@ -40,6 +40,8 @@ const workloads = [
     name: "agentos-firstmate",
     serviceName: "agentos-$(AGENTOS_AGENT_NAME)",
     workloadName: "agentos-$(AGENTOS_AGENT_NAME)",
+    runtime: "pi",
+    runtimeVersion: "0.81.1",
   },
   {
     directory:
@@ -47,6 +49,8 @@ const workloads = [
     name: "agentos-secondmate",
     serviceName: "agentos-$(AGENTOS_AGENT_NAME)",
     workloadName: "agentos-$(AGENTOS_AGENT_NAME)",
+    runtime: "pi",
+    runtimeVersion: "0.81.1",
   },
   {
     directory:
@@ -54,6 +58,8 @@ const workloads = [
     name: "agentos-crewmate",
     serviceName: "agentos-$(AGENTOS_AGENT_NAME)",
     workloadName: "agentos-$(AGENTOS_AGENT_NAME)",
+    runtime: "codex",
+    runtimeVersion: "0.144.5",
   },
   {
     directory: "services/ai-gateway/kubernetes",
@@ -130,6 +136,21 @@ describe("Fleet OTEL workload contract", () => {
       expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
         "service.namespace=agentos",
       );
+      if (workload.runtime) {
+        expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
+          "service.version=0.1.0",
+        );
+        expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
+          "agentos.ai.runtime=$(AGENTOS_AI_RUNTIME)",
+        );
+        expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
+          "agentos.ai.runtime.version=$(AGENTOS_AI_RUNTIME_VERSION)",
+        );
+        expect(env.AGENTOS_AI_RUNTIME?.value).toBe(workload.runtime);
+        expect(env.AGENTOS_AI_RUNTIME_VERSION?.value).toBe(
+          workload.runtimeVersion,
+        );
+      }
       expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
         "k8s.namespace.name=$(K8S_NAMESPACE)",
       );
