@@ -72,7 +72,9 @@ export function registerAgentOSObservability(
     fallbackOutcome: AgentOSAIStreamOutcome = "upstream_error",
   ) => {
     if (!activeAttempt) return;
-    const error = message ? safeMessageError(message) : undefined;
+    const error = message
+      ? safeMessageError(message)
+      : safeFallbackError(fallbackOutcome);
     const streamOutcome = message
       ? streamOutcomeForMessage(message)
       : fallbackOutcome;
@@ -184,6 +186,14 @@ function streamOutcomeForMessage(
   if (message.stopReason === "aborted") return "aborted";
   if (message.stopReason === "error") return "upstream_error";
   return "completed";
+}
+
+function safeFallbackError(
+  outcome: AgentOSAIStreamOutcome,
+): OperationResult["error"] {
+  if (outcome === "aborted") return { name: "AbortError" };
+  if (outcome === "upstream_error") return { name: "ProviderError" };
+  return undefined;
 }
 
 function safeCount(value: number | undefined): number | undefined {

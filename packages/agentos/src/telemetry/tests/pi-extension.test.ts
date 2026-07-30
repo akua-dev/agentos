@@ -244,6 +244,37 @@ describe("Pi provider observability extension", () => {
     );
   });
 
+  test("classifies a stream without a terminal message as a provider failure", async () => {
+    const fake = createFakePi();
+    configureContext(fake);
+    const recorded = recorder();
+    registerAgentOSObservability(fake.pi, {
+      telemetry: recorded.telemetry,
+    });
+
+    await fake.emit("before_provider_headers", {
+      type: "before_provider_headers",
+      headers: {},
+    });
+    await fake.emit("after_provider_response", {
+      type: "after_provider_response",
+      status: 200,
+      headers: {},
+    });
+    await fake.emit("agent_settled", { type: "agent_settled" });
+
+    const attempt = recorded.operations[0]?.attempts[0];
+    expect(attempt?.outcome).toMatchObject({
+      status: 200,
+      streamOutcome: "upstream_error",
+      error: { name: "ProviderError" },
+    });
+    expect(recorded.operations[0]?.outcome).toEqual({
+      error: { name: "ProviderError" },
+      status: 200,
+    });
+  });
+
   test("can run alone as the explicit extension-disabled control", () => {
     const fake = createFakePi();
     const recorded = recorder();

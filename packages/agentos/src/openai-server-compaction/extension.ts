@@ -37,6 +37,7 @@ import {
 import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
 import {
   agentOSRouteForModel,
+  safeAssistantFailure,
   safeTokenCount,
   startAgentOSAuxiliaryOperation,
 } from "../telemetry/auxiliary.ts";
@@ -189,6 +190,13 @@ export async function generateBestEffortLocalSummary(
         env: request.auth.env,
       },
     );
+    if (safeAssistantFailure(response.stopReason)) {
+      throw new Error(
+        response.stopReason === "aborted"
+          ? "OpenAI portable compaction aborted"
+          : "OpenAI portable compaction failed",
+      );
+    }
     const summary = response.content
       .filter(
         (item): item is Extract<typeof item, { type: "text" }> =>

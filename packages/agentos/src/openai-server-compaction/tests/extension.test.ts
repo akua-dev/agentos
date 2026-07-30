@@ -747,4 +747,47 @@ describe("AgentOS OpenAI server-compaction extension", () => {
       { OPENAI_API_KEY: "scoped-token" },
     ]);
   });
+
+  test("falls back to Pi compaction when the portable model reports a failure", async () => {
+    let compactCalled = false;
+    const result = await generateBestEffortLocalSummary(
+      {
+        event,
+        model: model() as never,
+        auth: { apiKey: "resolved-token" },
+        thinkingLevel: "high",
+      },
+      {
+        complete: async () =>
+          ({
+            role: "assistant",
+            content: [{ type: "text", text: "must not be accepted" }],
+            usage: {
+              input: 1,
+              output: 1,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 2,
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+                total: 0,
+              },
+            },
+            stopReason: "error",
+            timestamp: 42,
+          }) as never,
+        compact: async () => {
+          compactCalled = true;
+          return local;
+        },
+        now: () => 42,
+      },
+    );
+
+    expect(compactCalled).toBe(true);
+    expect(result).toBe(local);
+  });
 });
