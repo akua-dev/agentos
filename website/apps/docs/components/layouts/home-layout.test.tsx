@@ -10,6 +10,35 @@ afterEach(() => {
 });
 
 describe('home layout', () => {
+  it('uses one accessible AgentOS wordmark with light and dark variants', () => {
+    render(
+      <FrameworkProvider
+        Link={({ href, children, ...props }) => (
+          <a href={href} {...props}>
+            {children}
+          </a>
+        )}
+        usePathname={() => '/'}
+        useParams={() => ({})}
+        useRouter={() => ({ push: () => {}, refresh: () => {} })}
+      >
+        <Layout params={Promise.resolve({})}>
+          <p>Content</p>
+        </Layout>
+      </FrameworkProvider>,
+    );
+
+    const wordmark = screen.getByRole('img', { name: 'AgentOS' });
+    const variants = wordmark.querySelectorAll('img[aria-hidden="true"]');
+
+    expect(screen.getAllByRole('img', { name: 'AgentOS' })).toHaveLength(1);
+    expect(variants).toHaveLength(2);
+    expect(Array.from(variants, (variant) => variant.getAttribute('width'))).toEqual([
+      '120',
+      '120',
+    ]);
+  });
+
   it('puts Learn before the direct Documentation link', () => {
     render(
       <FrameworkProvider

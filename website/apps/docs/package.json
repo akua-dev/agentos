@@ -8,10 +8,13 @@
     "build:worker": "opennextjs-cloudflare build",
     "types:check": "next typegen && tsc --noEmit",
     "clean": "rimraf .next",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "deploy:worker": "opennextjs-cloudflare deploy",
     "dev": "next dev",
     "lint": "node ./scripts/lint.entry.ts",
     "preview:worker": "opennextjs-cloudflare preview",
     "test": "vitest run --config vitest.config.ts",
+    "upload:worker": "opennextjs-cloudflare upload",
     "verify:site": "bun ./scripts/site-contract.ts",
     "start": "next start"
   },

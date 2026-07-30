@@ -1,5 +1,6 @@
-import { AlbumIcon, Boxes, Heart, LayoutTemplate } from 'lucide-react';
+import { AlbumIcon, Heart, LayoutTemplate } from 'lucide-react';
 import type { BaseLayoutProps, LinkItemType } from 'fumadocs-ui/layouts/shared';
+import { AgentOSWordmark } from '@/components/agentos-wordmark';
 
 export const learnLinkItem: LinkItemType = {
   icon: <AlbumIcon />,
@@ -37,21 +38,12 @@ export const secondaryLinkItems: LinkItemType[] = [
 
 export const linkItems: LinkItemType[] = [learnLinkItem, ...secondaryLinkItems];
 
-export const logo = (
-  <span className="flex size-7 items-center justify-center rounded-md bg-brand text-brand-foreground">
-    <Boxes className="size-4" aria-hidden />
-  </span>
-);
+export const logo = <AgentOSWordmark />;
 
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      title: (
-        <>
-          {logo}
-          <span className="font-medium">AgentOS</span>
-        </>
-      ),
+      title: logo,
     },
   };
 }
