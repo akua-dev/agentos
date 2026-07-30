@@ -16,6 +16,9 @@ type AgentMessages = Parameters<typeof convertToLlm>[0];
 
 export type AssistantPhase = "commentary" | "final_answer";
 
+const IMAGE_CONTENT_OMITTED_PLACEHOLDER =
+  "image content omitted because you do not support image input";
+
 export function isCompactionArtifact(value: unknown): value is CompactionArtifact {
   const parsed = ResponseItemSchema.safeParse(value);
   return parsed.success && parsed.data.type === "compaction";
@@ -23,6 +26,201 @@ export function isCompactionArtifact(value: unknown): value is CompactionArtifac
 
 export function isResponseItem(value: unknown): value is ResponseItem {
   return ResponseItemSchema.safeParse(value).success;
+}
+
+function cloneResponseItem<T extends ResponseItem>(item: T): T {
+  return structuredClone(item);
+}
+
+function responseItemCallId(item: ResponseItem): string | undefined {
+  if (!("call_id" in item)) return undefined;
+  return typeof item.call_id === "string" && item.call_id
+    ? item.call_id
+    : undefined;
+}
+
+function outputTypeForCallType(type: string): string | undefined {
+  if (type === "function_call" || type === "local_shell_call") {
+    return "function_call_output";
+  }
+  if (type === "tool_search_call") return "tool_search_output";
+  if (type === "custom_tool_call") return "custom_tool_call_output";
+  return undefined;
+}
+
+function syntheticOutputForCall(
+  item: ResponseItem,
+): ResponseItem | undefined {
+  const callId = responseItemCallId(item);
+  if (!callId) return undefined;
+  if (item.type === "function_call" || item.type === "local_shell_call") {
+    return {
+      type: "function_call_output",
+      call_id: callId,
+      output: "aborted",
+    };
+  }
+  if (item.type === "custom_tool_call") {
+    return {
+      type: "custom_tool_call_output",
+      call_id: callId,
+      output: "aborted",
+    };
+  }
+  if (item.type === "tool_search_call") {
+    const id =
+      "id" in item && typeof item.id === "string"
+        ? `${item.id}-output`
+        : `${callId}-output`;
+    return {
+      type: "tool_search_output",
+      id,
+      call_id: callId,
+      execution: "client",
+      status: "completed",
+      tools: [],
+    };
+  }
+  return undefined;
+}
+
+function ensureCallOutputsPresent(items: ResponseItem[]): ResponseItem[] {
+  const normalized: ResponseItem[] = [];
+  for (const item of items) {
+    normalized.push(item);
+    const outputType = outputTypeForCallType(item.type);
+    const callId = responseItemCallId(item);
+    if (!outputType || !callId) continue;
+    const hasOutput = items.some(
+      (candidate) =>
+        candidate.type === outputType &&
+        responseItemCallId(candidate) === callId,
+    );
+    if (hasOutput) continue;
+    const synthetic = syntheticOutputForCall(item);
+    if (synthetic) normalized.push(synthetic);
+  }
+  return normalized;
+}
+
+function removeOrphanOutputs(items: ResponseItem[]): ResponseItem[] {
+  const functionCallIds = new Set<string>();
+  const toolSearchCallIds = new Set<string>();
+  const customToolCallIds = new Set<string>();
+
+  for (const item of items) {
+    const callId = responseItemCallId(item);
+    if (!callId) continue;
+    if (item.type === "function_call" || item.type === "local_shell_call") {
+      functionCallIds.add(callId);
+    } else if (item.type === "tool_search_call") {
+      toolSearchCallIds.add(callId);
+    } else if (item.type === "custom_tool_call") {
+      customToolCallIds.add(callId);
+    }
+  }
+
+  return items.filter((item) => {
+    const callId = responseItemCallId(item);
+    if (item.type === "function_call_output") {
+      return Boolean(callId && functionCallIds.has(callId));
+    }
+    if (item.type === "custom_tool_call_output") {
+      return Boolean(callId && customToolCallIds.has(callId));
+    }
+    if (item.type === "tool_search_output") {
+      if (
+        ("execution" in item && item.execution === "server") ||
+        callId === undefined
+      ) {
+        return true;
+      }
+      return toolSearchCallIds.has(callId);
+    }
+    return true;
+  });
+}
+
+function modelSupportsImageInput(model: {
+  input?: readonly unknown[];
+}): boolean {
+  return Array.isArray(model.input) && model.input.includes("image");
+}
+
+function stripUnsupportedImageContentItems(
+  items: ResponseContentItem[],
+): ResponseContentItem[] {
+  return items.map((item) =>
+    item.type === "input_image"
+      ? {
+          type: "input_text",
+          text: IMAGE_CONTENT_OMITTED_PLACEHOLDER,
+        }
+      : item,
+  );
+}
+
+function stripUnsupportedOutputImages(
+  output: unknown,
+): unknown {
+  if (!Array.isArray(output)) return output;
+  return output.map((item) =>
+    typeof item === "object" &&
+    item !== null &&
+    "type" in item &&
+    item.type === "input_image"
+      ? {
+          type: "input_text",
+          text: IMAGE_CONTENT_OMITTED_PLACEHOLDER,
+        }
+      : item,
+  );
+}
+
+function stripImagesWhenUnsupported(
+  items: ResponseItem[],
+  model: { input?: readonly unknown[] },
+): ResponseItem[] {
+  if (modelSupportsImageInput(model)) return items;
+  return items.map((item) => {
+    const next = cloneResponseItem(item);
+    if (
+      next.type === "message" &&
+      Array.isArray(next.content)
+    ) {
+      next.content = stripUnsupportedImageContentItems(
+        next.content as ResponseContentItem[],
+      );
+    } else if (
+      (next.type === "function_call_output" ||
+        next.type === "custom_tool_call_output") &&
+      "output" in next
+    ) {
+      next.output = stripUnsupportedOutputImages(next.output) as
+        typeof next.output;
+    } else if (
+      next.type === "image_generation_call" &&
+      "result" in next &&
+      typeof next.result === "string"
+    ) {
+      next.result = "";
+    }
+    return next;
+  });
+}
+
+export function normalizeResponseItemsForPrompt(
+  items: ResponseItem[],
+  model: { input?: readonly unknown[] },
+): ResponseItem[] {
+  const withoutGhostSnapshots = items
+    .filter((item) => item.type !== "ghost_snapshot")
+    .map(cloneResponseItem);
+  const withCallOutputs = ensureCallOutputsPresent(
+    withoutGhostSnapshots,
+  );
+  const withoutOrphanOutputs = removeOrphanOutputs(withCallOutputs);
+  return stripImagesWhenUnsupported(withoutOrphanOutputs, model);
 }
 
 function imageUrl(image: ImageContent): string {
