@@ -72,6 +72,15 @@ describe("AgentOS AI telemetry contract v1", () => {
     expect(classifyAIError({ code: "HPE_INVALID_HEADER_TOKEN" })).toBe("protocol");
     expect(classifyAIError({ code: "Z_DATA_ERROR" })).toBe("decode");
     expect(
+      classifyAIError(
+        Object.defineProperty({}, "name", {
+          get() {
+            throw new Error("private throwing getter");
+          },
+        }),
+      ),
+    ).toBe("unknown");
+    expect(
       classifyAIError(new Error("seeded prompt and provider-private error body")),
     ).toBe("unknown");
     expect(classifyAIStatus(200, { name: "ProviderError" })).toBe("error");

@@ -271,6 +271,10 @@ function safeErrorField(
   field: "name" | "code",
 ): string {
   if (typeof error !== "object" || error === null) return "";
-  const value = Reflect.get(error, field);
-  return typeof value === "string" && value.length <= 64 ? value : "";
+  try {
+    const value = Reflect.get(error, field);
+    return typeof value === "string" && value.length <= 64 ? value : "";
+  } catch {
+    return "";
+  }
 }

@@ -187,6 +187,31 @@ managed account label/ID and success. `quota-axi` may provide additional
 read-only provider observations; it never selects accounts or mutates the
 gateway.
 
+### Gateway-only First Mate recovery
+
+When a direct `pi -ne` control succeeds but First Mate fails through the
+Gateway, change only the Gateway client boundary:
+
+1. Preserve the current `~/.pi/agent/models.json` and effective StatefulSet
+   render as rollback evidence without recording Secret values.
+2. Remove only the `openai-codex` Gateway provider override from
+   `models.json`, then select the native direct provider. Do not remove the
+   `@akua-dev/agentos` package or its `agentos-observability`, `mate-memory`,
+   `openai-server-compaction`, background-task, or supervision registrations.
+3. Remove `AI_GATEWAY_URL`, `AI_GATEWAY_TOKEN`, and the
+   `agentos.akua.dev/ai-gateway-client` label only from First Mate's workload
+   patch. Keep the standard `OTEL_*` environment unchanged.
+4. Keep `AGENTOS_OPENAI_SERVER_COMPACTION_ENABLED` unset or true so portable
+   summary plus direct-provider server compaction remains active and observable.
+5. Restart only the First Mate Pod after rendering the exact patch, resume its
+   native session, verify the direct provider/model, and run one short fixed
+   no-tool response. Compare the same fresh/resumed session matrix before
+   attributing the fault to the Gateway.
+
+This recovery does not disable a generic “Mate AI extension”: the Gateway is a
+provider transport override, while AgentOS behavior remains independently
+loaded through the normal Pi extension entrypoint.
+
 An upstream `401`, `429`, timeout or provider error is expected to reach the
 harness. Inspect the native harness error, `ai-gateway status`, Pod/PVC state
 and non-secret account list. Reauthenticate the affected opaque account with a

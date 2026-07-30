@@ -51,6 +51,16 @@ describe("durable routing state", () => {
     expect(await routing.summary(now + 1)).toEqual({
       activeReservations: 1,
       reservationsByAccount: { a: 1 },
+      lastSelection: {
+        observedAt: now,
+        reason: "best_candidate",
+        candidates: expect.arrayContaining([
+          expect.objectContaining({
+            accountId: "a",
+            eligible: true,
+          }),
+        ]),
+      },
     });
 
     const sticky = await routing.acquire({
@@ -117,5 +127,40 @@ describe("durable routing state", () => {
         now: now + 1,
       }),
     ).toMatchObject({ accountId: "b", decisionReason: "best_candidate" });
+  });
+
+  test("retains bounded codex-router rejection explanations for protected status", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-routing-"));
+    const routing = createRoutingState(
+      createRoutingStateStore(join(root, "routing.json")),
+    );
+
+    expect(
+      await routing.acquire({
+        candidates: [
+          {
+            accountId: "reauth",
+            label: "Reauth",
+            needsReauth: true,
+          },
+        ],
+        config: defaultRoutingConfig,
+        now,
+      }),
+    ).toBeUndefined();
+    expect(await routing.summary(now)).toMatchObject({
+      lastSelection: {
+        observedAt: now,
+        reason: "no_eligible_accounts",
+        candidates: [
+          {
+            accountId: "reauth",
+            eligible: false,
+            freshness: "unknown",
+            rejectionCode: "reauthentication_required",
+          },
+        ],
+      },
+    });
   });
 });

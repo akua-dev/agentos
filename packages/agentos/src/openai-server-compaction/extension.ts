@@ -36,6 +36,7 @@ import {
 } from "./session.ts";
 import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
 import {
+  agentOSRouteForModel,
   safeTokenCount,
   startAgentOSAuxiliaryOperation,
 } from "../telemetry/auxiliary.ts";
@@ -336,6 +337,7 @@ async function handleCompaction(
   requestShapes.delete(requestShapeKey(ctx));
   const remoteRequest: ServerCompactionRequest = {
     model,
+    route: agentOSRouteForModel(model),
     apiKey: resolved.apiKey,
     headers: remoteHeaders,
     sessionId: ctx.sessionManager.getSessionId(),

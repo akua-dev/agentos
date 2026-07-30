@@ -42,7 +42,7 @@ async function fixture() {
 describe("Mate memory automatic maintenance", () => {
   test("attributes every extraction model step without recording maintenance content", async () => {
     const recorded = createTelemetryRecorder();
-    let forwardedHeaders: Record<string, string> | undefined;
+    let forwardedHeaders: Record<string, string | null> | undefined;
     const authHeaders = { "x-original": "preserved" };
     const result = await runIsolatedMaintenanceAgent({
       agentDir: "/mate/.pi/agent",
