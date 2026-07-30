@@ -7,10 +7,31 @@ const withAnalyzer = createBundleAnalyzer({
 });
 
 const workerBuildBranch = process.env.WORKERS_CI_BRANCH?.trim() ?? '';
+const workerBuildGitSha = process.env.AGENTOS_BUILD_GIT_SHA?.trim().toLowerCase();
+
+if (workerBuildGitSha && !/^[0-9a-f]{40}$/.test(workerBuildGitSha)) {
+  throw new Error(
+    'AGENTOS_BUILD_GIT_SHA must be a full 40-character Git SHA.',
+  );
+}
 
 const config: NextConfig = {
   env: {
     NEXT_PUBLIC_POSTHOG_BUILD_BRANCH: workerBuildBranch,
+  },
+  async headers() {
+    if (!workerBuildGitSha) return [];
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-AgentOS-Git-SHA',
+            value: workerBuildGitSha,
+          },
+        ],
+      },
+    ];
   },
   reactStrictMode: true,
   experimental: {
