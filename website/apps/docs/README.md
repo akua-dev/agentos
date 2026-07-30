@@ -37,6 +37,10 @@ receive native Wrangler `tag` and `message` annotations containing the full
 revision. Rendered responses expose the same revision in
 `X-AgentOS-Git-SHA`.
 
+Publishing lets OpenNext prepare its cache, then invokes Wrangler directly
+with discrete arguments. This keeps Git metadata out of OpenNext's
+shell-backed passthrough while retaining the adapter's cache behavior.
+
 Set `NEXT_PUBLIC_SITE_URL` to the public origin when building for a different
 host. It defaults to `https://agentos.akua.dev` for production builds and to
 localhost during development.
