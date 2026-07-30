@@ -106,3 +106,17 @@ export {
   type AgentOSTelemetryAttributeValue,
   type AgentOSTelemetrySignal,
 } from "./telemetry/privacy.ts";
+export {
+  createAgentOSTelemetry,
+  createNoopAgentOSTelemetry,
+  initializeAgentOSTelemetryFromEnvironment,
+  type AgentOSOperation,
+  type AgentOSOperationInput,
+  type AgentOSOperationOutcome,
+  type AgentOSProviderAttempt,
+  type AgentOSProviderAttemptInput,
+  type AgentOSProviderAttemptOutcome,
+  type AgentOSTelemetry,
+  type AgentOSTelemetryOptions,
+  type AgentOSTraceCarrier,
+} from "./telemetry/runtime.ts";
