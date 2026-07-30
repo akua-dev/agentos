@@ -8,6 +8,21 @@ import {
 } from "../session.ts";
 import { parseResponseItems } from "../schemas.ts";
 
+const usage = {
+  input: 1,
+  output: 1,
+  cacheRead: 0,
+  cacheWrite: 0,
+  totalTokens: 2,
+  cost: {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    total: 0,
+  },
+};
+
 function message(id: string, parentId: string | null, text: string): SessionEntry {
   return {
     type: "message",
@@ -15,6 +30,54 @@ function message(id: string, parentId: string | null, text: string): SessionEntr
     parentId,
     timestamp: "2026-01-01T00:00:00.000Z",
     message: { role: "user", content: text, timestamp: 1 },
+  };
+}
+
+function assistant(
+  id: string,
+  parentId: string,
+  text: string,
+  api: "openai-responses" | "openai-codex-responses",
+  provider: "openai" | "openai-codex",
+  model: string,
+): SessionEntry {
+  return {
+    type: "message",
+    id,
+    parentId,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    message: {
+      role: "assistant",
+      content: [{ type: "text", text }],
+      api,
+      provider,
+      model,
+      usage,
+      stopReason: "stop",
+      timestamp: 1,
+    },
+  };
+}
+
+function toolResult(
+  id: string,
+  parentId: string,
+  callId: string,
+  text: string,
+): SessionEntry {
+  return {
+    type: "message",
+    id,
+    parentId,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    message: {
+      role: "toolResult",
+      toolCallId: callId,
+      toolName: "read",
+      content: [{ type: "text", text }],
+      isError: false,
+      timestamp: 1,
+    },
   };
 }
 
@@ -45,7 +108,14 @@ describe("native compaction session replay", () => {
       message("new", "compact", "after"),
     ];
 
-    expect(buildCompactionInput(entries, "openai-codex", "gpt-5.4")).toEqual([
+    expect(
+      buildCompactionInput(
+        entries,
+        "openai-codex",
+        "openai-codex-responses",
+        "gpt-5.4",
+      ),
+    ).toEqual([
       expect.objectContaining({
         type: "message",
         role: "user",
@@ -83,14 +153,36 @@ describe("native compaction session replay", () => {
       { type: "compaction" as const, encrypted_content: "opaque" },
     ]);
     if (!output) throw new Error("Invalid response item fixture.");
-    const details = nativeCompactionDetails("openai", "gpt-5.4", output);
+    const details = nativeCompactionDetails(
+      "openai",
+      "openai-responses",
+      "gpt-5.4",
+      output,
+    );
+    expect(details).toEqual({
+      [NATIVE_DETAILS_KEY]: {
+        version: 2,
+        implementation: "responses_compaction_v2",
+        provider: "openai",
+        api: "openai-responses",
+        model: "gpt-5.4",
+        replacementInput: output,
+      },
+    });
     const entries = [
       message("old", null, "already compacted"),
       compaction("compact", "old", "portable summary", details),
       message("new", "compact", "after"),
     ];
 
-    expect(buildCompactionInput(entries, "openai", "gpt-5.4")).toEqual([
+    expect(
+      buildCompactionInput(
+        entries,
+        "openai",
+        "openai-responses",
+        "gpt-5.4",
+      ),
+    ).toEqual([
       ...output,
       { type: "message", role: "user", content: [{ type: "input_text", text: "after" }] },
     ]);
@@ -99,6 +191,7 @@ describe("native compaction session replay", () => {
         { model: "gpt-5.4", input: [{ type: "message", role: "user", content: [] }] },
         entries,
         "openai",
+        "openai-responses",
         "gpt-5.4",
       ),
     ).toEqual({ model: "gpt-5.4", input: [...output, expect.any(Object)] });
@@ -106,7 +199,12 @@ describe("native compaction session replay", () => {
 
   test("never reuses an older artifact across a newer local compaction or model mismatch", () => {
     const artifact = { type: "compaction" as const, encrypted_content: "opaque" };
-    const native = nativeCompactionDetails("openai-codex", "gpt-5.4", [artifact]);
+    const native = nativeCompactionDetails(
+      "openai-codex",
+      "openai-codex-responses",
+      "gpt-5.4",
+      [artifact],
+    );
     const superseded = [
       message("old", null, "old"),
       compaction("native", "old", "one", native),
@@ -114,12 +212,24 @@ describe("native compaction session replay", () => {
       compaction("local", "middle", "two"),
     ];
     expect(
-      rewriteResponsesPayload({ input: [] }, superseded, "openai-codex", "gpt-5.4"),
+      rewriteResponsesPayload(
+        { input: [] },
+        superseded,
+        "openai-codex",
+        "openai-codex-responses",
+        "gpt-5.4",
+      ),
     ).toBeUndefined();
 
     const matching = superseded.slice(0, 2);
     expect(
-      rewriteResponsesPayload({ input: [] }, matching, "openai-codex", "gpt-5.3"),
+      rewriteResponsesPayload(
+        { input: [] },
+        matching,
+        "openai-codex",
+        "openai-codex-responses",
+        "gpt-5.3",
+      ),
     ).toBeUndefined();
   });
 
@@ -140,7 +250,14 @@ describe("native compaction session replay", () => {
       message("new", "compact", "after"),
     ];
 
-    expect(buildCompactionInput(entries, "openai", "gpt-5.4")).toEqual([
+    expect(
+      buildCompactionInput(
+        entries,
+        "openai",
+        "openai-responses",
+        "gpt-5.4",
+      ),
+    ).toEqual([
       expect.objectContaining({
         type: "message",
         content: [expect.objectContaining({ text: expect.stringContaining("portable summary") })],
@@ -165,7 +282,14 @@ describe("native compaction session replay", () => {
       message("new", "compact", "after"),
     ];
 
-    expect(buildCompactionInput(entries, "openai", "gpt-5.4")).toEqual([
+    expect(
+      buildCompactionInput(
+        entries,
+        "openai",
+        "openai-responses",
+        "gpt-5.4",
+      ),
+    ).toEqual([
       expect.objectContaining({
         type: "message",
         content: [expect.objectContaining({ text: expect.stringContaining("portable summary") })],
@@ -183,12 +307,160 @@ describe("native compaction session replay", () => {
         "compact",
         "old",
         "portable summary",
-        nativeCompactionDetails("openai", "gpt-5.4", [artifact]),
+        nativeCompactionDetails(
+          "openai",
+          "openai-responses",
+          "gpt-5.4",
+          [artifact],
+        ),
       ),
     ];
 
     expect(
-      rewriteResponsesPayload({ model: "gpt-5.3", input: [] }, entries, "openai", "gpt-5.4"),
+      rewriteResponsesPayload(
+        { model: "gpt-5.3", input: [] },
+        entries,
+        "openai",
+        "openai-responses",
+        "gpt-5.4",
+      ),
     ).toBeUndefined();
+  });
+
+  test("reads version-1 state and rejects version-2 API mismatches", () => {
+    const artifact = {
+      type: "compaction" as const,
+      encrypted_content: "opaque-legacy",
+    };
+    const legacy = [
+      message("old", null, "discarded"),
+      compaction("compact", "old", "portable summary", {
+        [NATIVE_DETAILS_KEY]: {
+          version: 1,
+          provider: "openai",
+          model: "gpt-5.4",
+          replacementInput: [artifact],
+        },
+      }),
+      message("new", "compact", "after"),
+    ];
+    expect(
+      buildCompactionInput(
+        legacy,
+        "openai",
+        "openai-responses",
+        "gpt-5.4",
+      ),
+    ).toEqual([
+      artifact,
+      {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "after" }],
+      },
+    ]);
+
+    const versionTwo = [
+      message("old", null, "discarded"),
+      compaction(
+        "compact",
+        "old",
+        "portable summary",
+        nativeCompactionDetails(
+          "openai-codex",
+          "openai-codex-responses",
+          "gpt-5.4",
+          [artifact],
+        ),
+      ),
+    ];
+    expect(
+      rewriteResponsesPayload(
+        { input: [] },
+        versionTwo,
+        "openai-codex",
+        "openai-responses",
+        "gpt-5.4",
+      ),
+    ).toBeUndefined();
+  });
+
+  test("replays only matching completed turns plus the pending tail", () => {
+    const artifact = {
+      type: "compaction" as const,
+      encrypted_content: "opaque-turns",
+    };
+    const entries = [
+      message("old", null, "discarded"),
+      compaction(
+        "compact",
+        "old",
+        "portable summary",
+        nativeCompactionDetails(
+          "openai-codex",
+          "openai-codex-responses",
+          "gpt-5.4",
+          [artifact],
+        ),
+      ),
+      message("foreign-user", "compact", "omit user"),
+      assistant(
+        "foreign-assistant",
+        "foreign-user",
+        "omit assistant",
+        "openai-codex-responses",
+        "openai-codex",
+        "gpt-5.3",
+      ),
+      message("matching-user", "foreign-assistant", "keep user"),
+      assistant(
+        "matching-assistant",
+        "matching-user",
+        "keep assistant",
+        "openai-codex-responses",
+        "openai-codex",
+        "gpt-5.4",
+      ),
+      message("pending-user", "matching-assistant", "current user"),
+      toolResult("pending-tool", "pending-user", "call-1", "current tool"),
+    ];
+
+    expect(
+      buildCompactionInput(
+        entries,
+        "openai-codex",
+        "openai-codex-responses",
+        "gpt-5.4",
+      ),
+    ).toEqual([
+      artifact,
+      {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "keep user" }],
+      },
+      {
+        type: "message",
+        role: "assistant",
+        content: [
+          {
+            type: "output_text",
+            text: "keep assistant",
+            annotations: [],
+          },
+        ],
+        status: "completed",
+      },
+      {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "current user" }],
+      },
+      {
+        type: "function_call_output",
+        call_id: "call-1",
+        output: [{ type: "input_text", text: "current tool" }],
+      },
+    ]);
   });
 });

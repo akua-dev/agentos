@@ -1,6 +1,5 @@
 import {
   buildSessionContext,
-  sessionEntryToContextMessages,
   type CompactionEntry,
   type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
@@ -11,8 +10,11 @@ import {
 import {
   JsonObjectSchema,
   NativeCompactionStateSchema,
+  NativeCompactionStateV2Schema,
   ProviderRequestPayloadSchema,
   type NativeCompactionState,
+  type NativeCompactionApi,
+  type NativeCompactionProvider,
   type ProviderRequestPayload,
   type ResponseUsage,
 } from "./schemas.ts";
@@ -36,45 +38,95 @@ function latestCompaction(entries: SessionEntry[]) {
   return undefined;
 }
 
-function messagesAfter(entries: SessionEntry[], index: number) {
-  return entries.slice(index + 1).flatMap(sessionEntryToContextMessages);
-}
-
 export function nativeCompactionDetails(
-  provider: string,
+  provider: NativeCompactionProvider,
+  api: NativeCompactionApi,
   model: string,
   replacementInput: ResponseItem[],
   usage?: ResponseUsage,
 ): Record<typeof NATIVE_DETAILS_KEY, NativeCompactionState> {
+  const state = NativeCompactionStateV2Schema.parse({
+    version: 2,
+    implementation: "responses_compaction_v2",
+    provider,
+    api,
+    model,
+    replacementInput,
+    ...(usage ? { usage } : {}),
+  });
   return {
-    [NATIVE_DETAILS_KEY]: {
-      version: 1,
-      provider,
-      model,
-      replacementInput,
-      ...(usage ? { usage } : {}),
-    },
+    [NATIVE_DETAILS_KEY]: state,
   };
 }
 
-function matchingState(entries: SessionEntry[], provider: string, model: string) {
+function matchingState(
+  entries: SessionEntry[],
+  provider: NativeCompactionProvider,
+  api: NativeCompactionApi,
+  model: string,
+) {
   const latest = latestCompaction(entries);
   if (!latest) return undefined;
   const state = readState(latest.entry);
-  if (!state || state.provider !== provider || state.model !== model) return undefined;
+  if (
+    !state ||
+    state.provider !== provider ||
+    state.model !== model ||
+    (state.version === 2 && state.api !== api)
+  ) {
+    return undefined;
+  }
   return { state, index: latest.index };
+}
+
+function matchingTrailingMessages(
+  entries: SessionEntry[],
+  index: number,
+  provider: NativeCompactionProvider,
+  api: NativeCompactionApi,
+  model: string,
+): ResponseItem[] {
+  const completed: ResponseItem[] = [];
+  let pending: ResponseItem[] = [];
+
+  for (const entry of entries.slice(index + 1)) {
+    if (entry.type !== "message") continue;
+    const items = messagesToResponseItems([entry.message]);
+    if (items.length === 0) continue;
+    if (entry.message.role === "assistant") {
+      if (
+        entry.message.provider === provider &&
+        entry.message.api === api &&
+        entry.message.model === model
+      ) {
+        completed.push(...pending, ...items);
+      }
+      pending = [];
+      continue;
+    }
+    pending.push(...items);
+  }
+
+  return [...completed, ...pending];
 }
 
 export function buildCompactionInput(
   entries: SessionEntry[],
-  provider: string,
+  provider: NativeCompactionProvider,
+  api: NativeCompactionApi,
   model: string,
 ): ResponseItem[] {
-  const native = matchingState(entries, provider, model);
+  const native = matchingState(entries, provider, api, model);
   if (native) {
     return [
       ...native.state.replacementInput,
-      ...messagesToResponseItems(messagesAfter(entries, native.index)),
+      ...matchingTrailingMessages(
+        entries,
+        native.index,
+        provider,
+        api,
+        model,
+      ),
     ];
   }
   return messagesToResponseItems(buildSessionContext(entries).messages);
@@ -83,19 +135,26 @@ export function buildCompactionInput(
 export function rewriteResponsesPayload(
   payload: unknown,
   entries: SessionEntry[],
-  provider: string,
+  provider: NativeCompactionProvider,
+  api: NativeCompactionApi,
   model: string,
 ): ProviderRequestPayload | undefined {
   const parsed = ProviderRequestPayloadSchema.safeParse(payload);
   if (!parsed.success) return undefined;
   if (parsed.data.model !== undefined && parsed.data.model !== model) return undefined;
-  const native = matchingState(entries, provider, model);
+  const native = matchingState(entries, provider, api, model);
   if (!native) return undefined;
   return {
     ...parsed.data,
     input: [
       ...native.state.replacementInput,
-      ...messagesToResponseItems(messagesAfter(entries, native.index)),
+      ...matchingTrailingMessages(
+        entries,
+        native.index,
+        provider,
+        api,
+        model,
+      ),
     ],
   };
 }

@@ -165,8 +165,10 @@ describe("AgentOS OpenAI server-compaction extension", () => {
       details: {
         readFiles: ["a.ts"],
         agentosOpenAIServerCompaction: {
-          version: 1,
+          version: 2,
+          implementation: "responses_compaction_v2",
           provider: "openai-codex",
+          api: "openai-codex-responses",
           model: "gpt-5.4",
           replacementInput: [{ type: "compaction", encrypted_content: "opaque" }],
           usage: { input_tokens: 10, output_tokens: 1, total_tokens: 11 },
@@ -277,7 +279,12 @@ describe("AgentOS OpenAI server-compaction extension", () => {
         summary: "portable",
         firstKeptEntryId: "m1",
         tokensBefore: 100,
-        details: nativeCompactionDetails("openai-codex", "gpt-5.4", [artifact]),
+        details: nativeCompactionDetails(
+          "openai-codex",
+          "openai-codex-responses",
+          "gpt-5.4",
+          [artifact],
+        ),
       },
       {
         type: "message",

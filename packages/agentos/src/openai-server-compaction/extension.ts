@@ -218,7 +218,12 @@ async function handleCompaction(
     apiKey: resolved.apiKey,
     headers: mergedHeaders(model.headers, resolved.headers),
     sessionId: ctx.sessionManager.getSessionId(),
-    input: buildCompactionInput(event.branchEntries, model.provider, model.id),
+    input: buildCompactionInput(
+      event.branchEntries,
+      model.provider,
+      model.api,
+      model.id,
+    ),
     instructions: compactionInstructions(ctx.getSystemPrompt(), event.customInstructions),
     tools: toolsPayload(pi.getAllTools(), pi.getActiveTools()),
     reasoning: reasoningFor(thinkingLevel, model),
@@ -272,6 +277,7 @@ async function handleCompaction(
 
   const native = nativeCompactionDetails(
     model.provider,
+    model.api,
     model.id,
     remote.value.output,
     remote.value.usage,
@@ -326,6 +332,7 @@ export function createOpenAIServerCompactionExtension(
         event.payload,
         ctx.sessionManager.getBranch(),
         model.provider,
+        model.api,
         model.id,
       );
     });
