@@ -35,3 +35,23 @@ provider/routing/account/session identity, or full errors, messages or stacks.
 
 The package, executable, Kubernetes resources, Service DNS, Secret, PVC path,
 environment and client headers consistently use the `ai-gateway` identity.
+
+## OpenTelemetry
+
+The Gateway initializes fail-open OpenTelemetry only when the standard
+`OTEL_*` workload environment selects a configured exporter. It emits bounded
+request, authentication, route-acquisition, route-release, upstream, and stream
+spans plus the contract-v1 metrics documented in
+[`ARCHITECTURE.md`](../../ARCHITECTURE.md#ai-telemetry-contract-v1).
+Readiness never depends on telemetry export.
+
+Validated inbound `traceparent` and `tracestate` continue the runtime trace.
+Every provider attempt receives a fresh `x-client-request-id`; inbound
+`x-agentos-*` correlation metadata is consumed by the Gateway and stripped
+before OpenAI. Provider request IDs appear only on protected spans and
+correlated failure logs. Metrics never contain request, trace, span, operation,
+attempt, session, route-slot, provider-account, or provider-request IDs.
+
+Use the released `agentos-observability` Skill for the controlled
+default-extension versus `-ne -e observability` matrix, portable dashboards,
+alerts, and runbooks.
