@@ -49,10 +49,10 @@ Robin Braemer at source revision
 
 ## Codex Router
 
-`services/ai-gateway/` redistributes the pinned portable `core` and `codex`
-workspace packages from
+`services/ai-gateway/` depends on and the production image redistributes the
+root package from
 [`akua-dev/codex-router`](https://github.com/akua-dev/codex-router) at commit
-`a1d020607cdde212efd57b00ed96a43caa51a6bc`, used under the MIT License:
+`489557ad72774fd0dd67f3fdec402fc246d5256e`, used under the MIT License:
 
 > MIT License
 >

@@ -41,6 +41,9 @@ Repository-wide constraints:
 - Keep every installed Effect package on one exact beta version. Effect
   services, layers, schemas, typed errors, tests and observability follow
   `$effect-ts`; do not create a second local Effect style guide.
+- Consume shared `codex-router` behavior only through its public root Git
+  package pinned to a full commit SHA. Keep AgentOS adapters thin and never
+  vendor or copy the routing implementation.
 - Never place credentials in Git, prompts, argv, persisted task requests,
   generated artifacts or logs. Use the authority's approved environment,
   file, secret or login mechanism.

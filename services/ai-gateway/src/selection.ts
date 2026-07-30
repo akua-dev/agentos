@@ -9,7 +9,7 @@ import {
   weeklyUrgency as routerWeeklyUrgency,
   type CandidateExplanation as RouterCandidateExplanation,
   type RoutingConfig as RouterRoutingConfig,
-} from "@akua-dev/codex-router-core";
+} from "@akua-dev/codex-router/core";
 import { Effect, Option, Result } from "effect";
 import type {
   Candidate,

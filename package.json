@@ -9,14 +9,11 @@
     "database",
     "packages/*",
     "services/*",
-    "vendor/codex-router/packages/*",
     "website/apps/docs"
   ],
   "scripts": {
     "build": "bun run --filter @akua-dev/agentos build",
-    "test": "bun run build && bun test . ./packages/agentos/src/background-tasks ./packages/agentos/src/supervision-guard ./packages/agentos/src/openai-server-compaction ./packages/agentos/src/mate-memory --path-ignore-patterns='website/apps/docs/**' --path-ignore-patterns='vendor/codex-router/**' && bun run router:test && bun run router:bun:test && bun run site:test",
-    "router:test": "vitest run --config vendor/codex-router/vitest.config.ts",
-    "router:bun:test": "bun test vendor/codex-router/packages/bun/test",
+    "test": "bun run build && bun test . ./packages/agentos/src/background-tasks ./packages/agentos/src/supervision-guard ./packages/agentos/src/openai-server-compaction ./packages/agentos/src/mate-memory --path-ignore-patterns='website/apps/docs/**' && bun run site:test",
     "typecheck": "tsc --project tsconfig.json",
     "check": "bun run test && bun run typecheck && bun run site:lint && bun run site:typecheck",
     "site:dev": "bun run --cwd website/apps/docs dev",
