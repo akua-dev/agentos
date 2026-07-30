@@ -446,6 +446,160 @@ reviewed Skill and RBAC without owning the component's source directory.
 Claude, Gemini, WebSockets, multi-replica authority, public ingress and
 general-purpose egress proxy behavior remain outside the first contract.
 
+## AI telemetry contract v1
+
+AgentOS AI telemetry is a diagnostic control plane, never a second inference
+data plane. Pi, Codex and the optional Fleet AI Gateway export asynchronously
+to one Fleet-local OpenTelemetry Collector Service. Collector or remote-export
+failure never blocks a provider request and never participates in Agent or
+Gateway readiness. The Collector remains a separate single-replica StatefulSet
+with its own retained PVC so inference credentials, routing state and telemetry
+storage do not share a process or volume.
+
+Contract version `1` owns the only AgentOS-specific AI telemetry vocabulary.
+Instrumentation imports its executable definitions from
+`packages/agentos/src/telemetry/contract.ts`; components do not invent local
+attribute or metric names. Additive bounded values may extend version 1 only
+after privacy, cardinality, Collector and dashboard review. Renaming a field,
+changing its meaning or broadening a bounded value into arbitrary input
+requires a new contract version and an explicit dashboard migration.
+
+Every resource carries the applicable standard OpenTelemetry identity:
+
+- `service.name`, `service.namespace=agentos`, `service.version` and
+  `deployment.environment.name`;
+- `k8s.cluster.name`, `k8s.namespace.name`, `k8s.workload.name`,
+  `k8s.pod.name` and `k8s.container.name`; and
+- `agentos.fleet.name`, `agentos.ai.runtime` (`pi` or `codex`) and
+  `agentos.ai.runtime.version`.
+
+Fleet and Kubernetes values are deployment-controlled resource attributes.
+Pod UID is useful inside the Collector for association but is not exported as a
+metric label. Provider account identity, email, credential identity and raw
+provider account IDs have no telemetry representation. A deployment that must
+compare routes may assign an opaque `slot-[A-Za-z0-9_-]+` route slot; it appears
+only on protected spans and correlated logs.
+
+The bounded per-operation vocabulary is:
+
+| Attribute | Values | Signals | Cardinality and sensitivity |
+| --- | --- | --- | --- |
+| `agentos.ai.runtime` | `pi`, `codex` | all | 2, public operational |
+| `agentos.ai.route` | `direct`, `ai_gateway` | all | 2, public operational |
+| `agentos.ai.provider.family` | `openai`, `other` | all | 2, public operational |
+| `agentos.ai.request.kind` | `main`, `compaction`, `memory_extract`, `memory_consolidate`, `extension` | all | 5, public operational |
+| `agentos.ai.model.family` | `gpt-5`, `gpt-4.1`, `o-series`, `other` | all | 4, public operational |
+| `agentos.ai.session.state` | `fresh`, `resumed` | all | 2, operational |
+| `agentos.ai.stream.mode` | `streaming`, `non_streaming` | all | 2, operational |
+| `agentos.ai.status_class` | `success`, `client_error`, `server_error`, `cancelled`, `error` | all | 5, operational |
+| `agentos.ai.error.class` | `none`, `authentication`, `rate_limit`, `overload`, `timeout`, `abort`, `transport`, `protocol`, `decode`, `unavailable`, `unknown` | all | 11, operational |
+| `agentos.ai.stream.outcome` | `not_streamed`, `completed`, `client_disconnect`, `aborted`, `upstream_error` | all | 5, operational |
+| operation, attempt, trace, span, session and provider request IDs | opaque, capped at 128 characters | spans and protected correlated logs only | unbounded, restricted |
+| `agentos.ai.route.slot` | opaque `slot-*`, capped at 32 characters | spans and protected correlated logs only | deployment-bounded, restricted |
+
+HTTP status code, numeric token counts, chunk count and byte count may be span
+attributes. Metrics use only the bounded dimensions in the table; they never
+carry a request, trace, span, attempt, operation, thread, session, pod UID,
+provider request or route-slot identifier. Instrumentation records no arbitrary
+exception message or stack. `401`/`403`, `429`, `502`/`503`/`529`, timeout,
+abort, transport, protocol and decode failures map to the bounded error classes
+before export.
+
+The canonical span trees are:
+
+```text
+Pi direct
+agentos.ai.operation
+└── agentos.ai.provider.attempt {runtime=pi, route=direct, kind=main}
+
+Pi through Gateway
+agentos.ai.operation
+└── agentos.ai.provider.attempt {runtime=pi, route=ai_gateway, kind=main}
+    └── ai-gateway.request
+        ├── ai-gateway.route.acquire
+        ├── ai-gateway.upstream
+        └── ai-gateway.stream
+
+Codex through Gateway
+codex conversation/turn span
+└── Codex native API attempt
+    └── ai-gateway.request
+        ├── ai-gateway.route.acquire
+        ├── ai-gateway.upstream
+        └── ai-gateway.stream
+
+Auxiliary work
+agentos.ai.operation
+├── agentos.ai.provider.attempt {kind=main}
+├── agentos.ai.provider.attempt {kind=compaction}
+└── agentos.ai.provider.attempt {kind=memory_extract|memory_consolidate}
+```
+
+A retry or failover creates a new provider-attempt span and unique AgentOS
+attempt ID under the same operation trace. Stream chunks are aggregated, not
+spanned individually. Direct routes never manufacture a Gateway span.
+Auxiliary work is a child of the active operation when possible and otherwise
+uses a safe standalone operation or span link.
+
+Contract metrics are monotonic counters unless noted:
+
+| Metric | Unit/type | Required labels |
+| --- | --- | --- |
+| `agentos.ai.operations` | `{operation}` counter | runtime, route, status class, error class |
+| `agentos.ai.provider.attempts` | `{attempt}` counter | runtime, route, request kind, model family, status class, error class |
+| `agentos.ai.operation.duration` | `s` histogram | runtime, route, status class |
+| `agentos.ai.provider.duration` | `s` histogram | runtime, route, request kind, status class |
+| `agentos.ai.upstream.headers.duration` | `s` histogram | route, status class |
+| `agentos.ai.stream.first_byte.duration` | `s` histogram | route, stream outcome |
+| `agentos.ai.stream.duration` | `s` histogram | route, stream outcome |
+| `agentos.ai.streams.active` | `{stream}` up/down counter | route |
+| `agentos.ai.stream.chunks` | `{chunk}` counter | route, stream outcome |
+| `agentos.ai.stream.bytes` | `By` counter | route, stream outcome |
+| `agentos.ai.route.acquire.duration` | `s` histogram | route, status class |
+| `agentos.ai.quota.observation.age` | `s` histogram | route, stale boolean |
+
+Duration histograms use seconds with boundaries `0.005`, `0.01`, `0.025`,
+`0.05`, `0.1`, `0.25`, `0.5`, `1`, `2.5`, `5`, `10`, `30`, `60`, `120` and
+`300`. Backend-derived dashboards may calculate provider calls per operation
+from trace structure; operation IDs are never copied into metric labels.
+
+The privacy boundary is an allowlist at both instrumentation and Collector
+layers. Telemetry never includes prompts, system prompts, transcripts, message
+content, request or response bodies, tool arguments or results, memory content,
+authorization values, cookies, API/OAuth keys, OTLP exporter headers,
+provider-account identity, arbitrary upstream error bodies or content-bearing
+stack traces. HTTP headers are never captured wholesale. Provider
+`x-request-id` or `x-oai-request-id` may be copied only into a capped protected
+span/log field. A unique AgentOS attempt value may be sent as
+`x-client-request-id` where the provider contract supports it; long-lived
+Codex thread identity is kept separate.
+
+AgentOS extracts and injects W3C `traceparent` and `tracestate`. Baggage is
+disabled unless a reviewed key allowlist exists; arbitrary inbound baggage and
+internal route metadata are stripped. Malformed or oversized context is
+discarded and replaced without failing inference. Propagation and telemetry
+recording failures are always fail-open.
+
+Workloads consume the official OpenTelemetry environment surface:
+`OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`,
+`OTEL_EXPORTER_OTLP_ENDPOINT` and signal-specific endpoint overrides,
+`OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_COMPRESSION`,
+`OTEL_EXPORTER_OTLP_TIMEOUT`, `OTEL_EXPORTER_OTLP_HEADERS`,
+`OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG`,
+`OTEL_PROPAGATORS=tracecontext,baggage` and the signal exporter selectors.
+`OTEL_SDK_DISABLED=true` is the explicit disabled mode. Secret exporter headers
+are sourced from Secrets and never rendered in ConfigMaps or diagnostics.
+Codex does not enable exporters from these variables by itself, so AgentOS
+atomically reconciles its native `[otel]` configuration from the same surface
+and forces `log_user_prompt=false`.
+
+Collector persistent sending queues retain accepted batches only until remote
+delivery or bounded queue eviction. The optional local diagnostic archive is
+off by default, size/time rotated on the Collector PVC and never a supported
+query backend. The remote OTLP backend owns searchable retention and access
+control. Collector queue exhaustion or storage failure may drop telemetry but
+cannot consume the AI Gateway volume or change inference health.
+
 ## Health and recovery
 
 Kubernetes liveness means the pod runtime is technically alive.
