@@ -245,6 +245,7 @@ describe("publishable AgentOS Pi artifacts", () => {
       "@opentelemetry/api": "1.9.1",
       "@opentelemetry/exporter-metrics-otlp-http": "0.221.0",
       "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
+      "@opentelemetry/sdk-metrics": "2.10.0",
       "@opentelemetry/sdk-node": "0.221.0",
       yaml: "2.9.0",
       zod: "4.4.3",
