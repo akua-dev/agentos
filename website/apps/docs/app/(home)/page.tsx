@@ -90,7 +90,7 @@ export default function Page() {
             authority and a verifiable path from human intent to delivered evidence.
           </p>
           <div className="flex w-fit flex-wrap items-center justify-center gap-4">
-            <Link href="/docs/start/get-started" className={buttonVariants()}>
+            <Link href="/learn" className={buttonVariants()}>
               Get started
             </Link>
             <a
@@ -323,11 +323,11 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
             company starts to work.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
-            <Link href="/docs/start/get-started" className={buttonVariants()}>
+            <Link href="/learn" className={buttonVariants()}>
               Get started
             </Link>
-            <Link href="/learn" className={buttonVariants({ variant: 'secondary' })}>
-              Start the course
+            <Link href="/docs" className={buttonVariants({ variant: 'secondary' })}>
+              Open documentation
             </Link>
             <a
               href="https://github.com/akua-dev/agentos/blob/main/CONTRIBUTING.md"

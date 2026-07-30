@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 describe('home layout', () => {
-  it('keeps Documentation as a direct link to the docs root', () => {
+  it('puts Learn before the direct Documentation link', () => {
     render(
       <FrameworkProvider
         Link={({ href, children, ...props }) => (
@@ -28,6 +28,14 @@ describe('home layout', () => {
       </FrameworkProvider>,
     );
 
-    expect(screen.getByRole('link', { name: 'Documentation' }).getAttribute('href')).toBe('/docs');
+    const links = screen.getAllByRole('link');
+    const learnIndex = links.findIndex((link) => link.textContent === 'Learn');
+    const documentationIndex = links.findIndex(
+      (link) => link.textContent === 'Documentation',
+    );
+
+    expect(learnIndex).toBeGreaterThanOrEqual(0);
+    expect(documentationIndex).toBeGreaterThan(learnIndex);
+    expect(links[documentationIndex]?.getAttribute('href')).toBe('/docs');
   });
 });

@@ -1,13 +1,14 @@
 import { AlbumIcon, Boxes, Heart, LayoutTemplate } from 'lucide-react';
 import type { BaseLayoutProps, LinkItemType } from 'fumadocs-ui/layouts/shared';
 
-export const linkItems: LinkItemType[] = [
-  {
-    icon: <AlbumIcon />,
-    text: 'Learn',
-    url: '/learn',
-    active: 'nested-url',
-  },
+export const learnLinkItem: LinkItemType = {
+  icon: <AlbumIcon />,
+  text: 'Learn',
+  url: '/learn',
+  active: 'nested-url',
+};
+
+export const secondaryLinkItems: LinkItemType[] = [
   {
     text: 'Benchmarks',
     url: '/benchmarks',
@@ -33,6 +34,8 @@ export const linkItems: LinkItemType[] = [
     external: true,
   },
 ];
+
+export const linkItems: LinkItemType[] = [learnLinkItem, ...secondaryLinkItems];
 
 export const logo = (
   <span className="flex size-7 items-center justify-center rounded-md bg-brand text-brand-foreground">

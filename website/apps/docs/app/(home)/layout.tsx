@@ -1,5 +1,9 @@
 import { HomeLayout } from 'fumadocs-ui/layouts/home';
-import { baseOptions, linkItems } from '@/components/layouts/shared';
+import {
+  baseOptions,
+  learnLinkItem,
+  secondaryLinkItems,
+} from '@/components/layouts/shared';
 import {
   NavbarMenu,
   NavbarMenuContent,
@@ -14,6 +18,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
     <HomeLayout
       {...baseOptions()}
       links={[
+        learnLinkItem,
         {
           type: 'menu',
           on: 'menu',
@@ -97,7 +102,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
             </NavbarMenu>
           ),
         },
-        ...linkItems,
+        ...secondaryLinkItems,
       ]}
       className="dark:bg-neutral-950 dark:[--color-fd-background:var(--color-neutral-950)] [--color-fd-primary:var(--color-brand)]"
     >
