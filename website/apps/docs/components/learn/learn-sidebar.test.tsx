@@ -75,8 +75,8 @@ describe('CurriculumNavigation', () => {
     expect(screen.getByRole('link', { name: 'Introduction' }).hasAttribute('aria-current')).toBe(
       false,
     );
-    expect(screen.getByRole('link', { name: '2. Second lesson' }).getAttribute('aria-current')).toBe(
-      'page',
-    );
+    expect(
+      screen.getByRole('link', { name: /2\s*Second lesson/ }).getAttribute('aria-current'),
+    ).toBe('page');
   });
 });

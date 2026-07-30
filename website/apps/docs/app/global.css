@@ -7,6 +7,7 @@
 @theme {
   --spacing-page: 1436px;
   --color-brand: #a84a00;
+  --color-brand-strong: #8f3e00;
   --color-brand-foreground: white;
   --color-brand-secondary: #efe8a3;
   --color-brand-secondary-foreground: #5c5100;
@@ -21,6 +22,7 @@
   --color-landing-foreground-200: #b7af7e;
 
   --color-brand: #fff383;
+  --color-brand-strong: #fff383;
   --color-brand-secondary: #fc7744;
   --color-brand-secondary-foreground: #521700;
   --color-brand-foreground: black;

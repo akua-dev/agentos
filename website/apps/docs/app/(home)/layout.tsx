@@ -4,14 +4,8 @@ import {
   learnLinkItem,
   secondaryLinkItems,
 } from '@/components/layouts/shared';
-import {
-  NavbarMenu,
-  NavbarMenuContent,
-  NavbarMenuLink,
-  NavbarMenuTrigger,
-} from 'fumadocs-ui/layouts/home/navbar';
-import Link from 'fumadocs-core/link';
-import { Book, ComponentIcon, Pencil, PlusIcon, Server } from 'lucide-react';
+import { Book, ComponentIcon } from 'lucide-react';
+import type { CSSProperties } from 'react';
 
 export default function Layout({ children }: LayoutProps<'/'>) {
   return (
@@ -37,74 +31,19 @@ export default function Layout({ children }: LayoutProps<'/'>) {
           ],
         },
         {
-          type: 'custom',
+          text: 'Documentation',
+          url: '/docs',
           on: 'nav',
-          children: (
-            <NavbarMenu>
-              <NavbarMenuTrigger>
-                <Link href="/docs">Documentation</Link>
-              </NavbarMenuTrigger>
-              <NavbarMenuContent>
-                <NavbarMenuLink href="/docs/start/get-started" className="md:row-span-2">
-                  <div className="-mx-3 -mt-3 mb-4 flex min-h-28 items-center justify-center rounded-t-lg bg-brand/10">
-                    <Book className="size-10 text-brand" aria-hidden />
-                  </div>
-                  <p className="font-medium">Getting Started</p>
-                  <p className="text-fd-muted-foreground text-sm">
-                    Bring your first AgentOS fleet online.
-                  </p>
-                </NavbarMenuLink>
-
-                <NavbarMenuLink
-                  href="/docs/architecture"
-                  className="lg:col-start-2"
-                >
-                  <ComponentIcon className="bg-fd-primary text-fd-primary-foreground p-1 mb-2 rounded-md" />
-                  <p className="font-medium">Architecture</p>
-                  <p className="text-fd-muted-foreground text-sm">
-                    See every authority and system boundary.
-                  </p>
-                </NavbarMenuLink>
-
-                <NavbarMenuLink
-                  href="/benchmarks"
-                  className="lg:col-start-2"
-                >
-                  <Server className="bg-fd-primary text-fd-primary-foreground p-1 mb-2 rounded-md" />
-                  <p className="font-medium">Benchmarks</p>
-                  <p className="text-fd-muted-foreground text-sm">
-                    Inspect public evidence, including failures.
-                  </p>
-                </NavbarMenuLink>
-
-                <NavbarMenuLink
-                  href="/docs/concepts/autonomous-companies"
-                  className="lg:col-start-3 lg:row-start-1"
-                >
-                  <Pencil className="bg-fd-primary text-fd-primary-foreground p-1 mb-2 rounded-md" />
-                  <p className="font-medium">Vision</p>
-                  <p className="text-fd-muted-foreground text-sm">
-                    Why autonomous companies need an operating system.
-                  </p>
-                </NavbarMenuLink>
-
-                <NavbarMenuLink
-                  href="/docs/contribute"
-                  className="lg:col-start-3 lg:row-start-2"
-                >
-                  <PlusIcon className="bg-fd-primary text-fd-primary-foreground p-1 mb-2 rounded-md" />
-                  <p className="font-medium">Contributing</p>
-                  <p className="text-fd-muted-foreground text-sm">
-                    Help build the open company harness.
-                  </p>
-                </NavbarMenuLink>
-              </NavbarMenuContent>
-            </NavbarMenu>
-          ),
+          active: 'nested-url',
         },
         ...secondaryLinkItems,
       ]}
       className="dark:bg-neutral-950 dark:[--color-fd-background:var(--color-neutral-950)] [--color-fd-primary:var(--color-brand)]"
+      style={
+        {
+          '--fd-layout-width': '100vw',
+        } as CSSProperties
+      }
     >
       {children}
     </HomeLayout>

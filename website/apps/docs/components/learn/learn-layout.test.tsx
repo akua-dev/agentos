@@ -11,6 +11,34 @@ afterEach(() => {
 });
 
 describe('LearnLayout', () => {
+  it('lets the desktop navigation rails reach the viewport edges', () => {
+    const record: LearnPageRecord = {
+      title: 'Begin',
+      description: 'Begin here.',
+      url: '/learn/first/begin',
+      courseId: 'first',
+      courseTitle: 'First',
+      courseOrder: 1,
+      lessonId: 'begin',
+      lessonOrder: 1,
+      estimatedMinutes: 2,
+    };
+
+    render(
+      <LearnLayout
+        curriculum={buildCurriculum([record])}
+        selection={{ kind: 'introduction' }}
+        toc={[]}
+      >
+        Introduction
+      </LearnLayout>,
+    );
+
+    const shell = screen.getByRole('main').parentElement;
+
+    expect(shell?.style.maxWidth).toBe('none');
+  });
+
   it('describes progress using the actual curriculum size', () => {
     const record: LearnPageRecord = {
       title: 'Begin',

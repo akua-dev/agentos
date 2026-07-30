@@ -40,7 +40,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const { body: Mdx, toc, lastModified } = await page.data.load();
 
   return (
-    <DocsPage toc={toc} {...pageProps}>
+    <DocsPage toc={toc} role="main" {...pageProps}>
       <h1 className="text-[1.75em] font-semibold">{page.data.title}</h1>
       <p className="text-lg text-fd-muted-foreground mb-2">{page.data.description}</p>
       <CanonicalSources sources={page.data.canonical} />
@@ -94,21 +94,24 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
 
 function DocsCategory({ url }: { url: string }) {
   return (
-    <Cards>
-      {findSiblings(source.getPageTree(), url).map((item) => {
-        if (item.type === 'separator') return;
-        if (item.type === 'folder') {
-          if (!item.index) return;
-          item = item.index;
-        }
+    <>
+      <h2 className="sr-only">Explore this section</h2>
+      <Cards>
+        {findSiblings(source.getPageTree(), url).map((item) => {
+          if (item.type === 'separator') return;
+          if (item.type === 'folder') {
+            if (!item.index) return;
+            item = item.index;
+          }
 
-        return (
-          <Card key={item.url} title={item.name} href={item.url}>
-            {item.description}
-          </Card>
-        );
-      })}
-    </Cards>
+          return (
+            <Card key={item.url} title={item.name} href={item.url}>
+              {item.description}
+            </Card>
+          );
+        })}
+      </Cards>
+    </>
   );
 }
 

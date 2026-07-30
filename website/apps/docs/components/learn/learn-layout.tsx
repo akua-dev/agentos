@@ -23,7 +23,10 @@ export function LearnLayout({
   return (
     <>
       <LearnDrawer curriculum={curriculum} selection={selection} />
-      <div className="mx-auto grid w-full max-w-[1536px] lg:grid-cols-[268px_minmax(0,1fr)] xl:grid-cols-[268px_minmax(0,1fr)_240px]">
+      <div
+        className="grid w-full lg:grid-cols-[18.5rem_minmax(0,1fr)] xl:grid-cols-[18.5rem_minmax(0,1fr)_16rem]"
+        style={{ maxWidth: 'none' }}
+      >
         <LearnSidebar curriculum={curriculum} selection={selection} />
         <main className="min-w-0 px-5 py-9 sm:px-8 lg:px-10 xl:px-12">{children}</main>
         <aside className="sticky top-16 hidden h-[calc(100dvh-4rem)] overflow-y-auto border-l px-5 py-6 xl:block">
