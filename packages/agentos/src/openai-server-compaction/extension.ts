@@ -314,12 +314,12 @@ async function handleCompaction(
   const localAttempt = telemetryOperation.startProviderAttempt({
     compactionPath: "portable_summary",
     requestKind: "compaction",
-    streamMode: "streaming",
+    streamMode: "non_streaming",
   });
   const remoteAttempt = telemetryOperation.startProviderAttempt({
     compactionPath: "native_server",
     requestKind: "compaction",
-    streamMode: "streaming",
+    streamMode: model.provider === "openai-codex" ? "streaming" : "non_streaming",
   });
   const baseHeaders = mergedHeaders(model.headers, resolved.headers);
   const localHeaders = { ...baseHeaders };

@@ -16,7 +16,13 @@ import {
   type Tracer,
 } from "@opentelemetry/api";
 import {
+  AggregationType,
+  InstrumentType,
+  type ViewOptions,
+} from "@opentelemetry/sdk-metrics";
+import {
   AGENTOS_AI_METRICS,
+  AGENTOS_AI_DURATION_BUCKETS_SECONDS,
   AGENTOS_AI_TELEMETRY_CONTRACT_VERSION,
   type AgentOSAICompactionPath,
   type AgentOSAIModelFamily,
@@ -101,6 +107,27 @@ export interface AgentOSTelemetryOptions {
   clock?: () => number;
   id?: () => string;
   shutdown?: () => Promise<void>;
+}
+
+export function createAgentOSMetricViews(): ViewOptions[] {
+  return [
+    AGENTOS_AI_METRICS.operationDuration,
+    AGENTOS_AI_METRICS.providerDuration,
+    AGENTOS_AI_METRICS.upstreamHeadersDuration,
+    AGENTOS_AI_METRICS.firstByteDuration,
+    AGENTOS_AI_METRICS.streamDuration,
+    AGENTOS_AI_METRICS.routeAcquisitionDuration,
+    AGENTOS_AI_METRICS.quotaObservationAge,
+  ].map((instrumentName) => ({
+    instrumentName,
+    instrumentType: InstrumentType.HISTOGRAM,
+    aggregation: {
+      type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
+      options: {
+        boundaries: [...AGENTOS_AI_DURATION_BUCKETS_SECONDS],
+      },
+    },
+  }));
 }
 
 interface Instruments {
@@ -479,7 +506,7 @@ async function initializeEnvironmentTelemetry(): Promise<AgentOSTelemetry> {
   }
   try {
     const { NodeSDK } = await import("@opentelemetry/sdk-node");
-    const sdk = new NodeSDK();
+    const sdk = new NodeSDK({ views: createAgentOSMetricViews() });
     sdk.start();
     return createAgentOSTelemetry({
       enabled: true,

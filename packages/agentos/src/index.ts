@@ -78,6 +78,7 @@ export {
   AGENTOS_AI_COMPACTION_PATHS,
   AGENTOS_AI_DURATION_BUCKETS_SECONDS,
   AGENTOS_AI_ERROR_CLASSES,
+  AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
   AGENTOS_AI_METRICS,
   AGENTOS_AI_MODEL_FAMILIES,
   AGENTOS_AI_PROVIDER_FAMILIES,
@@ -110,6 +111,7 @@ export {
   type AgentOSTelemetrySignal,
 } from "./telemetry/privacy.ts";
 export {
+  createAgentOSMetricViews,
   createAgentOSTelemetry,
   createNoopAgentOSTelemetry,
   initializeAgentOSTelemetryFromEnvironment,

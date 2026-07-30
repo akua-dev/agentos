@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, test } from "bun:test";
 import type { OAuthCredentials } from "@earendil-works/pi-ai/oauth";
 import { createAIGatewayService } from "../src/service.ts";
+import type { GatewayTelemetry } from "../src/telemetry.ts";
 
 function accessToken(accountId: string, suffix = ""): string {
   const payload = Buffer.from(
@@ -141,6 +142,52 @@ describe("AI gateway service", () => {
     expect(responseCalls).toBe(1);
   });
 
+  test("records bounded quota observation age and freshness during acquisition", async () => {
+    const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-service-"));
+    let now = 1_000_000;
+    const observations: Array<[number, boolean]> = [];
+    let usageCalls = 0;
+    const service = await createAIGatewayService({
+      stateDirectory,
+      clientToken: "fleet-token",
+      allowApiKeyFallback: false,
+      oauth: { refresh: async () => credentials("provider-a") },
+      clock: () => now,
+      telemetry: recordingQuotaTelemetry(observations),
+      fetchImpl: async (input) => {
+        if (String(input).includes("wham/usage")) {
+          usageCalls += 1;
+          if (usageCalls === 2) throw new Error("usage unavailable");
+          return Response.json({
+            rate_limit: {
+              primary_window: {
+                used_percent: 10,
+                limit_window_seconds: 18_000,
+                reset_at: Math.floor((now + 3_600_000) / 1_000),
+              },
+              secondary_window: {
+                used_percent: 20,
+                limit_window_seconds: 604_800,
+                reset_at: Math.floor((now + 86_400_000) / 1_000),
+              },
+            },
+          });
+        }
+        return new Response("ok");
+      },
+    });
+    await service.vault.addFromOAuth("Primary", credentials("provider-a"));
+
+    expect((await service.fetch(proxyRequest())).status).toBe(200);
+    now += 61_000;
+    expect((await service.fetch(proxyRequest())).status).toBe(200);
+
+    expect(observations).toEqual([
+      [0, false],
+      [61, true],
+    ]);
+  });
+
   test("recovers the same OAuth account after a visible 401 and fresh login", async () => {
     const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-service-"));
     let responseCalls = 0;
@@ -256,3 +303,27 @@ describe("AI gateway service", () => {
     expect(responseCalls).toBe(1);
   });
 });
+
+function recordingQuotaTelemetry(observations: Array<[number, boolean]>): GatewayTelemetry {
+  return {
+    enabled: true,
+    startRequest() {
+      return {
+        attemptId: "gateway-test",
+        authenticate() {},
+        routeStarted() {},
+        routeEnded() {},
+        quotaObservation(ageSeconds, stale) {
+          observations.push([ageSeconds, stale]);
+        },
+        upstreamStarted() {},
+        upstreamHeaders() {},
+        upstreamFailed() {},
+        streamChunk() {},
+        routeReleaseStarted() {},
+        routeReleased() {},
+        end() {},
+      };
+    },
+  };
+}

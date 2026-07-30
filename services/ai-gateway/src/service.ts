@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS } from "@akua-dev/agentos";
 import type { CodexOAuthClient, AccountVault } from "./accounts.ts";
 import { createAccountVault, createAccountVaultStore } from "./accounts.ts";
 import {
@@ -6,7 +7,7 @@ import {
   isClientAuthorized,
   type FetchImplementation,
 } from "./proxy.ts";
-import type { GatewayTelemetry } from "./telemetry.ts";
+import type { GatewayRequestTelemetry, GatewayTelemetry } from "./telemetry.ts";
 import { createRoutingState, createRoutingStateStore } from "./routing-state.ts";
 import { defaultRoutingConfig } from "./selection.ts";
 import type { Candidate, RouteLease, UsageSnapshot } from "./types.ts";
@@ -51,6 +52,7 @@ export async function createAIGatewayService(
   const acquire = async (
     sessionKey: string | undefined,
     signal: AbortSignal,
+    requestTelemetry: GatewayRequestTelemetry,
   ): Promise<RouteLease | undefined> => {
     const summaries = await vault.list();
     const candidates = await Promise.all(
@@ -94,6 +96,16 @@ export async function createAIGatewayService(
         };
       }),
     );
+
+    const observationNow = clock();
+    for (const candidate of candidates) {
+      const snapshot = candidate.usage;
+      if (!snapshot) continue;
+      requestTelemetry.quotaObservation(
+        quotaObservationAgeSeconds(observationNow, snapshot.observedAt),
+        snapshot.stale,
+      );
+    }
 
     const reservation = await routing.acquire({
       candidates,
@@ -207,6 +219,14 @@ export async function createAIGatewayService(
       return proxy(request);
     },
   };
+}
+
+function quotaObservationAgeSeconds(now: number, observedAt: number): number {
+  if (!Number.isFinite(now) || !Number.isFinite(observedAt)) return 0;
+  return Math.min(
+    AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
+    Math.max(0, now - observedAt) / 1_000,
+  );
 }
 
 function parseRetryAfter(value: string | null, now: number): number | undefined {

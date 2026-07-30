@@ -38,7 +38,11 @@ export interface StreamFailureObservation {
 
 export interface ProxyHandlerOptions {
   clientToken: string;
-  acquire(sessionKey: string | undefined, signal: AbortSignal): Promise<RouteLease | undefined>;
+  acquire(
+    sessionKey: string | undefined,
+    signal: AbortSignal,
+    telemetry: GatewayRequestTelemetry,
+  ): Promise<RouteLease | undefined>;
   fetchImpl: FetchImplementation;
   heartbeatMs?: number;
   telemetry?: GatewayTelemetry;
@@ -78,7 +82,7 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
     telemetry.routeStarted();
     let lease: RouteLease | undefined;
     try {
-      lease = await options.acquire(sessionKey, request.signal);
+      lease = await options.acquire(sessionKey, request.signal, telemetry);
     } catch (error) {
       telemetry.routeEnded("error", error);
       telemetry.end({
