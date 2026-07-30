@@ -141,6 +141,7 @@ export const selectAccount = Effect.fn("selectAccount")(function* (input: Select
 
   if (ranked.length === 0) {
     return yield* new NoEligibleAccountsError({
+      explanations,
       message: "No account has safe quota and health data"
     })
   }
@@ -152,6 +153,7 @@ export const selectAccount = Effect.fn("selectAccount")(function* (input: Select
   const best = preferred[0]
   if (best === undefined) {
     return yield* new NoEligibleAccountsError({
+      explanations,
       message: "No account remains after freshness selection"
     })
   }

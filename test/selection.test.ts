@@ -228,13 +228,40 @@ describe("selectAccount", () => {
     Effect.gen(function* () {
       const failure = yield* Effect.flip(
         selectAccount({
-          candidates: [candidate("unknown", { usage: false })],
+          candidates: [
+            candidate("reauth", { requiresReauthentication: true }),
+            candidate("blocked", {
+              block: AccountBlock.make({
+                kind: "quota",
+                retryAt: now + hour
+              })
+            }),
+            candidate("unknown", { usage: false }),
+            candidate("short-exhausted", { shortUsed: 91 }),
+            candidate("weekly-exhausted", { weeklyUsed: 98 }),
+            candidate("too-old", { observedAt: now - day - 1 }),
+            candidate("expired-reset", { weeklyResetAt: now })
+          ],
           config: defaultRoutingConfig,
           now
         })
       )
 
       expect(failure).toBeInstanceOf(NoEligibleAccountsError)
+      expect(
+        failure.explanations.map((explanation) => [
+          explanation.accountId,
+          Option.getOrUndefined(explanation.rejection)
+        ])
+      ).toEqual([
+        [AccountId.make("reauth"), "reauthentication_required"],
+        [AccountId.make("blocked"), "active_block"],
+        [AccountId.make("unknown"), "usage_unknown"],
+        [AccountId.make("short-exhausted"), "short_headroom"],
+        [AccountId.make("weekly-exhausted"), "weekly_headroom"],
+        [AccountId.make("too-old"), "usage_too_old"],
+        [AccountId.make("expired-reset"), "weekly_reset_elapsed"]
+      ])
     })
   )
 })
