@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import {
+  link,
   mkdir,
   readFile,
+  unlink,
   writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -173,19 +175,25 @@ export async function resolveCodexInstallationId(
     }
 
     const installationId = randomUUID();
+    const temporaryPath = join(codexHome, `.installation_id-${randomUUID()}.tmp`);
     try {
-      await writeFile(installationPath, installationId, {
+      await writeFile(temporaryPath, installationId, {
         encoding: "utf8",
         flag: "wx",
         mode: 0o644,
       });
-      return installationId;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      return (
-        canonicalUuid(await readFile(installationPath, "utf8")) ??
-        randomUUID()
-      );
+      try {
+        await link(temporaryPath, installationPath);
+        return installationId;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        return (
+          canonicalUuid(await readFile(installationPath, "utf8")) ??
+          randomUUID()
+        );
+      }
+    } finally {
+      await unlink(temporaryPath).catch(() => undefined);
     }
   } catch {
     // Installation identity is affinity metadata; failure must not block AI.
