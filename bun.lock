@@ -84,6 +84,10 @@
         "@types/proper-lockfile": "4.1.4",
       },
     },
+    "services/otel-collector": {
+      "name": "@agentos/otel-collector",
+      "version": "0.0.0",
+    },
     "website/apps/docs": {
       "name": "docs",
       "version": "0.1.13",
@@ -150,6 +154,8 @@
     "@agentos/database": ["@agentos/database@workspace:database"],
 
     "@agentos/github-app-token": ["@agentos/github-app-token@workspace:clis/github-app-token"],
+
+    "@agentos/otel-collector": ["@agentos/otel-collector@workspace:services/otel-collector"],
 
     "@agentos/pg-listen": ["@agentos/pg-listen@workspace:clis/pg-listen"],
 

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-otel-collector
+spec:
+  template:
+    spec:
+      containers:
+        - name: collector
+          args:
+            - --config=file:/etc/otelcol/collector.yaml
+            - --config=file:/etc/otelcol-secret/headers.yaml
+          env:
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: agentos-otel-remote
+                  key: endpoint
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otelcol
+              readOnly: true
+            - name: remote-headers
+              mountPath: /etc/otelcol-secret
+              readOnly: true
+            - name: storage
+              mountPath: /var/lib/otelcol
+      volumes:
+        - name: config
+          configMap:
+            name: agentos-otel-collector
+        - name: remote-headers
+          secret:
+            secretName: agentos-otel-remote
+            items:
+              - key: headers.yaml
+                path: headers.yaml
