@@ -1,3 +1,8 @@
+import { documentationRoutes } from './docs-contract';
+import { learningRoutes } from './learn-contract';
+
+const productionOrigin = 'https://agentos.akua.dev';
+
 export interface RouteExpectation {
   path: string;
   status: number;
@@ -29,8 +34,12 @@ export const routeExpectations: readonly RouteExpectation[] = [
       'under human',
       'Read https://github.com/akua-dev/agentos/blob/main/BOOTSTRAP.md',
       'From one answer to a company.',
+      `${productionOrigin}/`,
+      `${productionOrigin}/opengraph-image.png`,
+      'SoftwareSourceCode',
     ],
     excludes: [
+      'banner.png',
       'Fumadocs',
       'shadcn',
       'Turbo DX at Vercel',
@@ -50,7 +59,7 @@ export const routeExpectations: readonly RouteExpectation[] = [
   {
     path: '/docs',
     status: 200,
-    includes: ['AgentOS documentation'],
+    includes: ['AgentOS documentation', `${productionOrigin}/docs`],
     excludes: ['The framework for building documentation sites'],
   },
   {
@@ -60,26 +69,38 @@ export const routeExpectations: readonly RouteExpectation[] = [
       'What is an autonomous company?',
       'Get a working Fleet first',
       'What you will be able to run',
+      `${productionOrigin}/learn`,
     ],
     excludes: ['Fumadocs Blog'],
   },
   {
     path: '/benchmarks',
     status: 200,
-    includes: ['Measure the organization', '3 of 5', 'failed and incomplete'],
+    includes: [
+      'Measure the organization',
+      '3 of 5',
+      'failed and incomplete',
+      `${productionOrigin}/benchmarks`,
+    ],
     excludes: ['customer testimonial'],
   },
-  {
-    path: '/banner.png',
-    status: 200,
-    includes: [],
-    excludes: [],
-  },
+  ...['/favicon.ico', '/icon.png', '/apple-icon.png', '/opengraph-image.png'].map(
+    (path): RouteExpectation => ({
+      path,
+      status: 200,
+      includes: [],
+      excludes: [],
+    }),
+  ),
   ...documentationRoutes.slice(1).map(
     (route): RouteExpectation => ({
       path: route.path,
       status: 200,
-      includes: [route.title, 'Canonical sources'],
+      includes: [
+        route.title,
+        'Canonical sources',
+        `${productionOrigin}${route.path}`,
+      ],
       excludes: ['Fumadocs'],
     }),
   ),
@@ -87,10 +108,27 @@ export const routeExpectations: readonly RouteExpectation[] = [
     (route): RouteExpectation => ({
       path: route.path,
       status: 200,
-      includes: [route.title, 'Canonical sources'],
+      includes: [
+        route.title,
+        'Canonical sources',
+        `${productionOrigin}${route.path}`,
+      ],
       excludes: ['Fumadocs'],
     }),
   ),
+  {
+    path: '/robots.txt',
+    status: 200,
+    includes: [
+      'OAI-SearchBot',
+      'ChatGPT-User',
+      'Claude-SearchBot',
+      'Claude-User',
+      'PerplexityBot',
+      `${productionOrigin}/sitemap.xml`,
+    ],
+    excludes: [],
+  },
   {
     path: '/sitemap.xml',
     status: 200,
@@ -104,8 +142,14 @@ export const routeExpectations: readonly RouteExpectation[] = [
   {
     path: '/llms.txt',
     status: 200,
-    includes: ['## Documentation', '## Learn', 'Upgrade without losing control'],
-    excludes: ['Fumadocs UI'],
+    includes: [
+      '## Documentation',
+      '## Learn',
+      'Upgrade without losing control',
+      `${productionOrigin}/docs`,
+      `${productionOrigin}/llms-full.txt`,
+    ],
+    excludes: ['Fumadocs UI', '](/'],
   },
   {
     path: '/llms-full.txt',
@@ -147,7 +191,6 @@ export async function auditSite(
 
   for (const expectation of expectations) {
     let response: Response;
-
     try {
       response = await dependencies.fetch(new URL(expectation.path, origin), {
         redirect: 'manual',
@@ -220,5 +263,3 @@ if (import.meta.main) {
     console.log(`Checked ${result.checked} public routes with no failures.`);
   }
 }
-import { documentationRoutes } from './docs-contract';
-import { learningRoutes } from './learn-contract';

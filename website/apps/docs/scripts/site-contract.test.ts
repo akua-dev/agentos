@@ -78,7 +78,13 @@ describe('auditSite', () => {
 
   it('defines the complete Landing, Docs, Learn, discovery, and removal contract', () => {
     const paths = routeExpectations.map((expectation) => expectation.path);
-    expect(paths).toHaveLength(81);
+    expect(paths).toHaveLength(85);
+    expect(paths).toContain('/favicon.ico');
+    expect(paths).toContain('/icon.png');
+    expect(paths).toContain('/apple-icon.png');
+    expect(paths).toContain('/opengraph-image.png');
+    expect(paths).toContain('/robots.txt');
+    expect(paths).not.toContain('/banner.png');
     expect(paths).toContain('/docs/operate/supervise-steer');
     expect(paths).toContain('/learn/03-stay-in-control/upgrade-without-losing-control');
     expect(paths).toContain('/api/search?query=sovereign');
@@ -90,7 +96,11 @@ describe('auditSite', () => {
       (expectation) => expectation.path === '/docs/start/get-started',
     );
 
-    expect(docsExpectation?.includes).toEqual(['Get started', 'Canonical sources']);
+    expect(docsExpectation?.includes).toEqual([
+      'Get started',
+      'Canonical sources',
+      'https://agentos.akua.dev/docs/start/get-started',
+    ]);
     expect(docsExpectation?.includes).not.toContain('What changes at this layer?');
   });
 
