@@ -1,37 +1,18 @@
 import { timingSafeEqual } from "node:crypto";
 import {
+  extractSessionKey,
+  isSupportedResponsePath,
+  resolveUpstreamTarget,
+  sanitizeRequestHeaders,
+  sanitizeResponseHeaders,
+} from "@akua-dev/codex-router-codex";
+import { Effect, Option, Result } from "effect";
+import {
   createNoopGatewayTelemetry,
   type GatewayRequestTelemetry,
   type GatewayTelemetry,
 } from "./telemetry.ts";
 import type { RouteLease } from "./types.ts";
-
-const ALLOWED_PATHS = new Set(["/responses", "/v1/responses", "/codex/responses"]);
-const REQUEST_HEADERS_TO_REMOVE = new Set([
-  "authorization",
-  "api-key",
-  "chatgpt-account-id",
-  "host",
-  "content-length",
-  "connection",
-  "proxy-authorization",
-  "proxy-authenticate",
-  "x-api-key",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
-]);
-const RESPONSE_HEADERS_TO_REMOVE = new Set([
-  "connection",
-  "content-encoding",
-  "content-length",
-  "proxy-authenticate",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
-]);
 
 export type FetchImplementation = (
   input: string | URL | Request,
@@ -78,12 +59,22 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
       return jsonResponse(401, { error: "unauthorized" });
     }
     const url = new URL(request.url);
-    if (request.method !== "POST" || !ALLOWED_PATHS.has(url.pathname)) {
+    if (
+      request.method !== "POST" ||
+      !isSupportedResponsePath(url.pathname)
+    ) {
       telemetry.end({ status: 404, streamOutcome: "not_streamed" });
       return jsonResponse(404, { error: "not_found" });
     }
 
-    const sessionKey = explicitSessionKey(request.headers);
+    const sessionResult = Effect.runSync(
+      Effect.result(extractSessionKey(request.headers)),
+    );
+    if (Result.isFailure(sessionResult)) {
+      telemetry.end({ status: 400, streamOutcome: "not_streamed" });
+      return jsonResponse(400, { error: "invalid_session" });
+    }
+    const sessionKey = Option.getOrUndefined(sessionResult.success);
     telemetry.routeStarted();
     let lease: RouteLease | undefined;
     try {
@@ -103,17 +94,21 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
     }
     telemetry.routeEnded("acquired");
 
-    const headers = sanitizedRequestHeaders(request.headers);
+    const headers = sanitizeRequestHeaders(request.headers);
+    for (const name of [...headers.keys()]) {
+      if (name.startsWith("x-agentos-")) headers.delete(name);
+    }
     headers.set("accept-encoding", "identity");
     headers.set("authorization", `Bearer ${lease.accessToken}`);
-    let upstreamUrl: string;
+    let accountKind: "codex_subscription" | "openai_api_key";
     if (lease.kind === "codex_oauth") {
-      upstreamUrl = "https://chatgpt.com/backend-api/codex/responses";
+      accountKind = "codex_subscription";
       headers.set("chatgpt-account-id", lease.providerAccountId);
     } else {
-      upstreamUrl = "https://api.openai.com/v1/responses";
+      accountKind = "openai_api_key";
       headers.delete("chatgpt-account-id");
     }
+    const upstreamUrl = resolveUpstreamTarget(url.pathname, accountKind);
     telemetry.upstreamStarted(headers);
 
     let upstream: Response;
@@ -147,8 +142,7 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
     }
 
     const upstreamEncoding = classifyUpstreamEncoding(upstream.headers);
-    const responseHeaders = new Headers(upstream.headers);
-    for (const name of RESPONSE_HEADERS_TO_REMOVE) responseHeaders.delete(name);
+    const responseHeaders = sanitizeResponseHeaders(upstream.headers);
     if (!upstream.body) {
       await releaseLease(lease, telemetry);
       telemetry.end({
@@ -194,32 +188,6 @@ function constantTimeEqual(actual: string, expected: string): boolean {
   const left = Buffer.from(actual);
   const right = Buffer.from(expected);
   return left.length === right.length && timingSafeEqual(left, right);
-}
-
-function explicitSessionKey(headers: Headers): string | undefined {
-  for (const name of [
-    "x-ai-gateway-session",
-    "session-id",
-    "x-codex-session-id",
-    "x-codex-window-id",
-    "x-codex-parent-thread-id",
-    "x-codex-turn-state",
-  ]) {
-    const value = headers.get(name)?.trim();
-    if (value) return value.slice(0, 256);
-  }
-  return undefined;
-}
-
-function sanitizedRequestHeaders(input: Headers): Headers {
-  const headers = new Headers(input);
-  headers.delete("x-ai-gateway-token");
-  headers.delete("x-ai-gateway-session");
-  for (const name of REQUEST_HEADERS_TO_REMOVE) headers.delete(name);
-  for (const name of [...headers.keys()]) {
-    if (name.startsWith("x-agentos-")) headers.delete(name);
-  }
-  return headers;
 }
 
 function classifyUpstreamEncoding(headers: Headers): UpstreamEncoding {

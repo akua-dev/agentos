@@ -88,7 +88,14 @@ export function createRoutingState(store: AtomicJsonStore<RoutingStateFile>) {
         );
         const candidates = input.candidates.map((candidate) => {
           const block = blocks.find((value) => value.accountId === candidate.accountId);
-          return { ...candidate, ...(block ? { block } : {}) };
+          const activeReservations = reservations.filter(
+            (value) => value.accountId === candidate.accountId,
+          ).length;
+          return {
+            ...candidate,
+            activeReservations,
+            ...(block ? { block } : {}),
+          };
         });
         const decision = selectAccount({
           candidates,

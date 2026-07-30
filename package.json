@@ -7,13 +7,18 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "workspaces": ["clis/*", "database", "packages/*", "services/*", "website/apps/docs"],
+  "workspaces": [
+    "clis/*",
+    "database",
+    "packages/*",
+    "services/*",
+    "vendor/codex-router/packages/*",
+    "website/apps/docs"
+  ],
   "scripts": {
     "build": "bun run --filter @akua-dev/agentos build",
-    "test": "bun run build && bun test . ./packages/agentos/src/background-tasks ./packages/agentos/src/supervision-guard ./packages/agentos/src/openai-server-compaction ./packages/agentos/src/mate-memory --path-ignore-patterns='website/apps/docs/**' && bun run site:test",
+    "test": "bun run build && bun test . ./packages/agentos/src/background-tasks ./packages/agentos/src/supervision-guard ./packages/agentos/src/openai-server-compaction ./packages/agentos/src/mate-memory --path-ignore-patterns='website/apps/docs/**' --path-ignore-patterns='vendor/codex-router/**' && bun run router:test && bun run site:test",
+    "router:test": "vitest run --config vendor/codex-router/vitest.config.ts",
     "typecheck": "tsc --project tsconfig.json",
     "check": "bun run test && bun run typecheck && bun run site:lint && bun run site:typecheck",
     "site:dev": "bun run --cwd website/apps/docs dev",
@@ -28,8 +33,11 @@
     "site:upload:worker": "bun run --cwd website/apps/docs upload:worker"
   },
   "devDependencies": {
+    "@effect/vitest": "4.0.0-beta.102",
     "@types/bun": "1.3.14",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
   },
   "dependencies": {
     "@akua-dev/agentos": "workspace:*",

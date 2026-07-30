@@ -87,4 +87,35 @@ describe("durable routing state", () => {
     });
     expect((await store.read()).reservations).toHaveLength(1);
   });
+
+  test("uses codex-router reservation pressure as the deterministic tie break", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-routing-"));
+    const store = createRoutingStateStore(join(root, "routing.json"));
+    const routing = createRoutingState(store);
+    const tied = candidates.map((value) => ({
+      ...value,
+      usage: {
+        ...value.usage!,
+        weeklyWindow: {
+          usedPercent: 20,
+          resetsAt: now + 24 * 3_600_000,
+        },
+      },
+    }));
+
+    expect(
+      await routing.acquire({
+        candidates: tied,
+        config: defaultRoutingConfig,
+        now,
+      }),
+    ).toMatchObject({ accountId: "a", decisionReason: "best_candidate" });
+    expect(
+      await routing.acquire({
+        candidates: tied,
+        config: defaultRoutingConfig,
+        now: now + 1,
+      }),
+    ).toMatchObject({ accountId: "b", decisionReason: "best_candidate" });
+  });
 });

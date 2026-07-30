@@ -11,10 +11,14 @@ subscription capacity is worth the Captain-approved credential authority and
 additional service lifecycle. The operator workflow lives in
 `$agentos-ai-gateway`; the stable boundary lives in `ARCHITECTURE.md`.
 
-The package derives its selection and credential-safety semantics from prior
-MIT-licensed work by Robin Braemer and its raw proxy/session ideas from the
-MIT-licensed `manaflow-ai/subrouter`. It does not capture transcripts, wrap
-harness commands or silently change models/providers.
+Shared selection, session, lease, Responses protocol, header sanitation and
+streaming semantics come from the pinned MIT-licensed
+[`akua-dev/codex-router`](../../vendor/codex-router/UPSTREAM.md) workspace
+snapshot. AgentOS supplies only its Fleet OAuth, quota, persistence, health and
+OpenTelemetry adapters. Shared routing behavior changes upstream first and is
+then refreshed here; this package does not carry an independent policy fork.
+It does not capture transcripts, wrap harness commands or silently change
+models/providers.
 
 This is deliberately not a universal AgentOS proxy. Git, PostgreSQL,
 Kubernetes, Herdr, registries and other provider tools retain their native

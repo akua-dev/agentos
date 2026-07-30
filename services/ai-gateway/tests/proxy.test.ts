@@ -186,6 +186,32 @@ describe("authenticated raw Responses proxy", () => {
     expect(acquired).toBe(false);
   });
 
+  test("rejects oversized explicit sessions before acquiring a route", async () => {
+    let acquireCalls = 0;
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => {
+        acquireCalls += 1;
+        return undefined;
+      },
+      fetchImpl: async () => new Response("unexpected"),
+    });
+
+    const response = await handler(
+      new Request("http://gateway.test/v1/responses", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer fleet-token",
+          "session-id": "s".repeat(257),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_session" });
+    expect(acquireCalls).toBe(0);
+  });
+
   test("forces identity encoding upstream and preserves a long streamed response", async () => {
     const chunks = Array.from({ length: 256 }, (_, index) =>
       new TextEncoder().encode(`data: ${index.toString().padStart(3, "0")}-${"x".repeat(1_016)}\n\n`),
@@ -629,6 +655,44 @@ describe("authenticated raw Responses proxy", () => {
 
     expect(forwardedBody).toBe(body);
     expect(await response.text()).toBe(providerBody);
+  });
+
+  test("uses codex-router path mapping for the direct compact endpoint", async () => {
+    let upstream: Request | undefined;
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "provider-key",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => undefined,
+      }),
+      fetchImpl: async (input, init) => {
+        upstream = new Request(
+          input instanceof Request ? input.url : input.toString(),
+          init,
+        );
+        return new Response(null, { status: 204 });
+      },
+    });
+
+    const response = await handler(
+      new Request("http://gateway.test/v1/responses/compact", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer fleet-token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ model: "gpt-test", input: [] }),
+      }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(upstream?.url).toBe(
+      "https://api.openai.com/v1/responses/compact",
+    );
   });
 
   test("returns the upstream response even when local response bookkeeping fails", async () => {
