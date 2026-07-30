@@ -44,6 +44,18 @@ The `agentos-site` production trigger in Cloudflare Workers Builds uses:
 | Deploy command | `bun run deploy:worker` |
 | Production branch | `main` |
 
+Configure the optional preview trigger for every non-production branch with:
+
+| Setting | Value |
+| --- | --- |
+| Root directory | `website/apps/docs` |
+| Build command | `bun run build:worker` |
+| Non-production branch deploy command | `bun run upload:worker` |
+| Production branch exclusion | `main` |
+
+That keeps preview builds on OpenNext's `versions upload` path instead of
+letting Workers Builds fall back to a plain Wrangler upload.
+
 `wrangler.jsonc` is the source of truth for the Worker name, entry point,
 compatibility settings and asset binding. Cloudflare keeps the Git build and
 deploy commands on the Workers Builds trigger: Wrangler has no deploy-command
