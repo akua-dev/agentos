@@ -13,7 +13,6 @@ const config: NextConfig = {
       fullUrl: true,
     },
   },
-  serverExternalPackages: ['ts-morph', 'typescript', 'twoslash', 'shiki'],
   images: {
     remotePatterns: [
       {

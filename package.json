@@ -16,7 +16,10 @@
     "site:typecheck": "bun run --cwd website/apps/docs types:check",
     "site:build": "bun run --cwd website/apps/docs build",
     "site:build:worker": "bun run --cwd website/apps/docs build:worker",
-    "site:preview:worker": "bun run --cwd website/apps/docs preview:worker"
+    "site:deploy": "bun run --cwd website/apps/docs deploy",
+    "site:deploy:worker": "bun run --cwd website/apps/docs deploy:worker",
+    "site:preview:worker": "bun run --cwd website/apps/docs preview:worker",
+    "site:upload:worker": "bun run --cwd website/apps/docs upload:worker"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "0.81.1",
