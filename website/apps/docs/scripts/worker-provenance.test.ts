@@ -106,31 +106,32 @@ describe('Worker version publication', () => {
       '--tag',
       `git-${gitSha}`,
       '--message',
-      `git-sha-${gitSha}_branch-git-chore-cloudflare-provenance`,
+      `Git revision ${gitSha}; branch ${gitBranch}`,
     ]);
   });
 
   it('attaches identical metadata and the branch alias to preview versions', () => {
     expect(createWorkerCommand('preview', provenance)).toEqual([
+      'versions',
       'upload',
       '--tag',
       `git-${gitSha}`,
       '--message',
-      `git-sha-${gitSha}_branch-git-chore-cloudflare-provenance`,
+      `Git revision ${gitSha}; branch ${gitBranch}`,
       '--preview-alias',
       'git-chore-cloudflare-provenance',
     ]);
   });
 
-  it('keeps every passthrough value safe for OpenNext shell forwarding', () => {
+  it('keeps metadata as distinct native Wrangler arguments', () => {
     const command = createWorkerCommand('preview', {
       ...provenance,
       gitBranch: 'feat/provenance; echo unsafe',
     });
 
     expect(command).toContain(
-      `git-sha-${gitSha}_branch-git-feat-provenance-echo-unsafe`,
+      `Git revision ${gitSha}; branch feat/provenance; echo unsafe`,
     );
-    expect(command.every((value) => /^[a-zA-Z0-9_-]+$/.test(value))).toBe(true);
+    expect(command).toContain('git-feat-provenance-echo-unsafe');
   });
 });

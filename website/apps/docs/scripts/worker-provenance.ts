@@ -227,14 +227,14 @@ export function createWorkerCommand(
   mode: PublicationMode,
   provenance: WorkerProvenance,
 ): string[] {
-  const command = mode === 'production' ? 'deploy' : 'upload';
+  const command = mode === 'production' ? ['deploy'] : ['versions', 'upload'];
   const previewAlias = createPreviewAlias(provenance.gitBranch);
   const args = [
-    command,
+    ...command,
     '--tag',
     `git-${provenance.gitSha}`,
     '--message',
-    `git-sha-${provenance.gitSha}_branch-${previewAlias}`,
+    `Git revision ${provenance.gitSha}; branch ${provenance.gitBranch}`,
   ];
 
   if (mode === 'preview') {

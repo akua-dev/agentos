@@ -25,18 +25,35 @@ export function publishWorker(mode: PublicationMode): void {
   console.log(
     `Publishing ${mode} Worker version from Git revision ${provenance.gitSha}.`,
   );
-  const result = spawnSync(
+  run('bunx', [
+    '--bun',
+    'opennextjs-cloudflare',
+    'populateCache',
+    'remote',
+  ]);
+  run(
     'bunx',
-    ['--bun', 'opennextjs-cloudflare', ...args],
-    {
-      cwd: appDirectory,
-      stdio: 'inherit',
-    },
+    ['--bun', 'wrangler', ...args],
+    mode === 'production'
+      ? { ...process.env, OPEN_NEXT_DEPLOY: 'true' }
+      : process.env,
   );
+}
+
+function run(
+  command: string,
+  args: readonly string[],
+  environment = process.env,
+): void {
+  const result = spawnSync(command, [...args], {
+    cwd: appDirectory,
+    env: environment,
+    stdio: 'inherit',
+  });
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(
-      `OpenNext ${args[0]} exited with code ${result.status ?? 'unknown'}.`,
+      `${command} ${args.join(' ')} exited with code ${result.status ?? 'unknown'}.`,
     );
   }
 }

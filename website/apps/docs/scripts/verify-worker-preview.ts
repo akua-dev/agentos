@@ -81,7 +81,7 @@ export async function verifyWorkerPreview(
   const previewUrl = createPreviewUrl(options.branch, options.previewSuffix);
   const fetchImplementation = options.fetch ?? fetch;
   const wait = options.sleep ?? sleep;
-  const timeoutMs = options.timeoutMs ?? 15 * 60_000;
+  const timeoutMs = options.timeoutMs ?? 30 * 60_000;
   const pollIntervalMs = options.pollIntervalMs ?? 5_000;
   const deadline = Date.now() + timeoutMs;
   let lastPreviewStatus = 0;
