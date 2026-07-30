@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 describe('home layout', () => {
-  it('anchors the shared header to the viewport edges', () => {
+  it('preserves the shared content frame for the header', () => {
     const { container } = render(
       <FrameworkProvider
         Link={({ href, children, ...props }) => (
@@ -30,7 +30,7 @@ describe('home layout', () => {
 
     const shell = container.querySelector<HTMLElement>('#nd-home-layout');
 
-    expect(shell?.style.getPropertyValue('--fd-layout-width')).toBe('100vw');
+    expect(shell?.style.getPropertyValue('--fd-layout-width')).toBe('');
   });
 
   it('uses one accessible AgentOS wordmark with light and dark variants', () => {
