@@ -78,6 +78,10 @@ describe("AgentOS fail-open telemetry runtime", () => {
     expect(firstHeaders.get("x-agentos-request-attempt-id")).toBe(
       "attempt-2",
     );
+    expect(firstHeaders.get("x-agentos-runtime")).toBe("pi");
+    expect(firstHeaders.get("x-agentos-request-kind")).toBe("main");
+    expect(firstHeaders.get("x-agentos-model-family")).toBe("gpt-5");
+    expect(firstHeaders.get("x-agentos-stream-mode")).toBe("streaming");
     expect(secondHeaders.get("x-agentos-request-attempt-id")).toBe(
       "attempt-3",
     );

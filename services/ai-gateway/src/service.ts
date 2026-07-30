@@ -6,6 +6,7 @@ import {
   isClientAuthorized,
   type FetchImplementation,
 } from "./proxy.ts";
+import type { GatewayTelemetry } from "./telemetry.ts";
 import { createRoutingState, createRoutingStateStore } from "./routing-state.ts";
 import { defaultRoutingConfig } from "./selection.ts";
 import type { Candidate, RouteLease, UsageSnapshot } from "./types.ts";
@@ -20,6 +21,7 @@ export interface AIGatewayServiceOptions {
   openAIApiKey?: string;
   oauth: CodexOAuthClient;
   fetchImpl: FetchImplementation;
+  telemetry?: GatewayTelemetry;
   clock?: () => number;
 }
 
@@ -156,6 +158,7 @@ export async function createAIGatewayService(
     clientToken: options.clientToken,
     acquire,
     fetchImpl: options.fetchImpl,
+    ...(options.telemetry ? { telemetry: options.telemetry } : {}),
   });
 
   return {

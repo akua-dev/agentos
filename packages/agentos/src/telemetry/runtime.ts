@@ -266,6 +266,16 @@ function startProviderAttempt(options: {
             carrierSetter,
           );
           injected["x-agentos-request-attempt-id"] = attemptId;
+          injected["x-agentos-runtime"] = String(
+            options.base["agentos.ai.runtime"] ?? "",
+          );
+          injected["x-agentos-request-kind"] =
+            options.attemptInput.requestKind;
+          injected["x-agentos-model-family"] = String(
+            options.base["agentos.ai.model.family"] ?? "other",
+          );
+          injected["x-agentos-stream-mode"] =
+            options.attemptInput.streamMode;
           for (const [key, value] of Object.entries(injected)) {
             if (carrier instanceof Headers) carrier.set(key, value);
             else carrier[key] = value;
