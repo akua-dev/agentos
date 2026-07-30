@@ -33,6 +33,17 @@ Set `NEXT_PUBLIC_SITE_URL` to the public origin when building for a different
 host. It defaults to `https://agentos.akua.dev` for production builds and to
 localhost during development.
 
+Anonymous website analytics use PostHog's cookieless mode, honor Do Not Track,
+disable session recording and send through CNAP's first-party
+`https://ph.akua.dev` endpoint. Analytics stays completely disabled when
+`NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` is absent. Set
+`NEXT_PUBLIC_POSTHOG_HOST` only to override the first-party endpoint.
+
+Both PostHog values are public browser configuration, not server secrets.
+Configure them as Cloudflare Workers Builds environment variables because
+Next.js embeds `NEXT_PUBLIC_*` values while building the client bundle;
+`wrangler.jsonc` runtime variables cannot configure an already-built bundle.
+
 The `agentos-site` production trigger in Cloudflare Workers Builds uses:
 
 | Setting | Value |
