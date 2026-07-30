@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const appAsset = (name: string) => new URL(`../app/${name}`, import.meta.url);
+const publicAsset = (name: string) => new URL(`../public/${name}`, import.meta.url);
 
 function pngDimensions(bytes: Buffer): { width: number; height: number } {
   expect(bytes.subarray(0, 8)).toEqual(
@@ -27,9 +28,18 @@ describe('AgentOS browser and social assets', () => {
   it.each([
     ['icon.png', 512, 512],
     ['apple-icon.png', 180, 180],
-    ['opengraph-image.png', 1200, 630],
   ] as const)('publishes %s at its contract dimensions', async (name, width, height) => {
     expect(pngDimensions(await readFile(appAsset(name)))).toEqual({ width, height });
+  });
+
+  it('publishes the social preview at its public path', async () => {
+    expect(pngDimensions(await readFile(publicAsset('opengraph-image.png')))).toEqual({
+      width: 1200,
+      height: 630,
+    });
+    await expect(stat(appAsset('opengraph-image.png'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
   });
 
   it('publishes the common favicon sizes in one ICO', async () => {

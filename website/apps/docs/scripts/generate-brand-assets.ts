@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import sharp from 'sharp';
 
 const appDirectory = new URL('../app/', import.meta.url);
+const publicDirectory = new URL('../public/', import.meta.url);
 const brandDirectory = new URL('../../../../docs/brand/', import.meta.url);
 const iconSource = new URL('agentos-browser-icon.svg', brandDirectory);
 const wordmarkSource = new URL('agentos-wordmark-bone.svg', brandDirectory);
@@ -71,7 +72,7 @@ export async function generateBrandAssets(): Promise<void> {
     writeFile(new URL('icon.png', appDirectory), icon),
     writeFile(new URL('apple-icon.png', appDirectory), appleIcon),
     writeFile(new URL('favicon.ico', appDirectory), createIco(faviconImages)),
-    writeFile(new URL('opengraph-image.png', appDirectory), socialImage),
+    writeFile(new URL('opengraph-image.png', publicDirectory), socialImage),
   ]);
 }
 
