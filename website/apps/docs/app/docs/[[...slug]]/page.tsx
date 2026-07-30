@@ -116,18 +116,17 @@ export async function generateMetadata(props: PageProps<'/docs/[[...slug]]'>): P
   const { slug = [] } = await props.params;
   const page = source.getPage(slug);
   if (!page)
-    return createMetadata({
+    return {
       title: 'Not Found',
-    });
+      robots: { index: false, follow: false },
+    };
 
   const description = page.data.description ?? 'AgentOS documentation';
 
   return createMetadata({
     title: page.data.title,
     description,
-    openGraph: {
-      url: `/docs/${page.slugs.join('/')}`,
-    },
+    path: page.url as `/${string}`,
   });
 }
 
