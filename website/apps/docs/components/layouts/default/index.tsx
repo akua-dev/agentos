@@ -15,12 +15,7 @@ export function DefaultLayout({ children }: LayoutProps<'/docs'>) {
       links={linkItems}
       nav={{
         ...base.nav,
-        title: (
-          <>
-            {logo}
-            <span className="font-medium max-md:hidden">AgentOS</span>
-          </>
-        ),
+        title: logo,
       }}
       tabs={{
         transform(option, node) {

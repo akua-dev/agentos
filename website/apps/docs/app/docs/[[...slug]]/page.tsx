@@ -6,7 +6,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 import { TypeTable } from 'fumadocs-ui/components/type-table';
 import { createMetadata } from '@/lib/metadata';
 import { source } from '@/lib/source';
-import { Mermaid } from '@/components/mdx/mermaid';
+import { Mermaid } from '@/components/mdx/mermaid-lazy';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import Link from 'fumadocs-core/link';
 import { findSiblings } from 'fumadocs-core/page-tree';
