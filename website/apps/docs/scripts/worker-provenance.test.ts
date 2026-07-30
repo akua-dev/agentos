@@ -103,7 +103,6 @@ describe('Worker version publication', () => {
   it('attaches the exact Git revision to production version metadata', () => {
     expect(createWorkerCommand('production', provenance)).toEqual([
       'deploy',
-      '--strict',
       '--tag',
       `git-${gitSha}`,
       '--message',
@@ -114,7 +113,6 @@ describe('Worker version publication', () => {
   it('attaches identical metadata and the branch alias to preview versions', () => {
     expect(createWorkerCommand('preview', provenance)).toEqual([
       'upload',
-      '--strict',
       '--tag',
       `git-${gitSha}`,
       '--message',

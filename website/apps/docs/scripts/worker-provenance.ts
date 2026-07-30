@@ -231,7 +231,6 @@ export function createWorkerCommand(
   const previewAlias = createPreviewAlias(provenance.gitBranch);
   const args = [
     command,
-    '--strict',
     '--tag',
     `git-${provenance.gitSha}`,
     '--message',
