@@ -10,7 +10,7 @@ import {
   type CandidateExplanation as RouterCandidateExplanation,
   type RoutingConfig as RouterRoutingConfig,
 } from "@akua-dev/codex-router-core";
-import { Effect, Option } from "effect";
+import { Effect, Option, Result } from "effect";
 import type {
   Candidate,
   CandidateExplanation,
@@ -135,7 +135,7 @@ export function weeklyUrgency(snapshot: UsageSnapshot, now: number): number {
 
 export function selectAccount(input: SelectionInput): SelectionDecision {
   const result = Effect.runSync(
-    Effect.option(
+    Effect.result(
       selectRouterAccount({
         candidates: input.candidates.map(toRouterCandidate),
         config: toRouterConfig(input.config),
@@ -146,20 +146,15 @@ export function selectAccount(input: SelectionInput): SelectionDecision {
       }),
     ),
   );
-  if (Option.isNone(result)) {
+  if (Result.isFailure(result)) {
     return {
       reason: "no_eligible_accounts",
-      candidates: input.candidates.map((candidate) => ({
-        accountId: candidate.accountId,
-        eligible: false,
-        freshness: candidate.usage ? "stale" : "unknown",
-        rejectionCode: "no_eligible_accounts",
-      })),
+      candidates: result.failure.explanations.map(fromRouterExplanation),
     };
   }
   return {
-    accountId: result.value.accountId,
-    reason: result.value.reason,
-    candidates: result.value.explanations.map(fromRouterExplanation),
+    accountId: result.success.accountId,
+    reason: result.success.reason,
+    candidates: result.success.explanations.map(fromRouterExplanation),
   };
 }
