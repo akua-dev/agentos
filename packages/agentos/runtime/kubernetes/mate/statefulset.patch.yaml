@@ -23,6 +23,10 @@ spec:
               value: /opt/agentos/node_modules
             - name: K8S_CONTAINER_NAME
               value: agentos
+            - name: AGENTOS_AI_RUNTIME
+              value: pi
+            - name: AGENTOS_AI_RUNTIME_VERSION
+              value: 0.81.1
             - name: AGENTOS_AGENT_CWD
               value: /opt/agentos
             - name: AGENTOS_AGENT_NAME

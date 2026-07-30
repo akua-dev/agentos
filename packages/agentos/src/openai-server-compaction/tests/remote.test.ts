@@ -635,6 +635,10 @@ describe("OpenAI server compaction transport", () => {
         baseUrl: "https://api.openai.com/v1",
       }),
       apiKey: "openai-token",
+      headers: {
+        "x-agentos-request-attempt-id": "attempt-private",
+        traceparent: "00-11111111111111111111111111111111-2222222222222222-01",
+      },
       input,
       instructions: "system prompt",
       tools: [
@@ -666,6 +670,10 @@ describe("OpenAI server compaction transport", () => {
     expect(headers.has("x-codex-installation-id")).toBe(false);
     expect(headers.has("x-codex-window-id")).toBe(false);
     expect(headers.has("session-id")).toBe(false);
+    expect(headers.has("x-agentos-request-attempt-id")).toBe(false);
+    expect(headers.get("traceparent")).toBe(
+      "00-11111111111111111111111111111111-2222222222222222-01",
+    );
     expect(JSON.parse(String(request?.init.body))).toEqual({
       model: "gpt-5.4",
       input: [...input, { type: "compaction_trigger" }],

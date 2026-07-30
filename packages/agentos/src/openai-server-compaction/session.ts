@@ -91,9 +91,8 @@ function matchingTrailingMessages(
 
   for (const entry of entries.slice(index + 1)) {
     if (entry.type !== "message") continue;
-    const items = messagesToResponseItems([entry.message]);
-    if (items.length === 0) continue;
     if (entry.message.role === "assistant") {
+      const items = messagesToResponseItems([entry.message]);
       if (
         entry.message.provider === provider &&
         entry.message.api === api &&
@@ -104,6 +103,8 @@ function matchingTrailingMessages(
       pending = [];
       continue;
     }
+    const items = messagesToResponseItems([entry.message]);
+    if (items.length === 0) continue;
     pending.push(...items);
   }
 

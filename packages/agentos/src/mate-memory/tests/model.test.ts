@@ -10,6 +10,8 @@ import { createTelemetryRecorder } from "../../telemetry/tests/fake-telemetry.ts
 describe("Mate memory relevance selection", () => {
   test("attributes the selector call without recording memory content", async () => {
     const recorded = createTelemetryRecorder();
+    let forwardedHeaders: Record<string, string> | undefined;
+    const authHeaders = { "x-original": "preserved" };
     const selected = await selectRelevantTopics({
       prompt: "SEED_PROMPT private human request",
       startup: {
@@ -35,17 +37,19 @@ describe("Mate memory relevance selection", () => {
         getApiKeyAndHeaders: async () => ({
           ok: true,
           apiKey: "sk-seeded-secret",
-          headers: {},
+          headers: authHeaders,
         }),
       } as never,
       telemetry: recorded.telemetry,
-      completeImpl: async () =>
-        ({
+      completeImpl: async (_model, _context, options) => {
+        forwardedHeaders = options?.headers;
+        return ({
           role: "assistant",
           content: [{ type: "text", text: '{"ids":["topic-0"]}' }],
           usage: { input: 4, output: 2 },
           stopReason: "stop",
-        }) as never,
+        }) as never;
+      },
     });
 
     expect(selected).toEqual(["topics/private-project.md"]);
@@ -53,9 +57,10 @@ describe("Mate memory relevance selection", () => {
       {
         input: {
           requestKind: "extension",
-          streamMode: "streaming",
+          streamMode: "non_streaming",
         },
         outcome: {
+          error: undefined,
           inputTokens: 4,
           outputTokens: 2,
           status: 200,
@@ -72,6 +77,12 @@ describe("Mate memory relevance selection", () => {
     expect(JSON.stringify(recorded.operations)).not.toContain(
       "private-project",
     );
+    expect(forwardedHeaders).toMatchObject({
+      "x-original": "preserved",
+      traceparent: expect.any(String),
+      "x-agentos-request-attempt-id": expect.any(String),
+    });
+    expect(authHeaders).toEqual({ "x-original": "preserved" });
   });
 
   test("redacts the human request before building the selector message", () => {

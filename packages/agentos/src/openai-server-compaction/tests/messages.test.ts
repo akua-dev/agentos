@@ -378,8 +378,8 @@ describe("Responses message conversion", () => {
       },
       input[1]!,
       {
-        type: "function_call_output",
-        call_id: "shell-call-1",
+        type: "local_shell_call_output",
+        id: "shell-call-1",
         output: "aborted",
       },
       input[2]!,

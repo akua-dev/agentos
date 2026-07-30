@@ -1,0 +1,13 @@
+{
+  "name": "@akua-dev/codex-router-codex",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@akua-dev/codex-router-core": "workspace:*",
+    "effect": "4.0.0-beta.102"
+  }
+}

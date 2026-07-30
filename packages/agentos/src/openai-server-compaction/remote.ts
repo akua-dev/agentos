@@ -288,6 +288,13 @@ async function requestHeaders(
     "x-codex-beta-features",
     [...new Set([...configured, REMOTE_COMPACTION_FEATURE])].join(","),
   );
+  if (!isGatewayEndpoint(endpoint)) {
+    for (const [name] of headers) {
+      if (name.toLowerCase().startsWith("x-agentos-")) {
+        headers.delete(name);
+      }
+    }
+  }
 
   if (!isCodexModel(params.model)) {
     headers.delete("openai-beta");
@@ -328,6 +335,14 @@ async function requestHeaders(
     }
   }
   return headers;
+}
+
+function isGatewayEndpoint(endpoint: string): boolean {
+  try {
+    return new URL(endpoint).hostname.toLowerCase().includes("gateway");
+  } catch {
+    return false;
+  }
 }
 
 async function boundedResponseText(response: Response, signal: AbortSignal): Promise<string> {

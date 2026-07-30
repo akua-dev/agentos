@@ -76,7 +76,7 @@ function exporterForSignal(
   const signalPrefix = `OTEL_${signal.toUpperCase()}_EXPORTER`;
   const selected = (
     environment[signalPrefix] ??
-    (hasEndpoint(environment) ? "otlp" : "none")
+    (hasEndpoint(environment, signal) ? "otlp" : "none")
   )
     .trim()
     .toLowerCase();
@@ -206,12 +206,10 @@ function removeOtelTables(source: string): string {
   return lines.join("\n");
 }
 
-function hasEndpoint(environment: Environment): boolean {
+function hasEndpoint(environment: Environment, signal: Signal): boolean {
   return Boolean(
     environment.OTEL_EXPORTER_OTLP_ENDPOINT?.trim() ||
-      environment.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim() ||
-      environment.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT?.trim() ||
-      environment.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT?.trim(),
+      environment[`OTEL_EXPORTER_OTLP_${signal.toUpperCase()}_ENDPOINT`]?.trim(),
   );
 }
 

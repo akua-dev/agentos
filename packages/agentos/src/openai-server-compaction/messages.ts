@@ -40,20 +40,44 @@ function responseItemCallId(item: ResponseItem): string | undefined {
 }
 
 function outputTypeForCallType(type: string): string | undefined {
-  if (type === "function_call" || type === "local_shell_call") {
-    return "function_call_output";
-  }
+  if (type === "function_call") return "function_call_output";
+  if (type === "local_shell_call") return "local_shell_call_output";
   if (type === "tool_search_call") return "tool_search_output";
   if (type === "custom_tool_call") return "custom_tool_call_output";
   return undefined;
+}
+
+function responseItemIdentifier(item: ResponseItem): string | undefined {
+  if (!(
+    "id" in item &&
+    typeof item.id === "string" &&
+    item.id
+  )) {
+    return undefined;
+  }
+  return item.id;
+}
+
+function outputPairId(item: ResponseItem): string | undefined {
+  if (item.type === "local_shell_call") return responseItemCallId(item);
+  if (item.type === "local_shell_call_output") return responseItemIdentifier(item);
+  return responseItemCallId(item);
 }
 
 function syntheticOutputForCall(
   item: ResponseItem,
 ): ResponseItem | undefined {
   const callId = responseItemCallId(item);
+  if (item.type === "local_shell_call") {
+    if (!callId) return undefined;
+    return {
+      type: "local_shell_call_output",
+      id: callId,
+      output: "aborted",
+    };
+  }
   if (!callId) return undefined;
-  if (item.type === "function_call" || item.type === "local_shell_call") {
+  if (item.type === "function_call") {
     return {
       type: "function_call_output",
       call_id: callId,
@@ -89,12 +113,12 @@ function ensureCallOutputsPresent(items: ResponseItem[]): ResponseItem[] {
   for (const item of items) {
     normalized.push(item);
     const outputType = outputTypeForCallType(item.type);
-    const callId = responseItemCallId(item);
-    if (!outputType || !callId) continue;
+    const pairId = outputPairId(item);
+    if (!outputType || !pairId) continue;
     const hasOutput = items.some(
       (candidate) =>
         candidate.type === outputType &&
-        responseItemCallId(candidate) === callId,
+        outputPairId(candidate) === pairId,
     );
     if (hasOutput) continue;
     const synthetic = syntheticOutputForCall(item);
@@ -105,6 +129,7 @@ function ensureCallOutputsPresent(items: ResponseItem[]): ResponseItem[] {
 
 function removeOrphanOutputs(items: ResponseItem[]): ResponseItem[] {
   const functionCallIds = new Set<string>();
+  const localShellCallIds = new Set<string>();
   const toolSearchCallIds = new Set<string>();
   const customToolCallIds = new Set<string>();
 
@@ -112,7 +137,8 @@ function removeOrphanOutputs(items: ResponseItem[]): ResponseItem[] {
     const callId = responseItemCallId(item);
     if (!callId) continue;
     if (item.type === "function_call" || item.type === "local_shell_call") {
-      functionCallIds.add(callId);
+      if (item.type === "function_call") functionCallIds.add(callId);
+      else localShellCallIds.add(callId);
     } else if (item.type === "tool_search_call") {
       toolSearchCallIds.add(callId);
     } else if (item.type === "custom_tool_call") {
@@ -124,6 +150,10 @@ function removeOrphanOutputs(items: ResponseItem[]): ResponseItem[] {
     const callId = responseItemCallId(item);
     if (item.type === "function_call_output") {
       return Boolean(callId && functionCallIds.has(callId));
+    }
+    if (item.type === "local_shell_call_output") {
+      const id = responseItemIdentifier(item);
+      return Boolean(id && localShellCallIds.has(id));
     }
     if (item.type === "custom_tool_call_output") {
       return Boolean(callId && customToolCallIds.has(callId));

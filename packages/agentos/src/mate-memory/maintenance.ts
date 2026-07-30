@@ -659,8 +659,10 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = async (
     for (let step = 0; step < MAX_MAINTENANCE_STEPS; step += 1) {
       currentAttempt = operation.startProviderAttempt({
         requestKind,
-        streamMode: "streaming",
+        streamMode: "non_streaming",
       });
+      const headers = { ...auth.headers };
+      currentAttempt.inject(headers);
       const response = await (request.completeImpl ?? complete)(
         request.model,
         {
@@ -675,7 +677,7 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = async (
         },
         {
           apiKey: auth.apiKey,
-          headers: auth.headers,
+          headers,
           env: auth.env,
           signal: request.signal,
           temperature: 0,

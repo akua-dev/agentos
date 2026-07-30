@@ -142,6 +142,33 @@ describe("Codex native OTEL bridge", () => {
     });
   });
 
+  test("uses a signal-specific endpoint without enabling signals lacking endpoints", async () => {
+    const path = await fixture();
+    await reconcileCodexOtelConfig(path, {
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:
+        "https://traces.agentos:4318/custom-traces",
+      OTEL_EXPORTER_OTLP_TRACES_HEADERS: "x-signal=traces",
+      OTEL_TRACES_EXPORTER: "otlp",
+      OTEL_SDK_DISABLED: "false",
+    });
+    const parsed = Bun.TOML.parse(await readFile(path, "utf8")) as {
+      otel: Record<string, unknown>;
+    };
+    expect(parsed.otel).toEqual({
+      environment: "dev",
+      exporter: "none",
+      log_user_prompt: false,
+      metrics_exporter: "none",
+      trace_exporter: {
+        "otlp-http": {
+          endpoint: "https://traces.agentos:4318/custom-traces",
+          headers: { "x-signal": "traces" },
+          protocol: "binary",
+        },
+      },
+    });
+  });
+
   test("disabled mode replaces stale Codex exporters while preserving unrelated tables", async () => {
     const path = await fixture(
       [
