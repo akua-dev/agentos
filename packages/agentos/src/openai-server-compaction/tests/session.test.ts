@@ -366,7 +366,7 @@ describe("native compaction session replay", () => {
     ).toBeUndefined();
   });
 
-  test("reads version-1 state and rejects version-2 API mismatches", () => {
+  test("rejects version-1 replay state and version-2 API mismatches", () => {
     const artifact = {
       type: "compaction" as const,
       encrypted_content: "opaque-legacy",
@@ -384,20 +384,14 @@ describe("native compaction session replay", () => {
       message("new", "compact", "after"),
     ];
     expect(
-      buildCompactionInput(
+      rewriteResponsesPayload(
+        { input: [] },
         legacy,
         "openai",
         "openai-responses",
         "gpt-5.4",
       ),
-    ).toEqual([
-      artifact,
-      {
-        type: "message",
-        role: "user",
-        content: [{ type: "input_text", text: "after" }],
-      },
-    ]);
+    ).toBeUndefined();
 
     const versionTwo = [
       message("old", null, "discarded"),

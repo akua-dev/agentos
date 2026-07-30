@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { selectAccount } from "./selection.ts";
 import { createAtomicJsonStore, type AtomicJsonStore } from "./storage.ts";
-import type { Candidate, Reservation, RoutingConfig, RoutingStateFile } from "./types.ts";
+import type {
+  Candidate,
+  CandidateExplanation,
+  Reservation,
+  RoutingConfig,
+  RoutingStateFile,
+} from "./types.ts";
 
 const RoutingStateSchema = z
   .object({
@@ -54,9 +60,15 @@ export interface AcquiredReservation extends Reservation {
 export interface RoutingSummary {
   activeReservations: number;
   reservationsByAccount: Record<string, number>;
+  lastSelection?: {
+    observedAt: number;
+    reason: string;
+    candidates: CandidateExplanation[];
+  };
 }
 
 export function createRoutingState(store: AtomicJsonStore<RoutingStateFile>) {
+  let lastSelection: RoutingSummary["lastSelection"];
   return {
     async summary(now: number): Promise<RoutingSummary> {
       const active = (await store.read()).reservations.filter((value) => value.expiresAt > now);
@@ -65,7 +77,11 @@ export function createRoutingState(store: AtomicJsonStore<RoutingStateFile>) {
         reservationsByAccount[reservation.accountId] =
           (reservationsByAccount[reservation.accountId] ?? 0) + 1;
       }
-      return { activeReservations: active.length, reservationsByAccount };
+      return {
+        activeReservations: active.length,
+        reservationsByAccount,
+        ...(lastSelection ? { lastSelection } : {}),
+      };
     },
 
     async acquire(input: {
@@ -103,6 +119,11 @@ export function createRoutingState(store: AtomicJsonStore<RoutingStateFile>) {
           now: input.now,
           ...(currentAccountId ? { currentAccountId } : {}),
         });
+        lastSelection = {
+          observedAt: input.now,
+          reason: decision.reason,
+          candidates: decision.candidates,
+        };
         if (!decision.accountId) return { ...state, reservations, assignments, blocks };
 
         const reservation: Reservation = {

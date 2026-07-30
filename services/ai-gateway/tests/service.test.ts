@@ -57,6 +57,30 @@ describe("AI gateway service", () => {
     expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(200);
     await service.vault.markNeedsReauth(accountId);
     expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(503);
+
+    const unavailable = await service.fetch(proxyRequest());
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toEqual({ error: "no_eligible_account" });
+    const protectedStatus = await service.fetch(
+      new Request("http://gateway.test/status", {
+        headers: { authorization: "Bearer fleet-token" },
+      }),
+    );
+    expect(await protectedStatus.json()).toMatchObject({
+      routing: {
+        lastSelection: {
+          reason: "no_eligible_accounts",
+          candidates: [
+            {
+              accountId,
+              eligible: false,
+              freshness: "unknown",
+              rejectionCode: "reauthentication_required",
+            },
+          ],
+        },
+      },
+    });
   });
 
   test("uses the explicitly enabled API-key fallback without storing it in status", async () => {
@@ -92,7 +116,11 @@ describe("AI gateway service", () => {
       routing?: { activeReservations: number; reservationsByAccount: Record<string, number> };
     };
     expect(parsed.apiKeyFallback).toBe(true);
-    expect(parsed.routing).toEqual({ activeReservations: 0, reservationsByAccount: {} });
+    expect(parsed.routing).toMatchObject({
+      activeReservations: 0,
+      reservationsByAccount: {},
+      lastSelection: { reason: "no_eligible_accounts" },
+    });
     expect(body).not.toContain("api-secret");
   });
 

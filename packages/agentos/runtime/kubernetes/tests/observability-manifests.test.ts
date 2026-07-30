@@ -136,7 +136,7 @@ describe("Fleet OTEL workload contract", () => {
       expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
         "service.namespace=agentos",
       );
-      if (workload.runtime) {
+      if ("runtime" in workload) {
         expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
           "service.version=0.1.0",
         );

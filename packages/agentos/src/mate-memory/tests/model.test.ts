@@ -10,7 +10,7 @@ import { createTelemetryRecorder } from "../../telemetry/tests/fake-telemetry.ts
 describe("Mate memory relevance selection", () => {
   test("attributes the selector call without recording memory content", async () => {
     const recorded = createTelemetryRecorder();
-    let forwardedHeaders: Record<string, string> | undefined;
+    let forwardedHeaders: Record<string, string | null> | undefined;
     const authHeaders = { "x-original": "preserved" };
     const selected = await selectRelevantTopics({
       prompt: "SEED_PROMPT private human request",

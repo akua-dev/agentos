@@ -2,8 +2,6 @@ import { randomUUID } from "node:crypto";
 import {
   mkdir,
   readFile,
-  rename,
-  unlink,
   writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -17,6 +15,7 @@ import {
 } from "./messages.ts";
 import {
   JsonObjectSchema,
+  DirectCompactResponseSchema,
   OutputItemDoneEventSchema,
   ProviderEventSchema,
   TerminalEventSchema,
@@ -73,6 +72,7 @@ export type ServerCompactionRequest = {
   timeoutMs?: number;
   fetchImpl?: FetchLike;
   codexInstallationId?: () => string | Promise<string>;
+  route?: "direct" | "ai_gateway";
 };
 
 export class OpenAICompactionHttpError extends Error {
@@ -113,11 +113,9 @@ export function endpointForModel(model: Model<Api>): string {
     if (baseUrl.endsWith("/codex")) return `${baseUrl}/responses`;
     return `${baseUrl}/codex/responses`;
   }
-  if (baseUrl.endsWith("/responses/compact")) {
-    return baseUrl.slice(0, -"/compact".length);
-  }
-  if (baseUrl.endsWith("/responses")) return baseUrl;
-  return `${baseUrl}/responses`;
+  if (baseUrl.endsWith("/responses/compact")) return baseUrl;
+  if (baseUrl.endsWith("/responses")) return `${baseUrl}/compact`;
+  return `${baseUrl}/responses/compact`;
 }
 
 function caseInsensitiveHeader(headers: Headers, name: string): string | null {
@@ -167,33 +165,28 @@ export async function resolveCodexInstallationId(
   const installationPath = join(codexHome, "installation_id");
   try {
     await mkdir(codexHome, { recursive: true });
-    const existing = await readFile(installationPath, "utf8").catch(
-      () => undefined,
-    );
-    const canonical = existing
-      ? canonicalUuid(existing)
-      : undefined;
-    if (canonical) return canonical;
+    try {
+      const existing = canonicalUuid(await readFile(installationPath, "utf8"));
+      return existing ?? randomUUID();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
 
     const installationId = randomUUID();
-    const temporaryPath = join(
-      codexHome,
-      `.installation_id.${process.pid}.${randomUUID()}.tmp`,
-    );
     try {
-      await writeFile(temporaryPath, installationId, {
+      await writeFile(installationPath, installationId, {
         encoding: "utf8",
         flag: "wx",
         mode: 0o644,
       });
-      await rename(temporaryPath, installationPath);
-    } finally {
-      await unlink(temporaryPath).catch(() => undefined);
+      return installationId;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      return (
+        canonicalUuid(await readFile(installationPath, "utf8")) ??
+        randomUUID()
+      );
     }
-    const persisted = canonicalUuid(
-      await readFile(installationPath, "utf8"),
-    );
-    return persisted ?? installationId;
   } catch {
     // Installation identity is affinity metadata; failure must not block AI.
     return randomUUID();
@@ -279,16 +272,21 @@ async function requestHeaders(
   }
   headers.set("content-type", "application/json");
 
-  headers.set("accept", "text/event-stream");
-  const configured = (headers.get("x-codex-beta-features") ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  headers.set(
-    "x-codex-beta-features",
-    [...new Set([...configured, REMOTE_COMPACTION_FEATURE])].join(","),
-  );
-  if (!isGatewayEndpoint(endpoint)) {
+  if (isCodexModel(params.model)) {
+    headers.set("accept", "text/event-stream");
+    const configured = (headers.get("x-codex-beta-features") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    headers.set(
+      "x-codex-beta-features",
+      [...new Set([...configured, REMOTE_COMPACTION_FEATURE])].join(","),
+    );
+  } else {
+    headers.set("accept", "application/json");
+    headers.delete("x-codex-beta-features");
+  }
+  if (params.route !== "ai_gateway") {
     for (const [name] of headers) {
       if (name.toLowerCase().startsWith("x-agentos-")) {
         headers.delete(name);
@@ -321,10 +319,10 @@ async function requestHeaders(
     } else {
       headers.delete("x-codex-installation-id");
     }
+    headers.set("x-client-request-id", randomUUID());
     if (params.sessionId) {
       headers.set("session-id", params.sessionId);
       headers.set("thread-id", params.sessionId);
-      headers.set("x-client-request-id", params.sessionId);
       headers.set("x-codex-window-id", `${params.sessionId}:0`);
     }
     const hostname = new URL(endpoint).hostname;
@@ -335,14 +333,6 @@ async function requestHeaders(
     }
   }
   return headers;
-}
-
-function isGatewayEndpoint(endpoint: string): boolean {
-  try {
-    return new URL(endpoint).hostname.toLowerCase().includes("gateway");
-  } catch {
-    return false;
-  }
 }
 
 async function boundedResponseText(response: Response, signal: AbortSignal): Promise<string> {
@@ -564,6 +554,29 @@ function parseCompactionEvents(events: ProviderEvent[]): ServerCompactionResult 
   return { output, ...(usage ? { usage } : {}) };
 }
 
+function parseDirectCompactionResponse(text: string): ServerCompactionResult {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new Error("OpenAI server compaction returned invalid compact response JSON.");
+  }
+  const parsed = DirectCompactResponseSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error("OpenAI server compaction returned an invalid compact response.");
+  }
+  const artifacts = parsed.data.output.filter(artifactFrom);
+  if (artifacts.length !== 1) {
+    throw new Error(
+      `OpenAI server compaction compact response expected one artifact, received ${artifacts.length}.`,
+    );
+  }
+  return {
+    output: parsed.data.output,
+    usage: parsed.data.usage,
+  };
+}
+
 export async function requestServerCompaction(
   params: ServerCompactionRequest,
 ): Promise<ServerCompactionResult> {
@@ -571,20 +584,26 @@ export async function requestServerCompaction(
   const deadline = deadlineSignal(params.signal, params.timeoutMs);
   try {
     if (deadline.signal.aborted) throw abortReason(deadline.signal);
-    const body = {
+    const sharedBody = {
       model: params.model.id,
-      input: [...params.input, { type: "compaction_trigger" }],
+      input: params.input,
       instructions: params.instructions,
       tools: params.tools,
       parallel_tool_calls: true,
-      tool_choice: "auto",
-      stream: true,
-      store: false,
-      include: ["reasoning.encrypted_content"],
       ...(params.sessionId ? { prompt_cache_key: params.sessionId } : {}),
       ...(params.reasoning ? { reasoning: params.reasoning } : {}),
       ...(params.text ? { text: params.text } : {}),
     };
+    const body = isCodexModel(params.model)
+      ? {
+          ...sharedBody,
+          input: [...params.input, { type: "compaction_trigger" }],
+          tool_choice: "auto",
+          stream: true,
+          store: false,
+          include: ["reasoning.encrypted_content"],
+        }
+      : sharedBody;
     const response = await awaitWithAbort(
       (params.fetchImpl ?? fetch)(endpoint, {
         method: "POST",
@@ -599,6 +618,9 @@ export async function requestServerCompaction(
       throw new OpenAICompactionHttpError(response.status);
     }
     const responseText = await boundedResponseText(response, deadline.signal);
+    if (!isCodexModel(params.model)) {
+      return parseDirectCompactionResponse(responseText);
+    }
     const result = parseCompactionEvents(parseSse(responseText));
     const artifact = result.output
       .map(artifactFrom)

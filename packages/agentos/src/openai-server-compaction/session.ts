@@ -70,9 +70,10 @@ function matchingState(
   const state = readState(latest.entry);
   if (
     !state ||
+    state.version !== 2 ||
     state.provider !== provider ||
     state.model !== model ||
-    (state.version === 2 && state.api !== api)
+    state.api !== api
   ) {
     return undefined;
   }
