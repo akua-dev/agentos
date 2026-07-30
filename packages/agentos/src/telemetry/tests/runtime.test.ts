@@ -26,9 +26,7 @@ function testTelemetry() {
   const tracerProvider = new BasicTracerProvider({
     spanProcessors: [new SimpleSpanProcessor(spans)],
   });
-  const metrics = new InMemoryMetricExporter(
-    AggregationTemporality.CUMULATIVE,
-  );
+  const metrics = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
   const metricReader = new PeriodicExportingMetricReader({
     exporter: metrics,
     exportIntervalMillis: 60_000,
@@ -84,16 +82,13 @@ describe("AgentOS fail-open telemetry runtime", () => {
     expect(firstHeaders.get("traceparent")).toMatch(
       /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
     );
-    expect(firstHeaders.get("x-agentos-request-attempt-id")).toBe(
-      "attempt-2",
-    );
+    expect(firstHeaders.get("x-agentos-request-attempt-id")).toBe("attempt-2");
     expect(firstHeaders.get("x-agentos-runtime")).toBe("pi");
     expect(firstHeaders.get("x-agentos-request-kind")).toBe("main");
     expect(firstHeaders.get("x-agentos-model-family")).toBe("gpt-5");
     expect(firstHeaders.get("x-agentos-stream-mode")).toBe("streaming");
-    expect(secondHeaders.get("x-agentos-request-attempt-id")).toBe(
-      "attempt-3",
-    );
+    expect(firstHeaders.get("x-agentos-session-state")).toBe("resumed");
+    expect(secondHeaders.get("x-agentos-request-attempt-id")).toBe("attempt-3");
     expect(firstHeaders.get("traceparent")?.split("-")[1]).toBe(
       secondHeaders.get("traceparent")?.split("-")[1],
     );
@@ -161,13 +156,14 @@ describe("AgentOS fail-open telemetry runtime", () => {
       .flatMap(({ scopeMetrics }) =>
         scopeMetrics.flatMap(({ metrics: scopedMetrics }) => scopedMetrics),
       );
-    const durationMetrics = exportedMetrics
-      .filter(({ descriptor }) =>
-        [
-          AGENTOS_AI_METRICS.operationDuration,
-          AGENTOS_AI_METRICS.providerDuration,
-        ].includes(descriptor.name as typeof AGENTOS_AI_METRICS.operationDuration),
-      );
+    const durationMetrics = exportedMetrics.filter(({ descriptor }) =>
+      [
+        AGENTOS_AI_METRICS.operationDuration,
+        AGENTOS_AI_METRICS.providerDuration,
+      ].includes(
+        descriptor.name as typeof AGENTOS_AI_METRICS.operationDuration,
+      ),
+    );
     expect(durationMetrics).toHaveLength(2);
     for (const metric of durationMetrics) {
       expect(JSON.stringify(metric)).toContain(
@@ -175,6 +171,37 @@ describe("AgentOS fail-open telemetry runtime", () => {
       );
     }
 
+    await Promise.all([
+      fixture.tracerProvider.shutdown(),
+      fixture.meterProvider.shutdown(),
+    ]);
+  });
+
+  test("emits private correlation headers only for explicit AI Gateway routes", async () => {
+    const fixture = testTelemetry();
+    const operation = fixture.telemetry.startOperation({
+      runtime: "codex",
+      route: "direct",
+      sessionState: "fresh",
+      modelFamily: "gpt-5",
+      providerFamily: "openai",
+    });
+    const attempt = operation.startProviderAttempt({
+      requestKind: "main",
+      streamMode: "streaming",
+    });
+    const headers = new Headers();
+    attempt.inject(headers);
+
+    expect(headers.get("traceparent")).toMatch(
+      /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
+    );
+    expect(
+      [...headers.keys()].filter((name) => name.startsWith("x-agentos-")),
+    ).toEqual([]);
+
+    attempt.end({ status: 200, streamOutcome: "completed" });
+    operation.end({ status: 200 });
     await Promise.all([
       fixture.tracerProvider.shutdown(),
       fixture.meterProvider.shutdown(),

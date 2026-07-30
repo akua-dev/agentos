@@ -39,24 +39,20 @@ export interface SelectionInput {
   currentAccountId?: string;
 }
 
-function toRouterConfig(config: RoutingConfig): RouterRoutingConfig {
+export function toRouterConfig(config: RoutingConfig): RouterRoutingConfig {
   return {
     usageFreshnessMs: config.usageFreshnessMs,
     maximumUsageAgeMs: routerDefaultRoutingConfig.maximumUsageAgeMs,
     stalePenaltyPercent: routerDefaultRoutingConfig.stalePenaltyPercent,
-    minimumShortRemainingPercent:
-      config.headroom.shortWindowMinimumPercent,
-    minimumWeeklyRemainingPercent:
-      config.headroom.weeklyMinimumPercent,
+    minimumShortRemainingPercent: config.headroom.shortWindowMinimumPercent,
+    minimumWeeklyRemainingPercent: config.headroom.weeklyMinimumPercent,
     hysteresisRatio: config.scoreHysteresisRatio,
     assignmentTtlMs: config.assignmentTtlMs,
     leaseTtlMs: config.reservationTtlMs,
   };
 }
 
-function toRouterUsage(
-  candidate: Candidate,
-): RouterUsageSnapshot | undefined {
+function toRouterUsage(candidate: Candidate): RouterUsageSnapshot | undefined {
   const usage = candidate.usage;
   if (!usage?.shortWindow || !usage.weeklyWindow) return undefined;
   return RouterUsageSnapshot.make({
@@ -82,7 +78,7 @@ function toRouterUsage(
   });
 }
 
-function toRouterCandidate(candidate: Candidate): RouterCandidate {
+export function toRouterCandidate(candidate: Candidate): RouterCandidate {
   const usage = toRouterUsage(candidate);
   const block = candidate.block
     ? AccountBlock.make({
@@ -102,7 +98,7 @@ function toRouterCandidate(candidate: Candidate): RouterCandidate {
   });
 }
 
-function fromRouterExplanation(
+export function fromRouterExplanation(
   value: RouterCandidateExplanation,
 ): CandidateExplanation {
   const freshness = Option.getOrUndefined(value.freshness) ?? "unknown";
@@ -116,9 +112,7 @@ function fromRouterExplanation(
     eligible: value.eligible,
     freshness,
     ...(rejectionCode === undefined ? {} : { rejectionCode }),
-    ...(weeklyRemainingPercent === undefined
-      ? {}
-      : { weeklyRemainingPercent }),
+    ...(weeklyRemainingPercent === undefined ? {} : { weeklyRemainingPercent }),
     ...(urgency === undefined ? {} : { urgency }),
   };
 }

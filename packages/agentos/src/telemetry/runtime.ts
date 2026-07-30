@@ -73,8 +73,7 @@ export interface AgentOSProviderAttemptOutcome extends AgentOSOperationOutcome {
 }
 
 export type AgentOSTraceCarrier =
-  | Headers
-  | Readonly<Record<string, string | undefined>>;
+  Headers | Readonly<Record<string, string | undefined>>;
 
 export interface AgentOSProviderAttempt {
   readonly id: string;
@@ -152,9 +151,7 @@ const carrierSetter: TextMapSetter<Record<string, string>> = {
   },
 };
 
-let environmentTelemetry:
-  | Promise<AgentOSTelemetry>
-  | undefined;
+let environmentTelemetry: Promise<AgentOSTelemetry> | undefined;
 
 export function createAgentOSTelemetry(
   options: AgentOSTelemetryOptions = {},
@@ -211,19 +208,17 @@ export function createAgentOSTelemetry(
             ended = true;
             const final = outcomeAttributes(outcome);
             finishSpan(span, final);
-            record(
-              () =>
-                instruments.operations.add(
-                  1,
-                  safeTelemetryAttributes({ ...base, ...final }, "metric"),
-                ),
+            record(() =>
+              instruments.operations.add(
+                1,
+                safeTelemetryAttributes({ ...base, ...final }, "metric"),
+              ),
             );
-            record(
-              () =>
-                instruments.operationDuration.record(
-                  elapsedSeconds(startedAt, clock()),
-                  safeTelemetryAttributes({ ...base, ...final }, "metric"),
-                ),
+            record(() =>
+              instruments.operationDuration.record(
+                elapsedSeconds(startedAt, clock()),
+                safeTelemetryAttributes({ ...base, ...final }, "metric"),
+              ),
             );
           },
         };
@@ -271,8 +266,7 @@ function startProviderAttempt(options: {
       "agentos.ai.stream.mode": options.attemptInput.streamMode,
       ...(options.attemptInput.compactionPath
         ? {
-            "agentos.ai.compaction.path":
-              options.attemptInput.compactionPath,
+            "agentos.ai.compaction.path": options.attemptInput.compactionPath,
           }
         : {}),
       ...(options.attemptInput.routeSlot
@@ -295,22 +289,22 @@ function startProviderAttempt(options: {
       inject(carrier) {
         try {
           const injected: Record<string, string> = {};
-          options.propagator.inject(
-            attemptContext,
-            injected,
-            carrierSetter,
-          );
-          injected["x-agentos-request-attempt-id"] = attemptId;
-          injected["x-agentos-runtime"] = String(
-            options.base["agentos.ai.runtime"] ?? "",
-          );
-          injected["x-agentos-request-kind"] =
-            options.attemptInput.requestKind;
-          injected["x-agentos-model-family"] = String(
-            options.base["agentos.ai.model.family"] ?? "other",
-          );
-          injected["x-agentos-stream-mode"] =
-            options.attemptInput.streamMode;
+          options.propagator.inject(attemptContext, injected, carrierSetter);
+          if (options.base["agentos.ai.route"] === "ai_gateway") {
+            injected["x-agentos-request-attempt-id"] = attemptId;
+            injected["x-agentos-runtime"] = String(
+              options.base["agentos.ai.runtime"] ?? "",
+            );
+            injected["x-agentos-request-kind"] =
+              options.attemptInput.requestKind;
+            injected["x-agentos-model-family"] = String(
+              options.base["agentos.ai.model.family"] ?? "other",
+            );
+            injected["x-agentos-stream-mode"] = options.attemptInput.streamMode;
+            injected["x-agentos-session-state"] = String(
+              options.base["agentos.ai.session.state"] ?? "fresh",
+            );
+          }
           for (const [key, value] of Object.entries(injected)) {
             if (carrier instanceof Headers) carrier.set(key, value);
             else carrier[key] = value;
@@ -329,8 +323,7 @@ function startProviderAttempt(options: {
             : {}),
           ...(outcome.providerRequestId
             ? {
-                "agentos.ai.provider.request_id":
-                  outcome.providerRequestId,
+                "agentos.ai.provider.request_id": outcome.providerRequestId,
               }
             : {}),
           ...(outcome.chunks !== undefined
@@ -377,13 +370,10 @@ function createInstruments(meter: Meter): Instruments {
       unit: "{operation}",
       description: "Completed AgentOS AI operations",
     }),
-    providerAttempts: meter.createCounter(
-      AGENTOS_AI_METRICS.providerAttempts,
-      {
-        unit: "{attempt}",
-        description: "Completed AgentOS AI provider attempts",
-      },
-    ),
+    providerAttempts: meter.createCounter(AGENTOS_AI_METRICS.providerAttempts, {
+      unit: "{attempt}",
+      description: "Completed AgentOS AI provider attempts",
+    }),
     operationDuration: meter.createHistogram(
       AGENTOS_AI_METRICS.operationDuration,
       {
@@ -430,10 +420,7 @@ function outcomeAttributes(
         outcome.status,
         outcome.error,
       ),
-      "agentos.ai.error.class": classifyAIError(
-        outcome.error,
-        outcome.status,
-      ),
+      "agentos.ai.error.class": classifyAIError(outcome.error, outcome.status),
       ...(outcome.status !== undefined
         ? { "http.response.status_code": outcome.status }
         : {}),
@@ -442,19 +429,14 @@ function outcomeAttributes(
   );
 }
 
-function finishSpan(
-  span: Span,
-  attributes: Readonly<Record<string, unknown>>,
-) {
+function finishSpan(span: Span, attributes: Readonly<Record<string, unknown>>) {
   record(() => {
     const safe = safeTelemetryAttributes(attributes, "span");
     span.setAttributes(safe);
     const statusClass = safe["agentos.ai.status_class"];
     span.setStatus({
       code:
-        statusClass === "success"
-          ? SpanStatusCode.OK
-          : SpanStatusCode.ERROR,
+        statusClass === "success" ? SpanStatusCode.OK : SpanStatusCode.ERROR,
     });
     span.end();
   });
@@ -469,7 +451,7 @@ function extractParent(
   for (const key of ["traceparent", "tracestate"] as const) {
     const value =
       carrier instanceof Headers
-        ? carrier.get(key) ?? undefined
+        ? (carrier.get(key) ?? undefined)
         : carrier[key];
     const maximum = key === "traceparent" ? 55 : 512;
     if (value && value.length <= maximum) safe[key] = value;
@@ -517,9 +499,7 @@ async function initializeEnvironmentTelemetry(): Promise<AgentOSTelemetry> {
   }
 }
 
-function hasExporterConfiguration(
-  environment: NodeJS.ProcessEnv,
-): boolean {
+function hasExporterConfiguration(environment: NodeJS.ProcessEnv): boolean {
   const exporters = [
     environment.OTEL_TRACES_EXPORTER,
     environment.OTEL_METRICS_EXPORTER,
@@ -533,9 +513,9 @@ function hasExporterConfiguration(
   }
   return Boolean(
     environment.OTEL_EXPORTER_OTLP_ENDPOINT?.trim() ||
-      environment.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim() ||
-      environment.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT?.trim() ||
-      environment.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT?.trim(),
+    environment.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim() ||
+    environment.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT?.trim() ||
+    environment.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT?.trim(),
   );
 }
 

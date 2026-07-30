@@ -13,11 +13,22 @@ type Resource = {
 
 const kubernetes = new URL("..", import.meta.url).pathname;
 
-async function render(): Promise<Resource[]> {
-  const process = Bun.spawn(["kubectl", "kustomize", join(kubernetes, "base")], {
-    stderr: "pipe",
-    stdout: "pipe",
-  });
+async function render(
+  directory = join(kubernetes, "base"),
+): Promise<Resource[]> {
+  const process = Bun.spawn(
+    [
+      "kubectl",
+      "kustomize",
+      "--load-restrictor",
+      "LoadRestrictionsNone",
+      directory,
+    ],
+    {
+      stderr: "pipe",
+      stdout: "pipe",
+    },
+  );
   const [exitCode, stdout, stderr] = await Promise.all([
     process.exited,
     new Response(process.stdout).text(),
@@ -140,11 +151,7 @@ describe("Crewmate Kubernetes base", () => {
     expect(environment.AGENTOS_THINKING).toBeUndefined();
     expect(environment.PI_CODING_AGENT_DIR).toBeUndefined();
     expect(container.command).toEqual(["herdr"]);
-    expect(container.args).toEqual([
-      "server",
-      "--session",
-      "agentos-crewmate",
-    ]);
+    expect(container.args).toEqual(["server", "--session", "agentos-crewmate"]);
     expect(container.livenessProbe.exec.command).toEqual([
       "herdr",
       "status",
@@ -176,5 +183,37 @@ describe("Crewmate Kubernetes base", () => {
         secret: { secretName: "agentos-crewmate-postgres" },
       },
     ]);
+  });
+
+  test("adds only the approved Fleet AI Gateway client boundary", async () => {
+    const resources = await render(
+      join(kubernetes, "tests", "fixtures", "ai-gateway-client"),
+    );
+    const statefulSet = resource(resources, "StatefulSet");
+    const spec = statefulSet.spec!;
+    const pod = spec.template.spec;
+    const container = pod.containers.find(
+      ({ name }: { name: string }) => name === "crewmate",
+    );
+    const environment = Object.fromEntries(
+      container.env.map(
+        ({ name, value, valueFrom }: Record<string, unknown>) => [
+          name,
+          value ?? valueFrom,
+        ],
+      ),
+    );
+
+    expect(spec.template.metadata.labels).toMatchObject({
+      "agentos.akua.dev/ai-gateway-client": "true",
+    });
+    expect(environment.AI_GATEWAY_URL).toBe(
+      "http://ai-gateway.agentos.svc.cluster.local:8787",
+    );
+    expect(environment.AI_GATEWAY_TOKEN).toEqual({
+      secretKeyRef: { key: "token", name: "ai-gateway-client" },
+    });
+    expect(pod.serviceAccountName).toBe("agentos-crewmate");
+    expect(spec.volumeClaimTemplates[0].metadata.name).toBe("home");
   });
 });

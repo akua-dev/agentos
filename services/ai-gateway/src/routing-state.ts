@@ -1,59 +1,26 @@
-import { randomUUID } from "node:crypto";
-import { z } from "zod";
-import { selectAccount } from "./selection.ts";
-import { createAtomicJsonStore, type AtomicJsonStore } from "./storage.ts";
+import { openSqliteRoutingState } from "@akua-dev/codex-router-bun";
+import {
+  AccountId,
+  LeaseToken,
+  SessionKey,
+  classifyUpstreamResponse,
+} from "@akua-dev/codex-router-core";
+import { Effect, Option } from "effect";
+import {
+  selectAccount,
+  toRouterCandidate,
+  toRouterConfig,
+} from "./selection.ts";
 import type {
   Candidate,
   CandidateExplanation,
-  Reservation,
   RoutingConfig,
-  RoutingStateFile,
 } from "./types.ts";
 
-const RoutingStateSchema = z
-  .object({
-    version: z.literal(1),
-    reservations: z.array(
-      z
-        .object({
-          accountId: z.string().min(1),
-          leaseToken: z.string().min(1),
-          createdAt: z.number().int().nonnegative(),
-          expiresAt: z.number().int().nonnegative(),
-        })
-        .strict(),
-    ),
-    assignments: z.array(
-      z
-        .object({
-          sessionKey: z.string().min(1),
-          accountId: z.string().min(1),
-          updatedAt: z.number().int().nonnegative(),
-        })
-        .strict(),
-    ),
-    blocks: z.array(
-      z
-        .object({
-          accountId: z.string().min(1),
-          kind: z.enum(["quota", "transient"]),
-          blockedAt: z.number().int().nonnegative(),
-          retryAt: z.number().int().nonnegative().optional(),
-        })
-        .strict(),
-    ),
-  })
-  .strict();
-
-export function createRoutingStateStore(path: string): AtomicJsonStore<RoutingStateFile> {
-  return createAtomicJsonStore({
-    path,
-    schema: RoutingStateSchema,
-    createDefault: () => ({ version: 1, reservations: [], assignments: [], blocks: [] }),
-  });
-}
-
-export interface AcquiredReservation extends Reservation {
+export interface AcquiredReservation {
+  accountId: string;
+  leaseToken: string;
+  expiresAt: number;
   decisionReason: string;
 }
 
@@ -67,121 +34,161 @@ export interface RoutingSummary {
   };
 }
 
-export function createRoutingState(store: AtomicJsonStore<RoutingStateFile>) {
+export async function createRoutingState(path: string, config: RoutingConfig) {
+  const routerConfig = toRouterConfig(config);
+  const handle = await Effect.runPromise(
+    openSqliteRoutingState(path, routerConfig),
+  );
   let lastSelection: RoutingSummary["lastSelection"];
+
   return {
     async summary(now: number): Promise<RoutingSummary> {
-      const active = (await store.read()).reservations.filter((value) => value.expiresAt > now);
-      const reservationsByAccount: Record<string, number> = {};
-      for (const reservation of active) {
-        reservationsByAccount[reservation.accountId] =
-          (reservationsByAccount[reservation.accountId] ?? 0) + 1;
-      }
+      const summary = await Effect.runPromise(handle.state.summary(now));
       return {
-        activeReservations: active.length,
-        reservationsByAccount,
+        activeReservations: summary.activeReservations,
+        reservationsByAccount: Object.fromEntries(
+          summary.accounts
+            .filter((account) => account.activeReservations > 0)
+            .map((account) => [account.accountId, account.activeReservations]),
+        ),
         ...(lastSelection ? { lastSelection } : {}),
       };
     },
 
     async acquire(input: {
       candidates: Candidate[];
-      config: RoutingConfig;
       now: number;
       sessionKey?: string;
     }): Promise<AcquiredReservation | undefined> {
-      let acquired: AcquiredReservation | undefined;
-      await store.update((state) => {
-        const reservations = state.reservations.filter((value) => value.expiresAt > input.now);
-        const assignments = state.assignments.filter(
-          (value) => value.updatedAt + input.config.assignmentTtlMs > input.now,
+      let summary = await Effect.runPromise(handle.state.summary(input.now));
+      const recoveredAccounts = summary.accounts.filter(
+        (account) =>
+          account.requiresReauthentication &&
+          input.candidates.some(
+            (candidate) =>
+              candidate.accountId === account.accountId &&
+              !candidate.needsReauth,
+          ),
+      );
+      for (const account of recoveredAccounts) {
+        await Effect.runPromise(
+          handle.state.recordResponse(
+            account.accountId,
+            classifyUpstreamResponse(200, new Headers(), input.now),
+            input.now,
+          ),
         );
-        const currentAccountId = input.sessionKey
-          ? assignments.find((value) => value.sessionKey === input.sessionKey)?.accountId
-          : undefined;
-        const blocks = state.blocks.filter(
-          (value) => value.retryAt === undefined || value.retryAt > input.now,
-        );
-        const candidates = input.candidates.map((candidate) => {
-          const block = blocks.find((value) => value.accountId === candidate.accountId);
-          const activeReservations = reservations.filter(
-            (value) => value.accountId === candidate.accountId,
-          ).length;
-          return {
-            ...candidate,
-            activeReservations,
-            ...(block ? { block } : {}),
-          };
-        });
-        const decision = selectAccount({
-          candidates,
-          config: input.config,
-          now: input.now,
-          ...(currentAccountId ? { currentAccountId } : {}),
-        });
-        lastSelection = {
-          observedAt: input.now,
-          reason: decision.reason,
-          candidates: decision.candidates,
-        };
-        if (!decision.accountId) return { ...state, reservations, assignments, blocks };
-
-        const reservation: Reservation = {
-          accountId: decision.accountId,
-          leaseToken: randomUUID(),
-          createdAt: input.now,
-          expiresAt: input.now + input.config.reservationTtlMs,
-        };
-        acquired = { ...reservation, decisionReason: decision.reason };
-        const nextAssignments = input.sessionKey
-          ? [
-              ...assignments.filter((value) => value.sessionKey !== input.sessionKey),
-              { sessionKey: input.sessionKey, accountId: decision.accountId, updatedAt: input.now },
-            ]
-          : assignments;
-        return {
-          ...state,
-          reservations: [...reservations, reservation],
-          assignments: nextAssignments,
-          blocks,
-        };
+      }
+      if (recoveredAccounts.length > 0) {
+        summary = await Effect.runPromise(handle.state.summary(input.now));
+      }
+      const diagnosticCandidates = overlayRoutingSummary(
+        input.candidates,
+        summary,
+      );
+      const decision = selectAccount({
+        candidates: diagnosticCandidates,
+        config,
+        now: input.now,
       });
-      return acquired;
+      const lease = await Effect.runPromise(
+        handle.state.acquire({
+          candidates: input.candidates.map(toRouterCandidate),
+          now: input.now,
+          ...(input.sessionKey
+            ? { sessionKey: SessionKey.make(input.sessionKey) }
+            : {}),
+        }),
+      );
+      const acquired = Option.getOrUndefined(lease);
+      const decisionReason =
+        acquired === undefined
+          ? decision.reason
+          : acquired.accountId === decision.accountId
+            ? decision.reason
+            : "current_account_hysteresis";
+      lastSelection = {
+        observedAt: input.now,
+        reason: decisionReason,
+        candidates: decision.candidates,
+      };
+      if (acquired === undefined) return undefined;
+      return {
+        accountId: acquired.accountId,
+        leaseToken: acquired.leaseToken,
+        expiresAt: acquired.expiresAt,
+        decisionReason,
+      };
     },
 
-    async renew(leaseToken: string, now: number, ttlMs = 120_000): Promise<boolean> {
-      let renewed = false;
-      await store.update((state) => ({
-        ...state,
-        reservations: state.reservations
-          .filter((value) => value.expiresAt > now)
-          .map((value) => {
-            if (value.leaseToken !== leaseToken) return value;
-            renewed = true;
-            return { ...value, expiresAt: now + ttlMs };
-          }),
-      }));
-      return renewed;
+    async renew(leaseToken: string, now: number): Promise<boolean> {
+      return await Effect.runPromise(
+        handle.state.renew(LeaseToken.make(leaseToken), now),
+      );
     },
 
     async release(leaseToken: string): Promise<boolean> {
-      let released = false;
-      await store.update((state) => ({
-        ...state,
-        reservations: state.reservations.filter((value) => {
-          if (value.leaseToken !== leaseToken) return true;
-          released = true;
-          return false;
-        }),
-      }));
-      return released;
+      await Effect.runPromise(
+        handle.state.release(LeaseToken.make(leaseToken)),
+      );
+      return true;
     },
 
-    async block(block: RoutingStateFile["blocks"][number]): Promise<void> {
-      await store.update((state) => ({
-        ...state,
-        blocks: [...state.blocks.filter((value) => value.accountId !== block.accountId), block],
-      }));
+    async recordResponse(
+      accountId: string,
+      status: number,
+      headers: Headers,
+      now: number,
+    ): Promise<void> {
+      await Effect.runPromise(
+        handle.state.recordResponse(
+          AccountId.make(accountId),
+          classifyUpstreamResponse(status, headers, now),
+          now,
+        ),
+      );
+    },
+
+    async close(): Promise<void> {
+      await Effect.runPromise(handle.close);
     },
   };
+}
+
+function overlayRoutingSummary(
+  candidates: Candidate[],
+  summary: {
+    accounts: ReadonlyArray<{
+      accountId: string;
+      activeReservations: number;
+      blockKind: Option.Option<"quota" | "transient">;
+      requiresReauthentication: boolean;
+    }>;
+  },
+): Candidate[] {
+  return candidates.map((candidate) => {
+    const account = summary.accounts.find(
+      (value) => value.accountId === candidate.accountId,
+    );
+    const blockKind = account
+      ? Option.getOrUndefined(account.blockKind)
+      : undefined;
+    return {
+      ...candidate,
+      activeReservations:
+        (candidate.activeReservations ?? 0) +
+        (account?.activeReservations ?? 0),
+      needsReauth:
+        candidate.needsReauth || account?.requiresReauthentication === true,
+      ...(candidate.block
+        ? { block: candidate.block }
+        : blockKind
+          ? {
+              block: {
+                kind: blockKind,
+              },
+            }
+          : {}),
+    };
+  });
 }

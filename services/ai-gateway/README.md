@@ -11,21 +11,31 @@ subscription capacity is worth the Captain-approved credential authority and
 additional service lifecycle. The operator workflow lives in
 `$agentos-ai-gateway`; the stable boundary lives in `ARCHITECTURE.md`.
 
-Shared selection, session, lease, Responses protocol, header sanitation and
-streaming semantics come from the pinned MIT-licensed
+The supported capacity order is direct per-Agent OAuth, this in-cluster
+multi-subscription Gateway, a mixed posture with only selected pooled clients,
+and an external Cloudflare Worker last. AgentOS-only Fleets should use the
+in-cluster or mixed posture: AgentOS can operate the service natively and keep
+the complete privacy-bounded AI path in its OpenTelemetry topology. Never chain
+a Cloudflare Worker through this service.
+
+Shared selection, session, lease, response classification, persistent routing
+transitions, Responses protocol, header sanitation and streaming semantics
+come from the pinned MIT-licensed
 [`akua-dev/codex-router`](../../vendor/codex-router/UPSTREAM.md) workspace
-snapshot. AgentOS supplies only its Fleet OAuth, quota, persistence, health and
-OpenTelemetry adapters. Shared routing behavior changes upstream first and is
-then refreshed here; this package does not carry an independent policy fork.
-It does not capture transcripts, wrap harness commands or silently change
+snapshot. AgentOS supplies only Fleet OAuth-vault integration, quota
+observations, protected rejection diagnostics, health, OpenTelemetry and
+deployment wiring. Shared routing behavior changes upstream first and is then
+refreshed here; this package does not carry an independent policy fork. It does
+not capture transcripts, wrap harness commands or silently change
 models/providers.
 
 This is deliberately not a universal AgentOS proxy. Git, PostgreSQL,
 Kubernetes, Herdr, registries and other provider tools retain their native
-interfaces. Account login, refresh and routing-state changes use locked atomic
-files and are observed by the running Bun service without a Caddy, Envoy or
-other dynamic-route control plane. Provider adapters and selection semantics
-remain reviewed source delivered through the normal image lifecycle.
+interfaces. Account login and refresh use the locked atomic OAuth vault;
+session, lease and block transitions use the canonical Effect Bun/SQLite
+package on the retained PVC. The running service needs no Caddy, Envoy or other
+dynamic-route control plane. Provider adapters and selection semantics remain
+reviewed source delivered through the normal image lifecycle.
 
 The request and response transport boundary, including upstream identity
 encoding and stale response-header handling, is defined in
@@ -39,6 +49,11 @@ provider/routing/account/session identity, or full errors, messages or stacks.
 
 The package, executable, Kubernetes resources, Service DNS, Secret, PVC path,
 environment and client headers consistently use the `ai-gateway` identity.
+The default First Mate, Second Mate, and Crewmate Kubernetes subtrees each own
+one optional `patches/ai-gateway-client.yaml`. A reviewed per-Agent overlay
+composes only the approved clients. Repeated Gateway-owned device logins create
+the multi-subscription pool; `$agentos-ai-gateway` owns the exact lifecycle and
+native Pi/Codex configuration.
 
 ## OpenTelemetry
 

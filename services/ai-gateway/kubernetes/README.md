@@ -8,6 +8,19 @@ with Captain-approved pooled capacity.
 The Kubernetes objects, Service DNS, Secret and PVC path use the `ai-gateway`
 identity consistently.
 
+This directory owns only the service. Optional client wiring stays with each
+workload owner:
+
+- `packages/agentos/resources/roles/firstmate/kubernetes/patches/ai-gateway-client.yaml`;
+- `packages/agentos/resources/roles/secondmate/kubernetes/patches/ai-gateway-client.yaml`;
+- `packages/agentos/resources/crewmates/default/kubernetes/patches/ai-gateway-client.yaml`.
+
+Compose the patch only in a reviewed overlay for an approved client. Applying
+all selected patches creates the in-cluster pooled posture; applying only
+worker or automation patches while Mates retain direct OAuth creates the mixed
+posture. `$agentos-ai-gateway` owns the exact Secret, login, client
+configuration, verification, recovery and retirement workflow.
+
 Storage provisioners do not agree on initial PVC ownership or mode. A short
 init container from the same AgentOS image therefore takes ownership of the
 retained mount and sets it to mode `0700` before the capability-free, non-root
@@ -27,6 +40,10 @@ The topology does not enable an OpenAI API-key fallback. Add `OPENAI_API_KEY` fr
 separate Secret and `AI_GATEWAY_ALLOW_API_KEY_FALLBACK=true` only after the
 Captain explicitly selects that fallback. Do not add an Ingress. Login and
 harness configuration are defined by `$agentos-ai-gateway`.
+
+Do not route a Cloudflare Worker into this Service. A standalone Worker is an
+exceptional separate router for a deployment that also serves non-AgentOS
+clients; it is not the preferred AgentOS topology.
 
 The `agentos:dev` image is a contributor placeholder. Published resources use a
 reviewed immutable AgentOS image digest.

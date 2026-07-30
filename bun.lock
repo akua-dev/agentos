@@ -8,8 +8,6 @@
         "@akua-dev/agentos": "workspace:*",
         "@earendil-works/pi-ai": "0.81.1",
         "@earendil-works/pi-coding-agent": "0.81.1",
-        "@akua-dev/codex-router-core": "workspace:*",
-        "effect": "4.0.0-beta.102",
         "ajv": "8.20.0",
         "yaml": "2.9.0",
         "zod": "4.4.3",
@@ -89,6 +87,7 @@
       },
       "dependencies": {
         "@akua-dev/agentos": "workspace:*",
+        "@akua-dev/codex-router-bun": "workspace:*",
         "@akua-dev/codex-router-codex": "workspace:*",
         "@akua-dev/codex-router-core": "workspace:*",
         "@earendil-works/pi-ai": "0.81.1",
@@ -107,6 +106,17 @@
     "services/otel-collector": {
       "name": "@agentos/otel-collector",
       "version": "0.0.0",
+    },
+    "vendor/codex-router/packages/bun": {
+      "name": "@akua-dev/codex-router-bun",
+      "version": "0.0.0",
+      "dependencies": {
+        "@akua-dev/codex-router-codex": "workspace:*",
+        "@akua-dev/codex-router-core": "workspace:*",
+        "@effect/platform-bun": "4.0.0-beta.102",
+        "@effect/sql-sqlite-bun": "4.0.0-beta.102",
+        "effect": "4.0.0-beta.102",
+      },
     },
     "vendor/codex-router/packages/codex": {
       "name": "@akua-dev/codex-router-codex",
@@ -195,6 +205,8 @@
     "@agentos/pg-listen": ["@agentos/pg-listen@workspace:clis/pg-listen"],
 
     "@akua-dev/agentos": ["@akua-dev/agentos@workspace:packages/agentos"],
+
+    "@akua-dev/codex-router-bun": ["@akua-dev/codex-router-bun@workspace:vendor/codex-router/packages/bun"],
 
     "@akua-dev/codex-router-codex": ["@akua-dev/codex-router-codex@workspace:vendor/codex-router/packages/codex"],
 
@@ -469,6 +481,12 @@
     "@earendil-works/pi-tui": ["@earendil-works/pi-tui@0.81.1", "", { "dependencies": { "get-east-asian-width": "1.6.0", "marked": "18.0.5" } }, "sha512-OMEe+Zt8oQYi/rCq3upxsTlIScWL0FPhXwQus34TbQb3EmTx88S7Uzx32JxvQiEeWOw8eDCdJf2PBUBE9r6wIg=="],
 
     "@ecies/ciphers": ["@ecies/ciphers@0.2.6", "", { "peerDependencies": { "@noble/ciphers": "^1.0.0" } }, "sha512-patgsRPKGkhhoBjETV4XxD0En4ui5fbX0hzayqI3M8tvNMGUoUvmyYAIWwlxBc1KX5cturfqByYdj5bYGRpN9g=="],
+
+    "@effect/platform-bun": ["@effect/platform-bun@4.0.0-beta.102", "", { "dependencies": { "@effect/platform-node-shared": "^4.0.0-beta.102" }, "peerDependencies": { "effect": "^4.0.0-beta.102" } }, "sha512-hTIb0jjTfXhNgnDq2OX5wrigc0OSvTT0VWWb1PLpMM395RJPu8rCIbTlGhy0NS7kZOd8FfgNi9e0sDhgyu+5Ag=="],
+
+    "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.0-beta.102", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.21.0" }, "peerDependencies": { "effect": "^4.0.0-beta.102" } }, "sha512-gVd793I72MrkX4dXo7eYtRKfNj0RW4eMRfVEKEJI16h2+mBDCzQ+gqMrog2hSTHQnaIbvbYShNQ4TVGuRCYZeQ=="],
+
+    "@effect/sql-sqlite-bun": ["@effect/sql-sqlite-bun@4.0.0-beta.102", "", { "peerDependencies": { "effect": "^4.0.0-beta.102" } }, "sha512-pBO6FBJ+a21j2qHmzJDK1DeJsxm7HpUQBgucw6prHQXLMUBkhOsfZofhw1FKEdGRDEhO0sGTjffa2KP7iOuDIg=="],
 
     "@effect/vitest": ["@effect/vitest@4.0.0-beta.102", "", { "peerDependencies": { "effect": "^4.0.0-beta.102", "vitest": "^3.0.0 || ^4.0.0" } }, "sha512-4dipFAYG6imOzrY3zy3BgzCJkbb9xESyzUef0WSx8bsK0/SpITqbJpdwKeOyDWLZ+rimjua8IbTFMAde865pIQ=="],
 
@@ -1273,6 +1291,8 @@
     "@types/trusted-types": ["@types/trusted-types@2.0.7", "", {}, "sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw=="],
 
     "@types/unist": ["@types/unist@3.0.3", "", {}, "sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q=="],
+
+    "@types/ws": ["@types/ws@8.18.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg=="],
 
     "@typescript/typescript-aix-ppc64": ["@typescript/typescript-aix-ppc64@7.0.2", "", { "os": "aix", "cpu": "ppc64" }, "sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ=="],
 

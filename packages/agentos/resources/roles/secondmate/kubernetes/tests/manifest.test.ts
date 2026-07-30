@@ -3,17 +3,28 @@ import { join } from "node:path";
 
 type Resource = {
   kind: string;
-  metadata: { name: string };
+  metadata: { labels?: Record<string, string>; name: string };
   spec?: Record<string, any>;
 };
 
 const kubernetes = new URL("..", import.meta.url).pathname;
 
-async function render(): Promise<Resource[]> {
-  const process = Bun.spawn(["kubectl", "kustomize", join(kubernetes, "base")], {
-    stderr: "pipe",
-    stdout: "pipe",
-  });
+async function render(
+  directory = join(kubernetes, "base"),
+): Promise<Resource[]> {
+  const process = Bun.spawn(
+    [
+      "kubectl",
+      "kustomize",
+      "--load-restrictor",
+      "LoadRestrictionsNone",
+      directory,
+    ],
+    {
+      stderr: "pipe",
+      stdout: "pipe",
+    },
+  );
   const [exitCode, stdout, stderr] = await Promise.all([
     process.exited,
     new Response(process.stdout).text(),
@@ -57,9 +68,7 @@ describe("Second Mate Kubernetes base", () => {
       "agentos:dev",
     ]);
     expect(
-      allContainers.map(
-        ({ workingDir }: { workingDir: string }) => workingDir,
-      ),
+      allContainers.map(({ workingDir }: { workingDir: string }) => workingDir),
     ).toEqual([
       "/opt/agentos/packages/agentos/resources/roles/secondmate",
       "/opt/agentos/packages/agentos/resources/roles/secondmate",
@@ -81,5 +90,37 @@ describe("Second Mate Kubernetes base", () => {
     expect(environment.AGENTOS_MODEL).toBeUndefined();
     expect(environment.AGENTOS_THINKING).toBeUndefined();
     expect(container.args).toEqual(["run", "--skip-tools", "secondmate:run"]);
+  });
+
+  test("adds only the approved Fleet AI Gateway client boundary", async () => {
+    const resources = await render(
+      join(kubernetes, "tests", "fixtures", "ai-gateway-client"),
+    );
+    const statefulSet = resource(resources, "StatefulSet");
+    const spec = statefulSet.spec!;
+    const pod = spec.template.spec;
+    const container = pod.containers.find(
+      ({ name }: { name: string }) => name === "agentos",
+    );
+    const environment = Object.fromEntries(
+      container.env.map(
+        ({ name, value, valueFrom }: Record<string, unknown>) => [
+          name,
+          value ?? valueFrom,
+        ],
+      ),
+    );
+
+    expect(spec.template.metadata.labels).toMatchObject({
+      "agentos.akua.dev/ai-gateway-client": "true",
+    });
+    expect(environment.AI_GATEWAY_URL).toBe(
+      "http://ai-gateway.agentos.svc.cluster.local:8787",
+    );
+    expect(environment.AI_GATEWAY_TOKEN).toEqual({
+      secretKeyRef: { key: "token", name: "ai-gateway-client" },
+    });
+    expect(pod.serviceAccountName).toBe("agentos-secondmate");
+    expect(spec.volumeClaimTemplates[0].metadata.name).toBe("home");
   });
 });

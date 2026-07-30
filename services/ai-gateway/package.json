@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@akua-dev/agentos": "workspace:*",
+    "@akua-dev/codex-router-bun": "workspace:*",
     "@akua-dev/codex-router-codex": "workspace:*",
     "@akua-dev/codex-router-core": "workspace:*",
     "@earendil-works/pi-ai": "0.81.1",

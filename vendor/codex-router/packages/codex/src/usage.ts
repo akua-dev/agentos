@@ -19,10 +19,10 @@ const RawWindow = Schema.Struct({
 })
 
 const RawRateLimit = Schema.Struct({
-  primary_window: Schema.optionalKey(RawWindow),
-  secondary_window: Schema.optionalKey(RawWindow),
-  primary: Schema.optionalKey(RawWindow),
-  secondary: Schema.optionalKey(RawWindow)
+  primary_window: Schema.optionalKey(Schema.NullOr(RawWindow)),
+  secondary_window: Schema.optionalKey(Schema.NullOr(RawWindow)),
+  primary: Schema.optionalKey(Schema.NullOr(RawWindow)),
+  secondary: Schema.optionalKey(Schema.NullOr(RawWindow))
 })
 
 const RawUsage = Schema.Struct({
@@ -32,7 +32,7 @@ const RawUsage = Schema.Struct({
   planType: Schema.optionalKey(Schema.String),
   credits: Schema.optionalKey(
     Schema.Struct({
-      balance: Schema.optionalKey(Schema.Number)
+      balance: Schema.optionalKey(Schema.Union([Schema.Number, Schema.String]))
     })
   )
 })
@@ -84,10 +84,10 @@ const classifyWindow = (raw: RawWindow, fallback: WindowKind): WindowKind => {
 }
 
 const parseWindow = (
-  raw: RawWindow | undefined,
+  raw: RawWindow | null | undefined,
   fallback: WindowKind
 ): ParsedWindow | undefined => {
-  if (raw === undefined) {
+  if (raw === undefined || raw === null) {
     return undefined
   }
   const usedPercent = raw.used_percent ?? raw.usedPercent
@@ -134,7 +134,11 @@ export const decodeCodexUsage = Effect.fn("decodeCodexUsage")(function* (
         parseWindow(rateLimit.primary_window ?? rateLimit.primary, "short"),
         parseWindow(rateLimit.secondary_window ?? rateLimit.secondary, "weekly")
       ].filter((window): window is ParsedWindow => window !== undefined)
-      const short = exactlyOne(windows, "short")
+      const short =
+        exactlyOne(windows, "short") ??
+        (windows.length === 1 && windows[0]?.kind === "weekly"
+          ? UsageWindow.make({ usedPercent: 0 })
+          : undefined)
       const weekly = exactlyOne(windows, "weekly")
       if (short === undefined || weekly === undefined) {
         throw failure()
@@ -144,10 +148,10 @@ export const decodeCodexUsage = Effect.fn("decodeCodexUsage")(function* (
     catch: failure
   })
 
+  const balance =
+    typeof raw.credits?.balance === "string" ? Number(raw.credits.balance) : raw.credits?.balance
   const credits =
-    raw.credits?.balance === undefined || !Number.isFinite(raw.credits.balance)
-      ? undefined
-      : Math.max(0, raw.credits.balance)
+    balance === undefined || !Number.isFinite(balance) ? undefined : Math.max(0, balance)
   const planType = raw.plan_type ?? raw.planType
   return UsageSnapshot.make({
     accountId: AccountId.make(accountId),

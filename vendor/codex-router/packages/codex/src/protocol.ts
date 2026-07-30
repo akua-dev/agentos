@@ -21,7 +21,10 @@ export const supportedResponsePaths: ReadonlyArray<SupportedResponsePath> = [
 export const isSupportedResponsePath = (path: string): path is SupportedResponsePath =>
   supportedResponsePaths.some((supported) => supported === path)
 
-export const resolveUpstreamTarget = (path: string, accountKind: AccountKind): string => {
+export const resolveUpstreamTarget = (
+  path: string,
+  accountKind: AccountKind = "codex_subscription"
+): string => {
   if (accountKind === "codex_subscription") {
     return "https://chatgpt.com/backend-api/codex/responses"
   }

@@ -113,4 +113,34 @@ describe("decodeCodexUsage", () => {
       expect(failure).toBeInstanceOf(CodexUsageParseError)
     })
   )
+
+  it.effect("treats an explicit weekly-only subscription limit as unconstrained short usage", () =>
+    Effect.gen(function* () {
+      const resetAtSeconds = 1_805_902_970
+      const usage = yield* decodeCodexUsage(
+        {
+          credits: { balance: "0" },
+          plan_type: "pro",
+          rate_limit: {
+            primary_window: {
+              limit_window_seconds: 604_800,
+              reset_after_seconds: 479_940,
+              reset_at: resetAtSeconds,
+              used_percent: 53
+            },
+            secondary_window: null
+          }
+        },
+        observedAt,
+        accountId
+      )
+
+      expect(usage.short.usedPercent).toBe(0)
+      expect(usage.short.resetAt).toBeUndefined()
+      expect(usage.weekly.usedPercent).toBe(53)
+      expect(usage.weekly.resetAt).toBe(resetAtSeconds * 1_000)
+      expect(usage.credits).toBe(0)
+      expect(usage.planType).toBe("pro")
+    })
+  )
 })
