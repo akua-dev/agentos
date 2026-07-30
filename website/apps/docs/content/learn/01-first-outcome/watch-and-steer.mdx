@@ -1,0 +1,61 @@
+---
+title: Watch and steer the work
+description: Read the authority that owns each fact and correct stale work before it compounds.
+courseId: first-outcome
+courseTitle: Run your first outcome
+courseOrder: 1
+lessonId: watch-and-steer
+lessonOrder: 3
+estimatedMinutes: 4
+canonical:
+  - label: Supervision procedure
+    path: packages/agentos/skills/agentos-supervision/SKILL.md
+  - label: Runtime procedure
+    path: packages/agentos/skills/agentos-runtime/SKILL.md
+---
+
+## Visibility without constant narration
+
+Autonomy should return human attention, not consume it with progress messages. First Mate
+supervises through durable state and narrow wake paths, then reports outcomes, material risks and
+decisions.
+
+Ask the authority that owns the question:
+
+- PostgreSQL: who owns the outcome and which decisions are open?
+- Kubernetes: is the intended workload healthy?
+- Herdr: what is the exact native session doing?
+- Git and its provider: what was committed, checked and opened for review?
+
+A dashboard or event log may project all four, but the projection does not become authority.
+
+## Inspect the onboarding worker
+
+The worker is active and First Mate has no decision to report. You attach to the named Herdr Agent
+and see a compatibility test failing. That terminal is direct process evidence; it does not change
+the Assignment or mark any message read.
+
+Then new evidence arrives: a recent provider change already exposes the field the worker planned
+to add with a migration. Waiting for a polished report would waste effort, so the supervisor
+steers the same owned session:
+
+> Provider change 842 exposes `valid_until` through the current endpoint. Re-evaluate the migration
+> before changing schema; preserve current work and report whether the existing API satisfies the
+> outcome.
+
+Steering changes the smallest stale assumption. It does not create a second worker to race the
+first or discard the work already done. If you speak directly in the attached terminal, your
+instruction wins over a stale brief and the supervisor reconciles the result afterward.
+
+## Look for evidence, not activity
+
+Useful evidence answers whether the outcome is moving:
+
+- the same Assignment remains owned;
+- the worker incorporated the new fact;
+- the project tests now exercise the intended behavior;
+- the final artifact stays within the accepted boundary.
+
+Token counts, terminal output and busy Pods can help diagnosis, but none proves the outcome.
+Next, learn how the Fleet returns [the human decision](/learn/01-first-outcome/make-human-decision)
+without making you its polling loop.

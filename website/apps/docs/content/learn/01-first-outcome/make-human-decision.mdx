@@ -1,0 +1,60 @@
+---
+title: Make the human decision
+description: Resolve one consequential choice while durable routing protects everyone else’s attention.
+courseId: first-outcome
+courseTitle: Run your first outcome
+courseOrder: 1
+lessonId: make-human-decision
+lessonOrder: 4
+estimatedMinutes: 4
+canonical:
+  - label: Decision procedure
+    path: packages/agentos/skills/agentos-decisions/SKILL.md
+  - label: Targeted notification behavior
+    path: database/migrations/0013_targeted_mate_notifications.sql
+---
+
+## Attention is part of the operating system
+
+A company needs durable communication without interrupting everyone. AgentOS separates the speech
+act from the signal that attention may be useful:
+
+```text
+commit durable Inbox row
+  → send a targeted wake hint
+  → recipient loads current bearings
+  → receive
+  → read
+  → resolve only when the speech act permits it
+```
+
+PostgreSQL `LISTEN/NOTIFY` is a wake hint, not a queue. A disconnected Mate may miss it while the
+Inbox row remains queryable. Receipt, reading and resolution are separate facts.
+
+Humans do not need to address internal Second Mates or know which worker is active. They speak to
+First Mate or the company surface. First Mate routes the question through the hierarchy to the
+right person. The Captain may be one person or a team; the relevant authority belongs with the
+people who live with the consequence.
+
+## Scope one exact approval
+
+The onboarding pull request is ready, but the project normally requires a human merge. First Mate
+presents what became known, the real options and the exact choice:
+
+> Approve merge of this exact onboarding validation pull request after its current required checks
+> remain green. This does not grant standing merge authority.
+
+That answer releases only work that depends on this decision. A different pull request, later
+force-push, credential grant or production deploy remains outside it.
+
+Reading the question is not approval. Having permission to merge is not approval either. The
+durable decision couples the exact answer to the dependent work that may now continue.
+
+## Spend attention deliberately
+
+Good autonomy makes ordinary work quiet and consequential work crisp. Escalate cost, risk,
+irreversibility, missing authority and boundary changes. Do not escalate routine tool choices that
+already fit the accepted brief.
+
+Next, see how the same outcome becomes a normal project artifact and survives interruption in
+[Deliver and recover the outcome](/learn/01-first-outcome/deliver-and-recover).

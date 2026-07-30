@@ -1,0 +1,66 @@
+---
+title: Measure and improve
+description: Evaluate whole outcomes, freeze failures and change the smallest source that owns the cause.
+courseId: grow-company
+courseTitle: Grow the company
+courseOrder: 2
+lessonId: measure-and-improve
+lessonOrder: 4
+estimatedMinutes: 5
+canonical:
+  - label: Benchmark specification
+    path: benchmarks/SPEC.md
+  - label: Evaluation Skill
+    path: .agents/skills/agentos-evaluation/SKILL.md
+  - label: Improvement review
+    path: .agents/skills/agentos-improvement-review/SKILL.md
+---
+
+## Measure outcomes, not motion
+
+Agent activity is not organizational performance. Measure verified human outcomes and what the
+company spent to deliver them:
+
+- acceptance evidence and outcome quality;
+- Captain decisions, clarifications and repair interventions;
+- elapsed time, retries, tokens and duplicated work;
+- interruption detection and return to useful work;
+- authority, safety and chain of custody;
+- missing telemetry and explicit limitations.
+
+One composite score can hide failure. Keep the dimensions and failed attempts visible.
+
+For the support domain, run declared scenarios: a new defect, a duplicate delivery, an existing
+Task match, a controlled worker interruption and a consequence requiring a human decision. Freeze
+the exact subject and evidence for each. If token data is missing, record `unknown`, not zero.
+
+## Separate evaluation from improvement
+
+Do not change the system while measuring it. Freeze the failing run first, then start a separate
+improvement review:
+
+```text
+observe → freeze → explain cause → regression test
+→ smallest owning change → rerun
+```
+
+Suppose repeated webhook delivery created two Tasks. Provider IDs, external-event rows, claims and
+resulting Tasks show that the released ingestion contract accepted two identities for one provider
+key.
+
+The cause is not “the Agent forgot.” Write a database behavior test, change the versioned SQL
+invariant and rerun the original scenario plus a held-out retry shape. Telling every Agent to
+“remember not to duplicate events” would leave the deterministic defect in place.
+
+If the failure instead came from reconciliation judgment, change the one owning Skill and test the
+behavior through a scenario. If a private preference was missing, change memory. The evidence
+chooses the owner.
+
+## Widen autonomy only after evidence
+
+A domain earns more signals, capabilities or standing authority after complete chains of custody
+show that it delivers useful outcomes, recovers honestly and returns the right decisions. This is
+how the company grows without turning confidence into unbounded trust.
+
+You now have a learning organization. The final chapter shows how to
+[upgrade it without losing control](/learn/03-stay-in-control/upgrade-without-losing-control).

@@ -1,0 +1,31 @@
+---
+title: Kubernetes and authorization
+description: Workload truth, persistent homes and least-authority runtime boundaries.
+canonical:
+  - label: Kubernetes and authorization architecture
+    path: ARCHITECTURE.md
+  - label: Runtime Kubernetes resources
+    path: packages/agentos/runtime/kubernetes
+  - label: Agent workload resources
+    path: packages/agentos/resources
+---
+
+Kubernetes owns live workload state and effective runtime authorization. AgentOS composes a shared
+runtime base with role-owned overlays for First Mate, Second Mate and Crewmate workloads.
+
+Persistent Agents receive a home PVC. ServiceAccounts and bindings expose only the mutation scope
+their role requires. First Mate may be installed with an explicitly approved broader overlay when
+bootstrap or Fleet operation needs it; broad permission is never inferred from prose.
+
+## Authorization has two gates
+
+Kubernetes may answer `yes` to `auth can-i`, while the organizational action still needs Captain
+approval. Conversely, a recorded human decision cannot make a denied API call succeed. Both native
+permission and organizational authority must be true.
+
+Manifests remain versioned release assets. Inspect rendered and server-side diffs before apply.
+Use explicit context and namespace, verify observed images by digest and preserve home PVCs during
+replacement.
+
+AgentOS does not add a controller merely to mirror Kubernetes state into PostgreSQL. Supervision
+queries Kubernetes narrowly when workload evidence matters.

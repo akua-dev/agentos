@@ -1,0 +1,30 @@
+---
+title: Memory and learning
+description: Private fallible context separated from shared Fleet truth and reviewed improvement.
+canonical:
+  - label: Memory procedure
+    path: packages/agentos/skills/agentos-memory/SKILL.md
+  - label: Memory migration
+    path: database/migrations/0014_mate_memory.sql
+  - label: Improvement review
+    path: .agents/skills/agentos-improvement-review/SKILL.md
+---
+
+Private Mate memory helps one persistent Agent apply earlier feedback and stable context. It is
+fallible context, not Fleet authority, current-state proof or permission.
+
+For example, memory may say the Captain prefers decisions to reach a particular company surface.
+That preference helps shape communication, but current PostgreSQL rows decide what remains
+unresolved, provider state decides what changed and current instructions decide what is allowed.
+
+## Memory boundaries
+
+- Memory belongs to one Mate’s persistent home and is private by default.
+- The Captain or supervising Mate can ask it to remember, correct, forget, pin, pause or resume.
+- A Mate may propose a useful learning upward; it does not edit another Mate’s PVC.
+- Conflicts are surfaced rather than silently rewriting a newer instruction.
+- A stale-write guard prevents one session from overwriting a newer memory revision.
+
+Organization-wide learning follows a different path: freeze evaluation evidence, identify the
+smallest reproducible cause, make one reviewed improvement and rerun the held-out behavior. A good
+memory hint may inspire that review, but it does not bypass it.

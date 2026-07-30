@@ -1,0 +1,35 @@
+---
+title: PostgreSQL coordination
+description: Durable Fleet truth, RLS and atomic organizational transitions.
+canonical:
+  - label: PostgreSQL boundary
+    path: ARCHITECTURE.md
+  - label: Database migrations
+    path: database/migrations
+  - label: Database behavior tests
+    path: database/tests
+---
+
+PostgreSQL is the durable coordination authority for Agent identities, hierarchy, projects, Tasks,
+Assignments, Inbox speech acts, exact Captain decisions, learnings, composition evidence and
+external-event reconciliation.
+
+Versioned SQL owns constraints, grants, row-level security, Functions and Triggers. Shared
+organizational transitions use released Functions so one transaction can preserve coupled state.
+For example, Task acceptance creates the Task and its first Assignment atomically; decision
+resolution records the exact answer and removes dependent Task edges atomically.
+
+## RLS boundary
+
+Each registered active Agent authenticates as a database principal. The schema resolves its Agent
+identity and applies released read and mutation rules. A parent may manage only its authorized
+hierarchy. Bypassing RLS to make an operation pass destroys the chain of custody.
+
+## What PostgreSQL is not
+
+It is not workload truth, terminal truth, delivered-code truth or a transcript warehouse.
+`LISTEN/NOTIFY` is a wake mechanism, not durable work. Direct SQL is appropriate for inspection;
+released Functions own transitions that carry invariants.
+
+Migrations are forward, ordered and preserved on partial failure. The database Skill owns
+installation, migration and recovery against the selected release.

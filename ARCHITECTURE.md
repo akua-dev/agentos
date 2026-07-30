@@ -757,6 +757,7 @@ workspace. The tree reflects ownership, not deployment order:
 │   └── ai-gateway/                   service, tests and optional K8s topology
 ├── release/kubernetes/               reviewed manifest release assembly
 ├── docs/                             supporting assets and stable pointers
+├── website/apps/docs/                public landing, Docs and Learn application
 ├── Dockerfile                        common AgentOS image build
 ├── mise.toml / mise.lock             reviewed Fleet tool baseline
 ├── package.json / bun.lock           workspace and dependency lock

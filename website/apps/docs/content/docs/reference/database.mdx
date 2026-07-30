@@ -1,0 +1,40 @@
+---
+title: Database objects
+description: The current PostgreSQL schema and public coordination Functions.
+canonical:
+  - label: Ordered migrations
+    path: database/migrations
+  - label: Database behavior tests
+    path: database/tests
+---
+
+The initial schema creates these durable tables in `agentos`:
+
+| Table | Owns |
+| --- | --- |
+| `agents` | Agent identity, role, parent, lifecycle and runtime references |
+| `projects` | Fleet project registry |
+| `captain` | Current release’s Captain-facing Fleet record |
+| `tasks` | Accepted intent, state and dependencies |
+| `task_assignments` | Bounded ownership, handoff history, reports and composition |
+| `inbox` | Durable hierarchy speech acts, receipt, reading and resolution |
+| `learnings` | Reviewed shared learnings |
+| `external_events` | Durable provider evidence and reconciliation claims |
+
+Later migrations extend these objects rather than creating shadow stores. Always inspect the full
+ordered chain for the selected release.
+
+## Representative public Functions
+
+- identity and authority: `current_agent_id`, `current_agent_role`, `can_manage_agent`;
+- provisioning: `provision_agent`, `register_agent_principal`, `retire_agent`;
+- work: `create_task_with_assignment`, `accept_backlog_task`,
+  `handoff_task_assignment`;
+- decisions: `hold_captain_decision`, `link_task_decision`,
+  `attest_assignment_decisions`, `resolve_captain_decision`;
+- attention: `receive_inbox`, `current_mate_bearings`, `mate_notification_channel`;
+- events: `ingest_external_event`, claim, refresh, assert, complete and release;
+- composition: change, replace and repair Functions.
+
+Use released Functions for transitions that carry invariants. Direct table queries are useful for
+inspection but do not recreate atomic acceptance, handoff or decision behavior ad hoc.

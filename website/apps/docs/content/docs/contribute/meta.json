@@ -1,0 +1,12 @@
+{
+  "title": "Contribute",
+  "pages": [
+    "index",
+    "repository-map",
+    "development",
+    "testing",
+    "evaluation",
+    "improvement",
+    "releases"
+  ]
+}
