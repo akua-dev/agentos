@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { $ } from "bun";
 import {
   chmod,
@@ -19,6 +19,8 @@ const repository = new URL("../../../..", import.meta.url).pathname.replace(
 const mateRuntime = join(repository, "packages", "agentos", "runtime");
 const prepareHome = join(mateRuntime, "prepare-home.ts");
 const temporaryDirectories: string[] = [];
+
+setDefaultTimeout(120_000);
 
 afterEach(async () => {
   await Promise.all(

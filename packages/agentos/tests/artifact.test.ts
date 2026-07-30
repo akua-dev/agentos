@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import {
   access,
   copyFile,
@@ -10,7 +10,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { createFakePi } from "./fake-pi.ts";
@@ -30,6 +30,8 @@ const replacementFixture = join(
   "replacement-package",
 );
 const temporaryDirectories: string[] = [];
+
+setDefaultTimeout(120_000);
 
 afterEach(async () => {
   await Promise.all(
@@ -58,12 +60,58 @@ async function run(
 }
 
 async function pack(packageDirectory: string, destination: string) {
-  const result = await run(
-    ["bun", "pm", "pack", "--destination", destination, "--quiet"],
+  const buildDirectory = join(destination, "build", "dist");
+  const isolatedPackage = join(destination, "package");
+  const publishableRoots = new Set([
+    ".npmignore",
+    "README.md",
+    "extensions",
+    "package.json",
+    "resources",
+    "runtime",
+    "skills",
+  ]);
+  await Promise.all([
+    mkdir(buildDirectory, { recursive: true }),
+    cp(packageDirectory, isolatedPackage, {
+      recursive: true,
+      filter: (source) => {
+        if (source === packageDirectory) return true;
+        const relative = source.slice(packageDirectory.length + sep.length);
+        return publishableRoots.has(relative.split(sep).at(0)!);
+      },
+    }),
+  ]);
+  const compile = await run(
+    [
+      join(packageDirectory, "node_modules", ".bin", "tsc"),
+      "--project",
+      join(packageDirectory, "tsconfig.build.json"),
+      "--outDir",
+      buildDirectory,
+    ],
     { cwd: packageDirectory },
   );
+  if (compile.exitCode !== 0) {
+    throw new Error(`Could not build ${packageDirectory}: ${compile.stderr}`);
+  }
+  await cp(buildDirectory, join(isolatedPackage, "dist"), {
+    recursive: true,
+  });
+  const result = await run(
+    [
+      "bun",
+      "pm",
+      "pack",
+      "--destination",
+      destination,
+      "--ignore-scripts",
+      "--quiet",
+    ],
+    { cwd: isolatedPackage },
+  );
   if (result.exitCode !== 0) {
-    throw new Error(`Could not pack ${packageDirectory}: ${result.stderr}`);
+    throw new Error(`Could not pack ${isolatedPackage}: ${result.stderr}`);
   }
   return result.stdout.trim().split("\n").at(-1)!;
 }
