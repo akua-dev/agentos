@@ -13,6 +13,13 @@ export function DefaultLayout({ children }: LayoutProps<'/docs'>) {
       {...base}
       tree={source.getPageTree()}
       links={linkItems}
+      containerProps={{
+        style: {
+          '--fd-layout-width': '100vw',
+          '--fd-sidebar-width': '18.5rem',
+          '--fd-toc-width': '16rem',
+        } as CSSProperties,
+      }}
       nav={{
         ...base.nav,
         title: logo,
