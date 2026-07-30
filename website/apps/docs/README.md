@@ -19,8 +19,13 @@ or deploy the Worker from the repository root with:
 ```console
 bun run site:build:worker
 bun run site:preview:worker
+bun run site:upload:worker
+bun run site:deploy:worker
 bun run site:deploy
 ```
+
+`site:upload:worker` and `site:deploy:worker` operate on an existing
+OpenNext build. `site:deploy` builds and deploys in one command.
 
 Set `NEXT_PUBLIC_SITE_URL` to the public origin when building for a different
 host. It defaults to `https://agentos.akua.dev` for production builds and to
