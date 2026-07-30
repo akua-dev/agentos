@@ -21,7 +21,13 @@ const runtime = new URL("..", import.meta.url).pathname;
 
 async function render(directory: string): Promise<Resource[]> {
   const child = Bun.spawn(
-    ["kubectl", "kustomize", "--load-restrictor", "LoadRestrictionsNone", directory],
+    [
+      "kubectl",
+      "kustomize",
+      "--load-restrictor",
+      "LoadRestrictionsNone",
+      directory,
+    ],
     { stderr: "pipe", stdout: "pipe" },
   );
   const [exitCode, stdout, stderr] = await Promise.all([
@@ -80,7 +86,9 @@ async function applyStrategicPatch(
 describe("First Mate Kubernetes resources", () => {
   test("renders one retained, non-root home with no public endpoint", async () => {
     const resources = await render(join(runtime, "base"));
-    expect(resources.map(({ kind, metadata }) => `${kind}/${metadata.name}`).sort()).toEqual([
+    expect(
+      resources.map(({ kind, metadata }) => `${kind}/${metadata.name}`).sort(),
+    ).toEqual([
       "Namespace/agentos",
       "RoleBinding/agentos-firstmate-admin",
       "Service/agentos-firstmate",
@@ -94,14 +102,22 @@ describe("First Mate Kubernetes resources", () => {
       selector: { "app.kubernetes.io/name": "agentos-firstmate" },
     });
 
-    const roleBinding = resource(resources, "RoleBinding", "agentos-firstmate-admin");
+    const roleBinding = resource(
+      resources,
+      "RoleBinding",
+      "agentos-firstmate-admin",
+    );
     expect(roleBinding.roleRef).toEqual({
       apiGroup: "rbac.authorization.k8s.io",
       kind: "ClusterRole",
       name: "admin",
     });
     expect(roleBinding.subjects).toEqual([
-      { kind: "ServiceAccount", name: "agentos-firstmate", namespace: "agentos" },
+      {
+        kind: "ServiceAccount",
+        name: "agentos-firstmate",
+        namespace: "agentos",
+      },
     ]);
 
     const statefulSet = resource(resources, "StatefulSet", "agentos-firstmate");
@@ -166,7 +182,9 @@ describe("First Mate Kubernetes resources", () => {
       "/opt/agentos/packages/agentos/resources/roles/firstmate",
       "/opt/agentos/packages/agentos/resources/roles/firstmate",
     ]);
-    expect(install.volumeMounts).toEqual([{ mountPath: "/home/agent", name: "home" }]);
+    expect(install.volumeMounts).toEqual([
+      { mountPath: "/home/agent", name: "home" },
+    ]);
     expect(prepare.volumeMounts).toEqual(install.volumeMounts);
     expect(firstmate.volumeMounts).toEqual(install.volumeMounts);
     expect(install.command).toEqual(["mise"]);
@@ -216,7 +234,9 @@ describe("First Mate Kubernetes resources", () => {
     });
     expect(
       resources.filter(({ kind }) =>
-        ["Ingress", "LoadBalancer", "NodePort", "ClusterRoleBinding"].includes(kind),
+        ["Ingress", "LoadBalancer", "NodePort", "ClusterRoleBinding"].includes(
+          kind,
+        ),
       ),
     ).toEqual([]);
   });
@@ -235,7 +255,11 @@ describe("First Mate Kubernetes resources", () => {
       name: "cluster-admin",
     });
     expect(binding.subjects).toEqual([
-      { kind: "ServiceAccount", name: "agentos-firstmate", namespace: "agentos" },
+      {
+        kind: "ServiceAccount",
+        name: "agentos-firstmate",
+        namespace: "agentos",
+      },
     ]);
   });
 
@@ -245,7 +269,10 @@ describe("First Mate Kubernetes resources", () => {
     const live = structuredClone(original);
     const livePod = live.spec!.template.spec;
     const liveImage = `ghcr.io/akua-dev/agentos@sha256:${"a".repeat(64)}`;
-    for (const container of [...livePod.initContainers, ...livePod.containers]) {
+    for (const container of [
+      ...livePod.initContainers,
+      ...livePod.containers,
+    ]) {
       container.image = liveImage;
       container.imagePullPolicy = "IfNotPresent";
     }
@@ -273,7 +300,9 @@ describe("First Mate Kubernetes resources", () => {
     const prepare = pod.initContainers[1];
     const firstmate = pod.containers[0];
     expect(
-      [install, prepare, firstmate].map(({ image }: { image: string }) => image),
+      [install, prepare, firstmate].map(
+        ({ image }: { image: string }) => image,
+      ),
     ).toEqual([liveImage, liveImage, liveImage]);
     expect(
       [install, prepare, firstmate].map(
@@ -290,8 +319,12 @@ describe("First Mate Kubernetes resources", () => {
       name: "existing-runtime",
       readOnly: true,
     });
-    expect(install.volumeMounts).not.toContainEqual(expect.objectContaining({ name: "postgres-ca" }));
-    expect(install.volumeMounts).not.toContainEqual(expect.objectContaining({ name: "postgres-pgpass" }));
+    expect(install.volumeMounts).not.toContainEqual(
+      expect.objectContaining({ name: "postgres-ca" }),
+    );
+    expect(install.volumeMounts).not.toContainEqual(
+      expect.objectContaining({ name: "postgres-pgpass" }),
+    );
     expect(prepare.volumeMounts).toContainEqual({
       mountPath: "/var/run/agentos/postgres-credentials",
       name: "postgres-pgpass",
@@ -321,7 +354,10 @@ describe("First Mate Kubernetes resources", () => {
     expect(environment.PGPASSWORD).toBeUndefined();
     expect(
       Object.fromEntries(
-        prepare.env.map(({ name, value }: { name: string; value: string }) => [name, value]),
+        prepare.env.map(({ name, value }: { name: string; value: string }) => [
+          name,
+          value,
+        ]),
       ).AGENTOS_PGPASS_SOURCE,
     ).toBe("/var/run/agentos/postgres-credentials/pgpass");
     expect(pod.volumes).toContainEqual({
@@ -383,11 +419,14 @@ describe("First Mate Kubernetes resources", () => {
       ),
     );
 
-    expect(pod.initContainers.every((container: Record<string, any>) =>
-      !(container.volumeMounts ?? []).some(
-        (mount: Record<string, string>) => mount.name === "github-app",
+    expect(
+      pod.initContainers.every(
+        (container: Record<string, any>) =>
+          !(container.volumeMounts ?? []).some(
+            (mount: Record<string, string>) => mount.name === "github-app",
+          ),
       ),
-    )).toBe(true);
+    ).toBe(true);
     expect(firstmate.volumeMounts).toContainEqual({
       mountPath: "/var/run/secrets/agentos/github",
       name: "github-app",
@@ -418,5 +457,37 @@ describe("First Mate Kubernetes resources", () => {
       name: "existing-runtime",
       configMap: { name: "existing-runtime" },
     });
+  });
+
+  test("adds only the approved Fleet AI Gateway client boundary", async () => {
+    const resources = await render(
+      join(runtime, "tests", "fixtures", "ai-gateway-client"),
+    );
+    const statefulSet = resource(resources, "StatefulSet", "agentos-firstmate");
+    const spec = statefulSet.spec!;
+    const pod = spec.template.spec;
+    const firstmate = pod.containers.find(
+      ({ name }: { name: string }) => name === "agentos",
+    );
+    const environment = Object.fromEntries(
+      firstmate.env.map(
+        ({ name, value, valueFrom }: Record<string, unknown>) => [
+          name,
+          value ?? valueFrom,
+        ],
+      ),
+    );
+
+    expect(spec.template.metadata.labels).toMatchObject({
+      "agentos.akua.dev/ai-gateway-client": "true",
+    });
+    expect(environment.AI_GATEWAY_URL).toBe(
+      "http://ai-gateway.agentos.svc.cluster.local:8787",
+    );
+    expect(environment.AI_GATEWAY_TOKEN).toEqual({
+      secretKeyRef: { key: "token", name: "ai-gateway-client" },
+    });
+    expect(pod.serviceAccountName).toBe("agentos-firstmate");
+    expect(spec.volumeClaimTemplates[0].metadata.name).toBe("home");
   });
 });

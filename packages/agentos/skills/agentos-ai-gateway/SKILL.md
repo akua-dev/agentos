@@ -13,9 +13,11 @@ the Captain accepts one additional credential authority and service lifecycle.
 The gateway chooses credentials for the requested model; it never chooses a
 model, queues a prompt or hides the provider response. PostgreSQL remains Fleet
 coordination truth. The gateway's retained PVC owns only its OAuth vault,
-session assignments, quota or transient blocks and active reservations. Bounded
-quota observations remain process-local and refresh after restart. The vault's
-`needsReauth` flag is the single authentication-eligibility authority.
+plus canonical `codex-router` SQLite session assignments, quota or transient
+blocks and active reservations. Bounded quota observations remain process-local
+and refresh after restart. The vault's `needsReauth` flag is the single
+authentication-eligibility authority and is reconciled into router state after
+a fresh Gateway-owned login.
 
 Use `ai-gateway`, `AI_GATEWAY_*` and the AI-gateway client label consistently.
 Never create a second StatefulSet or copy its credential vault during an
@@ -27,6 +29,26 @@ is no automated PVC or OAuth-vault migration. Return its clients to verified
 direct authentication, retire the old topology under the Captain's authority,
 then install and authenticate this gateway fresh.
 
+## Choose the capacity posture
+
+Evaluate the least distributed complete posture first:
+
+| Order | Posture                                   | Use when                                                                            | Capacity and telemetry authority                                                                                                  |
+| ----- | ----------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | **Direct per-Agent OAuth**                | One Agent, independent credentials, or recovery                                     | Each native harness owns its subscription; AgentOS observes the client operation                                                  |
+| 2     | **In-cluster multi-subscription Gateway** | Several approved Agents should share quota-aware subscription capacity              | One Fleet AI Gateway owns the pool and routing; AgentOS OpenTelemetry owns the complete in-cluster view                           |
+| 3     | **Mixed in-cluster routing**              | Mates should retain direct auth while selected workers or automation share capacity | Direct harnesses and the Gateway own separate credential boundaries; AgentOS observes both                                        |
+| 4     | **External Cloudflare Worker**            | The same deliberately external router must also serve clients outside AgentOS       | The Worker owns its separate pool and router telemetry; AgentOS observes only its clients unless an explicit export is configured |
+
+For an AgentOS-only Fleet, posture 2 or 3 is stronger than posture 4: Agents
+can operate the Gateway with native Kubernetes, no inference path leaves the
+cluster before reaching OpenAI, and the Fleet-local Collector receives the
+full privacy-bounded trace. Posture 4 is an exceptional integration described
+last, not an upgrade to the in-cluster service.
+
+The OpenAI API-key fallback is not a multi-subscription posture. It remains a
+separately approved last-resort credential source for the in-cluster Gateway.
+
 ## Decide and inspect
 
 1. Resolve the exact AgentOS revision, Kubernetes context, `agentos` namespace,
@@ -35,11 +57,9 @@ then install and authenticate this gateway fresh.
    `Secret/ai-gateway-client`, its PVC and the selected-client NetworkPolicy
    already exist. Inspect only metadata and non-secret status; do not print
    Secret data or the vault.
-3. Compare two complete paths:
-   - recommended pooled capacity: the gateway owns fresh server-side Codex OAuth
-     chains and selected Agent Pods receive only a Fleet client token;
-   - minimal direct authentication: each Agent's native harness owns its
-     credential on its PVC.
+3. Compare the four complete postures above. For pooled capacity inside an
+   AgentOS Fleet, prefer the in-cluster Gateway or mixed posture. Keep direct
+   native authentication available for at least one approved recovery path.
 4. Reject pooled routing when the endpoint would require a public Ingress, the
    storage cannot remain single-writer, selected Pods cannot be isolated, or a
    third-party policy forbids subscription proxying. Do not claim that pooled
@@ -91,6 +111,7 @@ The empty gateway is live but intentionally not ready. Add each subscription wit
 a fresh device login owned by the gateway Pod:
 
 ```console
+# Repeat this login once for every approved subscription in the pool.
 kubectl --context <context> --namespace agentos exec -it statefulset/ai-gateway \
   --container ai-gateway -- ai-gateway login <non-secret-label>
 kubectl --context <context> --namespace agentos exec statefulset/ai-gateway \
@@ -106,6 +127,10 @@ Keep them out of durable work records and generated artifacts, and show no
 access or refresh token. OAuth chains rotate on refresh; never copy a local Pi
 or Codex auth file into the gateway. Readiness becomes healthy after at least
 one eligible OAuth account or an explicitly enabled API-key fallback exists.
+After every login, inspect the bounded account list and status before starting
+the next login. Use a unique non-secret operational label for each managed
+slot. Do not reuse one provider account in two Gateway slots or split the same
+refresh chain between independent routers.
 
 Keep `OPENAI_API_KEY` in a separate Kubernetes Secret. Enable
 `AI_GATEWAY_ALLOW_API_KEY_FALLBACK=true` only through an approved workload
@@ -120,6 +145,43 @@ three values:
 - label `agentos.akua.dev/ai-gateway-client: "true"`;
 - `AI_GATEWAY_URL=http://ai-gateway.agentos.svc.cluster.local:8787`;
 - `AI_GATEWAY_TOKEN` from `Secret/ai-gateway-client` key `token`.
+
+The default distribution ships one additive client patch for each workload:
+
+| Client      | Base                                                           | Optional patch                                                                           | StatefulSet          |
+| ----------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------- |
+| First Mate  | `packages/agentos/resources/roles/firstmate/kubernetes/base`   | `packages/agentos/resources/roles/firstmate/kubernetes/patches/ai-gateway-client.yaml`   | `agentos-firstmate`  |
+| Second Mate | `packages/agentos/resources/roles/secondmate/kubernetes/base`  | `packages/agentos/resources/roles/secondmate/kubernetes/patches/ai-gateway-client.yaml`  | `agentos-secondmate` |
+| Crewmate    | `packages/agentos/resources/crewmates/default/kubernetes/base` | `packages/agentos/resources/crewmates/default/kubernetes/patches/ai-gateway-client.yaml` | `agentos-crewmate`   |
+
+Compose the approved client's base and patch in its reviewed per-Agent
+Kustomize overlay. For example, the First Mate overlay contains:
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - <agentos-checkout>/packages/agentos/resources/roles/firstmate/kubernetes/base
+patches:
+  - path: <agentos-checkout>/packages/agentos/resources/roles/firstmate/kubernetes/patches/ai-gateway-client.yaml
+    target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: agentos-firstmate
+```
+
+Use the exact base, patch, and StatefulSet from the table for Second Mate or
+Crewmate. Render the overlay with
+`kubectl --context <context> kustomize --load-restrictor LoadRestrictionsNone
+<reviewed-client-overlay>` and apply that reviewed render through the Fleet's
+normal native Kubernetes workflow.
+
+Posture 2 composes the patch for every approved pooled client. Posture 3
+composes it only for selected workers or trusted automation and leaves the
+other Mates' workload plus native harness authentication unchanged. A workload
+without the patch cannot pass the Gateway NetworkPolicy and receives neither
+Gateway environment variable.
 
 Render the effective StatefulSet and inspect the diff. Environment changes need
 a real process/Pod restart; Pi `/reload` cannot change environment. Ask before
@@ -224,3 +286,43 @@ remove its gateway provider environment/label. Then stop the StatefulSet, revoke
 or remove managed accounts and the client Secret, and ask separately before
 deleting the retained PVC. A rollback that leaves either provider credentials
 or an untracked client token behind is incomplete.
+
+## External Cloudflare Worker
+
+Use this final posture only when the Captain deliberately chooses one
+externally hosted `codex-router` Worker as a separate capacity authority,
+normally because non-AgentOS clients must use it too. An AgentOS-only Fleet
+should use the in-cluster Gateway instead.
+
+Before connecting any Agent:
+
+1. Verify the exact `akua-dev/codex-router` release supports standalone direct
+   Cloudflare egress, subscription OAuth, the AgentOS correlation-header
+   boundary, and byte-preserving Responses streaming. Do not infer support from
+   an OpenAI-compatible URL.
+2. Keep the Worker's OAuth pool and routing state separate from the in-cluster
+   Gateway. Never share one refresh chain between both authorities.
+3. Never route the Worker into `Service/ai-gateway`, route the in-cluster
+   Gateway through the Worker, or expose the Fleet Gateway with an Ingress.
+4. Give a selected Pi client the external HTTPS base URL and
+   `X-AI-Router-Token: $AI_GATEWAY_TOKEN`; give native Codex the external
+   `/v1` base URL with `env_key="AI_GATEWAY_TOKEN"`. Keep the Secret-backed
+   environment and explicit provider/model verification from the in-cluster
+   procedure.
+5. Treat Cloudflare Workers Observability as the router's default log and trace
+   view. Native Workers logs and traces are available on Free with their
+   documented event and retention limits. External OTLP export is a separate
+   Workers Paid feature. AgentOS's Collector remains authoritative for the
+   in-cluster client spans; do not claim one joined trace until deployed
+   propagation evidence proves it.
+6. Preserve privacy-safe AgentOS operation and attempt identifiers only through
+   the Worker's reviewed bounded correlation contract. Never export prompts,
+   response bodies, credentials, headers, provider account identity, or
+   arbitrary errors.
+
+See the official Cloudflare documentation for
+[Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/),
+[Workers Traces](https://developers.cloudflare.com/workers/observability/traces/),
+[OpenTelemetry export](https://developers.cloudflare.com/workers/observability/exporting-opentelemetry-data/),
+and current
+[trace-propagation limitations](https://developers.cloudflare.com/workers/observability/traces/known-limitations/).

@@ -6,7 +6,11 @@ import type {
 } from "../src/telemetry.ts";
 import type { RouteLease } from "../src/types.ts";
 
-function request(path = "/responses", token = "fleet-token", signal?: AbortSignal) {
+function request(
+  path = "/responses",
+  token = "fleet-token",
+  signal?: AbortSignal,
+) {
   return new Request(`http://gateway.test${path}`, {
     method: "POST",
     headers: {
@@ -49,6 +53,7 @@ describe("authenticated raw Responses proxy", () => {
     gatewayRequest.headers.set("x-agentos-request-kind", "main");
     gatewayRequest.headers.set("x-agentos-model-family", "gpt-5");
     gatewayRequest.headers.set("x-agentos-stream-mode", "streaming");
+    gatewayRequest.headers.set("baggage", "private=caller-secret");
     gatewayRequest.headers.set(
       "x-agentos-request-attempt-id",
       "pi-attempt-private",
@@ -61,6 +66,7 @@ describe("authenticated raw Responses proxy", () => {
         name.startsWith("x-agentos-"),
       ),
     ).toEqual([]);
+    expect(upstream?.headers.has("baggage")).toBe(false);
     expect(upstream?.headers.get("x-client-request-id")).toBe(
       "gateway-attempt",
     );
@@ -74,10 +80,7 @@ describe("authenticated raw Responses proxy", () => {
       ["chunk", 11],
       "releaseStarted",
       ["released", false],
-      [
-        "end",
-        { status: 200, streamOutcome: "completed" },
-      ],
+      ["end", { status: 200, streamOutcome: "completed" }],
     ]);
   });
 
@@ -104,25 +107,20 @@ describe("authenticated raw Responses proxy", () => {
     expect(unauthorizedEvents).toEqual([
       "start",
       ["authenticate", false],
-      [
-        "end",
-        { status: 401, streamOutcome: "not_streamed" },
-      ],
+      ["end", { status: 401, streamOutcome: "not_streamed" }],
     ]);
     expect(unavailableEvents).toEqual([
       "start",
       ["authenticate", true],
       "routeStarted",
       ["routeEnded", "unavailable"],
-      [
-        "end",
-        { status: 503, streamOutcome: "not_streamed" },
-      ],
+      ["end", { status: 503, streamOutcome: "not_streamed" }],
     ]);
   });
 
   test("requests an identity upstream and does not forward stale decoded content encoding", async () => {
-    const upstreamBody = "decoded upstream response that must not be decompressed twice";
+    const upstreamBody =
+      "decoded upstream response that must not be decompressed twice";
     const upstream = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
@@ -146,11 +144,17 @@ describe("authenticated raw Responses proxy", () => {
         release: async () => undefined,
       }),
       fetchImpl: (_input, init) => {
-        upstreamAcceptEncoding = new Headers(init?.headers).get("accept-encoding");
+        upstreamAcceptEncoding = new Headers(init?.headers).get(
+          "accept-encoding",
+        );
         return fetch(upstream.url, init);
       },
     });
-    const gateway = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: handler });
+    const gateway = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: handler,
+    });
 
     try {
       const response = await fetch(new URL("/responses", gateway.url), {
@@ -214,9 +218,13 @@ describe("authenticated raw Responses proxy", () => {
 
   test("forces identity encoding upstream and preserves a long streamed response", async () => {
     const chunks = Array.from({ length: 256 }, (_, index) =>
-      new TextEncoder().encode(`data: ${index.toString().padStart(3, "0")}-${"x".repeat(1_016)}\n\n`),
+      new TextEncoder().encode(
+        `data: ${index.toString().padStart(3, "0")}-${"x".repeat(1_016)}\n\n`,
+      ),
     );
-    const expected = chunks.map((chunk) => new TextDecoder().decode(chunk)).join("");
+    const expected = chunks
+      .map((chunk) => new TextDecoder().decode(chunk))
+      .join("");
     let upstream: Request | undefined;
     const handler = createProxyHandler({
       clientToken: "fleet-token",
@@ -229,7 +237,10 @@ describe("authenticated raw Responses proxy", () => {
         release: async () => undefined,
       }),
       fetchImpl: async (input, init) => {
-        upstream = new Request(input instanceof Request ? input.url : input.toString(), init);
+        upstream = new Request(
+          input instanceof Request ? input.url : input.toString(),
+          init,
+        );
         return new Response(
           new ReadableStream<Uint8Array>({
             start(controller) {
@@ -293,7 +304,8 @@ describe("authenticated raw Responses proxy", () => {
   });
 
   test("preserves privacy-safe stream failure evidence when lease cleanup also fails", async () => {
-    const providerDetail = "provider route secret: error decoding response body";
+    const providerDetail =
+      "provider route secret: error decoding response body";
     let released = false;
     let observation: unknown;
     let pullCount = 0;
@@ -461,9 +473,13 @@ describe("authenticated raw Responses proxy", () => {
         return new Response(
           new ReadableStream<Uint8Array>({
             start(controller) {
-              signal.addEventListener("abort", () => controller.error(signal.reason), {
-                once: true,
-              });
+              signal.addEventListener(
+                "abort",
+                () => controller.error(signal.reason),
+                {
+                  once: true,
+                },
+              );
             },
             pull() {
               markReadStarted();
@@ -476,7 +492,9 @@ describe("authenticated raw Responses proxy", () => {
       },
     });
 
-    const response = await handler(request("/responses", "fleet-token", requestController.signal));
+    const response = await handler(
+      request("/responses", "fleet-token", requestController.signal),
+    );
     const reader = response.body?.getReader();
     expect(reader).toBeDefined();
     const pendingRead = reader!.read();
@@ -501,7 +519,10 @@ describe("authenticated raw Responses proxy", () => {
         release: async () => undefined,
       }),
       fetchImpl: async (input, init) => {
-        upstream = new Request(input instanceof Request ? input.url : input.toString(), init);
+        upstream = new Request(
+          input instanceof Request ? input.url : input.toString(),
+          init,
+        );
         return new Response("ok");
       },
     });
@@ -528,7 +549,10 @@ describe("authenticated raw Responses proxy", () => {
         release: async () => undefined,
       }),
       fetchImpl: async (input, init) => {
-        upstream = new Request(input instanceof Request ? input.url : input.toString(), init);
+        upstream = new Request(
+          input instanceof Request ? input.url : input.toString(),
+          init,
+        );
         return new Response("ok");
       },
     });
@@ -537,7 +561,9 @@ describe("authenticated raw Responses proxy", () => {
     gatewayRequest.headers.set("x-api-key", "inbound-x-api-key");
 
     expect((await handler(gatewayRequest)).status).toBe(200);
-    expect(upstream?.headers.get("authorization")).toBe("Bearer selected-secret");
+    expect(upstream?.headers.get("authorization")).toBe(
+      "Bearer selected-secret",
+    );
     expect(upstream?.headers.has("api-key")).toBe(false);
     expect(upstream?.headers.has("x-api-key")).toBe(false);
   });
@@ -563,7 +589,10 @@ describe("authenticated raw Responses proxy", () => {
         return lease;
       },
       fetchImpl: async (input, init) => {
-        upstream = new Request(input instanceof Request ? input.url : input.toString(), init);
+        upstream = new Request(
+          input instanceof Request ? input.url : input.toString(),
+          init,
+        );
         return new Response("data: one\n\ndata: two\n\n", {
           status: 429,
           headers: { "content-type": "text/event-stream", "retry-after": "9" },
@@ -572,7 +601,9 @@ describe("authenticated raw Responses proxy", () => {
     });
 
     const response = await handler(request("/v1/responses"));
-    expect(upstream?.url).toBe("https://chatgpt.com/backend-api/codex/responses");
+    expect(upstream?.url).toBe(
+      "https://chatgpt.com/backend-api/codex/responses",
+    );
     expect(upstream?.headers.get("authorization")).toBe("Bearer oauth-secret");
     expect(upstream?.headers.get("chatgpt-account-id")).toBe("provider-a");
     expect(response.status).toBe(429);
@@ -595,7 +626,10 @@ describe("authenticated raw Responses proxy", () => {
         release: async () => undefined,
       }),
       fetchImpl: async (input, init) => {
-        upstream = new Request(input instanceof Request ? input.url : input.toString(), init);
+        upstream = new Request(
+          input instanceof Request ? input.url : input.toString(),
+          init,
+        );
         return new Response("ok");
       },
     });
@@ -690,9 +724,7 @@ describe("authenticated raw Responses proxy", () => {
     );
 
     expect(response.status).toBe(204);
-    expect(upstream?.url).toBe(
-      "https://api.openai.com/v1/responses/compact",
-    );
+    expect(upstream?.url).toBe("https://api.openai.com/v1/responses/compact");
   });
 
   test("returns the upstream response even when local response bookkeeping fails", async () => {
@@ -713,7 +745,8 @@ describe("authenticated raw Responses proxy", () => {
           throw new Error("state write failed");
         },
       }),
-      fetchImpl: async () => new Response("real upstream body", { status: 429 }),
+      fetchImpl: async () =>
+        new Response("real upstream body", { status: 429 }),
     });
 
     const response = await handler(request());

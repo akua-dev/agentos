@@ -9,14 +9,15 @@ import {
   defaultRoutingConfig,
   inMemoryRoutingStateLayer
 } from "@akua-dev/codex-router-core"
-import { Effect, Layer, Redacted } from "effect"
+import { Effect, Layer, Redacted, Result } from "effect"
 import {
-  AccountCredential,
   AccountDirectory,
   ClientAuthenticator,
   GatewayTelemetry,
+  SubscriptionCredential,
   TransportError,
   UpstreamTransport,
+  configuredSubscriptionRouterLayer,
   extractSessionKey,
   makeRouterFetch,
   resolveUpstreamTarget,
@@ -50,7 +51,6 @@ interface Probe {
 
 interface TestLayerOptions {
   readonly authorized?: boolean
-  readonly accountKind?: "codex_subscription" | "openai_api_key"
   readonly response?: () => Response
   readonly transportFailure?: boolean
   readonly bookkeepingFailure?: boolean
@@ -75,7 +75,7 @@ const makeTestLayer = (probe: Probe, options: TestLayerOptions = {}) => {
       ).pipe(Layer.provide(inMemoryRoutingStateLayer(defaultRoutingConfig)))
     : inMemoryRoutingStateLayer(defaultRoutingConfig)
 
-  return Layer.mergeAll(
+  const dependencies = Layer.mergeAll(
     routing,
     Layer.succeed(
       ClientAuthenticator,
@@ -89,11 +89,13 @@ const makeTestLayer = (probe: Probe, options: TestLayerOptions = {}) => {
         candidates: Effect.succeed([candidate]),
         credential: () =>
           Effect.succeed(
-            AccountCredential.make({
+            SubscriptionCredential.make({
               accessToken: Redacted.make("selected-secret"),
               accountId,
-              kind: options.accountKind ?? "codex_subscription",
-              providerAccountId: "provider-account-a"
+              expiresAt: Number.MAX_SAFE_INTEGER,
+              generation: 1,
+              providerAccountId: Redacted.make("provider-account-a"),
+              refreshToken: Redacted.make("refresh-secret")
             })
           )
       })
@@ -125,6 +127,10 @@ const makeTestLayer = (probe: Probe, options: TestLayerOptions = {}) => {
         decision: () => Effect.void
       })
     )
+  )
+  return Layer.merge(
+    dependencies,
+    configuredSubscriptionRouterLayer.pipe(Layer.provide(dependencies))
   )
 }
 
@@ -214,6 +220,7 @@ const post = (path: string, body = "{}", headers: HeadersInit = {}) =>
             fetch(
               post(path, '{"compaction_trigger":123}', {
                 authorization: "Bearer caller-secret",
+                baggage: "private=caller-secret",
                 "chatgpt-account-id": "caller-account",
                 "session-id": "session-a",
                 "x-api-key": "caller-api-key"
@@ -235,6 +242,7 @@ const post = (path: string, body = "{}", headers: HeadersInit = {}) =>
           expect(request.url).toBe("https://chatgpt.com/backend-api/codex/responses")
           expect(request.headers.get("authorization")).toBe("Bearer selected-secret")
           expect(request.headers.get("chatgpt-account-id")).toBe("provider-account-a")
+          expect(request.headers.has("baggage")).toBe(false)
           expect(request.headers.has("x-api-key")).toBe(false)
           expect(request.headers.get("session-id")).toBe("session-a")
         }
@@ -268,6 +276,56 @@ const post = (path: string, body = "{}", headers: HeadersInit = {}) =>
 
 {
   const probe = makeProbe()
+  layer(makeTestLayer(probe))("opaque request ownership", (it) => {
+    it.effect(
+      "never decodes, clones, or tees the model request before its single transmission",
+      () =>
+        Effect.gen(function* () {
+          let forbiddenCalls = 0
+          const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{"opaque":true}'))
+              controller.close()
+            }
+          })
+          Object.defineProperty(body, "tee", {
+            value: () => {
+              forbiddenCalls += 1
+              throw new Error("request stream must not be teed")
+            }
+          })
+          const request = post("/responses")
+          Object.defineProperty(request, "body", { value: body })
+          for (const method of [
+            "arrayBuffer",
+            "blob",
+            "bytes",
+            "clone",
+            "formData",
+            "json",
+            "text"
+          ]) {
+            Object.defineProperty(request, method, {
+              value: () => {
+                forbiddenCalls += 1
+                throw new Error(`request.${method} must not be called`)
+              }
+            })
+          }
+
+          const fetch = yield* makeRouterFetch()
+          const response = yield* Effect.promise(() => fetch(request))
+
+          expect(response.status).toBe(204)
+          expect(forbiddenCalls).toBe(0)
+          expect(probe.requests).toHaveLength(1)
+        })
+    )
+  })
+}
+
+{
+  const probe = makeProbe()
   layer(makeTestLayer(probe, { transportFailure: true }))("transport failure", (it) => {
     it.effect("releases the lease and returns a gateway error before any response", () =>
       Effect.gen(function* () {
@@ -278,6 +336,39 @@ const post = (path: string, body = "{}", headers: HeadersInit = {}) =>
 
         expect(response.status).toBe(502)
         expect(summary.activeReservations).toBe(0)
+      })
+    )
+  })
+}
+
+{
+  const probe = makeProbe()
+  layer(
+    makeTestLayer(probe, {
+      response: () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.error(new Error("upstream stream failed"))
+            }
+          }),
+          { status: 200 }
+        )
+    })
+  )("stream failure", (it) => {
+    it.effect("releases the lease after an upstream stream error without retransmitting", () =>
+      Effect.gen(function* () {
+        const fetch = yield* makeRouterFetch()
+        const response = yield* Effect.promise(() => fetch(post("/responses")))
+        const read = yield* Effect.result(
+          Effect.tryPromise(() => response.body!.getReader().read())
+        )
+        const state = yield* RoutingState
+        const summary = yield* state.summary(Date.now())
+
+        expect(Result.isFailure(read)).toBe(true)
+        expect(summary.activeReservations).toBe(0)
+        expect(probe.requests).toHaveLength(1)
       })
     )
   })
@@ -339,14 +430,20 @@ const post = (path: string, body = "{}", headers: HeadersInit = {}) =>
   })
 }
 
-layer(makeTestLayer(makeProbe(), { accountKind: "openai_api_key" }))("protocol helpers", (it) => {
-  it.effect("extracts only explicit bounded sessions and maps API-key compact paths", () =>
+layer(makeTestLayer(makeProbe()))("protocol helpers", (it) => {
+  it.effect("extracts only explicit bounded sessions and maps subscription paths", () =>
     Effect.gen(function* () {
       const session = yield* extractSessionKey(
         new Headers({ "x-codex-parent-thread-id": " thread-1 " })
       )
 
       expect(session.valueOrUndefined).toBe("thread-1")
+      expect(resolveUpstreamTarget("/v1/responses/compact")).toBe(
+        "https://chatgpt.com/backend-api/codex/responses"
+      )
+      expect(resolveUpstreamTarget("/codex/responses")).toBe(
+        "https://chatgpt.com/backend-api/codex/responses"
+      )
       expect(resolveUpstreamTarget("/v1/responses/compact", "openai_api_key")).toBe(
         "https://api.openai.com/v1/responses/compact"
       )

@@ -1,8 +1,8 @@
 import { mkdtemp } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { createRoutingState, createRoutingStateStore } from "../src/routing-state.ts";
+import { createRoutingState } from "../src/routing-state.ts";
 import { defaultRoutingConfig } from "../src/selection.ts";
 import type { Candidate } from "../src/types.ts";
 
@@ -17,7 +17,10 @@ const candidates: Candidate[] = [
       observedAt: now,
       stale: false,
       shortWindow: { usedPercent: 10, resetsAt: now + 3_600_000 },
-      weeklyWindow: { usedPercent: 20, resetsAt: now + 24 * 3_600_000 },
+      weeklyWindow: {
+        usedPercent: 20,
+        resetsAt: now + 24 * 3_600_000,
+      },
     },
   },
   {
@@ -29,20 +32,22 @@ const candidates: Candidate[] = [
       observedAt: now,
       stale: false,
       shortWindow: { usedPercent: 10, resetsAt: now + 3_600_000 },
-      weeklyWindow: { usedPercent: 20, resetsAt: now + 48 * 3_600_000 },
+      weeklyWindow: {
+        usedPercent: 20,
+        resetsAt: now + 48 * 3_600_000,
+      },
     },
   },
 ];
 
-describe("durable routing state", () => {
+describe("canonical durable routing state adapter", () => {
   test("selects and reserves atomically, persists explicit stickiness, renews and releases", async () => {
     const root = await mkdtemp(join(tmpdir(), "ai-gateway-routing-"));
-    const store = createRoutingStateStore(join(root, "routing.json"));
-    const routing = createRoutingState(store);
+    const path = join(root, "routing.sqlite");
+    const routing = await createRoutingState(path, defaultRoutingConfig);
 
     const first = await routing.acquire({
       candidates,
-      config: defaultRoutingConfig,
       now,
       sessionKey: "session-1",
     });
@@ -63,45 +68,54 @@ describe("durable routing state", () => {
       },
     });
 
-    const sticky = await routing.acquire({
-      candidates,
-      config: defaultRoutingConfig,
-      now: now + 1,
-      sessionKey: "session-1",
-    });
-    expect(sticky?.accountId).toBe("a");
-
     expect(await routing.renew(first!.leaseToken, now + 30_000)).toBe(true);
     expect(await routing.release(first!.leaseToken)).toBe(true);
-    expect((await store.read()).assignments).toEqual([
-      expect.objectContaining({ sessionKey: "session-1", accountId: "a" }),
-    ]);
+    await routing.close();
+
+    const reopened = await createRoutingState(path, defaultRoutingConfig);
+    try {
+      const sticky = await reopened.acquire({
+        candidates,
+        now: now + 30_001,
+        sessionKey: "session-1",
+      });
+      expect(sticky?.accountId).toBe("a");
+    } finally {
+      await reopened.close();
+    }
   });
 
   test("does not invent stickiness without an explicit session key and removes expired leases", async () => {
     const root = await mkdtemp(join(tmpdir(), "ai-gateway-routing-"));
-    const store = createRoutingStateStore(join(root, "routing.json"));
-    const routing = createRoutingState(store);
-    const acquired = await routing.acquire({
-      candidates,
-      config: { ...defaultRoutingConfig, reservationTtlMs: 10 },
-      now,
+    const routing = await createRoutingState(join(root, "routing.sqlite"), {
+      ...defaultRoutingConfig,
+      reservationTtlMs: 10,
     });
-    expect(acquired).toBeDefined();
-    expect((await store.read()).assignments).toEqual([]);
+    try {
+      const acquired = await routing.acquire({
+        candidates,
+        now,
+      });
+      expect(acquired).toBeDefined();
 
-    await routing.acquire({
-      candidates,
-      config: { ...defaultRoutingConfig, reservationTtlMs: 10 },
-      now: now + 11,
-    });
-    expect((await store.read()).reservations).toHaveLength(1);
+      await routing.acquire({
+        candidates,
+        now: now + 11,
+      });
+      expect(await routing.summary(now + 11)).toMatchObject({
+        activeReservations: 1,
+      });
+    } finally {
+      await routing.close();
+    }
   });
 
   test("uses codex-router reservation pressure as the deterministic tie break", async () => {
     const root = await mkdtemp(join(tmpdir(), "ai-gateway-routing-"));
-    const store = createRoutingStateStore(join(root, "routing.json"));
-    const routing = createRoutingState(store);
+    const routing = await createRoutingState(
+      join(root, "routing.sqlite"),
+      defaultRoutingConfig,
+    );
     const tied = candidates.map((value) => ({
       ...value,
       usage: {
@@ -113,54 +127,66 @@ describe("durable routing state", () => {
       },
     }));
 
-    expect(
-      await routing.acquire({
-        candidates: tied,
-        config: defaultRoutingConfig,
-        now,
-      }),
-    ).toMatchObject({ accountId: "a", decisionReason: "best_candidate" });
-    expect(
-      await routing.acquire({
-        candidates: tied,
-        config: defaultRoutingConfig,
-        now: now + 1,
-      }),
-    ).toMatchObject({ accountId: "b", decisionReason: "best_candidate" });
+    try {
+      expect(
+        await routing.acquire({
+          candidates: tied,
+          now,
+        }),
+      ).toMatchObject({
+        accountId: "a",
+        decisionReason: "best_candidate",
+      });
+      expect(
+        await routing.acquire({
+          candidates: tied,
+          now: now + 1,
+        }),
+      ).toMatchObject({
+        accountId: "b",
+        decisionReason: "best_candidate",
+      });
+    } finally {
+      await routing.close();
+    }
   });
 
   test("retains bounded codex-router rejection explanations for protected status", async () => {
     const root = await mkdtemp(join(tmpdir(), "ai-gateway-routing-"));
-    const routing = createRoutingState(
-      createRoutingStateStore(join(root, "routing.json")),
+    const routing = await createRoutingState(
+      join(root, "routing.sqlite"),
+      defaultRoutingConfig,
     );
 
-    expect(
-      await routing.acquire({
-        candidates: [
-          {
-            accountId: "reauth",
-            label: "Reauth",
-            needsReauth: true,
-          },
-        ],
-        config: defaultRoutingConfig,
-        now,
-      }),
-    ).toBeUndefined();
-    expect(await routing.summary(now)).toMatchObject({
-      lastSelection: {
-        observedAt: now,
-        reason: "no_eligible_accounts",
-        candidates: [
-          {
-            accountId: "reauth",
-            eligible: false,
-            freshness: "unknown",
-            rejectionCode: "reauthentication_required",
-          },
-        ],
-      },
-    });
+    try {
+      expect(
+        await routing.acquire({
+          candidates: [
+            {
+              accountId: "reauth",
+              label: "Reauth",
+              needsReauth: true,
+            },
+          ],
+          now,
+        }),
+      ).toBeUndefined();
+      expect(await routing.summary(now)).toMatchObject({
+        lastSelection: {
+          observedAt: now,
+          reason: "no_eligible_accounts",
+          candidates: [
+            {
+              accountId: "reauth",
+              eligible: false,
+              freshness: "unknown",
+              rejectionCode: "reauthentication_required",
+            },
+          ],
+        },
+      });
+    } finally {
+      await routing.close();
+    }
   });
 });

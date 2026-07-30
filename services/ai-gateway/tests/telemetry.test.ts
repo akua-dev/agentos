@@ -26,9 +26,7 @@ function fixture() {
   const tracerProvider = new BasicTracerProvider({
     spanProcessors: [new SimpleSpanProcessor(spans)],
   });
-  const metrics = new InMemoryMetricExporter(
-    AggregationTemporality.CUMULATIVE,
-  );
+  const metrics = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
   const metricReader = new PeriodicExportingMetricReader({
     exporter: metrics,
     exportIntervalMillis: 60_000,
@@ -54,6 +52,31 @@ function fixture() {
 }
 
 describe("AI Gateway telemetry", () => {
+  test("records bounded fresh and resumed session states", async () => {
+    const test = fixture();
+    for (const sessionState of ["fresh", "resumed", "private"]) {
+      const scope = test.telemetry.startRequest(
+        new Request("http://gateway.test/responses", {
+          headers: { "x-agentos-session-state": sessionState },
+        }),
+      );
+      scope.end({ status: 200, streamOutcome: "not_streamed" });
+    }
+
+    await test.tracerProvider.forceFlush();
+    expect(
+      test.spans
+        .getFinishedSpans()
+        .filter((span) => span.name === "ai-gateway.request")
+        .map((span) => span.attributes["agentos.ai.session.state"]),
+    ).toEqual(["fresh", "resumed", "fresh"]);
+
+    await Promise.all([
+      test.tracerProvider.shutdown(),
+      test.meterProvider.shutdown(),
+    ]);
+  });
+
   test("traces routing, one provider attempt, streaming, and release with safe correlation", async () => {
     const test = fixture();
     const request = new Request("http://gateway.test/responses", {
@@ -100,8 +123,7 @@ describe("AI Gateway telemetry", () => {
       "ai-gateway.request",
     ]);
     expect(
-      finished.find((span) => span.name === "ai-gateway.upstream")
-        ?.attributes,
+      finished.find((span) => span.name === "ai-gateway.upstream")?.attributes,
     ).toMatchObject({
       "agentos.ai.request.attempt_id": "gateway-2",
       "agentos.ai.provider.request_id": "req_safe_provider_1",
@@ -137,18 +159,19 @@ describe("AI Gateway telemetry", () => {
       .flatMap(({ scopeMetrics }) =>
         scopeMetrics.flatMap(({ metrics: scopedMetrics }) => scopedMetrics),
       );
-    const durationMetrics = exportedMetrics
-      .filter(({ descriptor }) =>
-        [
-          AGENTOS_AI_METRICS.operationDuration,
-          AGENTOS_AI_METRICS.providerDuration,
-          AGENTOS_AI_METRICS.upstreamHeadersDuration,
-          AGENTOS_AI_METRICS.firstByteDuration,
-          AGENTOS_AI_METRICS.streamDuration,
-          AGENTOS_AI_METRICS.routeAcquisitionDuration,
-          AGENTOS_AI_METRICS.quotaObservationAge,
-        ].includes(descriptor.name as typeof AGENTOS_AI_METRICS.operationDuration),
-      );
+    const durationMetrics = exportedMetrics.filter(({ descriptor }) =>
+      [
+        AGENTOS_AI_METRICS.operationDuration,
+        AGENTOS_AI_METRICS.providerDuration,
+        AGENTOS_AI_METRICS.upstreamHeadersDuration,
+        AGENTOS_AI_METRICS.firstByteDuration,
+        AGENTOS_AI_METRICS.streamDuration,
+        AGENTOS_AI_METRICS.routeAcquisitionDuration,
+        AGENTOS_AI_METRICS.quotaObservationAge,
+      ].includes(
+        descriptor.name as typeof AGENTOS_AI_METRICS.operationDuration,
+      ),
+    );
     expect(durationMetrics).toHaveLength(7);
     for (const metric of durationMetrics) {
       expect(JSON.stringify(metric)).toContain(
@@ -156,7 +179,8 @@ describe("AI Gateway telemetry", () => {
       );
     }
     const quotaMetric = exportedMetrics.find(
-      ({ descriptor }) => descriptor.name === AGENTOS_AI_METRICS.quotaObservationAge,
+      ({ descriptor }) =>
+        descriptor.name === AGENTOS_AI_METRICS.quotaObservationAge,
     );
     expect(quotaMetric && JSON.stringify(quotaMetric)).toContain(
       '"agentos.ai.quota.stale":true',
@@ -170,8 +194,7 @@ describe("AI Gateway telemetry", () => {
 
   test("records failures without payloads, credentials, provider identities, or error text", async () => {
     const test = fixture();
-    const secret =
-      "SEED_PROMPT sk-seeded-secret provider-account@example.test";
+    const secret = "SEED_PROMPT sk-seeded-secret provider-account@example.test";
     const scope = test.telemetry.startRequest(
       new Request("http://gateway.test/responses", {
         method: "POST",

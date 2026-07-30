@@ -13,15 +13,15 @@ truthful.
 
 Each kind of state has one authority:
 
-| Concern | Authority |
-| --- | --- |
-| Human planning and provider workflow | Captain-selected tracker or provider |
-| Durable fleet data | PostgreSQL |
-| Live workload state | Kubernetes |
-| Terminal and harness runtime | Herdr inside each runtime pod |
-| Agent home and unfinished work | Agent-owned PVC |
-| Delivered code | Git and its remote |
-| Optional pooled AI credentials and routing state | Fleet AI Gateway PVC and process |
+| Concern                                          | Authority                            |
+| ------------------------------------------------ | ------------------------------------ |
+| Human planning and provider workflow             | Captain-selected tracker or provider |
+| Durable fleet data                               | PostgreSQL                           |
+| Live workload state                              | Kubernetes                           |
+| Terminal and harness runtime                     | Herdr inside each runtime pod        |
+| Agent home and unfinished work                   | Agent-owned PVC                      |
+| Delivered code                                   | Git and its remote                   |
+| Optional pooled AI credentials and routing state | Fleet AI Gateway PVC and process     |
 
 AgentOS does not continuously mirror one authority into another.
 PostgreSQL stores pod locators, not heartbeats; Kubernetes is inspected when live state matters.
@@ -374,12 +374,28 @@ coordination kernel: PostgreSQL still owns work and communication, the harness
 still chooses the requested provider/model, and the provider response still
 returns synchronously to the calling harness.
 
+AgentOS evaluates capacity postures from the least distributed complete path:
+
+1. direct per-Agent OAuth for the minimal topology and recovery;
+2. the in-cluster Fleet AI Gateway for a shared multi-subscription pool;
+3. a mixed in-cluster posture where selected Mates remain direct and only
+   approved workers or trusted automation use the Gateway; and
+4. an external Cloudflare Worker only when the same deliberately external
+   router must also serve non-AgentOS clients.
+
+For an AgentOS-only Fleet, the in-cluster or mixed posture is stronger than the
+external Worker posture. Agents can operate the Gateway through native
+Kubernetes, the service needs no public Ingress, and the Fleet-local
+OpenTelemetry Collector receives the complete privacy-bounded request path.
+Cloudflare is a standalone deployment surface for `codex-router`, not an
+upgrade or dependency for AgentOS.
+
 The first implementation is a single-replica Bun service with one retained
 ReadWriteOnce PVC. Its mode-`0600` OAuth vault owns fresh server-created Codex
 refresh chains and authentication eligibility. Bounded quota observations stay
-process-local and are refreshed after restart; the separate routing file owns
-only opaque session assignments, quota or transient blocks and renewable
-request reservations.
+process-local and are refreshed after restart; the canonical `codex-router`
+Bun/SQLite state owns only opaque session assignments, quota or transient
+blocks and renewable request reservations.
 It stores no prompts, model responses or harness transcripts. An OpenAI API key
 may be mounted separately as an explicitly enabled last-resort fallback and is
 never copied into the mutable OAuth vault.
@@ -434,15 +450,35 @@ This is not a universal AgentOS proxy. Git, PostgreSQL, Kubernetes, Herdr,
 registries and other provider tools continue through their native interfaces.
 Adding another mediated protocol requires a separate review of its authority,
 credentials and failure semantics; similarity to HTTP traffic is insufficient.
-The gateway's account vault and routing state use locked atomic files that are
-read during live operations, so account login, rotation, reservations and
-blocks do not require a reverse-proxy reload. Provider adapters and selection
-semantics remain reviewed source and change through the normal image lifecycle;
-there is no generic dynamic-route control plane.
+The gateway's account vault uses locked atomic updates and its canonical
+`codex-router` routing state uses transactional SQLite on the retained PVC, so
+account login, rotation, reservations and blocks do not require a reverse-proxy
+reload. Provider adapters and selection semantics remain reviewed source and
+change through the normal image lifecycle; there is no generic dynamic-route
+control plane.
 
 The released service, tests and optional Kubernetes topology live together in
 `services/ai-gateway/`. First Mate may operate that topology through its
 reviewed Skill and RBAC without owning the component's source directory.
+Each default role owns an additive `ai-gateway-client.yaml` patch in its
+Kubernetes `patches/` directory. A reviewed per-Agent overlay composes that
+patch only for an approved client; it adds the selected-client label, private
+Service URL and Secret-backed Fleet client token without choosing a provider,
+model or thinking level. Composing every approved client produces the pooled
+posture; composing selected clients only produces the mixed posture. Removing
+the patch returns that workload to its independent native-authentication
+environment without changing its retained home.
+
+An exceptional AgentOS client may use a standalone Cloudflare Worker only as a
+separate external credential and routing authority. The Worker never forwards
+into the in-cluster Gateway, the Gateway never forwards through the Worker, and
+one OAuth refresh chain is never shared between their state authorities.
+Cloudflare Workers Observability owns the Worker's native router logs and
+traces; the AgentOS Collector continues to own the in-cluster client signals.
+External telemetry delivery or cross-system correlation is an explicit
+integration with its own plan, privacy and propagation constraints, not an
+implicit property of using the Worker.
+
 Claude, Gemini, WebSockets, multi-replica authority, public ingress and
 general-purpose egress proxy behavior remain outside the first contract.
 
@@ -482,20 +518,20 @@ only on protected spans and correlated logs.
 
 The bounded per-operation vocabulary is:
 
-| Attribute | Values | Signals | Cardinality and sensitivity |
-| --- | --- | --- | --- |
-| `agentos.ai.runtime` | `pi`, `codex` | all | 2, public operational |
-| `agentos.ai.route` | `direct`, `ai_gateway` | all | 2, public operational |
-| `agentos.ai.provider.family` | `openai`, `other` | all | 2, public operational |
-| `agentos.ai.request.kind` | `main`, `compaction`, `memory_extract`, `memory_consolidate`, `extension` | all | 5, public operational |
-| `agentos.ai.model.family` | `gpt-5`, `gpt-4.1`, `o-series`, `other` | all | 4, public operational |
-| `agentos.ai.session.state` | `fresh`, `resumed` | all | 2, operational |
-| `agentos.ai.stream.mode` | `streaming`, `non_streaming` | all | 2, operational |
-| `agentos.ai.status_class` | `success`, `client_error`, `server_error`, `cancelled`, `error` | all | 5, operational |
-| `agentos.ai.error.class` | `none`, `authentication`, `rate_limit`, `overload`, `timeout`, `abort`, `transport`, `protocol`, `decode`, `unavailable`, `unknown` | all | 11, operational |
-| `agentos.ai.stream.outcome` | `not_streamed`, `completed`, `client_disconnect`, `aborted`, `upstream_error` | all | 5, operational |
-| operation, attempt, trace, span, session and provider request IDs | opaque, capped at 128 characters | spans and protected correlated logs only | unbounded, restricted |
-| `agentos.ai.route.slot` | opaque `slot-*`, capped at 32 characters | spans and protected correlated logs only | deployment-bounded, restricted |
+| Attribute                                                         | Values                                                                                                                              | Signals                                  | Cardinality and sensitivity    |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------ |
+| `agentos.ai.runtime`                                              | `pi`, `codex`                                                                                                                       | all                                      | 2, public operational          |
+| `agentos.ai.route`                                                | `direct`, `ai_gateway`                                                                                                              | all                                      | 2, public operational          |
+| `agentos.ai.provider.family`                                      | `openai`, `other`                                                                                                                   | all                                      | 2, public operational          |
+| `agentos.ai.request.kind`                                         | `main`, `compaction`, `memory_extract`, `memory_consolidate`, `extension`                                                           | all                                      | 5, public operational          |
+| `agentos.ai.model.family`                                         | `gpt-5`, `gpt-4.1`, `o-series`, `other`                                                                                             | all                                      | 4, public operational          |
+| `agentos.ai.session.state`                                        | `fresh`, `resumed`                                                                                                                  | all                                      | 2, operational                 |
+| `agentos.ai.stream.mode`                                          | `streaming`, `non_streaming`                                                                                                        | all                                      | 2, operational                 |
+| `agentos.ai.status_class`                                         | `success`, `client_error`, `server_error`, `cancelled`, `error`                                                                     | all                                      | 5, operational                 |
+| `agentos.ai.error.class`                                          | `none`, `authentication`, `rate_limit`, `overload`, `timeout`, `abort`, `transport`, `protocol`, `decode`, `unavailable`, `unknown` | all                                      | 11, operational                |
+| `agentos.ai.stream.outcome`                                       | `not_streamed`, `completed`, `client_disconnect`, `aborted`, `upstream_error`                                                       | all                                      | 5, operational                 |
+| operation, attempt, trace, span, session and provider request IDs | opaque, capped at 128 characters                                                                                                    | spans and protected correlated logs only | unbounded, restricted          |
+| `agentos.ai.route.slot`                                           | opaque `slot-*`, capped at 32 characters                                                                                            | spans and protected correlated logs only | deployment-bounded, restricted |
 
 HTTP status code, numeric token counts, chunk count and byte count may be span
 attributes. Metrics use only the bounded dimensions in the table; they never
@@ -543,20 +579,20 @@ uses a safe standalone operation or span link.
 
 Contract metrics are monotonic counters unless noted:
 
-| Metric | Unit/type | Required labels |
-| --- | --- | --- |
-| `agentos.ai.operations` | `{operation}` counter | runtime, route, status class, error class |
-| `agentos.ai.provider.attempts` | `{attempt}` counter | runtime, route, request kind, model family, status class, error class |
-| `agentos.ai.operation.duration` | `s` histogram | runtime, route, status class |
-| `agentos.ai.provider.duration` | `s` histogram | runtime, route, request kind, status class |
-| `agentos.ai.upstream.headers.duration` | `s` histogram | route, status class |
-| `agentos.ai.stream.first_byte.duration` | `s` histogram | route, stream outcome |
-| `agentos.ai.stream.duration` | `s` histogram | route, stream outcome |
-| `agentos.ai.streams.active` | `{stream}` up/down counter | route |
-| `agentos.ai.stream.chunks` | `{chunk}` counter | route, stream outcome |
-| `agentos.ai.stream.bytes` | `By` counter | route, stream outcome |
-| `agentos.ai.route.acquire.duration` | `s` histogram | route, status class |
-| `agentos.ai.quota.observation.age` | `s` histogram | route, stale boolean |
+| Metric                                  | Unit/type                  | Required labels                                                       |
+| --------------------------------------- | -------------------------- | --------------------------------------------------------------------- |
+| `agentos.ai.operations`                 | `{operation}` counter      | runtime, route, status class, error class                             |
+| `agentos.ai.provider.attempts`          | `{attempt}` counter        | runtime, route, request kind, model family, status class, error class |
+| `agentos.ai.operation.duration`         | `s` histogram              | runtime, route, status class                                          |
+| `agentos.ai.provider.duration`          | `s` histogram              | runtime, route, request kind, status class                            |
+| `agentos.ai.upstream.headers.duration`  | `s` histogram              | route, status class                                                   |
+| `agentos.ai.stream.first_byte.duration` | `s` histogram              | route, stream outcome                                                 |
+| `agentos.ai.stream.duration`            | `s` histogram              | route, stream outcome                                                 |
+| `agentos.ai.streams.active`             | `{stream}` up/down counter | route                                                                 |
+| `agentos.ai.stream.chunks`              | `{chunk}` counter          | route, stream outcome                                                 |
+| `agentos.ai.stream.bytes`               | `By` counter               | route, stream outcome                                                 |
+| `agentos.ai.route.acquire.duration`     | `s` histogram              | route, status class                                                   |
+| `agentos.ai.quota.observation.age`      | `s` histogram              | route, stale boolean                                                  |
 
 Duration histograms use seconds with boundaries `0.005`, `0.01`, `0.025`,
 `0.05`, `0.1`, `0.25`, `0.5`, `1`, `2.5`, `5`, `10`, `30`, `60`, `120` and
@@ -1036,7 +1072,8 @@ workspace keeps one `bun.lock`.
   processes and rejects native-tool wrappers, prompt queues and shadow Fleet
   state.
 - `services/ai-gateway/` owns the optional authenticated Fleet AI request data
-  plane, its private credential/routing files, behavior tests and Kubernetes
+  plane, its private credential vault, canonical routing database, behavior
+  tests and Kubernetes
   topology; it does not own harness choice, PostgreSQL state or general Fleet
   traffic.
 - `database/AGENTS.md` governs SQL-first schema development without selecting an Agent role.

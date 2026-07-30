@@ -11,6 +11,24 @@ const skillPath = join(
 );
 
 describe("AgentOS AI Gateway operator skill", () => {
+  test("orders every subscription-capacity posture from native to exceptional", async () => {
+    const skill = await readFile(skillPath, "utf8");
+    const topologyLabels = Array.from(
+      skill.matchAll(/^\|\s*[1-4]\s*\|\s*\*\*(.+?)\*\*\s*\|/gm),
+      (match) => match[1],
+    );
+
+    expect(topologyLabels).toEqual([
+      "Direct per-Agent OAuth",
+      "In-cluster multi-subscription Gateway",
+      "Mixed in-cluster routing",
+      "External Cloudflare Worker",
+    ]);
+    expect(skill.indexOf("## External Cloudflare Worker")).toBeGreaterThan(
+      skill.indexOf("## Verify, recover and retire"),
+    );
+  });
+
   test("defines a First Mate gateway-only recovery without disabling AgentOS behavior", async () => {
     const skill = await readFile(skillPath, "utf8");
 

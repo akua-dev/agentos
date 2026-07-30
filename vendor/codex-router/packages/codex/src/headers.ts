@@ -1,6 +1,7 @@
 const requestHeadersToRemove = [
   "authorization",
   "api-key",
+  "baggage",
   "chatgpt-account-id",
   "host",
   "content-length",

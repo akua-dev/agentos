@@ -27,6 +27,7 @@ import {
   type AgentOSAIModelFamily,
   type AgentOSAIRequestKind,
   type AgentOSAIRuntime,
+  type AgentOSAISessionState,
   type AgentOSAIStreamMode,
   type AgentOSAIStreamOutcome,
   type AgentOSTelemetryAttributes,
@@ -143,7 +144,10 @@ function startGatewayRequest(options: {
   log: (record: Readonly<Record<string, string | number>>) => void;
   instruments: Instruments;
 }): GatewayRequestTelemetry {
-  const parentContext = extractParent(options.request.headers, options.propagator);
+  const parentContext = extractParent(
+    options.request.headers,
+    options.propagator,
+  );
   const requestId = options.id();
   const base = requestAttributes(options.request.headers, requestId);
   const requestStartedAt = options.clock();
@@ -280,8 +284,7 @@ function startGatewayRequest(options: {
                 ...outcomeAttributes(status),
                 ...(providerRequestId
                   ? {
-                      "agentos.ai.provider.request_id":
-                        providerRequestId,
+                      "agentos.ai.provider.request_id": providerRequestId,
                     }
                   : {}),
               },
@@ -388,8 +391,7 @@ function startGatewayRequest(options: {
               "agentos.ai.request.attempt_id": attemptId,
               ...(providerRequestId
                 ? {
-                    "agentos.ai.provider.request_id":
-                      providerRequestId,
+                    "agentos.ai.provider.request_id": providerRequestId,
                   }
                 : {}),
             },
@@ -400,10 +402,7 @@ function startGatewayRequest(options: {
             { ...base, ...final },
             "metric",
           );
-          options.instruments.providerAttempts.add(
-            1,
-            providerMetricAttributes,
-          );
+          options.instruments.providerAttempts.add(1, providerMetricAttributes);
           if (upstreamStartedAt !== undefined) {
             options.instruments.providerDuration.record(
               elapsed(upstreamStartedAt, options.clock()),
@@ -458,9 +457,7 @@ function startGatewayRequest(options: {
 function createInstruments(meter: Meter): Instruments {
   return {
     operations: meter.createCounter(AGENTOS_AI_METRICS.operations),
-    providerAttempts: meter.createCounter(
-      AGENTOS_AI_METRICS.providerAttempts,
-    ),
+    providerAttempts: meter.createCounter(AGENTOS_AI_METRICS.providerAttempts),
     operationDuration: meter.createHistogram(
       AGENTOS_AI_METRICS.operationDuration,
       { unit: "s" },
@@ -477,14 +474,12 @@ function createInstruments(meter: Meter): Instruments {
       AGENTOS_AI_METRICS.firstByteDuration,
       { unit: "s" },
     ),
-    streamDuration: meter.createHistogram(
-      AGENTOS_AI_METRICS.streamDuration,
-      { unit: "s" },
-    ),
-    activeStreams: meter.createUpDownCounter(
-      AGENTOS_AI_METRICS.activeStreams,
-      { unit: "{stream}" },
-    ),
+    streamDuration: meter.createHistogram(AGENTOS_AI_METRICS.streamDuration, {
+      unit: "s",
+    }),
+    activeStreams: meter.createUpDownCounter(AGENTOS_AI_METRICS.activeStreams, {
+      unit: "{stream}",
+    }),
     streamChunks: meter.createCounter(AGENTOS_AI_METRICS.streamChunks, {
       unit: "{chunk}",
     }),
@@ -542,7 +537,12 @@ function requestAttributes(
         ["streaming", "non_streaming"],
         "streaming",
       ),
-      "agentos.ai.session.state": "fresh",
+      "agentos.ai.session.state": boundedHeader<AgentOSAISessionState>(
+        headers,
+        "x-agentos-session-state",
+        ["fresh", "resumed"],
+        "fresh",
+      ),
       "agentos.ai.operation.id": requestId,
     },
     "span",
@@ -560,9 +560,7 @@ function boundedHeader<T extends string>(
 }
 
 function inferRuntime(headers: Headers): AgentOSAIRuntime {
-  return /\bcodex\b/i.test(headers.get("user-agent") ?? "")
-    ? "codex"
-    : "pi";
+  return /\bcodex\b/i.test(headers.get("user-agent") ?? "") ? "codex" : "pi";
 }
 
 function outcomeAttributes(
@@ -579,10 +577,7 @@ function outcomeAttributes(
   );
 }
 
-function finishSpan(
-  span: Span,
-  attributes: Readonly<Record<string, unknown>>,
-) {
+function finishSpan(span: Span, attributes: Readonly<Record<string, unknown>>) {
   const safe = safeTelemetryAttributes(attributes, "span");
   span.setAttributes(safe);
   span.setStatus({
@@ -616,11 +611,7 @@ function extractParent(
 function safeProviderRequestId(headers: Headers): string | undefined {
   for (const name of ["x-request-id", "x-oai-request-id"]) {
     const value = headers.get(name)?.trim();
-    if (
-      value &&
-      value.length <= 128 &&
-      /^[0-9A-Za-z_.:-]+$/.test(value)
-    ) {
+    if (value && value.length <= 128 && /^[0-9A-Za-z_.:-]+$/.test(value)) {
       return value;
     }
   }
@@ -671,10 +662,7 @@ function boundedAdd(total: number, increment: number): number {
 
 function boundedQuotaObservationAge(value: number): number {
   return Number.isFinite(value)
-    ? Math.min(
-        AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
-        Math.max(0, value),
-      )
+    ? Math.min(AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS, Math.max(0, value))
     : 0;
 }
 

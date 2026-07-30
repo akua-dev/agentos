@@ -1,0 +1,16 @@
+{
+  "name": "@akua-dev/codex-router-bun",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@akua-dev/codex-router-codex": "workspace:*",
+    "@akua-dev/codex-router-core": "workspace:*",
+    "@effect/platform-bun": "4.0.0-beta.102",
+    "@effect/sql-sqlite-bun": "4.0.0-beta.102",
+    "effect": "4.0.0-beta.102"
+  }
+}

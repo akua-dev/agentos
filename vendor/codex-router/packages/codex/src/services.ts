@@ -1,12 +1,6 @@
-import type {
-  AccountId,
-  Candidate,
-  SelectionReason,
-  SessionKey,
-  UsageSnapshot
-} from "@akua-dev/codex-router-core"
-import { Context, Effect, Option, Redacted, Schema } from "effect"
-import { AccountKind } from "./protocol.ts"
+import type { AccountId, Candidate, SelectionReason, SessionKey } from "@akua-dev/codex-router-core"
+import { Context, Effect, Option, Schema } from "effect"
+import type { SubscriptionCredential } from "./credentials.ts"
 
 export class AuthenticationError extends Schema.TaggedErrorClass<AuthenticationError>()(
   "AuthenticationError",
@@ -29,24 +23,9 @@ export class CredentialUnavailableError extends Schema.TaggedErrorClass<Credenti
   }
 ) {}
 
-export class UsageProbeError extends Schema.TaggedErrorClass<UsageProbeError>()("UsageProbeError", {
-  message: Schema.String
-}) {}
-
 export class TransportError extends Schema.TaggedErrorClass<TransportError>()("TransportError", {
   message: Schema.String
 }) {}
-
-export class AccountCredential extends Schema.Class<AccountCredential>("AccountCredential")({
-  accountId: Schema.String.pipe(Schema.brand("AccountId")),
-  kind: AccountKind,
-  accessToken: Schema.Redacted(Schema.String),
-  providerAccountId: Schema.optionalKey(Schema.String)
-}) {
-  get authorization(): string {
-    return `Bearer ${Redacted.value(this.accessToken)}`
-  }
-}
 
 export class ClientAuthenticator extends Context.Service<
   ClientAuthenticator,
@@ -55,22 +34,22 @@ export class ClientAuthenticator extends Context.Service<
   }
 >()("@akua-dev/codex-router/ClientAuthenticator") {}
 
+export class AdminAuthenticator extends Context.Service<
+  AdminAuthenticator,
+  {
+    readonly authenticate: (request: Request) => Effect.Effect<boolean, AuthenticationError>
+  }
+>()("@akua-dev/codex-router/AdminAuthenticator") {}
+
 export class AccountDirectory extends Context.Service<
   AccountDirectory,
   {
     readonly candidates: Effect.Effect<ReadonlyArray<Candidate>, AccountDirectoryError>
     readonly credential: (
       accountId: AccountId
-    ) => Effect.Effect<AccountCredential, CredentialUnavailableError>
+    ) => Effect.Effect<SubscriptionCredential, CredentialUnavailableError>
   }
 >()("@akua-dev/codex-router/AccountDirectory") {}
-
-export class UsageProbe extends Context.Service<
-  UsageProbe,
-  {
-    readonly usage: (accountId: AccountId) => Effect.Effect<UsageSnapshot, UsageProbeError>
-  }
->()("@akua-dev/codex-router/UsageProbe") {}
 
 export class UpstreamTransport extends Context.Service<
   UpstreamTransport,

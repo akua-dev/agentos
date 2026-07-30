@@ -8,7 +8,7 @@ import {
   type FetchImplementation,
 } from "./proxy.ts";
 import type { GatewayRequestTelemetry, GatewayTelemetry } from "./telemetry.ts";
-import { createRoutingState, createRoutingStateStore } from "./routing-state.ts";
+import { createRoutingState } from "./routing-state.ts";
 import { defaultRoutingConfig } from "./selection.ts";
 import type { Candidate, RouteLease, UsageSnapshot } from "./types.ts";
 import { CodexUsageHttpError, fetchCodexUsage } from "./usage.ts";
@@ -29,6 +29,7 @@ export interface AIGatewayServiceOptions {
 export interface AIGatewayService {
   vault: AccountVault;
   fetch(request: Request): Promise<Response>;
+  close(): Promise<void>;
 }
 
 export async function createAIGatewayService(
@@ -36,15 +37,19 @@ export async function createAIGatewayService(
 ): Promise<AIGatewayService> {
   const clock = options.clock ?? Date.now;
   const vault = createAccountVault({
-    store: createAccountVaultStore(join(options.stateDirectory, "accounts.json")),
+    store: createAccountVaultStore(
+      join(options.stateDirectory, "accounts.json"),
+    ),
     oauth: options.oauth,
     clock,
     refreshDirectory: options.stateDirectory,
   });
-  const routingStore = createRoutingStateStore(join(options.stateDirectory, "routing.json"));
-  const routing = createRoutingState(routingStore);
+  const routing = await createRoutingState(
+    join(options.stateDirectory, "routing.sqlite"),
+    defaultRoutingConfig,
+  );
   const usage = new Map<string, UsageSnapshot>();
-  await Promise.all([routingStore.read(), vault.list()]);
+  await vault.list();
 
   const fallbackAvailable = () =>
     options.allowApiKeyFallback && Boolean(options.openAIApiKey?.trim());
@@ -58,13 +63,20 @@ export async function createAIGatewayService(
     const candidates = await Promise.all(
       summaries.map(async (summary): Promise<Candidate> => {
         if (summary.needsReauth) {
-          return { accountId: summary.id, label: summary.label, needsReauth: true };
+          return {
+            accountId: summary.id,
+            label: summary.label,
+            needsReauth: true,
+          };
         }
         let snapshot = usage.get(summary.id);
         if (!snapshot || clock() - snapshot.observedAt >= USAGE_CACHE_MS) {
           let probedAccessToken: string | undefined;
           try {
-            const credential = await vault.getFreshCredential(summary.id, signal);
+            const credential = await vault.getFreshCredential(
+              summary.id,
+              signal,
+            );
             probedAccessToken = credential.accessToken;
             snapshot = await fetchCodexUsage({
               accessToken: credential.accessToken,
@@ -83,7 +95,11 @@ export async function createAIGatewayService(
               probedAccessToken !== undefined
             ) {
               await vault.markNeedsReauth(summary.id, probedAccessToken);
-              return { accountId: summary.id, label: summary.label, needsReauth: true };
+              return {
+                accountId: summary.id,
+                label: summary.label,
+                needsReauth: true,
+              };
             }
             if (snapshot) snapshot = { ...snapshot, stale: true };
           }
@@ -109,7 +125,6 @@ export async function createAIGatewayService(
 
     const reservation = await routing.acquire({
       candidates,
-      config: defaultRoutingConfig,
       now: clock(),
       ...(sessionKey ? { sessionKey } : {}),
     });
@@ -128,7 +143,10 @@ export async function createAIGatewayService(
 
     let credential;
     try {
-      credential = await vault.getFreshCredential(reservation.accountId, signal);
+      credential = await vault.getFreshCredential(
+        reservation.accountId,
+        signal,
+      );
     } catch (error) {
       await routing.release(reservation.leaseToken);
       throw error;
@@ -139,29 +157,24 @@ export async function createAIGatewayService(
       providerAccountId: credential.providerAccountId,
       accessToken: credential.accessToken,
       leaseToken: reservation.leaseToken,
-      renew: () =>
-        routing.renew(
-          reservation.leaseToken,
-          clock(),
-          defaultRoutingConfig.reservationTtlMs,
-        ),
+      renew: () => routing.renew(reservation.leaseToken, clock()),
       release: async () => {
         await routing.release(reservation.leaseToken);
       },
       recordResponse: async (status, headers) => {
+        const responseAt = clock();
         if (status === 401) {
-          await vault.markNeedsReauth(reservation.accountId, credential.accessToken);
-          return;
+          await vault.markNeedsReauth(
+            reservation.accountId,
+            credential.accessToken,
+          );
         }
-        if (status === 429) {
-          const blockedAt = clock();
-          await routing.block({
-            accountId: reservation.accountId,
-            kind: "quota",
-            blockedAt,
-            retryAt: parseRetryAfter(headers.get("retry-after"), blockedAt) ?? blockedAt + 60_000,
-          });
-        }
+        await routing.recordResponse(
+          reservation.accountId,
+          status,
+          headers,
+          responseAt,
+        );
       },
     };
   };
@@ -175,6 +188,7 @@ export async function createAIGatewayService(
 
   return {
     vault,
+    close: routing.close,
     async fetch(request) {
       const url = new URL(request.url);
       if (request.method === "GET" && url.pathname === "/healthz") {
@@ -184,8 +198,12 @@ export async function createAIGatewayService(
         const accounts = await vault.list();
         const ready =
           Boolean(options.clientToken) &&
-          (accounts.some((account) => !account.needsReauth) || fallbackAvailable());
-        return Response.json({ status: ready ? "ready" : "not_ready" }, { status: ready ? 200 : 503 });
+          (accounts.some((account) => !account.needsReauth) ||
+            fallbackAvailable());
+        return Response.json(
+          { status: ready ? "ready" : "not_ready" },
+          { status: ready ? 200 : 503 },
+        );
       }
       if (request.method === "GET" && url.pathname === "/status") {
         if (!isClientAuthorized(request, options.clientToken)) {
@@ -203,8 +221,12 @@ export async function createAIGatewayService(
                   usage: {
                     observedAt: snapshot.observedAt,
                     stale: snapshot.stale,
-                    ...(snapshot.shortWindow ? { shortWindow: snapshot.shortWindow } : {}),
-                    ...(snapshot.weeklyWindow ? { weeklyWindow: snapshot.weeklyWindow } : {}),
+                    ...(snapshot.shortWindow
+                      ? { shortWindow: snapshot.shortWindow }
+                      : {}),
+                    ...(snapshot.weeklyWindow
+                      ? { weeklyWindow: snapshot.weeklyWindow }
+                      : {}),
                   },
                 }
               : {}),
@@ -227,12 +249,4 @@ function quotaObservationAgeSeconds(now: number, observedAt: number): number {
     AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
     Math.max(0, now - observedAt) / 1_000,
   );
-}
-
-function parseRetryAfter(value: string | null, now: number): number | undefined {
-  if (!value) return undefined;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds >= 0) return now + Math.ceil(seconds * 1_000);
-  const date = Date.parse(value);
-  return Number.isNaN(date) ? undefined : Math.max(now, date);
 }
