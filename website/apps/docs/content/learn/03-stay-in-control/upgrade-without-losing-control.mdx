@@ -1,0 +1,70 @@
+---
+title: Upgrade without losing control
+description: Change a running Fleet while preserving identity, state, evidence and replaceable interfaces.
+courseId: stay-in-control
+courseTitle: Stay in control
+courseOrder: 3
+lessonId: upgrade-without-losing-control
+lessonOrder: 1
+estimatedMinutes: 5
+canonical:
+  - label: AgentOS vision
+    path: VISION.md
+  - label: Bootstrap and recovery procedure
+    path: packages/agentos/resources/roles/firstmate/skills/agentos-bootstrap/SKILL.md
+  - label: Deliberate exclusions
+    path: ARCHITECTURE.md
+---
+
+## Treat an upgrade as organizational change
+
+A running Fleet has several version states:
+
+```text
+writable AgentOS checkout
+loaded harness instructions
+database migration journal
+running image digest
+```
+
+Changing one does not change the others. A Git checkout can be current while a native session
+still has older instructions. New Markdown can be present while executable runtime code remains in
+the old image.
+
+First Mate may discover a newer stable release read-only. It should report the exact revision and
+relevant changes without modifying a dirty checkout or restarting itself. After approval, the
+released procedure verifies provenance, inspects intervening migrations, preserves PVC and
+recovery boundaries, advances ordered state and verifies each Mate against the intended version.
+
+An upgrade is complete when the same organizational identities, homes, work and authority remain
+intact under the new release—not merely when a new image becomes Ready.
+
+## Preserve sovereignty through native authorities
+
+Sovereignty means people control the technology they create and depend on. AgentOS keeps durable
+company state in standard systems the operator can inspect, self-host and replace:
+
+- Kubernetes for workloads, authorization and storage;
+- PostgreSQL for organizational coordination;
+- Herdr for native sessions;
+- PVCs for unfinished homes and worktrees;
+- Git and providers for delivered source.
+
+A user interface, protocol, event bus or observability warehouse can improve how humans and Agents
+collaborate. It must not become the only place the company knows itself or authorizes effects.
+
+The support company might replace Discord with a self-hosted, Buzz-like interface and connect
+additional harnesses through ACP. That migration should not rewrite Task identity, Agent homes or
+Git delivery. The new surface submits intent to the same First-Mate boundary, reads approved
+projections and routes exact decisions. If it disappears, the native authorities still preserve
+the organization.
+
+## The autonomous company you now know how to build
+
+You began with one prompt and one persistent First Mate. You delivered a bounded outcome, protected
+human attention, recovered work, added one durable domain, connected external reality and built a
+reviewed learning loop.
+
+That is the AgentOS path: independent systems that follow human intent and stay within boundaries
+people set. Return to the [course introduction](/learn), use the
+[technical documentation](/docs), or [bring AgentOS online](/docs/start/get-started).

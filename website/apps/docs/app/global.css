@@ -1,0 +1,129 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+@import 'fumadocs-twoslash/twoslash.css';
+@plugin 'tailwindcss-animate';
+
+@theme {
+  --spacing-page: 1436px;
+  --color-brand: #a84a00;
+  --color-brand-strong: #8f3e00;
+  --color-brand-foreground: white;
+  --color-brand-secondary: #efe8a3;
+  --color-brand-secondary-foreground: #5c5100;
+  --color-brand-200: hsl(33, 100%, 50%);
+
+  --color-landing-foreground: #59592a;
+  --color-landing-foreground-200: #a8a866;
+}
+
+.dark {
+  --color-landing-foreground: #e4e2d0;
+  --color-landing-foreground-200: #b7af7e;
+
+  --color-brand: #fff383;
+  --color-brand-strong: #fff383;
+  --color-brand-secondary: #fc7744;
+  --color-brand-secondary-foreground: #521700;
+  --color-brand-foreground: black;
+  --color-brand-200: #fff7c8;
+}
+
+@theme inline {
+  --default-font-family: var(--font-sans);
+  --default-mono-font-family: var(--font-mono);
+  --animate-marquee: marquee var(--duration) infinite linear;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(calc(-100% - var(--gap)));
+    }
+  }
+
+  @keyframes marquee-vertical {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(calc(-100% - var(--gap)));
+    }
+  }
+
+  @keyframes stroke {
+    from {
+      stroke-dasharray: 1000;
+    }
+    to {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 2000;
+    }
+  }
+
+  --animate-stroke: stroke 5s linear infinite;
+
+  --color-gradient-radial: radial-gradient(circle, var(--tw-gradient-stops));
+  --color-repeat-gradient-to-r: repeating-linear-gradient(to right, var(--tw-gradient-stops));
+  --color-repeat-gradient-to-br: repeating-linear-gradient(
+    to bottom right,
+    var(--tw-gradient-stops)
+  );
+}
+
+.agentos {
+  --color-fd-primary: var(--agentos-color);
+}
+
+:root {
+  --agentos-color: #a84a00;
+}
+
+html:not(.dark) .agentos {
+  --color-fd-muted-foreground: #606060;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+body {
+  background-color: var(--color-fd-background);
+}
+
+.dark {
+  --agentos-color: #fff383;
+}
+
+@keyframes circuit_1 {
+  0% {
+    transform: translateY(-20px);
+  }
+
+  100% {
+    transform: translateY(100px);
+  }
+}
+
+@keyframes circuit_1_x_energy {
+  0%,
+  46% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  47%,
+  70% {
+    opacity: 100%;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(212px);
+  }
+}

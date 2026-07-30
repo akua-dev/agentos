@@ -1,0 +1,34 @@
+---
+title: Bootstrap boundary
+description: Transfer trust from a temporary local Agent to one persistent First Mate in two stages.
+canonical:
+  - label: Bootstrap architecture
+    path: ARCHITECTURE.md
+  - label: Public handoff
+    path: BOOTSTRAP.md
+  - label: Bootstrap procedure
+    path: packages/agentos/resources/roles/firstmate/skills/agentos-bootstrap/SKILL.md
+---
+
+Bootstrap begins with a temporary coding Agent and ends with a persistent cluster First Mate. The
+handoff is intentionally two-stage so the temporary Agent does not become a permanent control
+plane.
+
+Stage one inspects the environment, resolves one immutable AgentOS revision and establishes the
+minimal First-Mate runtime only after required approvals. Stage two runs from the cluster First
+Mate, which owns database selection, Fleet reconciliation and its own long-lived operational
+boundary.
+
+```text
+temporary coding Agent
+  → inspect + explain + request approval
+  → establish persistent First Mate
+  → First Mate completes Fleet from inside Kubernetes
+```
+
+Existing First-Mate identity, home or database state is reconciled rather than duplicated. A
+stable release is preferred. A preview requires an exact commit, immutable image digest and
+reviewed rendered manifest.
+
+The public `BOOTSTRAP.md` is a safe handoff, not the operational procedure. The selected release’s
+Skill owns exact checks, approval points and recovery.

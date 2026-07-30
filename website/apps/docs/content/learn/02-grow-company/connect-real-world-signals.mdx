@@ -1,0 +1,62 @@
+---
+title: Connect real-world signals
+description: Reconcile durable provider evidence into owned work without turning every event into a Task.
+courseId: grow-company
+courseTitle: Grow the company
+courseOrder: 2
+lessonId: connect-real-world-signals
+lessonOrder: 2
+estimatedMinutes: 4
+canonical:
+  - label: External event architecture
+    path: ARCHITECTURE.md
+  - label: External event schema
+    path: database/migrations/0000_initial_fleet_schema.sql
+  - label: Targeted notification behavior
+    path: database/migrations/0013_targeted_mate_notifications.sql
+---
+
+## Let reality reach the company
+
+Support messages, GitHub activity, CI and production alerts are evidence. Ingestion makes that
+evidence durable; it does not decide what the company should do.
+
+```text
+signal → durable evidence → bounded claim → reconciliation → Task or no-op
+```
+
+An authorized reconciliation Agent decides whether the signal belongs to existing intent,
+deserves new accepted work or requires no action. Provider identity and deduplication prevent
+webhook retries from becoming duplicate organizational work. A bounded claim lets one Agent reason
+without holding a database transaction.
+
+## Reconcile one repeated support delivery
+
+The support provider emits three webhook deliveries for the same onboarding defect. The
+integration records one privacy-safe external-event identity and preserves the provider evidence.
+The support Second Mate claims it, then finds that pull request 128 already represents the
+accepted outcome.
+
+It links the evidence and completes reconciliation without creating another Task. The support
+provider remains authoritative for the customer conversation; PostgreSQL owns the Fleet’s
+ownership decision; Git and its provider own the delivered change.
+
+A targeted notification may wake the Second Mate quickly, but the notification is never the
+durable work. If it is missed, the event row remains available for reconciliation.
+
+## Keep integrations replaceable
+
+Webhook receivers, Argo Events or another automation system can perform deterministic ingestion
+and preprocessing. A searchable observability warehouse can help Agents investigate history.
+Neither should silently become the place that accepts outcomes or grants authority.
+
+The invariant is more important than the integration:
+
+- evidence is durable before wake-up;
+- duplicates map to one provider identity;
+- claims recover after failure;
+- reconciliation ends in an explicit Task, link or no-op;
+- consequential choices route through the same attention system.
+
+Now teach the domain what it should retain without confusing memory with truth in
+[Teach the company](/learn/02-grow-company/teach-company).

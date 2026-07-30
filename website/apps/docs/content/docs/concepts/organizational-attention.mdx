@@ -1,0 +1,35 @@
+---
+title: Organizational attention
+description: Durable communication, targeted wake hints and human judgment as separate concerns.
+canonical:
+  - label: Supervision procedure
+    path: packages/agentos/skills/agentos-supervision/SKILL.md
+  - label: Inbox migrations
+    path: database/migrations/0006_fleet_notifications.sql
+  - label: Targeted wake migration
+    path: database/migrations/0013_targeted_mate_notifications.sql
+---
+
+An organization must control attention without losing truth. AgentOS stores durable Inbox speech
+acts in PostgreSQL and uses targeted notification only as a **wake hint**. `LISTEN/NOTIFY` is not a
+queue and is never the durable message.
+
+The useful sequence is:
+
+```text
+commit durable row → wake target → target queries durable state → read → resolve if appropriate
+```
+
+Wake, load, receipt, reading and resolution are separate events. If an Agent misses a notification
+while disconnected, the committed row remains available after recovery. If several changes happen
+before it wakes, the durable query describes what still requires attention.
+
+## Human attention
+
+The same model applies beyond Agents. The Captain role can be held by a team, and a company surface
+should route a person’s intent to the right internal owner without asking the person to tag Second
+Mates. What reaches people should be progress with names on it, material risk and decisions only
+people can make.
+
+An Agent may also be steered directly through its live native session. That fast path must still be
+reconciled into durable state so later supervision does not miss the correction.

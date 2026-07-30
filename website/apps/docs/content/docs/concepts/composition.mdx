@@ -1,0 +1,31 @@
+---
+title: Composition
+description: Assemble an Agent from identity, harness, Skills, settings and capabilities.
+canonical:
+  - label: Composition architecture
+    path: ARCHITECTURE.md
+  - label: Agent provisioning contract
+    path: database/migrations/0004_provision_agents.sql
+---
+
+Composition selects what makes a particular Agent fit its role or Assignment:
+
+- the closest always-loaded identity instructions;
+- conditional Skills that own judgment;
+- a verified harness and model choice;
+- harness-native settings kept as opaque native configuration;
+- required capabilities and reviewed toolchain;
+- a resolved, verifiable bundle.
+
+The supervisor owns the judgment. A deterministic verifier can prove that a resolved bundle has the
+expected shape, but it cannot decide which capabilities the outcome deserves.
+
+## Persistent and bounded composition
+
+A First or Second Mate has a persistent role composition. A Crewmate receives a bounded brief and
+works inside the target project’s own instruction hierarchy. The project’s `AGENTS.md` remains
+authoritative for project code; AgentOS does not paste a parallel identity into the worktree.
+
+Composition is not a second package manager and does not normalize every Pi or Codex setting into
+an AgentOS schema. It records enough desired and observed evidence to detect drift while preserving
+the harness as the authority for its native configuration.

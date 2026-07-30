@@ -1,0 +1,32 @@
+---
+title: Benchmarks
+description: Evaluate whole-organization outcomes, attention, recovery and safety with evidence.
+canonical:
+  - label: Benchmark specification
+    path: benchmarks/SPEC.md
+  - label: Benchmark guide
+    path: benchmarks/README.md
+  - label: Published AgentOS results
+    path: benchmarks/results/agentos
+---
+
+The public benchmark asks how many verified human outcomes an Agent organization delivers for the
+human attention it consumes. It evaluates the whole path from first prompt through delivery,
+authority and recovery—not one model response.
+
+It measures effectiveness, human decisions and repair, elapsed time, tool and token use,
+duplication, crash recovery, chain of custody and missing evidence. Failed and incomplete attempts
+remain in the series. Missing telemetry is `unknown`, never silently zero.
+
+## Published baseline
+
+The repository’s current human-readable report covers five declared quickstart-to-delivery
+attempts: three passed, one failed and one ended incomplete. The final two accepted passes
+delivered in 16m 59s and 16m 16s with zero Captain follow-up turns, repair interventions or manual
+operational actions. A held-out controlled interruption resumed accepted work without lost changes,
+duplicate effects or human repair.
+
+Those numbers are scoped evidence, not a general production claim. Follow the result links to the
+exact subject, environment, revisions, limitations and sanitized artifacts.
+
+Evaluation freezes evidence. Improvement begins only in a separate run after the bundle is fixed.

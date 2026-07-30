@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.source/
+.turbo/
+.open-next/
+.wrangler/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+
+public/r
+public/registry

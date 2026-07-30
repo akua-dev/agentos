@@ -1,0 +1,33 @@
+---
+title: Security and chain of custody
+description: Bind human intent, authenticated ownership, native action and delivered evidence.
+canonical:
+  - label: System boundaries and chain of custody
+    path: ARCHITECTURE.md
+  - label: Authorization SQL
+    path: database/migrations/0001_agent_authorization.sql
+---
+
+AgentOS security is a chain of custody rather than one omnipotent service:
+
+```text
+provider intent
+  → accepted Task
+  → active Assignment
+  → authenticated Agent principal
+  → authorized native tool
+  → Git/provider evidence
+```
+
+Each edge answers a different question. The tracker proves human-visible intent. PostgreSQL proves
+durable ownership and exact decisions. The database principal and RLS prove which Agent may mutate
+Fleet state. Kubernetes and provider permissions prove native capability. Git and the provider
+prove what was delivered.
+
+Credentials never enter prompts, argv, persisted Task requests, generated artifacts or logs. The
+owning runtime uses approved files, Secrets or login mechanisms. A parent does not transfer its
+credential merely because a child needs a capability.
+
+Consequential authority remains explicit. Merge, cost, infrastructure, credential and destructive
+boundaries return to people unless an exact standing decision covers the routine action. Every
+unverified edge fails closed; a prose claim cannot fill the gap.

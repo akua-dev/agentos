@@ -757,6 +757,7 @@ workspace. The tree reflects ownership, not deployment order:
 │   └── ai-gateway/                   service, tests and optional K8s topology
 ├── release/kubernetes/               reviewed manifest release assembly
 ├── docs/                             supporting assets and stable pointers
+├── website/apps/docs/                public landing, Docs and Learn application
 ├── Dockerfile                        common AgentOS image build
 ├── mise.toml / mise.lock             reviewed Fleet tool baseline
 ├── package.json / bun.lock           workspace and dependency lock
@@ -849,6 +850,10 @@ workspace keeps one `bun.lock`.
   complete-distribution inspection, design, staging, native selection, reload
   or workload rollout, verification and rollback for additive and replacement
   AgentOS customizations.
+- `packages/agentos/skills/agentos-upgrade/` owns exact stable one-Mate release
+  updates, run-once released-database sequencing and First-Mate-only
+  frozen-roster Fleet order; its conditional references keep database,
+  atomic declarative/live member and Fleet mechanics separate.
 - `packages/agentos/resources/roles/` contains the default persistent role
   instruction surfaces, native Pi selection, role-scoped Skills, Mise and
   Kubernetes resources.
