@@ -9,6 +9,7 @@ import type {
 import type { Model } from "@earendil-works/pi-ai";
 import { createOpenAIServerCompactionExtension } from "../extension.ts";
 import { nativeCompactionDetails } from "../session.ts";
+import { createTelemetryRecorder } from "../../telemetry/tests/fake-telemetry.ts";
 
 type Handler = (event: any, context: ExtensionContext) => any;
 
@@ -90,6 +91,56 @@ const local: CompactionResult = {
 };
 
 describe("AgentOS OpenAI server-compaction extension", () => {
+  test("attributes both local and native provider calls as compaction", async () => {
+    const recorded = createTelemetryRecorder();
+    const handlers = harness({
+      telemetry: recorded.telemetry,
+      runLocalCompaction: async () => local,
+      runServerCompaction: async () => ({
+        output: [{ type: "compaction", encrypted_content: "opaque" }],
+        usage: { input_tokens: 10, output_tokens: 1, total_tokens: 11 },
+      }),
+    });
+
+    await handlers.get("session_before_compact")?.(event, context());
+
+    expect(recorded.operations).toHaveLength(1);
+    expect(recorded.operations[0]?.input).toMatchObject({
+      modelFamily: "gpt-5",
+      providerFamily: "openai",
+      route: "ai_gateway",
+      runtime: "pi",
+      sessionState: "resumed",
+    });
+    expect(recorded.operations[0]?.attempts).toEqual([
+      {
+        input: {
+          requestKind: "compaction",
+          streamMode: "streaming",
+        },
+        outcome: {
+          inputTokens: 2,
+          outputTokens: 3,
+          status: 200,
+          streamOutcome: "completed",
+        },
+      },
+      {
+        input: {
+          requestKind: "compaction",
+          streamMode: "streaming",
+        },
+        outcome: {
+          inputTokens: 10,
+          outputTokens: 1,
+          status: 200,
+          streamOutcome: "completed",
+        },
+      },
+    ]);
+    expect(recorded.operations[0]?.outcome).toEqual({ status: 200 });
+  });
+
   test("persists native state alongside Pi's portable local summary", async () => {
     const handlers = harness({
       runLocalCompaction: async () => local,

@@ -28,6 +28,15 @@ import {
   NATIVE_DETAILS_KEY,
   rewriteResponsesPayload,
 } from "./session.ts";
+import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
+import {
+  safeTokenCount,
+  startAgentOSAuxiliaryOperation,
+} from "../telemetry/auxiliary.ts";
+import type {
+  AgentOSProviderAttempt,
+  AgentOSProviderAttemptOutcome,
+} from "../telemetry/runtime.ts";
 
 type ResolvedAuth = {
   apiKey?: string;
@@ -47,6 +56,7 @@ type LocalCompactionRequest = {
 export type OpenAIServerCompactionDependencies = {
   runLocalCompaction(request: LocalCompactionRequest): Promise<CompactionResult>;
   runServerCompaction(request: ServerCompactionRequest): Promise<ServerCompactionResult>;
+  telemetry?: AgentOSTelemetrySource;
 };
 
 function isEnabled(): boolean {
@@ -216,12 +226,43 @@ async function handleCompaction(
     timeoutMs: configuredRemoteTimeout(),
   };
 
+  const telemetryOperation = await startAgentOSAuxiliaryOperation(
+    model,
+    dependencies.telemetry,
+    "resumed",
+  );
+  const localAttempt = telemetryOperation.startProviderAttempt({
+    requestKind: "compaction",
+    streamMode: "streaming",
+  });
+  const remoteAttempt = telemetryOperation.startProviderAttempt({
+    requestKind: "compaction",
+    streamMode: "streaming",
+  });
   const [local, remote] = await Promise.allSettled([
-    dependencies.runLocalCompaction(localRequest),
-    dependencies.runServerCompaction(remoteRequest),
+    observeCompactionAttempt(
+      localAttempt,
+      () => dependencies.runLocalCompaction(localRequest),
+      (result) => ({
+        inputTokens: safeTokenCount(result.usage?.input),
+        outputTokens: safeTokenCount(result.usage?.output),
+      }),
+    ),
+    observeCompactionAttempt(
+      remoteAttempt,
+      () => dependencies.runServerCompaction(remoteRequest),
+      (result) => ({
+        inputTokens: safeTokenCount(result.usage?.input_tokens),
+        outputTokens: safeTokenCount(result.usage?.output_tokens),
+      }),
+    ),
   ]);
 
-  if (local.status !== "fulfilled") return undefined;
+  if (local.status !== "fulfilled") {
+    telemetryOperation.end({ error: local.reason });
+    return undefined;
+  }
+  telemetryOperation.end({ status: 200 });
   if (remote.status !== "fulfilled") {
     if (!event.signal.aborted && ctx.hasUI) {
       ctx.ui.notify("OpenAI server compaction unavailable; using Pi's portable summary.", "warning");
@@ -242,6 +283,33 @@ async function handleCompaction(
       details: mergedDetails(local.value.details, native),
     },
   };
+}
+
+async function observeCompactionAttempt<T>(
+  attempt: AgentOSProviderAttempt,
+  run: () => Promise<T>,
+  counts: (
+    result: T,
+  ) => Pick<
+    AgentOSProviderAttemptOutcome,
+    "inputTokens" | "outputTokens"
+  >,
+): Promise<T> {
+  try {
+    const result = await run();
+    attempt.end({
+      status: 200,
+      streamOutcome: "completed",
+      ...counts(result),
+    });
+    return result;
+  } catch (error) {
+    attempt.end({
+      error,
+      streamOutcome: "upstream_error",
+    });
+    throw error;
+  }
 }
 
 export function createOpenAIServerCompactionExtension(
