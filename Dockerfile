@@ -109,6 +109,9 @@ COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY services/otel-collector/package.json services/otel-collector/package.json
+COPY vendor/codex-router/packages/core/package.json vendor/codex-router/packages/core/package.json
+COPY vendor/codex-router/packages/codex/package.json vendor/codex-router/packages/codex/package.json
 COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
 COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
 
@@ -158,6 +161,9 @@ COPY --from=agentos-runtime-dependencies \
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/ai-gateway/node_modules/ \
   /opt/agentos/services/ai-gateway/node_modules/
+COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/packages/agentos/node_modules/ \
+  /opt/agentos/packages/agentos/node_modules/
 COPY --from=agentos-package-build \
   /tmp/agentos-package-build/packages/agentos/dist/ \
   /opt/agentos/packages/agentos/dist/

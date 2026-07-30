@@ -56,6 +56,9 @@ async function copyProductionInstallInputs(destination: string) {
     "database/package.json",
     "packages/agentos/package.json",
     "services/ai-gateway/package.json",
+    "services/otel-collector/package.json",
+    "vendor/codex-router/packages/core/package.json",
+    "vendor/codex-router/packages/codex/package.json",
     ...(rootPackage.workspaces.includes("website/apps/docs")
       ? ["website/apps/docs/package.json"]
       : []),
@@ -108,6 +111,10 @@ test("the production image can prepare a persistent Mate home", async () => {
 
   await Promise.all([
     rename(join(installation, "node_modules"), join(imageRoot, "node_modules")),
+    rename(
+      join(installation, "packages", "agentos", "node_modules"),
+      join(imageRoot, "packages", "agentos", "node_modules"),
+    ),
     copyFile(
       join(installation, "packages", "agentos", "package.json"),
       join(imageRoot, "packages", "agentos", "package.json"),
