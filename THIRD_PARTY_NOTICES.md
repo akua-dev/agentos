@@ -47,16 +47,16 @@ Robin Braemer at source revision
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
 
-## Subrouter
+## Codex Router
 
-`services/ai-gateway/` adapts request proxying, path normalization and session
-stickiness ideas from
-[`manaflow-ai/subrouter`](https://github.com/manaflow-ai/subrouter) at commit
-`a691ae027723f31d838da543afc31ccd19d09d33`, used under the MIT License:
+`services/ai-gateway/` redistributes the pinned portable `core` and `codex`
+workspace packages from
+[`akua-dev/codex-router`](https://github.com/akua-dev/codex-router) at commit
+`a1d020607cdde212efd57b00ed96a43caa51a6bc`, used under the MIT License:
 
 > MIT License
 >
-> Copyright (c) 2026 Manaflow
+> Copyright (c) 2026 Akua
 >
 > Permission is hereby granted, free of charge, to any person obtaining a copy
 > of this software and associated documentation files (the "Software"), to deal
