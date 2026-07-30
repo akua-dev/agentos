@@ -130,6 +130,7 @@ describe("First Mate Kubernetes resources", () => {
       },
       labels: {
         "agentos.akua.dev/agent": "firstmate",
+        "agentos.akua.dev/otel-client": "true",
         "app.kubernetes.io/name": "agentos-firstmate",
         "app.kubernetes.io/part-of": "agentos",
       },

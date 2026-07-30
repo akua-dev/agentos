@@ -21,6 +21,8 @@ spec:
               value: /opt/agentos
             - name: NODE_PATH
               value: /opt/agentos/node_modules
+            - name: K8S_CONTAINER_NAME
+              value: agentos
             - name: AGENTOS_AGENT_CWD
               value: /opt/agentos
             - name: AGENTOS_AGENT_NAME

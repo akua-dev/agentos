@@ -66,6 +66,7 @@ describe("Crewmate Kubernetes base", () => {
       },
       labels: {
         "agentos.akua.dev/agent": "crewmate",
+        "agentos.akua.dev/otel-client": "true",
         "app.kubernetes.io/name": "agentos-crewmate",
         "app.kubernetes.io/part-of": "agentos",
       },
