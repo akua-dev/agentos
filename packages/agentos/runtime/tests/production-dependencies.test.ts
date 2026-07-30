@@ -59,6 +59,7 @@ async function copyProductionInstallInputs(destination: string) {
     "services/otel-collector/package.json",
     "vendor/codex-router/packages/core/package.json",
     "vendor/codex-router/packages/codex/package.json",
+    "vendor/codex-router/packages/bun/package.json",
     ...(rootPackage.workspaces.includes("website/apps/docs")
       ? ["website/apps/docs/package.json"]
       : []),
