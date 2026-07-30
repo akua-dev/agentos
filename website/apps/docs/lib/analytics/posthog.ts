@@ -7,9 +7,9 @@ export const DEFAULT_POSTHOG_PROJECT_TOKEN =
 export interface PostHogEnvironment {
   projectToken?: string;
   host?: string;
-  doNotTrack?: string | number | boolean;
-  msDoNotTrack?: string | number | boolean;
-  windowDoNotTrack?: string | number | boolean;
+  doNotTrack?: string | number | boolean | null;
+  msDoNotTrack?: string | number | boolean | null;
+  windowDoNotTrack?: string | number | boolean | null;
 }
 
 export interface PostHogClient {
@@ -32,7 +32,9 @@ export function resolvePostHogProjectToken(
   return undefined;
 }
 
-function isDoNotTrackEnabled(value: string | number | boolean | undefined): boolean {
+function isDoNotTrackEnabled(
+  value: string | number | boolean | null | undefined,
+): boolean {
   return (
     value === true ||
     value === 1 ||

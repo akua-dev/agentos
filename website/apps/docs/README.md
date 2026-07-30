@@ -33,10 +33,10 @@ Set `NEXT_PUBLIC_SITE_URL` to the public origin when building for a different
 host. It defaults to `https://agentos.akua.dev` for production builds and to
 localhost during development.
 
-Anonymous website analytics use PostHog's cookieless mode, honor Do Not Track,
-disable session recording and send through CNAP's first-party
-`https://ph.akua.dev` endpoint. Production builds on `main` use CNAP's public
-PostHog project token by default. Non-production Workers Builds previews stay
+Anonymous website analytics use PostHog's cookieless mode, create no anonymous
+person profiles, honor Do Not Track, disable session recording and send through
+CNAP's first-party `https://ph.akua.dev` endpoint. Production builds on `main` use
+CNAP's public PostHog project token by default. Non-production Workers Builds previews stay
 disabled unless `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` explicitly overrides the
 project. Set `NEXT_PUBLIC_POSTHOG_HOST` only to override the first-party
 endpoint. Development stays disabled when no token override is present.

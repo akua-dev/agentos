@@ -67,6 +67,21 @@ describe('initializePostHog', () => {
     expect(init).not.toHaveBeenCalled();
   });
 
+  it('treats the browser’s null Do Not Track value as unset', () => {
+    const init = vi.fn();
+
+    expect(
+      initializePostHog(
+        { init },
+        {
+          projectToken: 'phc_public_project_token',
+          doNotTrack: null,
+        },
+      ),
+    ).toBe(true);
+    expect(init).toHaveBeenCalledOnce();
+  });
+
   it('initializes cookieless analytics through the CNAP first-party host', () => {
     const init = vi.fn();
 
