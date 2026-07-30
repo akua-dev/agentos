@@ -83,11 +83,16 @@
         "ai-gateway": "./src/main.ts",
       },
       "dependencies": {
+        "@akua-dev/agentos": "workspace:*",
         "@earendil-works/pi-ai": "0.81.1",
+        "@opentelemetry/api": "1.9.1",
         "proper-lockfile": "4.1.2",
         "zod": "4.4.3",
       },
       "devDependencies": {
+        "@opentelemetry/core": "2.10.0",
+        "@opentelemetry/sdk-metrics": "2.10.0",
+        "@opentelemetry/sdk-trace-base": "2.10.0",
         "@types/proper-lockfile": "4.1.4",
       },
     },

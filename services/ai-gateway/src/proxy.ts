@@ -1,4 +1,9 @@
 import { timingSafeEqual } from "node:crypto";
+import {
+  createNoopGatewayTelemetry,
+  type GatewayRequestTelemetry,
+  type GatewayTelemetry,
+} from "./telemetry.ts";
 import type { RouteLease } from "./types.ts";
 
 const ALLOWED_PATHS = new Set(["/responses", "/v1/responses", "/codex/responses"]);
@@ -55,6 +60,7 @@ export interface ProxyHandlerOptions {
   acquire(sessionKey: string | undefined, signal: AbortSignal): Promise<RouteLease | undefined>;
   fetchImpl: FetchImplementation;
   heartbeatMs?: number;
+  telemetry?: GatewayTelemetry;
   observeStreamFailure?(
     observation: StreamFailureObservation,
   ): void | Promise<void>;
@@ -62,17 +68,40 @@ export interface ProxyHandlerOptions {
 
 export function createProxyHandler(options: ProxyHandlerOptions) {
   return async (request: Request): Promise<Response> => {
-    if (!isClientAuthorized(request, options.clientToken)) {
+    const telemetry = (
+      options.telemetry ?? createNoopGatewayTelemetry()
+    ).startRequest(request);
+    const authenticated = isClientAuthorized(request, options.clientToken);
+    telemetry.authenticate(authenticated);
+    if (!authenticated) {
+      telemetry.end({ status: 401, streamOutcome: "not_streamed" });
       return jsonResponse(401, { error: "unauthorized" });
     }
     const url = new URL(request.url);
     if (request.method !== "POST" || !ALLOWED_PATHS.has(url.pathname)) {
+      telemetry.end({ status: 404, streamOutcome: "not_streamed" });
       return jsonResponse(404, { error: "not_found" });
     }
 
     const sessionKey = explicitSessionKey(request.headers);
-    const lease = await options.acquire(sessionKey, request.signal);
-    if (!lease) return jsonResponse(503, { error: "no_eligible_account" });
+    telemetry.routeStarted();
+    let lease: RouteLease | undefined;
+    try {
+      lease = await options.acquire(sessionKey, request.signal);
+    } catch (error) {
+      telemetry.routeEnded("error", error);
+      telemetry.end({
+        error,
+        streamOutcome: "not_streamed",
+      });
+      throw error;
+    }
+    if (!lease) {
+      telemetry.routeEnded("unavailable");
+      telemetry.end({ status: 503, streamOutcome: "not_streamed" });
+      return jsonResponse(503, { error: "no_eligible_account" });
+    }
+    telemetry.routeEnded("acquired");
 
     const headers = sanitizedRequestHeaders(request.headers);
     headers.set("accept-encoding", "identity");
@@ -85,6 +114,7 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
       upstreamUrl = "https://api.openai.com/v1/responses";
       headers.delete("chatgpt-account-id");
     }
+    telemetry.upstreamStarted(headers);
 
     let upstream: Response;
     try {
@@ -97,9 +127,17 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
         duplex: "half",
       } as RequestInit & { duplex: "half" });
     } catch (error) {
-      await lease.release();
+      telemetry.upstreamFailed(error);
+      await releaseLease(lease, telemetry);
+      telemetry.end({
+        error,
+        streamOutcome: request.signal.aborted
+          ? "aborted"
+          : "upstream_error",
+      });
       throw error;
     }
+    telemetry.upstreamHeaders(upstream.status, upstream.headers);
     try {
       await lease.recordResponse?.(upstream.status, upstream.headers);
     } catch {
@@ -112,7 +150,11 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
     const responseHeaders = new Headers(upstream.headers);
     for (const name of RESPONSE_HEADERS_TO_REMOVE) responseHeaders.delete(name);
     if (!upstream.body) {
-      await lease.release();
+      await releaseLease(lease, telemetry);
+      telemetry.end({
+        status: upstream.status,
+        streamOutcome: "not_streamed",
+      });
       return new Response(null, {
         status: upstream.status,
         statusText: upstream.statusText,
@@ -127,6 +169,8 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
       request.signal,
       upstreamEncoding,
       options.observeStreamFailure ?? logStreamFailure,
+      telemetry,
+      upstream.status,
     );
     return new Response(body, {
       status: upstream.status,
@@ -172,6 +216,9 @@ function sanitizedRequestHeaders(input: Headers): Headers {
   headers.delete("x-ai-gateway-token");
   headers.delete("x-ai-gateway-session");
   for (const name of REQUEST_HEADERS_TO_REMOVE) headers.delete(name);
+  for (const name of [...headers.keys()]) {
+    if (name.startsWith("x-agentos-")) headers.delete(name);
+  }
   return headers;
 }
 
@@ -187,6 +234,8 @@ function streamWithLease(
   downstreamSignal: AbortSignal,
   upstreamEncoding: UpstreamEncoding,
   observeStreamFailure: (observation: StreamFailureObservation) => void | Promise<void>,
+  telemetry: GatewayRequestTelemetry,
+  upstreamStatus: number,
 ) {
   const reader = body.getReader();
   let finished = false;
@@ -197,17 +246,23 @@ function streamWithLease(
   }, heartbeatMs);
   timer.unref?.();
 
-  const finish = async () => {
+  const finish = async (
+    streamOutcome:
+      | "completed"
+      | "client_disconnect"
+      | "aborted"
+      | "upstream_error",
+    error?: unknown,
+  ) => {
     if (finished) return;
     finished = true;
     clearInterval(timer);
-    try {
-      await lease.release();
-    } catch {
-      // Cleanup must never replace the provider response or original stream
-      // failure, and the private routing error is not safe to log.
-      console.error("ai-gateway: lease release failed");
-    }
+    await releaseLease(lease, telemetry);
+    telemetry.end({
+      status: upstreamStatus,
+      ...(error === undefined ? {} : { error }),
+      streamOutcome,
+    });
   };
 
   return new ReadableStream<Uint8Array>({
@@ -228,16 +283,19 @@ function streamWithLease(
           };
           void reportStreamFailure(observeStreamFailure, observation);
         }
-        await finish();
+        await finish(
+          downstreamAborted ? "aborted" : "upstream_error",
+          error,
+        );
         return;
       }
 
       if (next.done) {
-        await finish();
+        await finish("completed");
         try {
           controller.close();
         } catch {
-          await finish();
+          await finish("client_disconnect");
         }
         return;
       }
@@ -245,17 +303,38 @@ function streamWithLease(
       try {
         controller.enqueue(next.value);
       } catch {
-        await finish();
+        await finish(
+          downstreamSignal.aborted ? "aborted" : "client_disconnect",
+        );
         return;
       }
       chunksForwarded = boundedAdd(chunksForwarded, 1);
       bytesForwarded = boundedAdd(bytesForwarded, next.value.byteLength);
+      telemetry.streamChunk(next.value.byteLength);
     },
     async cancel(reason) {
       await reader.cancel(reason).catch(() => undefined);
-      await finish();
+      await finish(
+        downstreamSignal.aborted ? "aborted" : "client_disconnect",
+      );
     },
   });
+}
+
+async function releaseLease(
+  lease: RouteLease,
+  telemetry: GatewayRequestTelemetry,
+) {
+  telemetry.routeReleaseStarted();
+  try {
+    await lease.release();
+    telemetry.routeReleased();
+  } catch (error) {
+    telemetry.routeReleased(error);
+    // Cleanup must never replace the provider response or original stream
+    // failure, and the private routing error is not safe to log.
+    console.error("ai-gateway: lease release failed");
+  }
 }
 
 function boundedAdd(total: number, increment: number): number {

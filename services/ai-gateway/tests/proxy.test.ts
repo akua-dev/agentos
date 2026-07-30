@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { createProxyHandler } from "../src/proxy.ts";
+import type {
+  GatewayRequestOutcome,
+  GatewayTelemetry,
+} from "../src/telemetry.ts";
 import type { RouteLease } from "../src/types.ts";
 
 function request(path = "/responses", token = "fleet-token", signal?: AbortSignal) {
@@ -17,6 +21,106 @@ function request(path = "/responses", token = "fleet-token", signal?: AbortSigna
 }
 
 describe("authenticated raw Responses proxy", () => {
+  test("reports the complete streamed lifecycle and strips AgentOS correlation headers upstream", async () => {
+    const events: unknown[] = [];
+    let upstream: Request | undefined;
+    const telemetry = recordingTelemetry(events);
+    const handler = createProxyHandler({
+      clientToken: "fleet-token",
+      telemetry,
+      acquire: async () => ({
+        kind: "openai_api_key",
+        accountId: "openai-api-key",
+        accessToken: "api-secret",
+        leaseToken: "api-key",
+        renew: async () => true,
+        release: async () => undefined,
+      }),
+      fetchImpl: async (input, init) => {
+        upstream = new Request(
+          input instanceof Request ? input.url : input.toString(),
+          init,
+        );
+        return new Response("stream-body", { status: 200 });
+      },
+    });
+    const gatewayRequest = request();
+    gatewayRequest.headers.set("x-agentos-runtime", "pi");
+    gatewayRequest.headers.set("x-agentos-request-kind", "main");
+    gatewayRequest.headers.set("x-agentos-model-family", "gpt-5");
+    gatewayRequest.headers.set("x-agentos-stream-mode", "streaming");
+    gatewayRequest.headers.set(
+      "x-agentos-request-attempt-id",
+      "pi-attempt-private",
+    );
+
+    const response = await handler(gatewayRequest);
+    expect(await response.text()).toBe("stream-body");
+    expect(
+      [...(upstream?.headers.keys() ?? [])].filter((name) =>
+        name.startsWith("x-agentos-"),
+      ),
+    ).toEqual([]);
+    expect(upstream?.headers.get("x-client-request-id")).toBe(
+      "gateway-attempt",
+    );
+    expect(events).toEqual([
+      "start",
+      ["authenticate", true],
+      "routeStarted",
+      ["routeEnded", "acquired"],
+      "upstreamStarted",
+      ["upstreamHeaders", 200],
+      ["chunk", 11],
+      "releaseStarted",
+      ["released", false],
+      [
+        "end",
+        { status: 200, streamOutcome: "completed" },
+      ],
+    ]);
+  });
+
+  test("reports authentication and capacity failures without starting an upstream attempt", async () => {
+    const unauthorizedEvents: unknown[] = [];
+    const unavailableEvents: unknown[] = [];
+    const unauthorized = createProxyHandler({
+      clientToken: "fleet-token",
+      telemetry: recordingTelemetry(unauthorizedEvents),
+      acquire: async () => undefined,
+      fetchImpl: fetch,
+    });
+    const unavailable = createProxyHandler({
+      clientToken: "fleet-token",
+      telemetry: recordingTelemetry(unavailableEvents),
+      acquire: async () => undefined,
+      fetchImpl: fetch,
+    });
+
+    expect((await unauthorized(request("/responses", "wrong"))).status).toBe(
+      401,
+    );
+    expect((await unavailable(request())).status).toBe(503);
+    expect(unauthorizedEvents).toEqual([
+      "start",
+      ["authenticate", false],
+      [
+        "end",
+        { status: 401, streamOutcome: "not_streamed" },
+      ],
+    ]);
+    expect(unavailableEvents).toEqual([
+      "start",
+      ["authenticate", true],
+      "routeStarted",
+      ["routeEnded", "unavailable"],
+      [
+        "end",
+        { status: 503, streamOutcome: "not_streamed" },
+      ],
+    ]);
+  });
+
   test("requests an identity upstream and does not forward stale decoded content encoding", async () => {
     const upstreamBody = "decoded upstream response that must not be decompressed twice";
     const upstream = Bun.serve({
@@ -554,3 +658,46 @@ describe("authenticated raw Responses proxy", () => {
     expect(released).toBe(true);
   });
 });
+
+function recordingTelemetry(events: unknown[]): GatewayTelemetry {
+  return {
+    enabled: true,
+    startRequest() {
+      events.push("start");
+      return {
+        attemptId: "gateway-attempt",
+        authenticate(authenticated) {
+          events.push(["authenticate", authenticated]);
+        },
+        routeStarted() {
+          events.push("routeStarted");
+        },
+        routeEnded(outcome) {
+          events.push(["routeEnded", outcome]);
+        },
+        upstreamStarted(headers) {
+          events.push("upstreamStarted");
+          headers.set("x-client-request-id", "gateway-attempt");
+        },
+        upstreamHeaders(status) {
+          events.push(["upstreamHeaders", status]);
+        },
+        upstreamFailed() {
+          events.push("upstreamFailed");
+        },
+        streamChunk(bytes) {
+          events.push(["chunk", bytes]);
+        },
+        routeReleaseStarted() {
+          events.push("releaseStarted");
+        },
+        routeReleased(error) {
+          events.push(["released", error !== undefined]);
+        },
+        end(outcome: GatewayRequestOutcome) {
+          events.push(["end", outcome]);
+        },
+      };
+    },
+  };
+}

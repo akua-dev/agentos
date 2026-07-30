@@ -73,6 +73,8 @@ describe("ai-gateway executable", () => {
   test("binds the explicitly configured native listen address", async () => {
     const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-listen-cli-"));
     let binding: { hostname: string; port: number } | undefined;
+    let telemetryInitialized = false;
+    let telemetryShutdown = false;
     const result = await runAIGatewayCli(["serve"], {
       environment: {
         AI_GATEWAY_LISTEN_HOST: "127.0.0.2",
@@ -83,6 +85,18 @@ describe("ai-gateway executable", () => {
       writeLine: () => undefined,
       login: async () => credentials("provider-a"),
       refresh: async () => credentials("provider-a"),
+      initializeTelemetry: async () => {
+        telemetryInitialized = true;
+        return {
+          enabled: false,
+          startOperation() {
+            throw new Error("unused");
+          },
+          async shutdown() {
+            telemetryShutdown = true;
+          },
+        };
+      },
       startServer: ({ hostname, port }) => {
         binding = { hostname, port };
         return { stop: () => undefined };
@@ -92,6 +106,8 @@ describe("ai-gateway executable", () => {
 
     expect(result).toBe(0);
     expect(binding).toEqual({ hostname: "127.0.0.2", port: 9876 });
+    expect(telemetryInitialized).toBe(true);
+    expect(telemetryShutdown).toBe(true);
   });
 
   test("ignores Kubernetes Service-link metadata as a listen-port choice", async () => {
