@@ -319,8 +319,8 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
             Stop being the loop. Stay at the helm.
           </h2>
           <p className="mx-auto mb-8 max-w-[680px] text-pretty">
-            Bring one Fleet online first, then grow it through three focused parts and ten
-            practical chapters.
+            Bring AgentOS online, give the Fleet a real outcome and learn each new layer as your
+            company starts to work.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link href="/docs/start/get-started" className={buttonVariants()}>
