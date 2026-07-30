@@ -7,6 +7,14 @@ Its `kubernetes/` directory owns the optional deployment shape. Runtime
 semantics stay in this service package; operator judgment, approvals and
 credential workflows stay in the shared `$agentos-ai-gateway` Skill.
 
+- `akua-dev/codex-router` is the source of truth for account selection,
+  session affinity, lease semantics, Responses path handling, header
+  sanitation and byte-preserving one-shot streaming. Consume its `core` and
+  `codex` packages through the pinned workspace snapshot; change shared policy
+  upstream first and refresh the snapshot instead of forking it here.
+- AgentOS owns only its integration adapters: OAuth refresh, live quota probes,
+  vault persistence, health surfaces and AgentOS OpenTelemetry correlation.
+  These adapters follow `$effect-ts` and must not reimplement router policy.
 - Version one is Codex-subscription-first. Keep provider-specific behavior
   behind narrow adapters so another provider does not weaken Codex semantics.
 - Authenticate before reading proxy request bodies. Strip inbound provider
