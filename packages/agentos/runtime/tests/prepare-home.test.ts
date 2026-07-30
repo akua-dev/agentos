@@ -48,6 +48,45 @@ async function run(script: string, env: Record<string, string>) {
 }
 
 describe("Mate home preparation", () => {
+  test("reconciles Codex native OTEL config for a Crewmate from standard workload variables", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "agentos-crewmate-home-"));
+    temporaryDirectories.push(sandbox);
+    const home = join(sandbox, "home");
+    const fakeBin = join(sandbox, "bin");
+    await mkdir(fakeBin, { recursive: true });
+    await makeExecutable(join(fakeBin, "mise"), "#!/bin/sh\nexit 0\n");
+
+    const result = await run(prepareHome, {
+      AGENTOS_AGENT_ROLE: "crewmate",
+      HOME: home,
+      MISE_SYSTEM_CONFIG_FILE: join(repository, "mise.toml"),
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://agentos-otel-collector:4318",
+      OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+      OTEL_LOGS_EXPORTER: "otlp",
+      OTEL_METRICS_EXPORTER: "otlp",
+      OTEL_RESOURCE_ATTRIBUTES:
+        "deployment.environment.name=test,service.namespace=agentos",
+      OTEL_SDK_DISABLED: "false",
+      OTEL_TRACES_EXPORTER: "otlp",
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+    });
+
+    expect(result).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+    const path = join(home, ".codex", "config.toml");
+    const parsed = Bun.TOML.parse(await readFile(path, "utf8")) as {
+      otel: Record<string, unknown>;
+    };
+    expect(parsed.otel.log_user_prompt).toBe(false);
+    expect(parsed.otel.environment).toBe("test");
+    expect(parsed.otel.trace_exporter).toEqual({
+      "otlp-http": {
+        endpoint: "http://agentos-otel-collector:4318/v1/traces",
+        protocol: "binary",
+      },
+    });
+    expect((await stat(path)).mode & 0o777).toBe(0o600);
+  });
+
   test("seeds a checkout and selected Pi defaults while preserving the agent-owned home", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "agentos-firstmate-home-"));
     temporaryDirectories.push(sandbox);
