@@ -8,6 +8,9 @@ const withAnalyzer = createBundleAnalyzer({
 
 const config: NextConfig = {
   reactStrictMode: true,
+  experimental: {
+    globalNotFound: true,
+  },
   logging: {
     fetches: {
       fullUrl: true,

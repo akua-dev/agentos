@@ -78,7 +78,7 @@ describe('auditSite', () => {
 
   it('defines the complete Landing, Docs, Learn, discovery, and removal contract', () => {
     const paths = routeExpectations.map((expectation) => expectation.path);
-    expect(paths).toHaveLength(85);
+    expect(paths).toHaveLength(86);
     expect(paths).toContain('/favicon.ico');
     expect(paths).toContain('/icon.png');
     expect(paths).toContain('/apple-icon.png');
@@ -88,6 +88,7 @@ describe('auditSite', () => {
     expect(paths).toContain('/docs/operate/supervise-steer');
     expect(paths).toContain('/learn/03-stay-in-control/upgrade-without-losing-control');
     expect(paths).toContain('/api/search?query=sovereign');
+    expect(paths).toContain('/does-not-exist');
     expect(paths).toContain('/showcase');
   });
 
@@ -114,6 +115,25 @@ describe('auditSite', () => {
 
     const result = await auditSite('https://agentos.example', [removed], {
       fetch: createFetch({}),
+    });
+
+    expect(result).toEqual({ checked: 1, failures: [] });
+  });
+
+  it('requires global 404 HTML to omit inherited homepage SEO metadata', async () => {
+    const notFound = routeExpectations.find(
+      (expectation) => expectation.path === '/does-not-exist',
+    );
+
+    expect(notFound).toBeDefined();
+
+    const result = await auditSite('https://agentos.example', [notFound!], {
+      fetch: createFetch({
+        '/does-not-exist': {
+          status: 404,
+          body: '<meta name="robots" content="noindex, nofollow">',
+        },
+      }),
     });
 
     expect(result).toEqual({ checked: 1, failures: [] });

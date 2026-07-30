@@ -92,6 +92,12 @@ export const routeExpectations: readonly RouteExpectation[] = [
       excludes: [],
     }),
   ),
+  {
+    path: '/does-not-exist',
+    status: 404,
+    includes: ['noindex'],
+    excludes: ['<link rel="canonical"', '<meta property="og:url"', 'index, follow'],
+  },
   ...documentationRoutes.slice(1).map(
     (route): RouteExpectation => ({
       path: route.path,
