@@ -155,12 +155,29 @@ function parseHeaders(value: string | undefined): Readonly<Record<string, string
     ) {
       throw new Error("OTEL exporter headers contain an invalid entry");
     }
+    if (isCredentialHeader(key)) {
+      throw new Error(
+        "OTEL exporter credential headers cannot be persisted in Codex config",
+      );
+    }
     result[key] = headerValue;
     if (Object.keys(result).length > 64) {
       throw new Error("OTEL exporter headers exceed 64 entries");
     }
   }
   return result;
+}
+
+function isCredentialHeader(key: string): boolean {
+  return (
+    key === "authorization" ||
+    key === "proxy-authorization" ||
+    key === "cookie" ||
+    key === "set-cookie" ||
+    /(?:^|[-_])(authentication|api[-_]?key|token|secret|password|credential)(?:$|[-_])/.test(
+      key,
+    )
+  );
 }
 
 function decode(value: string): string {

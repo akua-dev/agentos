@@ -46,7 +46,7 @@ describe("Codex native OTEL bridge", () => {
         "http://trace-collector.agentos:4318/custom-traces",
       OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
       OTEL_EXPORTER_OTLP_HEADERS:
-        "authorization=Bearer%20SEED_SECRET,x-tenant=agentos",
+        "x-tenant=agentos",
       OTEL_TRACES_EXPORTER: "otlp",
       OTEL_METRICS_EXPORTER: "otlp",
       OTEL_LOGS_EXPORTER: "otlp",
@@ -67,7 +67,6 @@ describe("Codex native OTEL bridge", () => {
         "otlp-http": {
           endpoint: "http://collector.agentos:4318/v1/logs",
           headers: {
-            authorization: "Bearer SEED_SECRET",
             "x-tenant": "agentos",
           },
           protocol: "binary",
@@ -78,7 +77,6 @@ describe("Codex native OTEL bridge", () => {
         "otlp-http": {
           endpoint: "http://collector.agentos:4318/v1/metrics",
           headers: {
-            authorization: "Bearer SEED_SECRET",
             "x-tenant": "agentos",
           },
           protocol: "binary",
@@ -89,7 +87,6 @@ describe("Codex native OTEL bridge", () => {
           endpoint:
             "http://trace-collector.agentos:4318/custom-traces",
           headers: {
-            authorization: "Bearer SEED_SECRET",
             "x-tenant": "agentos",
           },
           protocol: "binary",
@@ -104,7 +101,7 @@ describe("Codex native OTEL bridge", () => {
         "http://trace-collector.agentos:4318/custom-traces",
       OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
       OTEL_EXPORTER_OTLP_HEADERS:
-        "authorization=Bearer%20SEED_SECRET,x-tenant=agentos",
+        "x-tenant=agentos",
       OTEL_TRACES_EXPORTER: "otlp",
       OTEL_METRICS_EXPORTER: "otlp",
       OTEL_LOGS_EXPORTER: "otlp",
@@ -233,6 +230,22 @@ describe("Codex native OTEL bridge", () => {
       }),
     ).rejects.toThrow("Unsupported OTEL_TRACES_EXPORTER");
     expect(await readFile(path, "utf8")).toBe(original);
+  });
+
+  test("rejects credential headers without overwriting config", async () => {
+    const path = await fixture('model = "gpt-5.6-sol"\n');
+    const original = await readFile(path, "utf8");
+
+    await expect(
+      reconcileCodexOtelConfig(path, {
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector.agentos:4318",
+        OTEL_TRACES_EXPORTER: "otlp",
+        OTEL_EXPORTER_OTLP_HEADERS:
+          "authorization=Bearer%20MUST_NOT_BE_WRITTEN",
+      }),
+    ).rejects.toThrow("credential headers cannot be persisted");
+    expect(await readFile(path, "utf8")).toBe(original);
+    expect((await stat(path)).mode & 0o777).toBe(0o644);
   });
 
   const validationBin = process.env.AGENTOS_CODEX_VALIDATION_BIN;
