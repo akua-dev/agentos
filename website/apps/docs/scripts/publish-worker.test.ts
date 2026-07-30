@@ -9,6 +9,21 @@ import { describe, expect, it } from 'vitest';
 import * as publisher from './publish-worker';
 
 describe('Worker publication subprocess', () => {
+  it('lets Wrangler use its declared Node runtime for provider API calls', () => {
+    const createWranglerProcessArguments = (
+      publisher as unknown as {
+        createWranglerProcessArguments?: (
+          args: readonly string[],
+        ) => string[];
+      }
+    ).createWranglerProcessArguments;
+
+    expect(createWranglerProcessArguments).toBeTypeOf('function');
+    expect(
+      createWranglerProcessArguments!(['versions', 'upload']),
+    ).toEqual(['x', 'wrangler', 'versions', 'upload']);
+  });
+
   it('retries a command whose first attempt never completes', async () => {
     const temporaryDirectory = mkdtempSync(
       join(tmpdir(), 'agentos-worker-publish-'),

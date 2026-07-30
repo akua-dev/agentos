@@ -21,6 +21,12 @@ interface CommandOptions {
 
 class CommandTimeoutError extends Error {}
 
+export function createWranglerProcessArguments(
+  args: readonly string[],
+): string[] {
+  return ['x', 'wrangler', ...args];
+}
+
 function publicationMode(value: string | undefined): PublicationMode {
   if (value === 'preview' || value === 'production') return value;
   throw new Error('Publication mode must be preview or production.');
@@ -47,7 +53,7 @@ export async function publishWorker(mode: PublicationMode): Promise<void> {
   );
   await runCommandWithTimeoutRetry(
     process.execPath,
-    ['x', '--bun', 'wrangler', ...args],
+    createWranglerProcessArguments(args),
     {
       attempts: WRANGLER_UPLOAD_ATTEMPTS,
       environment:
