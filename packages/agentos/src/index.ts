@@ -75,6 +75,7 @@ export {
   type AgentOSSupervisionGuardOptions,
 } from "./supervision-guard/extension.ts";
 export {
+  AGENTOS_AI_COMPACTION_PATHS,
   AGENTOS_AI_DURATION_BUCKETS_SECONDS,
   AGENTOS_AI_ERROR_CLASSES,
   AGENTOS_AI_METRICS,
@@ -88,6 +89,7 @@ export {
   AGENTOS_AI_STREAM_MODES,
   AGENTOS_AI_STREAM_OUTCOMES,
   AGENTOS_AI_TELEMETRY_CONTRACT_VERSION,
+  type AgentOSAICompactionPath,
   type AgentOSAIErrorClass,
   type AgentOSAIModelFamily,
   type AgentOSAIProviderFamily,

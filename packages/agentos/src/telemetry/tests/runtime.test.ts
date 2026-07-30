@@ -66,6 +66,7 @@ describe("AgentOS fail-open telemetry runtime", () => {
     const second = operation.startProviderAttempt({
       requestKind: "compaction",
       streamMode: "non_streaming",
+      compactionPath: "portable_summary",
     });
     const secondHeaders = new Headers();
     second.inject(secondHeaders);
@@ -131,6 +132,7 @@ describe("AgentOS fail-open telemetry runtime", () => {
     expect(secondSpan?.attributes).toMatchObject({
       "agentos.ai.request.attempt_id": "attempt-3",
       "agentos.ai.request.kind": "compaction",
+      "agentos.ai.compaction.path": "portable_summary",
       "agentos.ai.error.class": "overload",
       "agentos.ai.status_class": "server_error",
     });
@@ -139,6 +141,7 @@ describe("AgentOS fail-open telemetry runtime", () => {
     expect(metricPayload).toContain("agentos.ai.provider.attempts");
     expect(metricPayload).toContain("agentos.ai.operations");
     expect(metricPayload).toContain("agentos.ai.provider.duration");
+    expect(metricPayload).toContain("portable_summary");
     expect(metricPayload).not.toContain("attempt-2");
     expect(metricPayload).not.toContain("attempt-3");
     expect(metricPayload).not.toContain("req_safe_1");

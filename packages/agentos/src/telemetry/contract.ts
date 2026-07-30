@@ -16,6 +16,13 @@ export const AGENTOS_AI_REQUEST_KINDS = [
 export type AgentOSAIRequestKind =
   (typeof AGENTOS_AI_REQUEST_KINDS)[number];
 
+export const AGENTOS_AI_COMPACTION_PATHS = [
+  "portable_summary",
+  "native_server",
+] as const;
+export type AgentOSAICompactionPath =
+  (typeof AGENTOS_AI_COMPACTION_PATHS)[number];
+
 export const AGENTOS_AI_STATUS_CLASSES = [
   "success",
   "client_error",
