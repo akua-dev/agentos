@@ -121,7 +121,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
         input: {
           compactionPath: "portable_summary",
           requestKind: "compaction",
-          streamMode: "streaming",
+          streamMode: "non_streaming",
         },
         outcome: {
           inputTokens: 2,
@@ -145,6 +145,32 @@ describe("AgentOS OpenAI server-compaction extension", () => {
       },
     ]);
     expect(recorded.operations[0]?.outcome).toEqual({ status: 200 });
+  });
+
+  test("uses the native transport mode for direct OpenAI compaction", async () => {
+    const recorded = createTelemetryRecorder();
+    const handlers = harness({
+      telemetry: recorded.telemetry,
+      runLocalCompaction: async () => local,
+      runServerCompaction: async () => ({
+        output: [{ type: "compaction", encrypted_content: "opaque" }],
+      }),
+    });
+
+    await handlers.get("session_before_compact")?.(
+      event,
+      context({
+        model: {
+          ...model(),
+          provider: "openai",
+          api: "openai-responses",
+        } as any,
+      }),
+    );
+
+    expect(
+      recorded.operations[0]?.attempts.map(({ input }) => input.streamMode),
+    ).toEqual(["non_streaming", "non_streaming"]);
   });
 
   test("persists native state alongside Pi's portable local summary", async () => {

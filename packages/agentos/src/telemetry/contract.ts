@@ -112,3 +112,5 @@ export const AGENTOS_AI_DURATION_BUCKETS_SECONDS = Object.freeze([
   120,
   300,
 ] as const);
+
+export const AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS = 86_400 as const;

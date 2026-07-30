@@ -15,6 +15,11 @@ import {
   createGatewayTelemetry,
   createNoopGatewayTelemetry,
 } from "../src/telemetry.ts";
+import {
+  createAgentOSMetricViews,
+  AGENTOS_AI_DURATION_BUCKETS_SECONDS,
+  AGENTOS_AI_METRICS,
+} from "@akua-dev/agentos";
 
 function fixture() {
   const spans = new InMemorySpanExporter();
@@ -28,7 +33,10 @@ function fixture() {
     exporter: metrics,
     exportIntervalMillis: 60_000,
   });
-  const meterProvider = new MeterProvider({ readers: [metricReader] });
+  const meterProvider = new MeterProvider({
+    readers: [metricReader],
+    views: createAgentOSMetricViews(),
+  });
   const logs: unknown[] = [];
   let nextId = 0;
   const telemetry = createGatewayTelemetry({
@@ -61,6 +69,7 @@ describe("AI Gateway telemetry", () => {
     scope.authenticate(true);
     scope.routeStarted();
     scope.routeEnded("acquired");
+    scope.quotaObservation(1.25, true);
     const headers = new Headers();
     scope.upstreamStarted(headers);
     expect(headers.get("x-client-request-id")).toBe("gateway-2");
@@ -114,6 +123,7 @@ describe("AI Gateway telemetry", () => {
       "agentos.ai.upstream.headers.duration",
       "agentos.ai.stream.first_byte.duration",
       "agentos.ai.stream.duration",
+      "agentos.ai.quota.observation.age",
       "agentos.ai.streams.active",
       "agentos.ai.stream.chunks",
       "agentos.ai.stream.bytes",
@@ -122,6 +132,35 @@ describe("AI Gateway telemetry", () => {
     }
     expect(metricPayload).not.toContain("gateway-2");
     expect(metricPayload).not.toContain("req_safe_provider_1");
+    const exportedMetrics = test.metrics
+      .getMetrics()
+      .flatMap(({ scopeMetrics }) =>
+        scopeMetrics.flatMap(({ metrics: scopedMetrics }) => scopedMetrics),
+      );
+    const durationMetrics = exportedMetrics
+      .filter(({ descriptor }) =>
+        [
+          AGENTOS_AI_METRICS.operationDuration,
+          AGENTOS_AI_METRICS.providerDuration,
+          AGENTOS_AI_METRICS.upstreamHeadersDuration,
+          AGENTOS_AI_METRICS.firstByteDuration,
+          AGENTOS_AI_METRICS.streamDuration,
+          AGENTOS_AI_METRICS.routeAcquisitionDuration,
+          AGENTOS_AI_METRICS.quotaObservationAge,
+        ].includes(descriptor.name as typeof AGENTOS_AI_METRICS.operationDuration),
+      );
+    expect(durationMetrics).toHaveLength(7);
+    for (const metric of durationMetrics) {
+      expect(JSON.stringify(metric)).toContain(
+        `"boundaries":${JSON.stringify([...AGENTOS_AI_DURATION_BUCKETS_SECONDS])}`,
+      );
+    }
+    const quotaMetric = exportedMetrics.find(
+      ({ descriptor }) => descriptor.name === AGENTOS_AI_METRICS.quotaObservationAge,
+    );
+    expect(quotaMetric && JSON.stringify(quotaMetric)).toContain(
+      '"agentos.ai.quota.stale":true',
+    );
 
     await Promise.all([
       test.tracerProvider.shutdown(),
@@ -196,6 +235,7 @@ describe("AI Gateway telemetry", () => {
       scope.authenticate(false);
       scope.routeStarted();
       scope.routeEnded("unavailable");
+      scope.quotaObservation(Number.POSITIVE_INFINITY, false);
       scope.upstreamStarted(headers);
       scope.upstreamFailed(new Error("private"));
       scope.routeReleaseStarted();

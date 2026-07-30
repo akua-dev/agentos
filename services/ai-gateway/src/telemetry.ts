@@ -19,6 +19,7 @@ import {
 } from "@opentelemetry/api";
 import {
   AGENTOS_AI_METRICS,
+  AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
   AGENTOS_AI_TELEMETRY_CONTRACT_VERSION,
   classifyAIError,
   classifyAIStatus,
@@ -44,6 +45,7 @@ export interface GatewayRequestTelemetry {
   authenticate(authenticated: boolean): void;
   routeStarted(): void;
   routeEnded(outcome: GatewayRouteOutcome, error?: unknown): void;
+  quotaObservation(ageSeconds: number, stale: boolean): void;
   upstreamStarted(headers: Headers): void;
   upstreamHeaders(status: number, headers: Headers): void;
   upstreamFailed(error: unknown): void;
@@ -80,6 +82,7 @@ interface Instruments {
   streamChunks: Counter;
   streamBytes: Counter;
   routeAcquisitionDuration: Histogram;
+  quotaObservationAge: Histogram;
 }
 
 const getter: TextMapGetter<Record<string, string>> = {
@@ -216,6 +219,17 @@ function startGatewayRequest(options: {
           );
         }
         routeSpan = undefined;
+      });
+    },
+    quotaObservation(ageSeconds, stale) {
+      safely(() => {
+        options.instruments.quotaObservationAge.record(
+          boundedQuotaObservationAge(ageSeconds),
+          safeTelemetryAttributes(
+            { ...base, "agentos.ai.quota.stale": stale },
+            "metric",
+          ),
+        );
       });
     },
     upstreamStarted(headers) {
@@ -481,6 +495,10 @@ function createInstruments(meter: Meter): Instruments {
       AGENTOS_AI_METRICS.routeAcquisitionDuration,
       { unit: "s" },
     ),
+    quotaObservationAge: meter.createHistogram(
+      AGENTOS_AI_METRICS.quotaObservationAge,
+      { unit: "s" },
+    ),
   };
 }
 
@@ -651,6 +669,15 @@ function boundedAdd(total: number, increment: number): number {
   return Math.min(Number.MAX_SAFE_INTEGER, total + safeIncrement);
 }
 
+function boundedQuotaObservationAge(value: number): number {
+  return Number.isFinite(value)
+    ? Math.min(
+        AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
+        Math.max(0, value),
+      )
+    : 0;
+}
+
 function safely(operation: () => void) {
   try {
     operation();
@@ -664,6 +691,7 @@ const noopRequest: GatewayRequestTelemetry = Object.freeze({
   authenticate() {},
   routeStarted() {},
   routeEnded() {},
+  quotaObservation() {},
   upstreamStarted() {},
   upstreamHeaders() {},
   upstreamFailed() {},

@@ -739,6 +739,9 @@ function recordingTelemetry(events: unknown[]): GatewayTelemetry {
         routeEnded(outcome) {
           events.push(["routeEnded", outcome]);
         },
+        quotaObservation(ageSeconds, stale) {
+          events.push(["quotaObservation", ageSeconds, stale]);
+        },
         upstreamStarted(headers) {
           events.push("upstreamStarted");
           headers.set("x-client-request-id", "gateway-attempt");

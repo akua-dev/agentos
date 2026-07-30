@@ -12,9 +12,14 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import {
+  createAgentOSMetricViews,
   createAgentOSTelemetry,
   createNoopAgentOSTelemetry,
 } from "../runtime.ts";
+import {
+  AGENTOS_AI_DURATION_BUCKETS_SECONDS,
+  AGENTOS_AI_METRICS,
+} from "../contract.ts";
 
 function testTelemetry() {
   const spans = new InMemorySpanExporter();
@@ -28,7 +33,10 @@ function testTelemetry() {
     exporter: metrics,
     exportIntervalMillis: 60_000,
   });
-  const meterProvider = new MeterProvider({ readers: [metricReader] });
+  const meterProvider = new MeterProvider({
+    readers: [metricReader],
+    views: createAgentOSMetricViews(),
+  });
   let nextId = 0;
   const telemetry = createAgentOSTelemetry({
     enabled: true,
@@ -148,6 +156,24 @@ describe("AgentOS fail-open telemetry runtime", () => {
     expect(
       (metricPayload.match(/agentos.ai.provider.attempts/g) ?? []).length,
     ).toBe(1);
+    const exportedMetrics = fixture.metrics
+      .getMetrics()
+      .flatMap(({ scopeMetrics }) =>
+        scopeMetrics.flatMap(({ metrics: scopedMetrics }) => scopedMetrics),
+      );
+    const durationMetrics = exportedMetrics
+      .filter(({ descriptor }) =>
+        [
+          AGENTOS_AI_METRICS.operationDuration,
+          AGENTOS_AI_METRICS.providerDuration,
+        ].includes(descriptor.name as typeof AGENTOS_AI_METRICS.operationDuration),
+      );
+    expect(durationMetrics).toHaveLength(2);
+    for (const metric of durationMetrics) {
+      expect(JSON.stringify(metric)).toContain(
+        `"boundaries":${JSON.stringify([...AGENTOS_AI_DURATION_BUCKETS_SECONDS])}`,
+      );
+    }
 
     await Promise.all([
       fixture.tracerProvider.shutdown(),
