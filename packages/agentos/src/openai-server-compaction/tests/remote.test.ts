@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, test } from "bun:test";
@@ -8,9 +8,11 @@ import { createAIGatewayService } from "../../../../../services/ai-gateway/src/s
 import {
   buildRemoteCompactionHistory,
   endpointForModel,
-  requestServerCompaction,
+  requestServerCompaction as requestServerCompactionImpl,
+  resolveCodexInstallationId,
   supportsServerCompaction,
   type OpenAICompactionModel,
+  type ServerCompactionRequest,
 } from "../remote.ts";
 import { parseResponseItems, type ResponseItem } from "../schemas.ts";
 import { nativeCompactionDetails, rewriteResponsesPayload } from "../session.ts";
@@ -22,6 +24,17 @@ const completeUsage = {
   output_tokens_details: { reasoning_tokens: 2 },
   total_tokens: 44,
 };
+const INSTALLATION_ID = "11111111-1111-4111-8111-111111111111";
+
+function requestServerCompaction(
+  params: ServerCompactionRequest,
+) {
+  return requestServerCompactionImpl({
+    ...params,
+    codexInstallationId: params.codexInstallationId ??
+      (() => INSTALLATION_ID),
+  });
+}
 
 function responseItems(value: unknown): ResponseItem[] {
   const parsed = parseResponseItems(value);
@@ -306,6 +319,11 @@ describe("OpenAI server compaction transport", () => {
     const headers = new Headers(request?.init.headers);
     expect(headers.get("authorization")).toBe("Bearer fleet-client-token");
     expect(headers.get("x-codex-beta-features")).toBe("remote_compaction_v2");
+    expect(headers.get("x-codex-installation-id")).toBe(INSTALLATION_ID);
+    expect(headers.get("x-codex-window-id")).toBe("session-1:0");
+    expect(headers.get("session-id")).toBe("session-1");
+    expect(headers.get("thread-id")).toBe("session-1");
+    expect(headers.get("x-client-request-id")).toBe("session-1");
     expect(headers.get("x-extra")).toBe("kept");
     const body = JSON.parse(String(request?.init.body));
     expect(body).toEqual(
@@ -645,6 +663,9 @@ describe("OpenAI server compaction transport", () => {
     expect(headers.get("accept")).toBe("text/event-stream");
     expect(headers.get("x-codex-beta-features")).toBe("remote_compaction_v2");
     expect(headers.has("openai-beta")).toBe(false);
+    expect(headers.has("x-codex-installation-id")).toBe(false);
+    expect(headers.has("x-codex-window-id")).toBe(false);
+    expect(headers.has("session-id")).toBe(false);
     expect(JSON.parse(String(request?.init.body))).toEqual({
       model: "gpt-5.4",
       input: [...input, { type: "compaction_trigger" }],
@@ -665,6 +686,25 @@ describe("OpenAI server compaction transport", () => {
       include: ["reasoning.encrypted_content"],
       prompt_cache_key: "session-2",
     });
+  });
+
+  test("resolves a stable Codex installation identity only when requested", async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), "agentos-codex-home-"));
+    const installationPath = join(codexHome, "installation_id");
+
+    const generated = await resolveCodexInstallationId(codexHome);
+    expect(generated).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(await readFile(installationPath, "utf8")).toBe(generated);
+
+    await writeFile(
+      installationPath,
+      "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA\n",
+    );
+    expect(await resolveCodexInstallationId(codexHome)).toBe(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
   });
 
   test("rejects malformed provider usage in the SSE terminal response", async () => {
