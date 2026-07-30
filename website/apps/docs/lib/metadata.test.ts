@@ -75,14 +75,7 @@ describe('AgentOS page metadata', () => {
       alternates: null,
       openGraph: null,
       twitter: null,
-      robots: {
-        index: false,
-        follow: false,
-        googleBot: {
-          index: false,
-          follow: false,
-        },
-      },
+      robots: null,
     });
   });
 });
