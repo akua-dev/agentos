@@ -169,9 +169,11 @@ export function classifyAIStatus(
 ): AgentOSAIStatusClass {
   if (isAbort(error)) return "cancelled";
   if (status !== undefined) {
-    if (status >= 200 && status < 400) return "success";
     if (status >= 400 && status < 500) return "client_error";
     if (status >= 500 && status < 600) return "server_error";
+    if (status >= 200 && status < 400) {
+      return error === undefined ? "success" : "error";
+    }
   }
   return error === undefined ? "success" : "error";
 }

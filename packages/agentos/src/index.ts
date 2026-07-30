@@ -16,6 +16,7 @@ export {
 export {
   createAgentOSBackgroundTasksRegistration,
   createAgentOSMateMemoryRegistration,
+  createAgentOSObservabilityRegistration,
   createAgentOSOpenAIServerCompactionRegistration,
   createAgentOSSupervisionGuardRegistration,
   defaultAgentOSRuntime,
@@ -120,3 +121,7 @@ export {
   type AgentOSTelemetryOptions,
   type AgentOSTraceCarrier,
 } from "./telemetry/runtime.ts";
+export {
+  registerAgentOSObservability,
+  type AgentOSObservabilityDependencies,
+} from "./telemetry/pi-extension.ts";
