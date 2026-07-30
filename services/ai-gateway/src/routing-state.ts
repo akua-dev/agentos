@@ -1,10 +1,10 @@
-import { openSqliteRoutingState } from "@akua-dev/codex-router-bun";
+import { openSqliteRoutingState } from "@akua-dev/codex-router/bun";
 import {
   AccountId,
   LeaseToken,
   SessionKey,
   classifyUpstreamResponse,
-} from "@akua-dev/codex-router-core";
+} from "@akua-dev/codex-router/core";
 import { Effect, Option } from "effect";
 import {
   selectAccount,

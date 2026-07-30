@@ -20,14 +20,14 @@ a Cloudflare Worker through this service.
 
 Shared selection, session, lease, response classification, persistent routing
 transitions, Responses protocol, header sanitation and streaming semantics
-come from the pinned MIT-licensed
-[`akua-dev/codex-router`](../../vendor/codex-router/UPSTREAM.md) workspace
-snapshot. AgentOS supplies only Fleet OAuth-vault integration, quota
-observations, protected rejection diagnostics, health, OpenTelemetry and
-deployment wiring. Shared routing behavior changes upstream first and is then
-refreshed here; this package does not carry an independent policy fork. It does
-not capture transcripts, wrap harness commands or silently change
-models/providers.
+come from the full-commit-pinned MIT-licensed
+[`akua-dev/codex-router`](https://github.com/akua-dev/codex-router) root Git
+package. AgentOS imports its `/core`, `/codex`, and `/bun` entry points and
+supplies only Fleet OAuth-vault integration, quota observations, protected
+rejection diagnostics, health, OpenTelemetry and deployment wiring. Shared
+routing behavior changes upstream first and the Git commit pin is then updated
+here; this package does not carry an independent policy fork. It does not
+capture transcripts, wrap harness commands or silently change models/providers.
 
 This is deliberately not a universal AgentOS proxy. Git, PostgreSQL,
 Kubernetes, Herdr, registries and other provider tools retain their native

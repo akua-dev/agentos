@@ -19,6 +19,12 @@ submodule. Keep all installed Effect packages on the exact aligned version
 required by that Skill; this development Skill does not restate or override
 Effect architecture, error, layer, schema, testing, or observability rules.
 
+Shared Codex routing changes land in `akua-dev/codex-router` first. Verify its
+public root Git package at the exact upstream commit, update the full-SHA pin in
+`services/ai-gateway/package.json`, regenerate `bun.lock`, and run the Gateway
+package-integration plus production-dependency tests. Do not vendor router
+source or reproduce its selection and persistence policy in AgentOS.
+
 At session start or after a Pod restart, fetch configured remotes read-only and compare the checkout HEAD with its upstream and the image seed. Report a newer revision; never switch a dirty checkout, install changed tools, reload Pi, or roll out an image without the applicable authority. Before dogfooding or evaluating AgentOS, complete the current-revision preflight in `CONTRIBUTING.md`: verify both the source revision and the instruction set actually loaded by each participating Mate. A current checkout alone is not proof that a persistent Pi session has loaded changed role files or Skills. For a reviewed Markdown or Skill-only update, change Git first and invoke Pi `/reload` at a safe turn boundary. Use a new image for OS packages, immutable runtime code or Kubernetes assets.
 
 Git and its remote own delivered source. The persistent home owns unfinished work. The image digest owns the running AgentOS revision.

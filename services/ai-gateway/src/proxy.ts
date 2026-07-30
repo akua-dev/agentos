@@ -5,7 +5,7 @@ import {
   resolveUpstreamTarget,
   sanitizeRequestHeaders,
   sanitizeResponseHeaders,
-} from "@akua-dev/codex-router-codex";
+} from "@akua-dev/codex-router/codex";
 import { Effect, Option, Result } from "effect";
 import {
   createNoopGatewayTelemetry,

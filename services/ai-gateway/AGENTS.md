@@ -11,8 +11,9 @@ credential workflows stay in the shared `$agentos-ai-gateway` Skill.
   session affinity, lease semantics, response classification, persistent
   routing transitions, Responses path handling, header sanitation and
   byte-preserving one-shot streaming. Consume its `core`, `codex`, and `bun`
-  packages through the pinned workspace snapshot; change shared policy upstream
-  first and refresh the snapshot instead of forking it here.
+  entry points through the root Git package pinned to a full commit SHA; change
+  shared policy upstream first, verify that exact public Git package, and update
+  the pin instead of copying or forking it here.
 - AgentOS owns only its integration adapters: OAuth refresh, live quota probes,
   OAuth-vault persistence, protected rejection diagnostics, health surfaces,
   AgentOS OpenTelemetry correlation and deployment wiring. These adapters

@@ -956,7 +956,6 @@ workspace. The tree reflects ownership, not deployment order:
 │   ├── AGENTS.md                     admission boundary for optional services
 │   ├── ai-gateway/                   service, tests and optional K8s topology
 │   └── otel-collector/               Collector topology, overlays and tests
-├── vendor/codex-router/              pinned shared routing workspace snapshot
 ├── release/kubernetes/               reviewed manifest release assembly
 ├── docs/                             supporting assets and stable pointers
 ├── website/apps/docs/                public landing, Docs and Learn application
@@ -1096,8 +1095,10 @@ workspace keeps one `bun.lock`.
   repository state.
 - `services/otel-collector/` is authoritative for the optional Fleet-local
   Collector topology, persistent buffering and explicit export overlays.
-- `vendor/codex-router/` is the pinned workspace snapshot for shared routing
-  policy; shared behavior changes upstream before this snapshot is refreshed.
+- `services/ai-gateway/package.json` pins the public
+  `akua-dev/codex-router` root Git package by full commit SHA. Its `/core`,
+  `/codex`, and `/bun` entry points own shared routing policy and runtime
+  mechanics; shared behavior changes upstream before the pin is updated.
 - `release/kubernetes/` is authoritative for human-readable
   First-Mate and database manifest rendering; stable generated assets belong
   to immutable GitHub releases, while previews remain exact-commit builds.
