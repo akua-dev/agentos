@@ -1,5 +1,8 @@
 import Link from 'next/link';
 import { ArrowLeft, BookOpen } from 'lucide-react';
+import { createNotFoundMetadata } from '@/lib/metadata';
+
+export const metadata = createNotFoundMetadata();
 
 export default function NotFound() {
   return (

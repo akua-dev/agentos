@@ -1,22 +1,9 @@
 import './global.css';
-import type { Metadata } from 'next';
 import { Geist, JetBrains_Mono } from 'next/font/google';
+import { createNotFoundMetadata } from '@/lib/metadata';
 import NotFound from './not-found';
 
-export const metadata: Metadata = {
-  title: 'Not Found',
-  alternates: null,
-  openGraph: null,
-  twitter: null,
-  robots: {
-    index: false,
-    follow: false,
-    googleBot: {
-      index: false,
-      follow: false,
-    },
-  },
-};
+export const metadata = createNotFoundMetadata();
 
 const geist = Geist({
   variable: '--font-sans',

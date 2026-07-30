@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createMetadata,
+  createNotFoundMetadata,
   defaultDescription,
   defaultTitle,
   socialImage,
@@ -65,6 +66,23 @@ describe('AgentOS page metadata', () => {
       width: 1200,
       height: 630,
       alt: 'AgentOS — the open-source company harness',
+    });
+  });
+
+  it('clears inherited SEO fields for not-found responses', () => {
+    expect(createNotFoundMetadata('Lesson not found')).toEqual({
+      title: 'Lesson not found',
+      alternates: null,
+      openGraph: null,
+      twitter: null,
+      robots: {
+        index: false,
+        follow: false,
+        googleBot: {
+          index: false,
+          follow: false,
+        },
+      },
     });
   });
 });

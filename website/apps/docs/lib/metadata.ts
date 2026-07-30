@@ -77,3 +77,20 @@ export function createMetadata({
     },
   };
 }
+
+export function createNotFoundMetadata(title = 'Not Found'): Metadata {
+  return {
+    title,
+    alternates: null,
+    openGraph: null,
+    twitter: null,
+    robots: {
+      index: false,
+      follow: false,
+      googleBot: {
+        index: false,
+        follow: false,
+      },
+    },
+  };
+}
