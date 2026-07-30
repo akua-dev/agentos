@@ -12,6 +12,8 @@ type Environment = Readonly<Record<string, string | undefined>>;
 type Signal = "logs" | "metrics" | "traces";
 type Protocol = "grpc" | "http/json" | "http/protobuf";
 
+class CredentialHeaderError extends Error {}
+
 interface Exporter {
   endpoint: string;
   headers: Readonly<Record<string, string>>;
@@ -23,7 +25,16 @@ export async function reconcileCodexOtelConfig(
   environment: Environment,
 ): Promise<void> {
   const source = await readOptional(path);
-  const managed = buildManagedOtel(environment);
+  let managed: string;
+  try {
+    managed = buildManagedOtel(environment);
+  } catch (error) {
+    if (!(error instanceof CredentialHeaderError)) throw error;
+    managed = buildManagedOtel({
+      ...environment,
+      OTEL_SDK_DISABLED: "true",
+    });
+  }
   const preserved = removeOtelTables(source).trimEnd();
   const next = `${preserved ? `${preserved}\n\n` : ""}${managed}\n`;
   if (source === next) {
@@ -156,7 +167,7 @@ function parseHeaders(value: string | undefined): Readonly<Record<string, string
       throw new Error("OTEL exporter headers contain an invalid entry");
     }
     if (isCredentialHeader(key)) {
-      throw new Error(
+      throw new CredentialHeaderError(
         "OTEL exporter credential headers cannot be persisted in Codex config",
       );
     }

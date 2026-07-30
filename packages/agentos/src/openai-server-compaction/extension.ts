@@ -59,6 +59,12 @@ export type LocalCompactionRequest = {
   model: OpenAICompactionModel;
   auth: ResolvedAuth;
   thinkingLevel: PiThinkingLevel;
+  telemetry?: LocalCompactionTelemetry;
+};
+
+export type LocalCompactionTelemetry = {
+  currentAttempt(): AgentOSProviderAttempt;
+  startFallbackAttempt(): void;
 };
 
 type LocalSummaryImplementations = {
@@ -155,6 +161,7 @@ export async function generateBestEffortLocalSummary(
   request: LocalCompactionRequest,
   implementations: LocalSummaryImplementations = localSummaryDefaults,
 ): Promise<CompactionResult> {
+  let portableAttemptEnded = false;
   try {
     const messages = request.event.branchEntries
       .filter(
@@ -190,7 +197,18 @@ export async function generateBestEffortLocalSummary(
         env: request.auth.env,
       },
     );
-    if (safeAssistantFailure(response.stopReason)) {
+    const failure = safeAssistantFailure(response.stopReason);
+    if (failure) {
+      portableAttemptEnded = true;
+      request.telemetry?.currentAttempt().end({
+        status: 200,
+        error: failure,
+        streamOutcome:
+          response.stopReason === "aborted" ? "aborted" : "upstream_error",
+        inputTokens: safeTokenCount(response.usage.input),
+        outputTokens: safeTokenCount(response.usage.output),
+      });
+      request.telemetry?.startFallbackAttempt();
       throw new Error(
         response.stopReason === "aborted"
           ? "OpenAI portable compaction aborted"
@@ -210,7 +228,14 @@ export async function generateBestEffortLocalSummary(
       firstKeptEntryId: request.event.preparation.firstKeptEntryId,
       tokensBefore: request.event.preparation.tokensBefore,
     };
-  } catch {
+  } catch (error) {
+    if (!portableAttemptEnded) {
+      request.telemetry?.currentAttempt().end({
+        error,
+        streamOutcome: "upstream_error",
+      });
+      request.telemetry?.startFallbackAttempt();
+    }
     return implementations.compact(
       request.event.preparation,
       request.model,
@@ -320,11 +345,13 @@ async function handleCompaction(
     dependencies.telemetry,
     "resumed",
   );
-  const localAttempt = telemetryOperation.startProviderAttempt({
-    compactionPath: "portable_summary",
-    requestKind: "compaction",
-    streamMode: "non_streaming",
-  });
+  const startPortableAttempt = () =>
+    telemetryOperation.startProviderAttempt({
+      compactionPath: "portable_summary",
+      requestKind: "compaction",
+      streamMode: "non_streaming",
+    });
+  let localAttempt = startPortableAttempt();
   const remoteAttempt = telemetryOperation.startProviderAttempt({
     compactionPath: "native_server",
     requestKind: "compaction",
@@ -340,6 +367,13 @@ async function handleCompaction(
     model,
     auth: { ...resolved, headers: localHeaders },
     thinkingLevel,
+    telemetry: {
+      currentAttempt: () => localAttempt,
+      startFallbackAttempt: () => {
+        localAttempt = startPortableAttempt();
+        localAttempt.inject(localHeaders);
+      },
+    },
   };
   const requestShape = requestShapes.get(requestShapeKey(ctx));
   requestShapes.delete(requestShapeKey(ctx));
@@ -368,7 +402,7 @@ async function handleCompaction(
 
   const [local, remote] = await Promise.allSettled([
     observeCompactionAttempt(
-      localAttempt,
+      () => localAttempt,
       () => dependencies.runLocalCompaction(localRequest),
       (result) => ({
         inputTokens: safeTokenCount(result.usage?.input),
@@ -414,7 +448,7 @@ async function handleCompaction(
 }
 
 async function observeCompactionAttempt<T>(
-  attempt: AgentOSProviderAttempt,
+  attempt: AgentOSProviderAttempt | (() => AgentOSProviderAttempt),
   run: () => Promise<T>,
   counts: (
     result: T,
@@ -425,14 +459,14 @@ async function observeCompactionAttempt<T>(
 ): Promise<T> {
   try {
     const result = await run();
-    attempt.end({
+    resolveAttempt(attempt).end({
       status: 200,
       streamOutcome: "completed",
       ...counts(result),
     });
     return result;
   } catch (error) {
-    attempt.end({
+    resolveAttempt(attempt).end({
       ...(error instanceof OpenAICompactionHttpError
         ? { status: error.status }
         : {}),
@@ -441,6 +475,12 @@ async function observeCompactionAttempt<T>(
     });
     throw error;
   }
+}
+
+function resolveAttempt(
+  attempt: AgentOSProviderAttempt | (() => AgentOSProviderAttempt),
+): AgentOSProviderAttempt {
+  return typeof attempt === "function" ? attempt() : attempt;
 }
 
 type ProviderRequestShape = {
