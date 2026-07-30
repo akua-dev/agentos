@@ -1,4 +1,4 @@
-import { AlbumIcon, Heart, LayoutTemplate } from 'lucide-react';
+import { AlbumIcon, Heart, LayoutTemplate, MessageCircle } from 'lucide-react';
 import type { BaseLayoutProps, LinkItemType } from 'fumadocs-ui/layouts/shared';
 import { AgentOSWordmark } from '@/components/agentos-wordmark';
 
@@ -21,6 +21,14 @@ export const secondaryLinkItems: LinkItemType[] = [
     url: 'https://akua.dev',
     external: true,
     icon: <Heart />,
+  },
+  {
+    type: 'icon',
+    url: 'https://akua.dev/discord',
+    label: 'Discord',
+    text: 'Discord',
+    icon: <MessageCircle />,
+    external: true,
   },
   {
     type: 'icon',
