@@ -886,6 +886,7 @@ workspace. The tree reflects ownership, not deployment order:
 ├── AGENTS.md                         identity-neutral repository rules
 ├── .agents/skills/
 │   ├── agentos-development/          workflow for changing AgentOS itself
+│   ├── effect-ts/                     repository Effect conventions and references
 │   ├── agentos-evaluation/           benchmark execution and evidence
 │   └── agentos-improvement-review/   reviewed learning from frozen evidence
 ├── benchmarks/
@@ -897,6 +898,8 @@ workspace. The tree reflects ownership, not deployment order:
 │   ├── AGENTS.md                     importable-package boundary
 │   └── agentos/                      public API and Pi-native distribution
 │       ├── extensions/agentos.ts     sole Pi-discovered AgentOS entrypoint
+│       ├── extensions/agentos-observability.ts
+│       │                               explicit diagnostic-only entrypoint
 │       ├── src/                      inert API, registrations and role setups
 │       ├── runtime/                  lifecycle, K8s, image seed and tests
 │       ├── skills/                   shared operational Skills
@@ -915,7 +918,9 @@ workspace. The tree reflects ownership, not deployment order:
 │   └── tests/                        behavioral PGlite contract tests
 ├── services/
 │   ├── AGENTS.md                     admission boundary for optional services
-│   └── ai-gateway/                   service, tests and optional K8s topology
+│   ├── ai-gateway/                   service, tests and optional K8s topology
+│   └── otel-collector/               Collector topology, overlays and tests
+├── vendor/codex-router/              pinned shared routing workspace snapshot
 ├── release/kubernetes/               reviewed manifest release assembly
 ├── docs/                             supporting assets and stable pointers
 ├── website/apps/docs/                public landing, Docs and Learn application
@@ -990,6 +995,8 @@ workspace keeps one `bun.lock`.
 - `docs/architecture.md` is a compatibility pointer to this document, not a second architecture source.
 - `.agents/skills/agentos-development/` contains the repository-development
   workflow shared by contributors and every Agent role working on AgentOS.
+- `.agents/skills/effect-ts/` contains the repository's Effect conventions and
+  references; Effect code must follow its pinned guidance and source checkout.
 - `.agents/skills/agentos-evaluation/` owns benchmark execution and sanitized
   evidence collection without changing the measured subject.
 - `.agents/skills/agentos-improvement-review/` owns causal review and the
@@ -1050,6 +1057,10 @@ workspace keeps one `bun.lock`.
 - `services/ai-gateway/kubernetes/` is authoritative for the optional
   single-replica gateway topology; its Secret values and local overlays are not
   repository state.
+- `services/otel-collector/` is authoritative for the optional Fleet-local
+  Collector topology, persistent buffering and explicit export overlays.
+- `vendor/codex-router/` is the pinned workspace snapshot for shared routing
+  policy; shared behavior changes upstream before this snapshot is refreshed.
 - `release/kubernetes/` is authoritative for human-readable
   First-Mate and database manifest rendering; stable generated assets belong
   to immutable GitHub releases, while previews remain exact-commit builds.
