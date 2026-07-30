@@ -32,4 +32,21 @@ describe('landing page', () => {
       '/learn',
     ]);
   });
+
+  it('renders the canonical AgentOS structured-data graph', () => {
+    const { container } = render(<Page />);
+    const script = container.querySelector('script[type="application/ld+json"]');
+
+    expect(script).not.toBeNull();
+    expect(JSON.parse(script?.textContent ?? '')).toMatchObject({
+      '@context': 'https://schema.org',
+      '@graph': [
+        { '@type': 'WebSite', name: 'AgentOS' },
+        {
+          '@type': 'SoftwareSourceCode',
+          codeRepository: 'https://github.com/akua-dev/agentos',
+        },
+      ],
+    });
+  });
 });
