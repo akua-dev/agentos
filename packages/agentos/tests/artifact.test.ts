@@ -242,6 +242,10 @@ describe("publishable AgentOS Pi artifacts", () => {
       skills: ["./skills"],
     });
     expect(manifest.dependencies).toEqual({
+      "@opentelemetry/api": "1.9.1",
+      "@opentelemetry/exporter-metrics-otlp-http": "0.221.0",
+      "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
+      "@opentelemetry/sdk-node": "0.221.0",
       yaml: "2.9.0",
       zod: "4.4.3",
     });
@@ -252,6 +256,11 @@ describe("publishable AgentOS Pi artifacts", () => {
         join(installedAgentOS, "dist", "roles", "firstmate.js"),
         join(installedAgentOS, "dist", "roles", "secondmate.js"),
         join(installedAgentOS, "extensions", "agentos.ts"),
+        join(
+          installedAgentOS,
+          "extensions",
+          "agentos-observability.ts",
+        ),
         join(installedAgentOS, "runtime", "create-image-seed.ts"),
         join(installedAgentOS, "skills", "agentos-customization", "SKILL.md"),
         join(installedAgentOS, "skills", "agentos-upgrade", "SKILL.md"),

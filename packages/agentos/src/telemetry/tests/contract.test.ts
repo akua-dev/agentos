@@ -10,6 +10,7 @@ import {
 } from "../contract.ts";
 import {
   classifyAIError,
+  classifyAIStatus,
   safeTelemetryAttributes,
 } from "../privacy.ts";
 
@@ -68,6 +69,7 @@ describe("AgentOS AI telemetry contract v1", () => {
     expect(
       classifyAIError(new Error("seeded prompt and provider-private error body")),
     ).toBe("unknown");
+    expect(classifyAIStatus(200, { name: "ProviderError" })).toBe("error");
   });
 
   test("keeps only allowlisted, bounded attributes for each signal", () => {
