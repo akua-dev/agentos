@@ -193,7 +193,11 @@ describe('rendered site contract', () => {
         '--port',
         String(port),
       ],
-      { cwd: appDirectory, stdio: 'ignore' },
+      {
+        cwd: appDirectory,
+        env: { ...process.env, NODE_ENV: 'development' },
+        stdio: 'ignore',
+      },
     );
     await waitForSite(siteBaseUrl, siteProcess);
   }, 120_000);
@@ -214,5 +218,17 @@ describe('rendered site contract', () => {
       checked: renderedRoutePaths.length,
       failures: [],
     });
+  }, 120_000);
+
+  it('emits one robots directive for each rendered 404', async () => {
+    for (const path of renderedRoutePaths) {
+      const response = await fetch(new URL(path, siteBaseUrl));
+      const html = await response.text();
+      const robots = [...html.matchAll(/<meta name="robots" content="([^"]+)"\/?>/g)].map(
+        (match) => match[1],
+      );
+
+      expect(robots, path).toEqual(['noindex']);
+    }
   }, 120_000);
 });
