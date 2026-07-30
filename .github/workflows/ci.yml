@@ -35,6 +35,12 @@ jobs:
       - name: Run repository checks
         run: bun run check
 
+      - name: Build the Cloudflare Worker
+        run: bun run site:build:worker
+
+      - name: Verify the Worker build preserved the checkout
+        run: git diff --exit-code
+
       - name: Render digest-pinned release manifests
         run: >-
           bun run release/kubernetes/render.ts
