@@ -7,6 +7,9 @@ export const DEFAULT_POSTHOG_PROJECT_TOKEN =
 export interface PostHogEnvironment {
   projectToken?: string;
   host?: string;
+  doNotTrack?: string | number | boolean;
+  msDoNotTrack?: string | number | boolean;
+  windowDoNotTrack?: string | number | boolean;
 }
 
 export interface PostHogClient {
@@ -16,13 +19,27 @@ export interface PostHogClient {
 export function resolvePostHogProjectToken(
   configuredToken: string | undefined,
   nodeEnvironment: string | undefined,
+  buildBranch: string | undefined,
 ): string | undefined {
   const token = configuredToken?.trim();
+  const branch = buildBranch?.trim();
 
   if (token) return token;
-  if (nodeEnvironment === 'production') return DEFAULT_POSTHOG_PROJECT_TOKEN;
+  if (nodeEnvironment === 'production' && (!branch || branch === 'main')) {
+    return DEFAULT_POSTHOG_PROJECT_TOKEN;
+  }
 
   return undefined;
+}
+
+function isDoNotTrackEnabled(value: string | number | boolean | undefined): boolean {
+  return (
+    value === true ||
+    value === 1 ||
+    value === '1' ||
+    value === 'true' ||
+    value === 'yes'
+  );
 }
 
 export function initializePostHog(
@@ -30,8 +47,13 @@ export function initializePostHog(
   environment: PostHogEnvironment,
 ): boolean {
   const projectToken = environment.projectToken?.trim();
+  const doNotTrackEnabled = [
+    environment.doNotTrack,
+    environment.msDoNotTrack,
+    environment.windowDoNotTrack,
+  ].some(isDoNotTrackEnabled);
 
-  if (!projectToken) return false;
+  if (!projectToken || doNotTrackEnabled) return false;
 
   client.init(projectToken, {
     api_host: environment.host?.trim() || DEFAULT_POSTHOG_HOST,

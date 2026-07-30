@@ -8,17 +8,29 @@ import {
 
 describe('resolvePostHogProjectToken', () => {
   it('uses the public CNAP project token for production builds', () => {
-    expect(resolvePostHogProjectToken(undefined, 'production')).toBe(
+    expect(resolvePostHogProjectToken(undefined, 'production', 'main')).toBe(
       DEFAULT_POSTHOG_PROJECT_TOKEN,
     );
   });
 
+  it('keeps local production builds enabled without Workers metadata', () => {
+    expect(resolvePostHogProjectToken(undefined, 'production', undefined)).toBe(
+      DEFAULT_POSTHOG_PROJECT_TOKEN,
+    );
+  });
+
+  it('keeps non-main Workers Builds previews disabled by default', () => {
+    expect(
+      resolvePostHogProjectToken(undefined, 'production', 'feat/website-posthog'),
+    ).toBeUndefined();
+  });
+
   it('keeps development disabled without an explicit token', () => {
-    expect(resolvePostHogProjectToken(undefined, 'development')).toBeUndefined();
+    expect(resolvePostHogProjectToken(undefined, 'development', undefined)).toBeUndefined();
   });
 
   it('prefers a configured project token', () => {
-    expect(resolvePostHogProjectToken('  phc_override  ', 'production')).toBe(
+    expect(resolvePostHogProjectToken('  phc_override  ', 'production', 'feature')).toBe(
       'phc_override',
     );
   });
@@ -34,6 +46,21 @@ describe('initializePostHog', () => {
         {
           projectToken: '   ',
           host: 'https://analytics.example.test',
+        },
+      ),
+    ).toBe(false);
+    expect(init).not.toHaveBeenCalled();
+  });
+
+  it('does not initialize analytics when Do Not Track is enabled', () => {
+    const init = vi.fn();
+
+    expect(
+      initializePostHog(
+        { init },
+        {
+          projectToken: 'phc_public_project_token',
+          doNotTrack: '1',
         },
       ),
     ).toBe(false);

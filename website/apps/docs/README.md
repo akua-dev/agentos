@@ -35,11 +35,11 @@ localhost during development.
 
 Anonymous website analytics use PostHog's cookieless mode, honor Do Not Track,
 disable session recording and send through CNAP's first-party
-`https://ph.akua.dev` endpoint. Production builds use CNAP's public PostHog
-project token by default. Set `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` only to
-override that project, and `NEXT_PUBLIC_POSTHOG_HOST` only to override the
-first-party endpoint. Development stays disabled when no token override is
-present.
+`https://ph.akua.dev` endpoint. Production builds on `main` use CNAP's public
+PostHog project token by default. Non-production Workers Builds previews stay
+disabled unless `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` explicitly overrides the
+project. Set `NEXT_PUBLIC_POSTHOG_HOST` only to override the first-party
+endpoint. Development stays disabled when no token override is present.
 
 Both PostHog values are public browser configuration, not server secrets.
 When overriding them in Cloudflare Workers Builds, remember that Next.js
