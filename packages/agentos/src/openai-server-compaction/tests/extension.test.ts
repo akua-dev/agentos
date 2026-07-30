@@ -790,4 +790,65 @@ describe("AgentOS OpenAI server-compaction extension", () => {
     expect(compactCalled).toBe(true);
     expect(result).toBe(local);
   });
+
+  test("records the failed portable call separately from its Pi fallback", async () => {
+    const recorded = createTelemetryRecorder();
+    const handlers = harness({
+      telemetry: recorded.telemetry,
+      runLocalCompaction: async (request) =>
+        generateBestEffortLocalSummary(request, {
+          complete: async () =>
+            ({
+              role: "assistant",
+              content: [{ type: "text", text: "must not be accepted" }],
+              usage: {
+                input: 1,
+                output: 1,
+                cacheRead: 0,
+                cacheWrite: 0,
+                totalTokens: 2,
+                cost: {
+                  input: 0,
+                  output: 0,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                  total: 0,
+                },
+              },
+              stopReason: "error",
+              timestamp: 42,
+            }) as never,
+          compact: async () => local,
+          now: () => 42,
+        }),
+      runServerCompaction: async () => {
+        throw new Error("server unavailable");
+      },
+    });
+
+    await handlers.get("session_before_compact")?.(event, context());
+
+    const attempts = recorded.operations[0]?.attempts ?? [];
+    const portableAttempts = attempts.filter(
+      ({ input }) => input.compactionPath === "portable_summary",
+    );
+    expect(portableAttempts).toHaveLength(2);
+    expect(portableAttempts[0]?.outcome).toMatchObject({
+      status: 200,
+      error: { name: "ProviderError" },
+      inputTokens: 1,
+      outputTokens: 1,
+      streamOutcome: "upstream_error",
+    });
+    expect(portableAttempts[1]?.outcome).toMatchObject({
+      status: 200,
+      inputTokens: 2,
+      outputTokens: 3,
+      streamOutcome: "completed",
+    });
+    expect(
+      attempts.find(({ input }) => input.compactionPath === "native_server")
+        ?.outcome,
+    ).toMatchObject({ streamOutcome: "upstream_error" });
+  });
 });

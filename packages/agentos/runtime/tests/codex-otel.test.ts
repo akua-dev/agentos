@@ -232,20 +232,38 @@ describe("Codex native OTEL bridge", () => {
     expect(await readFile(path, "utf8")).toBe(original);
   });
 
-  test("rejects credential headers without overwriting config", async () => {
-    const path = await fixture('model = "gpt-5.6-sol"\n');
-    const original = await readFile(path, "utf8");
+  test("disables Codex exporters when credentials cannot be persisted", async () => {
+    const path = await fixture(
+      [
+        'model = "gpt-5.6-sol"',
+        "",
+        "[otel]",
+        'trace_exporter = { otlp-http = { endpoint = "https://old.invalid", headers = { authorization = "OLD_SECRET" } } }',
+        "",
+      ].join("\n"),
+    );
 
-    await expect(
-      reconcileCodexOtelConfig(path, {
-        OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector.agentos:4318",
-        OTEL_TRACES_EXPORTER: "otlp",
-        OTEL_EXPORTER_OTLP_HEADERS:
-          "authorization=Bearer%20MUST_NOT_BE_WRITTEN",
-      }),
-    ).rejects.toThrow("credential headers cannot be persisted");
-    expect(await readFile(path, "utf8")).toBe(original);
-    expect((await stat(path)).mode & 0o777).toBe(0o644);
+    await reconcileCodexOtelConfig(path, {
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector.agentos:4318",
+      OTEL_TRACES_EXPORTER: "otlp",
+      OTEL_EXPORTER_OTLP_HEADERS:
+        "authorization=Bearer%20MUST_NOT_BE_WRITTEN",
+    });
+
+    const source = await readFile(path, "utf8");
+    const parsed = Bun.TOML.parse(source) as {
+      otel: Record<string, unknown>;
+    };
+    expect(parsed.otel).toEqual({
+      environment: "dev",
+      exporter: "none",
+      log_user_prompt: false,
+      metrics_exporter: "none",
+      trace_exporter: "none",
+    });
+    expect(source).not.toContain("MUST_NOT_BE_WRITTEN");
+    expect(source).not.toContain("OLD_SECRET");
+    expect((await stat(path)).mode & 0o777).toBe(0o600);
   });
 
   const validationBin = process.env.AGENTOS_CODEX_VALIDATION_BIN;
