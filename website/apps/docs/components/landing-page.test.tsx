@@ -5,10 +5,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import Page from '@/app/(home)/page';
 
-vi.mock('fumadocs-ui/components/codeblock.rsc', () => ({
-  ServerCodeBlock: ({ code }: { code: string }) => <pre>{code}</pre>,
-}));
-
 vi.mock('@/app/(home)/marquee', () => ({
   Marquee: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));

@@ -13,9 +13,9 @@ import {
   TerminalIcon,
   Users,
 } from 'lucide-react';
+import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
 import { cn } from '@/lib/cn';
 import { Marquee } from '@/app/(home)/marquee';
-import { ServerCodeBlock } from 'fumadocs-ui/components/codeblock.rsc';
 import { AgnosticBackground, CreateAppAnimation, Hero, Writing } from './page.client';
 
 const headingVariants = cva('font-medium tracking-tight text-balance', {
@@ -49,6 +49,27 @@ const cardVariants = cva('rounded-2xl p-6 text-sm shadow-lg', {
   },
   defaultVariants: { variant: 'default' },
 });
+
+function StaticCodeBlock({
+  code,
+  codeblock,
+}: {
+  code: string;
+  lang?: string;
+  codeblock?: { className?: string; title?: string };
+}) {
+  return (
+    <CodeBlock
+      title={codeblock?.title}
+      className={codeblock?.className}
+      viewportProps={{ className: 'bg-fd-secondary text-fd-secondary-foreground' }}
+    >
+      <Pre className="font-mono text-xs leading-6">
+        <code>{code}</code>
+      </Pre>
+    </CodeBlock>
+  );
+}
 
 const principles = [
   {
@@ -119,7 +140,7 @@ export default function Page() {
               <h2 className="content-center rounded-xl border-2 border-brand/50 px-3 py-2 font-mono text-sm font-bold text-brand uppercase">
                 One prompt
               </h2>
-              <ServerCodeBlock
+              <StaticCodeBlock
                 code={`Read https://github.com/akua-dev/agentos/blob/main/BOOTSTRAP.md.
 Help me bring AgentOS online — check my setup first, ask before changing anything.`}
                 lang="text"
@@ -272,7 +293,7 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
                 alone does not.
               </p>
             </div>
-            <ServerCodeBlock
+            <StaticCodeBlock
               lang="text"
               code={`Human intent
   → Task
@@ -348,7 +369,7 @@ function Progression() {
       tabs={{
         chatbot: (
           <div className="grid gap-8 rounded-2xl border bg-fd-card p-6 shadow-lg lg:grid-cols-2">
-            <ServerCodeBlock
+            <StaticCodeBlock
               lang="text"
               code={`Model → generation
 Chat → turns + context
@@ -376,7 +397,7 @@ Human still carries the goal.`}
         ),
         agent: (
           <div className="grid gap-8 rounded-2xl border bg-fd-card p-6 shadow-lg lg:grid-cols-2">
-            <ServerCodeBlock
+            <StaticCodeBlock
               lang="text"
               code={`bounded outcome
   → reason
@@ -405,7 +426,7 @@ Human still carries the goal.`}
         ),
         company: (
           <div className="grid gap-8 rounded-2xl border bg-fd-card p-6 shadow-lg lg:grid-cols-2">
-            <ServerCodeBlock
+            <StaticCodeBlock
               lang="text"
               code={`Agent team + durable organization
 

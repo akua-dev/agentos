@@ -75,16 +75,6 @@ const state = process.env.FAKE_HERDR_STATE!;
 const args = process.argv.slice(2);
 await appendFile(join(state, "calls.jsonl"), JSON.stringify(args) + "\\n");
 const command = args.slice(0, 2).join(" ");
-async function waitForObserverStart() {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    try {
-      await readFile(join(state, "observer-started"), "utf8");
-      return;
-    } catch {}
-    await Bun.sleep(10);
-  }
-  process.exit(1);
-}
 if (args[0] === "server") {
   await writeFile(join(state, "server-node-path"), process.env.NODE_PATH ?? "");
   await writeFile(join(state, "server-ready"), "ready\\n");
@@ -135,9 +125,6 @@ if (args[0] === "server") {
     candidate.pane_id === args[paneIndex + 1] && candidate.live,
   );
   if (!agent) process.exit(1);
-  if (process.env.FAKE_HERDR_WAIT_FOR_OBSERVER === "1") {
-    await waitForObserverStart();
-  }
   console.log(JSON.stringify({ result: { type: "pane_process_info" } }));
 } else if (command === "pane close") {
   const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
@@ -146,7 +133,6 @@ if (args[0] === "server") {
     JSON.stringify(agents.filter((candidate: { pane_id?: string }) => candidate.pane_id !== args[2])),
   );
 } else if (args.slice(0, 3).join(" ") === "terminal session observe") {
-  await writeFile(join(state, "observer-started"), "started\\n", "utf8");
   process.on("SIGTERM", () => process.exit(0));
   setInterval(() => {}, 1_000);
 }
@@ -582,9 +568,7 @@ describe("Mate runtime", () => {
 
   test("triggers native restore instead of creating a second First Mate", async () => {
     const cwd = defaultFirstMateCwd;
-    const { env, state } = await createHarness([], {
-      FAKE_HERDR_WAIT_FOR_OBSERVER: "1",
-    });
+    const { env, state } = await createHarness([]);
     const persistedSession = join(state, "current-session.jsonl");
     await writeFile(
       persistedSession,

@@ -25,11 +25,9 @@ bun run site:deploy
 ```
 
 `site:upload:worker` and `site:deploy:worker` operate on an existing
-OpenNext build. `site:deploy` builds and deploys in one command.
-
-The shared root `bun.lock` intentionally uses the lockfile format supported by
-the Workers Builds image. Keep it at that format when refreshing dependencies;
-the website build-contract test catches accidental upgrades to a newer format.
+OpenNext build. `site:deploy` builds and deploys in one command. The Worker
+build finishes with a native Wrangler dry run and fails if its compressed
+upload exceeds Cloudflare Workers' 3 MiB free-plan limit.
 
 Set `NEXT_PUBLIC_SITE_URL` to the public origin when building for a different
 host. It defaults to `https://agentos.akua.dev` for production builds and to
