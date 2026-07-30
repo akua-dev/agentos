@@ -1,0 +1,10 @@
+{
+  "name": "@agentos/otel-collector",
+  "version": "0.0.0",
+  "description": "Fleet-local OpenTelemetry Collector deployment and validation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test kubernetes/tests"
+  }
+}
