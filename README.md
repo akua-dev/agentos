@@ -67,10 +67,10 @@ evidence returns for your next local review or iteration.
 
 ## Bring your own workplace
 
-People should not have to accept one permanent Agent dashboard. A purpose-built
-interface can prepare each employee's relevant decisions and context, present a
-choice in the form that fits it, help revise feedback with a local Agent and
-send only approved intent to First Mate.
+People should not have to accept one permanent Agent dashboard. A future
+purpose-built interface could prepare each employee's relevant decisions and
+context, present a choice in the form that fits it, help revise feedback with a
+local Agent and send only approved intent to First Mate.
 
 [Flect](https://github.com/akua-dev/flect) is a public developer-preview
 interface shell and a natural first AgentOS dogfooding adopter. The proposed
