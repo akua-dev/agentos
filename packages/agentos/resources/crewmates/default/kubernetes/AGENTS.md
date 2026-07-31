@@ -3,7 +3,10 @@
 This subtree owns the reusable separate-Pod Crewmate workload base.
 
 - First or Second Mate creates a reviewed per-agent overlay and invokes native
-  kubectl; Crewmates never create other agents.
+  kubectl in the owning Mate's namespace; Crewmates never create other agents.
+- Keep the base namespace-neutral. The owning overlay selects the namespace and
+  may not smuggle Namespace, RBAC, NetworkPolicy, quota or Secret mutation into
+  an ordinary Crewmate workload.
 - Patch retained-home and Pod-security mechanics from this distribution's
   `packages/agentos/runtime/kubernetes/base`; keep Assignment identity,
   database credentials, selected tools, harness commands and role-specific

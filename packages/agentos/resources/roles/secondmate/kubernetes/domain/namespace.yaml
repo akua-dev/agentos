@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agentos-secondmate-domain
+  labels:
+    agentos.akua.dev/fleet: default
+    agentos.akua.dev/managed-by: agentos-firstmate
+    agentos.akua.dev/owner-agent-id: 00000000-0000-4000-8000-000000000002
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.35
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.35
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.35

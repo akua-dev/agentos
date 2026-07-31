@@ -17,17 +17,25 @@ canonical:
 | `packages/agentos/runtime/kubernetes/base` | Shared StatefulSet and runtime container shape |
 | `packages/agentos/runtime/kubernetes/mate` | Persistent-Mate specialization |
 | `packages/agentos/resources/roles/firstmate/kubernetes` | Namespace, service, identity, bindings and First-Mate patch |
-| `packages/agentos/resources/roles/secondmate/kubernetes` | Persistent domain-leader workload and identity |
-| `packages/agentos/resources/crewmates/default/kubernetes` | Bounded worker workload and identity |
+| `packages/agentos/resources/roles/secondmate/kubernetes/base` | Namespace-neutral persistent domain-leader workload and identity |
+| `packages/agentos/resources/roles/secondmate/kubernetes/domain` | Managed Namespace, workload and First-Mate/Second-Mate authority split |
+| `packages/agentos/resources/crewmates/default/kubernetes` | Namespace-neutral bounded worker workload and identity |
 | `database/kubernetes/cloudnative-pg` | Minimal optional self-hosted database operand |
 | `services/ai-gateway/kubernetes` | Optional gateway Service, StatefulSet and NetworkPolicy |
 
 Kustomize composes the reviewed resources; documentation does not reproduce complete manifests.
 Render before apply and inspect the result against the target cluster.
 
+The minimal profile may still place Agents in `agentos`. A persistent Second Mate normally uses
+one labeled domain namespace shared with its Crewmates. Reusable bases select no namespace; the
+owning per-Agent overlay selects it. Core PostgreSQL, AI Gateway and Collector clients use fully
+qualified `agentos.svc.cluster.local` addresses.
+
 The minimal self-hosted database shape is one instance with no reviewed HA or backup policy. The
 database Skill discovers compatible current CloudNativePG and PostgreSQL releases; those external
 versions are not encoded as AgentOS release metadata.
 
 First Mate’s cluster-admin overlay is explicit and separately approved. Base ServiceAccounts do
-not imply universal runtime control.
+not imply universal runtime control. The managed-domain Role allows a Second Mate to operate child
+workloads only in its namespace and withholds Secret and control-plane mutation. The domain
+NetworkPolicy isolates ingress without blocking Agent internet egress.

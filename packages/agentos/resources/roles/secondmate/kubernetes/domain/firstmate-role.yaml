@@ -1,0 +1,107 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agentos-firstmate-domain-supervisor
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - delete
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods/exec
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - pods/log
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+      - secrets
+      - serviceaccounts
+      - services
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - limitranges
+      - resourcequotas
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - controllerrevisions
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - rolebindings
+      - roles
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch

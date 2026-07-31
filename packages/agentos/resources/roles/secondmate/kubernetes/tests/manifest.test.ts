@@ -3,8 +3,15 @@ import { join } from "node:path";
 
 type Resource = {
   kind: string;
-  metadata: { labels?: Record<string, string>; name: string };
+  metadata: {
+    labels?: Record<string, string>;
+    name: string;
+    namespace?: string;
+  };
+  roleRef?: Record<string, string>;
+  rules?: Array<Record<string, string[]>>;
   spec?: Record<string, any>;
+  subjects?: Array<Record<string, string>>;
 };
 
 const kubernetes = new URL("..", import.meta.url).pathname;
@@ -40,6 +47,15 @@ function resource(resources: Resource[], kind: string) {
   return match;
 }
 
+function namedResource(resources: Resource[], kind: string, name: string) {
+  const match = resources.find(
+    (candidate) =>
+      candidate.kind === kind && candidate.metadata.name === name,
+  );
+  if (!match) throw new Error(`Missing ${kind}/${name}`);
+  return match;
+}
+
 describe("Second Mate Kubernetes base", () => {
   test("renders one persistent isolated Pi Mate", async () => {
     const resources = await render();
@@ -48,6 +64,9 @@ describe("Second Mate Kubernetes base", () => {
       "ServiceAccount",
       "StatefulSet",
     ]);
+    expect(
+      resources.every(({ metadata }) => metadata.namespace === undefined),
+    ).toBe(true);
 
     const statefulSet = resource(resources, "StatefulSet");
     expect(statefulSet.metadata.name).toBe("agentos-secondmate");
@@ -87,6 +106,12 @@ describe("Second Mate Kubernetes base", () => {
       "/home/agent/projects/agentos/packages/agentos",
     );
     expect(environment.AGENTOS_AGENT_ROLE).toBe("second_mate");
+    expect(environment.AGENTOS_DATABASE_URL).toContain(
+      "@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos",
+    );
+    expect(environment.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+      "http://agentos-otel-collector.agentos.svc.cluster.local:4318",
+    );
     expect(environment.AGENTOS_MODEL).toBeUndefined();
     expect(environment.AGENTOS_THINKING).toBeUndefined();
     expect(container.args).toEqual(["run", "--skip-tools", "secondmate:run"]);
@@ -122,5 +147,221 @@ describe("Second Mate Kubernetes base", () => {
     });
     expect(pod.serviceAccountName).toBe("agentos-secondmate");
     expect(spec.volumeClaimTemplates[0].metadata.name).toBe("home");
+  });
+
+  test("renders the same persistent Mate base into isolated domain namespaces", async () => {
+    const fixtures = [
+      {
+        directory: "domain-alpha",
+        namespace: "agentos-domain-alpha",
+        ownerAgentId: "00000000-0000-4000-8000-00000000000a",
+      },
+      {
+        directory: "domain-beta",
+        namespace: "agentos-domain-beta",
+        ownerAgentId: "00000000-0000-4000-8000-00000000000b",
+      },
+    ] as const;
+    const rendered = await Promise.all(
+      fixtures.map(async (fixture) => ({
+        ...fixture,
+        resources: await render(
+          join(kubernetes, "tests", "fixtures", fixture.directory),
+        ),
+      })),
+    );
+
+    for (const fixture of rendered) {
+      expect(
+        fixture.resources
+          .map(({ kind, metadata }) => `${kind}/${metadata.name}`)
+          .sort(),
+      ).toEqual([
+        "Namespace/" + fixture.namespace,
+        "NetworkPolicy/agentos-domain-ingress",
+        "ResourceQuota/agentos-domain-capacity",
+        "Role/agentos-firstmate-domain-supervisor",
+        "Role/agentos-secondmate-workload-manager",
+        "RoleBinding/agentos-firstmate-domain-supervisor-binding",
+        "RoleBinding/agentos-secondmate-workload-manager-binding",
+        "Service/agentos-secondmate",
+        "ServiceAccount/agentos-secondmate",
+        "StatefulSet/agentos-secondmate",
+      ]);
+      expect(
+        fixture.resources
+          .filter(({ kind }) => kind !== "Namespace")
+          .every(
+            ({ metadata }) => metadata.namespace === fixture.namespace,
+          ),
+      ).toBe(true);
+
+      const namespace = namedResource(
+        fixture.resources,
+        "Namespace",
+        fixture.namespace,
+      );
+      expect(namespace.metadata.labels).toEqual({
+        "agentos.akua.dev/fleet": "default",
+        "agentos.akua.dev/managed-by": "agentos-firstmate",
+        "agentos.akua.dev/owner-agent-id": fixture.ownerAgentId,
+        "pod-security.kubernetes.io/audit": "restricted",
+        "pod-security.kubernetes.io/audit-version": "v1.35",
+        "pod-security.kubernetes.io/enforce": "restricted",
+        "pod-security.kubernetes.io/enforce-version": "v1.35",
+        "pod-security.kubernetes.io/warn": "restricted",
+        "pod-security.kubernetes.io/warn-version": "v1.35",
+      });
+      const statefulSet = namedResource(
+        fixture.resources,
+        "StatefulSet",
+        "agentos-secondmate",
+      );
+      const environment = Object.fromEntries(
+        statefulSet.spec?.template.spec.containers[0].env.map(
+          ({ name, value }: { name: string; value: string }) => [name, value],
+        ),
+      );
+      expect(environment.AGENTOS_AGENT_ID).toBe(fixture.ownerAgentId);
+    }
+
+    const workloadIdentities = rendered.map(({ namespace, resources }) => {
+      const statefulSet = namedResource(
+        resources,
+        "StatefulSet",
+        "agentos-secondmate",
+      );
+      return `${namespace}/${statefulSet.kind}/${statefulSet.metadata.name}`;
+    });
+    expect(new Set(workloadIdentities).size).toBe(2);
+  });
+
+  test("grants child lifecycle authority without domain-control authority", async () => {
+    const namespace = "agentos-domain-alpha";
+    const resources = await render(
+      join(kubernetes, "tests", "fixtures", "domain-alpha"),
+    );
+    const workloadRole = namedResource(
+      resources,
+      "Role",
+      "agentos-secondmate-workload-manager",
+    );
+    expect(workloadRole.rules).toEqual([
+      {
+        apiGroups: [""],
+        resources: ["pods"],
+        verbs: ["delete", "get", "list", "watch"],
+      },
+      {
+        apiGroups: [""],
+        resources: ["pods/exec"],
+        verbs: ["create"],
+      },
+      {
+        apiGroups: [""],
+        resources: ["pods/log"],
+        verbs: ["get"],
+      },
+      {
+        apiGroups: [""],
+        resources: ["events", "persistentvolumeclaims"],
+        verbs: ["get", "list", "watch"],
+      },
+      {
+        apiGroups: [""],
+        resources: ["serviceaccounts", "services"],
+        verbs: ["create", "delete", "get", "list", "patch", "update", "watch"],
+      },
+      {
+        apiGroups: ["apps"],
+        resources: ["statefulsets"],
+        verbs: ["create", "delete", "get", "list", "patch", "update", "watch"],
+      },
+    ]);
+    expect(JSON.stringify(workloadRole.rules)).not.toMatch(
+      /secret|role|networkpolic|resourcequota|limitrange|namespace|\"\*\"/i,
+    );
+
+    const workloadBinding = namedResource(
+      resources,
+      "RoleBinding",
+      "agentos-secondmate-workload-manager-binding",
+    );
+    expect({
+      roleRef: workloadBinding.roleRef,
+      subjects: workloadBinding.subjects,
+    }).toEqual({
+      roleRef: {
+        apiGroup: "rbac.authorization.k8s.io",
+        kind: "Role",
+        name: "agentos-secondmate-workload-manager",
+      },
+      subjects: [
+        {
+          kind: "ServiceAccount",
+          name: "agentos-secondmate",
+          namespace,
+        },
+      ],
+    });
+
+    const firstmateRole = namedResource(
+      resources,
+      "Role",
+      "agentos-firstmate-domain-supervisor",
+    );
+    expect(JSON.stringify(firstmateRole.rules)).not.toContain('"*"');
+    expect(firstmateRole.rules).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ resources: ["pods/exec"], verbs: ["create"] }),
+        expect.objectContaining({
+          resources: expect.arrayContaining(["secrets"]),
+          verbs: ["create", "delete", "get", "list", "patch", "update", "watch"],
+        }),
+        expect.objectContaining({
+          apiGroups: ["rbac.authorization.k8s.io"],
+          resources: ["rolebindings", "roles"],
+        }),
+      ]),
+    );
+    const firstmateBinding = namedResource(
+      resources,
+      "RoleBinding",
+      "agentos-firstmate-domain-supervisor-binding",
+    );
+    expect(firstmateBinding.subjects).toEqual([
+      {
+        kind: "ServiceAccount",
+        name: "agentos-firstmate",
+        namespace: "agentos",
+      },
+    ]);
+
+    const quota = namedResource(
+      resources,
+      "ResourceQuota",
+      "agentos-domain-capacity",
+    );
+    expect(quota.spec).toEqual({
+      hard: {
+        "count/persistentvolumeclaims": "16",
+        "count/pods": "16",
+        "count/services": "16",
+        "count/services.loadbalancers": "0",
+        "count/services.nodeports": "0",
+        "count/statefulsets.apps": "16",
+        "requests.storage": "320Gi",
+      },
+    });
+    const ingress = namedResource(
+      resources,
+      "NetworkPolicy",
+      "agentos-domain-ingress",
+    );
+    expect(ingress.spec).toEqual({
+      ingress: [{ from: [{ podSelector: {} }] }],
+      podSelector: {},
+      policyTypes: ["Ingress"],
+    });
   });
 });

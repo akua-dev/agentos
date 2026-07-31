@@ -7,6 +7,7 @@ type Resource = {
     annotations?: Record<string, string>;
     labels?: Record<string, string>;
     name: string;
+    namespace?: string;
   };
   spec?: Record<string, any>;
 };
@@ -52,6 +53,9 @@ describe("Crewmate Kubernetes base", () => {
       "ServiceAccount",
       "StatefulSet",
     ]);
+    expect(
+      resources.every(({ metadata }) => metadata.namespace === undefined),
+    ).toBe(true);
 
     const statefulSet = resource(resources, "StatefulSet");
     expect(statefulSet.metadata.name).toBe("agentos-crewmate");
@@ -141,7 +145,7 @@ describe("Crewmate Kubernetes base", () => {
       AGENTOS_ASSIGNMENT_ID: "00000000-0000-4000-8000-000000000005",
       AGENTOS_BRIEF_PATH: "/home/agent/brief.md",
       AGENTOS_DATABASE_URL:
-        "postgresql://runtime_crewmate@agentos-postgres-rw.agentos.svc:5432/agentos?sslmode=require",
+        "postgresql://runtime_crewmate@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos?sslmode=require",
       AGENTOS_PGPASS_SOURCE: "/var/run/secrets/agentos/pgpass",
       AGENTOS_TASK_ID: "00000000-0000-4000-8000-000000000004",
       HERDR_SESSION: "agentos-crewmate",
@@ -149,6 +153,9 @@ describe("Crewmate Kubernetes base", () => {
     });
     expect(environment.AGENTOS_MODEL).toBeUndefined();
     expect(environment.AGENTOS_THINKING).toBeUndefined();
+    expect(environment.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+      "http://agentos-otel-collector.agentos.svc.cluster.local:4318",
+    );
     expect(environment.PI_CODING_AGENT_DIR).toBeUndefined();
     expect(container.command).toEqual(["herdr"]);
     expect(container.args).toEqual(["server", "--session", "agentos-crewmate"]);

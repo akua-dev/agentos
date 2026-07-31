@@ -1,8 +1,11 @@
 # Second Mate Kubernetes assets
 
-This subtree owns the reusable persistent Second Mate workload base.
+This subtree owns the namespace-neutral persistent Second Mate workload base
+and its reviewed managed-domain composition.
 
-- First Mate creates a reviewed per-agent overlay and invokes native kubectl.
+- First Mate creates one reviewed per-Agent overlay over `domain/`, selects the
+  concrete namespace there and invokes native kubectl. The generic `base/`
+  never selects a namespace.
 - Patch the shared Pi lifecycle from this distribution's
   `packages/agentos/runtime/kubernetes/mate`; keep only Second-Mate identity,
   working directory, tasks and credentials here.
@@ -12,9 +15,16 @@ This subtree owns the reusable persistent Second Mate workload base.
   every persistent Second-Mate Pod. Native in-cluster `kubectl` must use that
   identity; never substitute a separately minted bearer token as steady-state
   supervision authentication.
-- Keep child access out of this reusable base. The reviewed per-Agent overlay
-  owns least-privilege Role and RoleBinding resources for exact managed child
-  Pod names; never grant label-wide or sibling access here.
+- Keep child authority out of `base/`. The `domain/` composition binds the
+  Second Mate to namespaced Crewmate workload operations while withholding
+  Namespace, Secret, RBAC, quota, LimitRange, NetworkPolicy and cluster-scoped
+  mutation. First Mate owns those controls and is bound into the domain for
+  supervision and repair.
+- Treat every Secret in a domain namespace as visible to its Second Mate because
+  workload-create authority can mount it. Keep Fleet-root credentials in the
+  core namespace.
+- Keep domain ingress isolated to same-namespace Pods and leave egress open.
+  Do not delete a domain Namespace while retained PVCs still require preservation.
 - Keep Second Mate on Pi while leaving Pi model and thinking settings on its
   agent-owned PVC.
 - Never add a spawn/render wrapper or silently create RBAC and credentials.

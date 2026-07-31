@@ -146,12 +146,20 @@ three values:
 - `AI_GATEWAY_URL=http://ai-gateway.agentos.svc.cluster.local:8787`;
 - `AI_GATEWAY_TOKEN` from `Secret/ai-gateway-client` key `token`.
 
+The client Namespace must carry the same `agentos.akua.dev/fleet` label as the
+core `agentos` Namespace or the Gateway NetworkPolicy denies it. Kubernetes
+Secret references are namespace-local, so First Mate creates the approved
+`Secret/ai-gateway-client` in each selected domain without printing the token.
+Treat that token as visible to the domain's Second Mate: its workload-create
+authority can mount every Secret in its namespace. Do not copy the Gateway's
+OAuth vault, provider accounts or Fleet-root credentials into a domain.
+
 The default distribution ships one additive client patch for each workload:
 
 | Client      | Base                                                           | Optional patch                                                                           | StatefulSet          |
 | ----------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------- |
 | First Mate  | `packages/agentos/resources/roles/firstmate/kubernetes/base`   | `packages/agentos/resources/roles/firstmate/kubernetes/patches/ai-gateway-client.yaml`   | `agentos-firstmate`  |
-| Second Mate | `packages/agentos/resources/roles/secondmate/kubernetes/base`  | `packages/agentos/resources/roles/secondmate/kubernetes/patches/ai-gateway-client.yaml`  | `agentos-secondmate` |
+| Second Mate | `packages/agentos/resources/roles/secondmate/kubernetes/domain` | `packages/agentos/resources/roles/secondmate/kubernetes/patches/ai-gateway-client.yaml` | `agentos-secondmate` |
 | Crewmate    | `packages/agentos/resources/crewmates/default/kubernetes/base` | `packages/agentos/resources/crewmates/default/kubernetes/patches/ai-gateway-client.yaml` | `agentos-crewmate`   |
 
 Compose the approved client's base and patch in its reviewed per-Agent
@@ -172,7 +180,8 @@ patches:
 ```
 
 Use the exact base, patch, and StatefulSet from the table for Second Mate or
-Crewmate. Render the overlay with
+Crewmate. Select the owning namespace in that overlay; never rely on the core
+namespace as an implicit default. Render the overlay with
 `kubectl --context <context> kustomize --load-restrictor LoadRestrictionsNone
 <reviewed-client-overlay>` and apply that reviewed render through the Fleet's
 normal native Kubernetes workflow.

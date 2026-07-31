@@ -40,7 +40,7 @@ workspace="$(mise run database:prepare)"
 PGPASSFILE="$HOME/.pgpass" \
   PGSSLROOTCERT="/var/run/agentos/postgres/ca.crt" \
   NODE_EXTRA_CA_CERTS="/var/run/agentos/postgres/ca.crt" \
-  DATABASE_URL="postgresql://agentos@agentos-postgres-rw:5432/agentos?sslmode=verify-full" \
+  DATABASE_URL="postgresql://agentos@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos?sslmode=verify-full" \
   bun run --cwd "$workspace" migrate
 ```
 

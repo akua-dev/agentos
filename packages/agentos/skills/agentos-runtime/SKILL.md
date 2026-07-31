@@ -87,7 +87,7 @@ wrapper CLI for this sequence.
 - Keep First and Second Mates on Pi. Permit released worker harnesses such as Pi or Codex.
 - Keep one pod, ServiceAccount, durable home PVC, database principal and
   pod-local Herdr server per Agent.
-- Use `../secondmate/kubernetes/base` from First Mate and
+- Use `../secondmate/kubernetes/domain` from First Mate and
   `../../crewmates/default/kubernetes/base` from either Mate. Never apply a
   generic base
   directly: it contains visible placeholder identity and local-development
@@ -113,23 +113,27 @@ delegation or database intake from this Skill.
 1. Verify the supplied Agent, Task, Assignment, database login, Secret
    reference, brief and selected setup agree on one child identity.
 2. Resolve the owning Mate's namespace, Pod and `serviceAccountName` from
-   Kubernetes. Require its standard projected ServiceAccount token, CA and
+   Kubernetes. For a Crewmate, require the target namespace to equal the
+   owning Mate's namespace. A First Mate provisioning a Second Mate instead
+   uses that Mate's reviewed `kubernetes/domain` composition and proves the
+   Namespace Fleet and owner-Agent labels before applying the workload.
+   Require the owner's standard projected ServiceAccount token, CA and
    namespace mounts and native in-cluster `kubectl`; never create, copy or
    persist a bearer token or generated kubeconfig for steady-state child
-   supervision.
+   supervision. Verify that a Second Mate is bound to
+   `Role/agentos-secondmate-workload-manager` only in its own domain.
 3. Create `$HOME/.local/state/agentos/workloads/<handle>/kustomization.yaml`.
    Reference the released child base and patch every placeholder: resource
    names, Agent labels and UUID, Herdr session, database URL and Secret, Task
    and Assignment UUIDs where applicable, storage, selected image and image
-   pull policy. Published images require an immutable digest. In the managed
-   child's namespace, add one reviewed Role and RoleBinding that bind the
-   owning Mate's exact ServiceAccount and select only the child's stable Pod
-   name. Grant core `pods` `get`, `list` and `watch`; grant `pods/exec`
-   `create` only when the approved launch, attach, doorbell or recovery path
-   requires it. The RoleBinding subject must use the owning ServiceAccount's
-   exact name and namespace. Every rule must use `resourceNames`; never grant
-   sibling, label-wide or wildcard access. Remove a retired child name rather
-   than accumulating access.
+   pull policy. Published images require an immutable digest. A Crewmate
+   overlay contains only its dedicated ServiceAccount, headless Service and
+   retained one-replica StatefulSet; reject Namespace, Role, RoleBinding,
+   NetworkPolicy, ResourceQuota, LimitRange, Secret and cluster-scoped
+   resources. Its owner already receives the reviewed namespace-limited
+   workload authority from the domain composition. A Second-Mate overlay is
+   the one exception: First Mate composes the released domain assets and owns
+   every control resource in that render.
 4. Render a review artifact with native kubectl:
 
    ```console
@@ -138,13 +142,17 @@ delegation or database intake from this Skill.
      --output "$HOME/.local/state/agentos/workloads/<handle>/rendered.yaml"
    ```
 
-5. Inspect the complete rendered resources. Require exactly one dedicated
-   ServiceAccount, headless Service and retained one-replica StatefulSet. The
-   child Pod must explicitly enable its projected ServiceAccount identity when
-   it is a persistent Mate that will supervise its own children. Require only
-   the exact-parent Role and RoleBinding selected in step 3; reject placeholder
-   values, any other or broader RBAC, public endpoints, mutable remote images
-   and ownership conflicts.
+5. Inspect the complete rendered resources. For a Crewmate, require exactly one
+   dedicated ServiceAccount, headless Service and retained one-replica
+   StatefulSet and reject every control resource named in step 3. For a Second
+   Mate, additionally require the exact released Namespace, two Roles, two
+   RoleBindings, ingress-only NetworkPolicy and ResourceQuota from the domain
+   composition. Verify concrete Fleet and owner-Agent Namespace labels, the
+   core First-Mate subject, the domain Second-Mate subject, restricted Pod
+   Security labels, no wildcard RBAC and no egress policy. The child Pod must
+   explicitly enable its projected ServiceAccount identity when it is a
+   persistent Mate that will supervise its own children. Reject placeholder
+   values, public endpoints, mutable remote images and ownership conflicts.
 6. Ask for any installation, cost or RBAC approval not already recorded. Then
    validate against the API server and inspect the diff:
 
@@ -167,13 +175,16 @@ delegation or database intake from this Skill.
 
 8. Verify observed image IDs, ServiceAccount, Pod, PVC, Secret mount, Agent
    environment and Herdr status; for a persistent Mate, also verify the
-   projected token mount. From the owning Mate identity, use
-   `kubectl auth can-i` to verify exact named-Pod `get` and `watch`; an external
-   reviewer may use `--as` only when its current identity already has
-   impersonation authority. Verify any selected `pods/exec` grant through the
-   already-approved native launch or attach action. A denial blocks unattended
-   supervision; a network or API failure remains a visible failure rather than
-   a reason to mint another token. For a Crewmate, create or recover the
+   projected token mount. From a Second Mate identity, use `kubectl auth can-i`
+   to verify namespaced StatefulSet, Service and ServiceAccount creation plus
+   Pod read, replacement and approved exec. Also prove denial for Namespace,
+   Secret, RBAC, NetworkPolicy, ResourceQuota, LimitRange and sibling-namespace
+   access. From First Mate, prove inspect, exec, stop, credential and policy
+   maintenance in the domain. An external reviewer may use `--as` only when its
+   current identity already has impersonation authority. A denial of required
+   authority blocks unattended supervision; a network or API failure remains
+   a visible failure rather than a reason to mint another token. For a
+   Crewmate, create or recover the
    project and Treehouse lease inside that pod. Copy the
    PostgreSQL-authoritative brief's rendered harness view with native kubectl
    and verify its digest inside the pod:
