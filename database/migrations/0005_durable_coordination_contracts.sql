@@ -45,6 +45,8 @@ CREATE POLICY captain_second_mate_update
 ALTER TABLE agentos.task_assignments
   ADD COLUMN brief text CHECK (brief IS NULL OR length(btrim(brief)) > 0),
   ADD COLUMN report text CHECK (report IS NULL OR length(btrim(report)) > 0),
+  ADD COLUMN dispatch_profile jsonb NOT NULL DEFAULT '{}'::jsonb
+    CHECK (jsonb_typeof(dispatch_profile) = 'object'),
   ADD COLUMN supersedes_assignment_id uuid
     REFERENCES agentos.task_assignments(id) ON DELETE RESTRICT,
   ADD COLUMN decision_keys text[],
@@ -72,6 +74,8 @@ COMMENT ON COLUMN agentos.task_assignments.brief IS
   'Authoritative complete Assignment brief. A rendered PVC file is a replaceable harness view.';
 COMMENT ON COLUMN agentos.task_assignments.report IS
   'Authoritative final or handoff report required before an Assignment ends.';
+COMMENT ON COLUMN agentos.task_assignments.dispatch_profile IS
+  'Concrete harness plus optional native model, effort and immutable image selected for this Assignment.';
 COMMENT ON COLUMN agentos.task_assignments.supersedes_assignment_id IS
   'Prior Assignment ended by an atomic handoff of the same stable Task.';
 COMMENT ON COLUMN agentos.task_assignments.decision_keys IS
@@ -93,10 +97,24 @@ SET search_path = agentos, pg_temp
 AS $$
 DECLARE
   v_open_decision_keys text[];
+  v_target_harness text;
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF NEW.brief IS NULL OR length(btrim(NEW.brief)) = 0 THEN
       RAISE EXCEPTION 'Task Assignment requires a durable brief';
+    END IF;
+
+    IF nullif(btrim(NEW.dispatch_profile ->> 'harness'), '') IS NULL THEN
+      RAISE EXCEPTION 'Task Assignment requires a concrete dispatch-profile harness';
+    END IF;
+
+    SELECT agent.harness
+      INTO v_target_harness
+      FROM agentos.agents AS agent
+     WHERE agent.id = NEW.agent_id;
+
+    IF NEW.dispatch_profile ->> 'harness' IS DISTINCT FROM v_target_harness THEN
+      RAISE EXCEPTION 'dispatch-profile harness must match the assigned Agent';
     END IF;
   END IF;
 
@@ -151,6 +169,7 @@ BEGIN
     NEW.ended_at,
     NEW.brief,
     NEW.report,
+    NEW.dispatch_profile,
     NEW.supersedes_assignment_id,
     NEW.decision_keys,
     NEW.decisions_attested_at,
@@ -167,6 +186,7 @@ BEGIN
     OLD.ended_at,
     OLD.brief,
     OLD.report,
+    OLD.dispatch_profile,
     OLD.supersedes_assignment_id,
     OLD.decision_keys,
     OLD.decisions_attested_at,
@@ -184,7 +204,8 @@ CREATE FUNCTION agentos.handoff_task_assignment(
   p_destination_agent_id uuid,
   p_brief text,
   p_report text,
-  p_status_text text
+  p_status_text text,
+  p_dispatch_profile jsonb
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -207,6 +228,12 @@ BEGIN
     RAISE EXCEPTION 'Task handoff requires a complete brief, report and status text';
   END IF;
 
+  IF p_dispatch_profile IS NULL
+     OR jsonb_typeof(p_dispatch_profile) <> 'object'
+     OR nullif(btrim(p_dispatch_profile ->> 'harness'), '') IS NULL THEN
+    RAISE EXCEPTION 'Task handoff requires a concrete dispatch profile';
+  END IF;
+
   SELECT assignment.*
     INTO v_previous
     FROM agentos.task_assignments AS assignment
@@ -223,9 +250,8 @@ BEGIN
       FROM agentos.task_assignments AS assignment
      WHERE assignment.supersedes_assignment_id = p_assignment_id
        AND assignment.agent_id = p_destination_agent_id
-       AND assignment.brief = btrim(p_brief)
-       AND assignment.status_text = btrim(p_status_text)
-       AND v_previous.report = btrim(p_report);
+       AND assignment.brief = p_brief
+       AND assignment.dispatch_profile = p_dispatch_profile;
 
     IF v_replacement_id IS NOT NULL THEN
       RETURN v_replacement_id;
@@ -267,6 +293,7 @@ BEGIN
     status,
     status_text,
     brief,
+    dispatch_profile,
     supersedes_assignment_id
   ) VALUES (
     v_previous.task_id,
@@ -276,6 +303,7 @@ BEGIN
     'assigned',
     btrim(p_status_text),
     btrim(p_brief),
+    p_dispatch_profile,
     p_assignment_id
   )
   RETURNING id INTO v_replacement_id;
@@ -594,7 +622,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION agentos.handoff_task_assignment(
-  uuid, uuid, text, text, text
+  uuid, uuid, text, text, text, jsonb
 ) FROM PUBLIC;
 REVOKE ALL ON FUNCTION agentos.hold_captain_decision(
   uuid, text, text, text, text
@@ -625,7 +653,7 @@ BEGIN
     p_database_role
   );
   EXECUTE format(
-    'REVOKE INSERT (id, task_id, agent_id, assigned_by_agent_id, assignment_role, status, status_text, metadata, started_at, ended_at, brief, report, supersedes_assignment_id, decision_keys, decisions_attested_at, decisions_attested_by_agent_id) ON agentos.task_assignments FROM %I',
+    'REVOKE INSERT (id, task_id, agent_id, assigned_by_agent_id, assignment_role, status, status_text, metadata, started_at, ended_at, brief, report, dispatch_profile, supersedes_assignment_id, decision_keys, decisions_attested_at, decisions_attested_by_agent_id) ON agentos.task_assignments FROM %I',
     p_database_role
   );
   EXECUTE format(
@@ -637,7 +665,7 @@ BEGIN
     p_database_role
   );
   EXECUTE format(
-    'REVOKE EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text) FROM %I',
+    'REVOKE EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text, jsonb), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text) FROM %I',
     p_database_role
   );
   EXECUTE format(
@@ -664,7 +692,7 @@ BEGIN
       p_database_role
     );
     EXECUTE format(
-      'GRANT INSERT (id, task_id, agent_id, assigned_by_agent_id, assignment_role, status, status_text, metadata, started_at, ended_at, brief, report, supersedes_assignment_id, decision_keys, decisions_attested_at, decisions_attested_by_agent_id) ON agentos.task_assignments TO %I',
+      'GRANT INSERT (id, task_id, agent_id, assigned_by_agent_id, assignment_role, status, status_text, metadata, started_at, ended_at, brief, report, dispatch_profile, supersedes_assignment_id, decision_keys, decisions_attested_at, decisions_attested_by_agent_id) ON agentos.task_assignments TO %I',
       p_database_role
     );
     EXECUTE format(
@@ -676,7 +704,7 @@ BEGIN
       p_database_role
     );
     EXECUTE format(
-      'GRANT EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text) TO %I',
+      'GRANT EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text, jsonb), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text) TO %I',
       p_database_role
     );
     EXECUTE format(

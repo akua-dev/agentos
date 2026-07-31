@@ -14,7 +14,7 @@ beforeAll(async () => {
   const files = (await readdir(migrationsDirectory))
     .filter(
       (file) =>
-        /^\d+_.+\.sql$/.test(file) && Number.parseInt(file, 10) <= 13,
+        /^\d+_.+\.sql$/.test(file) && Number.parseInt(file, 10) <= 14,
     )
     .sort();
 
@@ -59,11 +59,12 @@ beforeAll(async () => {
 
     INSERT INTO agentos.task_assignments (
       id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-      status, status_text, brief
+      status, status_text, brief, dispatch_profile
     ) VALUES (
       '${assignmentId}', '${taskId}', '${secondMateId}', '${firstMateId}',
       'coordinate', 'active', 'Accepted before memory migration',
-      'Continue the existing work after migration.'
+      'Continue the existing work after migration.',
+      '{"version":1,"harness":"pi","materials":[],"settings":{}}'::jsonb
     );
   `);
 });
@@ -74,7 +75,7 @@ afterAll(async () => {
 
 test("refuses active Captain state, then removes the table after explicit archival", async () => {
   const migration = await import(
-    new URL("0014_mate_memory.sql", migrationsDirectory).href,
+    new URL("0015_mate_memory.sql", migrationsDirectory).href,
     { with: { type: "text" } },
   );
 

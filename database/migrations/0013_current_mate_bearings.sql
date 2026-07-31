@@ -336,7 +336,7 @@ BEGIN
     p_database_role
   );
   EXECUTE format(
-    'REVOKE INSERT (id, task_id, agent_id, assigned_by_agent_id, assignment_role, status, status_text, metadata, started_at, ended_at, brief, report, supersedes_assignment_id, decision_keys, decisions_attested_at, decisions_attested_by_agent_id) ON agentos.task_assignments FROM %I',
+    'REVOKE INSERT (id, task_id, agent_id, assigned_by_agent_id, assignment_role, status, status_text, metadata, started_at, ended_at, brief, report, dispatch_profile, supersedes_assignment_id, decision_keys, decisions_attested_at, decisions_attested_by_agent_id) ON agentos.task_assignments FROM %I',
     p_database_role
   );
   EXECUTE format(
@@ -348,7 +348,7 @@ BEGIN
     p_database_role
   );
   EXECUTE format(
-    'REVOKE EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text), agentos.create_task_with_assignment(uuid, uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb, text, text, text, text, jsonb), agentos.accept_backlog_task(uuid, uuid, uuid, text, text, text, text, text, text, jsonb), agentos.current_mate_bearings() FROM %I',
+    'REVOKE EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text, jsonb), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text), agentos.create_task_with_assignment(uuid, uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb, text, text, text, text, jsonb, jsonb), agentos.accept_backlog_task(uuid, uuid, uuid, text, text, text, text, text, text, jsonb, jsonb), agentos.current_mate_bearings() FROM %I',
     p_database_role
   );
   EXECUTE format(
@@ -383,7 +383,7 @@ BEGIN
       p_database_role
     );
     EXECUTE format(
-      'GRANT EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text), agentos.create_task_with_assignment(uuid, uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb, text, text, text, text, jsonb), agentos.accept_backlog_task(uuid, uuid, uuid, text, text, text, text, text, text, jsonb), agentos.current_mate_bearings() TO %I',
+      'GRANT EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text, jsonb), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text), agentos.create_task_with_assignment(uuid, uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb, text, text, text, text, jsonb, jsonb), agentos.accept_backlog_task(uuid, uuid, uuid, text, text, text, text, text, text, jsonb, jsonb), agentos.current_mate_bearings() TO %I',
       p_database_role
     );
     EXECUTE format(
