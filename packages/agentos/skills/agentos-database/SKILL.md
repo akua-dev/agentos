@@ -93,7 +93,7 @@ Do not add `postInitSQL` to the CNPG resource. Drizzle's ordered journal remains
 
 Use the CNPG-generated `agentos-postgres-app` identity for self-hosted PostgreSQL, never the superuser. Read Secret values only after credential approval and never print them.
 
-For direct `psql`, copy only the Secret's `pgpass` value into `~/.pgpass` on the owning agent PVC without exposing stdout, then set mode `0600`. From an Agent Pod in `agentos`, connect directly through the `agentos-postgres-rw` Service with explicit database and user names; do not create a port-forward inside the cluster. Refresh that file after credential rotation.
+For direct `psql`, copy only the Secret's `pgpass` value into `~/.pgpass` on the owning agent PVC without exposing stdout, then set mode `0600`. From any Agent namespace, connect directly through `agentos-postgres-rw.agentos.svc.cluster.local` with explicit database and user names; do not create a port-forward inside the cluster. Refresh that file after credential rotation.
 
 For Drizzle migrations, `pg-listen`, or another release-pinned `pg`
 process against that in-cluster CNPG Service, mount only the `ca.crt` key from
@@ -101,7 +101,7 @@ Secret `agentos-postgres-ca` read-only; never mount `ca.key`. Set
 `PGSSLROOTCERT` and `NODE_EXTRA_CA_CERTS` to that mounted certificate and use
 `PGSSLMODE=verify-full`. Keep the password in `~/.pgpass` and inject this
 non-secret URL into only the migration process:
-`postgresql://agentos@agentos-postgres-rw:5432/agentos?sslmode=verify-full`.
+`postgresql://agentos@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos?sslmode=verify-full`.
 The release-pinned `pg` 8 driver otherwise rejects CNPG's private cluster CA,
 while `sslmode=no-verify` or libpq-compatibility mode would weaken identity
 verification. Validate the Service hostname against the certificate and

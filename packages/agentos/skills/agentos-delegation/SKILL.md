@@ -147,8 +147,13 @@ Use released PostgreSQL schema for durable coordination and native tools against
    ArtifactFS Scout may instead use only the Assignment-scoped mount prepared
    through `$agentos-artifact-fs`; its overlay is scratch state and can never be
    promoted directly into delivered work.
-7. Create the dedicated workload from `../../crewmates/default/kubernetes/base` through a
-   reviewed per-Agent Kustomize overlay and native kubectl, then start the
+7. Create the dedicated workload from `../../crewmates/default/kubernetes/base`
+   through a reviewed per-Agent Kustomize overlay in the owning Mate's
+   namespace and native kubectl. A Second Mate must first prove that the
+   namespace carries its owner-Agent label and installed workload-manager Role;
+   the child overlay may not contain Namespace, Secret, RBAC, NetworkPolicy,
+   quota, LimitRange or cluster-scoped resources. First Mate owns those domain
+   controls. Then start the
    selected harness through the pod-local Herdr CLI only after the complete
    rendered brief and required runtime inputs have reached the child home.
    Confirm the selected Crewmate setup's native Skill catalog and required
@@ -249,6 +254,9 @@ Use released PostgreSQL schema for durable coordination and native tools against
 5. Remove a worktree or home only after its work is landed or explicitly discarded by the Captain.
    Return a Crewmate lease through the pinned Treehouse lifecycle; never
    manually delete its directory or Git metadata.
+6. Remove a child StatefulSet without deleting its retained PVC. A Second Mate
+   never deletes its domain Namespace; First Mate retires that Namespace only
+   after every retained PVC has separate explicit discard approval.
 
 For reassignment, call the released `agentos.handoff_task_assignment` Function.
 It ends the old Assignment with a report and creates one replacement for the

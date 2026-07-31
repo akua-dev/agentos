@@ -211,6 +211,11 @@ describe("Fleet OpenTelemetry Collector", () => {
       {
         from: [
           {
+            namespaceSelector: {
+              matchLabels: {
+                "agentos.akua.dev/fleet": "default",
+              },
+            },
             podSelector: {
               matchLabels: {
                 "agentos.akua.dev/otel-client": "true",

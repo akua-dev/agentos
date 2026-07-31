@@ -38,7 +38,7 @@ spec:
             - name: AGENTOS_AI_RUNTIME_VERSION
               value: 0.81.1
             - name: AGENTOS_DATABASE_URL
-              value: postgresql://runtime_secondmate@agentos-postgres-rw.agentos.svc:5432/agentos?sslmode=require
+              value: postgresql://runtime_secondmate@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos?sslmode=require
             - name: AGENTOS_PGPASS_SOURCE
               value: /var/run/secrets/agentos/pgpass
             - name: HERDR_SESSION

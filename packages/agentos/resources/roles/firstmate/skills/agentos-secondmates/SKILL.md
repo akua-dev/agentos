@@ -62,26 +62,39 @@ AgentOS or project instruction change.
    Give it a dedicated Pod, ServiceAccount, home PVC and pod-local Herdr server.
 3. Through the selected database platform's approved role-management path, create one login without `SUPERUSER`, `CREATEDB`, `CREATEROLE`, `BYPASSRLS` or inherited owner authority.
    Bind it with `agentos.register_agent_principal`; never embed its password in Fleet rows or the database URL.
-4. Create or select one approved Kubernetes Secret in the target namespace with a `pgpass` key for that login.
-   Do not print the value or invent a second secret format.
-5. Load `$agentos-runtime`. From the active First Mate role resource directory,
-   create a reviewed
-   per-Agent overlay over `../secondmate/kubernetes/base` under
-   `$HOME/.local/state/agentos/workloads/<handle>/`. Patch the returned Agent
-   UUID, Kubernetes-safe handle, immutable AgentOS image digest, namespace,
-   password-free PostgreSQL URL, Secret name, labels, Herdr session and storage.
+4. Load `$agentos-runtime`. From the active First Mate role resource directory,
+   create a reviewed per-Agent overlay over
+   `../secondmate/kubernetes/domain` under
+   `$HOME/.local/state/agentos/workloads/<handle>/`. Select one Kubernetes-safe
+   domain namespace and patch the Namespace name, Fleet label, returned owner
+   Agent UUID, Second-Mate RoleBinding subject namespace, workload identity,
+   immutable AgentOS image digest, password-free fully qualified PostgreSQL
+   URL, Secret name, labels, Herdr session and storage. The released domain
+   composition supplies restricted Pod Security labels, ingress-only
+   isolation, bounded quota, the Second-Mate workload Role and the core
+   First-Mate supervisor Role. Never add an egress-deny policy.
    If a persistent-Mate model or thinking level was selected, follow
    `$agentos-harnesses` and patch its `AGENTOS_MODEL` and `AGENTOS_THINKING`
    values onto the `prepare-home` init container before rendering or applying
    the workload. Do not add an omitted axis or a shared release default.
-6. Use the runtime skill's native `kubectl kustomize`, server-side dry-run,
+5. Render and inspect the complete overlay, then apply its reviewed Namespace
+   resource first. Verify its concrete Fleet and owner-Agent labels, restricted
+   Pod Security profile and absence of an egress policy. Create or select one
+   approved Secret in that namespace with a `pgpass` key for the login. Every
+   Secret in this namespace is domain-visible because the Second Mate can mount
+   it through a child workload; never place Fleet-root credentials there. Do
+   not print the value or invent a second secret format.
+6. Use the runtime skill's native server-side dry-run,
    `kubectl diff` and synchronous `kubectl apply` sequence. Stop on an existing
    resource with conflicting identity rather than adopting it by name. The
-   overlay creates no database role, Secret, broad RBAC or public endpoint.
-   It must retain the base's projected ServiceAccount identity and include only
-   the runtime skill's reviewed exact-parent supervision Role and RoleBinding.
-   Later Crewmate overlays add their own exact-child grants for this Second
-   Mate through the same runtime workflow.
+   overlay creates no database role, Secret or public endpoint. It must retain
+   the base's projected ServiceAccount identity and exactly the reviewed domain
+   Roles, RoleBindings, ResourceQuota and ingress NetworkPolicy. Verify the
+   Second Mate can create and operate Crewmate workloads only in this namespace,
+   cannot read or create Secrets or mutate namespace controls, and cannot read,
+   exec or create anything in a sibling domain. Verify First Mate can inspect,
+   attach, stop, manage domain credentials and repair controls. Later Crewmate
+   overlays contain no RBAC; they consume the installed domain Role.
 7. Attach to the Second Mate Pod and load `$agentos-auth` for Pi's browser login.
    Login happens in the persistent Pi home; never copy First Mate's or the local bootstrap agent's token directory.
 8. Verify the PostgreSQL session resolves the expected Agent identity, parent and charter through the password-free URL and persisted mode-`0600` pgpass file.
@@ -133,5 +146,12 @@ Retirement is explicit, never an idle timeout.
 3. Require the Second Mate to hand off every active child Agent and durable decision thread.
 4. Preserve delivered artifacts, reports, Inbox history and charter history.
 5. Call `agentos.retire_agent` only after the database accepts that no active Assignments or children remain.
-6. Remove runtime resources and the persistent home only after separate explicit Captain approval when that removal would discard recoverable state.
-7. Never use a forced runtime deletion to bypass database retirement guards.
+6. Remove the StatefulSet, Service and ServiceAccount without deleting retained
+   PVCs. Keep the domain Namespace and its controls while any retained PVC or
+   recoverable state remains.
+7. Delete retained PVCs and then the Namespace only after separate explicit
+   Captain approval for that destructive discard. Namespace deletion is never
+   routine cleanup because it deletes namespaced PVC objects regardless of the
+   StatefulSet retention policy.
+8. Never use a forced runtime or Namespace deletion to bypass database
+   retirement guards.

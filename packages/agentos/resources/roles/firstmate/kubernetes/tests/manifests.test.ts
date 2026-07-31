@@ -95,6 +95,9 @@ describe("First Mate Kubernetes resources", () => {
       "ServiceAccount/agentos-firstmate",
       "StatefulSet/agentos-firstmate",
     ]);
+    expect(resource(resources, "Namespace", "agentos").metadata.labels).toEqual({
+      "agentos.akua.dev/fleet": "default",
+    });
 
     const service = resource(resources, "Service", "agentos-firstmate");
     expect(service.spec).toEqual({
@@ -344,7 +347,7 @@ describe("First Mate Kubernetes resources", () => {
     );
     expect(environment).toMatchObject({
       DATABASE_URL:
-        "postgresql://agentos@agentos-postgres-rw:5432/agentos?sslmode=verify-full",
+        "postgresql://agentos@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos?sslmode=verify-full",
       EXISTING_RUNTIME_SETTING: "preserve-me",
       NODE_EXTRA_CA_CERTS: "/var/run/agentos/postgres/ca.crt",
       PGPASSFILE: "/home/agent/.pgpass",

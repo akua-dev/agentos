@@ -131,7 +131,7 @@ describe("optional Fleet AI gateway", () => {
           from: [
             {
               namespaceSelector: {
-                matchLabels: { "kubernetes.io/metadata.name": "agentos" },
+                matchLabels: { "agentos.akua.dev/fleet": "default" },
               },
               podSelector: {
                 matchLabels: { "agentos.akua.dev/ai-gateway-client": "true" },
