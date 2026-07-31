@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-crewmate
+spec:
+  template:
+    spec:
+      initContainers:
+        - $patch: replace
+      containers:
+        - $patch: replace
+        - name: crewmate
+          image: registry.k8s.io/pause:3.10.1
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: home
+              mountPath: /home/agent
+      volumes:
+        - $patch: replace
