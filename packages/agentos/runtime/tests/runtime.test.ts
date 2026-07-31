@@ -475,20 +475,38 @@ describe("Mate runtime", () => {
   test("gives a persistent checkout access to release-installed dependencies", async () => {
     const releaseRoot = "/opt/agentos-test";
     const { env, state } = await createHarness([], {
-      AGENTOS_AGENT_CWD:
-        "/home/agent/projects/agentos/packages/agentos/resources/roles/firstmate",
-      AGENTOS_DISTRIBUTION_ROOT:
-        "/home/agent/projects/agentos/packages/agentos",
       AGENTOS_RELEASE_ROOT: releaseRoot,
       NODE_PATH: "",
     });
+    const distributionRoot = join(
+      state,
+      "persistent-checkout",
+      "packages",
+      "agentos",
+    );
+    const agentCwd = join(
+      distributionRoot,
+      "resources",
+      "roles",
+      "firstmate",
+    );
+    await mkdir(agentCwd, { recursive: true });
+    env.AGENTOS_AGENT_CWD = agentCwd;
+    env.AGENTOS_DISTRIBUTION_ROOT = distributionRoot;
     const child = Bun.spawn([process.execPath, runMate], {
       env,
       stderr: "pipe",
       stdout: "pipe",
     });
 
-    await waitFor(async () => Bun.file(join(state, "server-ready")).exists());
+    await waitFor(async () => {
+      if (child.exitCode !== null) {
+        throw new Error(await new Response(child.stderr).text());
+      }
+      return (await readCalls(state)).some(
+        (call) => call[0] === "agent" && call[1] === "start",
+      );
+    });
     child.kill("SIGTERM");
     expect(await child.exited).toBe(0);
     expect(await readFile(join(state, "server-node-path"), "utf8")).toBe(
