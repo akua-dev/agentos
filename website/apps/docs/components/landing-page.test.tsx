@@ -59,6 +59,19 @@ describe('landing page', () => {
     );
   });
 
+  it('presents handoff as a boundary for any product or company work', () => {
+    render(<Page />);
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Start anywhere. Bring in the Fleet when the outcome matters.',
+      }),
+    ).not.toBeNull();
+    expect(screen.getByText(/UI direction/)).not.toBeNull();
+    expect(screen.getByText(/backend architecture/)).not.toBeNull();
+    expect(screen.getByText(/code review/)).not.toBeNull();
+  });
+
   it('renders the canonical AgentOS structured-data graph', () => {
     const { container } = render(<Page />);
     const script = container.querySelector('script[type="application/ld+json"]');

@@ -14,10 +14,9 @@ export function DefaultLayout({ children }: LayoutProps<'/docs'>) {
       tree={source.getPageTree()}
       links={linkItems}
       containerProps={{
+        className: 'md:[--fd-sidebar-width:18.5rem]! xl:[--fd-toc-width:16rem]!',
         style: {
           '--fd-layout-width': '100vw',
-          '--fd-sidebar-width': '18.5rem',
-          '--fd-toc-width': '16rem',
         } as CSSProperties,
       }}
       nav={{

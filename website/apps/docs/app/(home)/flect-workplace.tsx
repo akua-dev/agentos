@@ -9,10 +9,11 @@ export function FlectWorkplace() {
       <div className={styles.storyHeader}>
         <div>
           <p className={styles.conceptLabel}>AgentOS × Flect concept</p>
-          <h2 id="flect-workplace-title">The interface to your AgentOS company.</h2>
+          <h2 id="flect-workplace-title">One front door to the work of your company.</h2>
           <p className={styles.introduction}>
-            Flect is a public developer preview and a natural future AgentOS dogfooding adopter.
-            This is a future direction, not a shipped integration.
+            Install Flect and shape an adaptable local workplace today. It is a public developer
+            preview and a natural future AgentOS dogfooding adopter; that integration is a future
+            direction, not a shipped integration.
           </p>
         </div>
         <p className={styles.previewStatus}>Flect public developer preview</p>
@@ -30,20 +31,23 @@ export function FlectWorkplace() {
 
       <div className={styles.storyBody}>
         <div>
-          <p className={styles.surfaceLabel}>A possible future workflow</p>
-          <h3>Personalized context, durable authority.</h3>
+          <p className={styles.surfaceLabel}>A future company loop</p>
+          <h3>Bring the right work to the right people.</h3>
           <p>
-            A real AgentOS × Flect demonstration would show personalized context and decisions,
-            agent-assisted revision, explicit human approval, and bounded handoff to First Mate
-            only after that integration is built and dogfooded.
+            A future AgentOS adapter could assemble product work, personalized context and
+            decisions, then invite people with relevant context, expertise, or authority to review
+            it. Flect&apos;s built-in Agent could help inspect or revise the draft before bounded,
+            explicitly approved intent returns to First Mate.
           </p>
         </div>
 
         <div className={styles.authority}>
-          <p className={styles.surfaceLabel}>The boundary stays clear</p>
+          <p className={styles.surfaceLabel}>Bridge before deep adapters</p>
           <p>
-            AgentOS remains the durable authority for accepted work, decisions, evidence, and
-            handoffs. Flect can shape the human surface without becoming a second source of truth.
+            An approved embedded browser or iframe could present an existing product inside that
+            workplace before a deeper adapter exists. That is a future integration path, not a
+            shipped capability. AgentOS remains the durable authority for accepted work, decisions,
+            evidence, and handoffs.
           </p>
         </div>
       </div>
@@ -51,7 +55,8 @@ export function FlectWorkplace() {
       <div className={styles.storyFooter}>
         <p>
           Flect works beyond AgentOS as a standalone/local interface shell; product and API adapters
-          are future work, not shipped.
+          are future work, not shipped, and the surface never needs to become a second company
+          authority.
         </p>
         <div className={styles.storyLinks}>
           <Link href="/docs/concepts/human-work-surfaces">

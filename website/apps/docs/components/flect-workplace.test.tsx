@@ -13,7 +13,7 @@ describe('FlectWorkplace', () => {
     render(<FlectWorkplace />);
 
     expect(
-      screen.getByRole('heading', { name: 'The interface to your AgentOS company.' }),
+      screen.getByRole('heading', { name: 'One front door to the work of your company.' }),
     ).not.toBeNull();
     expect(
       screen
@@ -25,6 +25,10 @@ describe('FlectWorkplace', () => {
     expect(screen.getByText(/personalized context and decisions/)).not.toBeNull();
     expect(screen.getByText(/standalone\/local interface shell/)).not.toBeNull();
     expect(screen.getByText(/product and API adapters are future work, not shipped/)).not.toBeNull();
+    expect(screen.getByText(/adaptable local workplace today/)).not.toBeNull();
+    expect(screen.getByText(/context, expertise, or authority/)).not.toBeNull();
+    expect(screen.getByText(/embedded browser or iframe/)).not.toBeNull();
+    expect(screen.getByText(/future integration path, not a shipped capability/)).not.toBeNull();
     expect(
       screen.getByRole('link', { name: 'Design a human work surface' }).getAttribute('href'),
     ).toBe('/docs/concepts/human-work-surfaces');
@@ -41,6 +45,6 @@ describe('FlectWorkplace', () => {
 
     expect(screen.getAllByRole('img')).toHaveLength(1);
     expect(screen.queryByRole('list', { name: 'Adaptive workplace handoff' })).toBeNull();
-    expect(screen.getByText(/A real AgentOS × Flect demonstration would show/)).not.toBeNull();
+    expect(screen.getByText(/A future AgentOS adapter could assemble/)).not.toBeNull();
   });
 });

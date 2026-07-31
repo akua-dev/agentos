@@ -173,14 +173,14 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
         <section className="col-span-full overflow-hidden rounded-2xl bg-brand-secondary text-brand-secondary-foreground">
           <div className="grid lg:grid-cols-[1.05fr_0.95fr]">
             <div className="p-7 md:p-10 lg:p-12">
-              <p className="mb-4 font-medium">The local agent you already use is a starting point.</p>
+              <p className="mb-4 font-medium">Work can start wherever thinking is fastest.</p>
               <h2 className="max-w-[18ch] text-3xl leading-[1.04] font-medium tracking-[-0.03em] text-balance md:text-5xl">
-                Start where you think fastest. Hand off when the outcome matters.
+                Start anywhere. Bring in the Fleet when the outcome matters.
               </h2>
               <p className="mt-6 max-w-[60ch] text-pretty">
-                Plan, prototype, diagnose or partially implement locally. Package the desired
-                result and durable evidence, then let First Mate turn accepted intent into owned,
-                accountable Fleet work.
+                Shape a UI, sketch backend architecture, research, implement, diagnose, test, or
+                conduct a code review locally. Package the desired result and durable evidence,
+                then let First Mate turn accepted intent into accountable Fleet work.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
@@ -199,7 +199,10 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
             </div>
             <div className="grid border-t border-brand-secondary-foreground/20 bg-brand-secondary-foreground/7 lg:border-t-0 lg:border-l">
               {[
-                ['Local evidence', 'A plan, diagnosis, branch, patch or reviewed prototype.'],
+                [
+                  'Working evidence',
+                  'A UI direction, architecture sketch, research finding, patch or review.',
+                ],
                 ['Bounded handoff', 'Outcome, evidence, constraints and exact authority boundary.'],
                 ['Accountable Fleet work', 'A Task and one active Assignment after acceptance.'],
                 ['Reviewed result', 'Delivery evidence returns for your next decision or iteration.'],

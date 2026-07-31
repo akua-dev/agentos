@@ -1,6 +1,6 @@
 ---
 title: Human work surfaces
-description: Give each person the attention, context and decision view they need without creating another organizational authority.
+description: Bring work to the people whose context, expertise or authority matters without creating another organizational authority.
 canonical:
   - label: Vision
     path: VISION.md
@@ -9,41 +9,52 @@ canonical:
 ---
 
 AgentOS should not require every person to supervise a wall of chats or accept one permanent
-dashboard. A focused internal tool, a tracker, a local assistant or an adaptive workplace can all
-be human interfaces to the same company. The surface may change; accountable work and authority
-must remain legible underneath it.
+dashboard. A focused internal tool, tracker, local assistant or adaptive workplace can all be human
+interfaces to the same company. The surface may change for the work and the person; accountable
+ownership and authority must remain legible underneath it.
 
-## Personalize attention, not authority
+## Bring work to the relevant people
 
-A useful employee surface can select the decisions and context relevant to one person, prepare
-them before that person arrives and present each choice in the form that makes it easiest to judge.
-An incident may need a timeline and recovery options. A product approval may need evidence,
-tradeoffs and the proposed release boundary. A research choice may need a comparison.
+One accountable owner does not imply one person has all the wisdom. A product decision may need
+customer context, engineering constraints, design judgment and an exact approval. A code review
+may need a security specialist without transferring ownership of the delivery. An incident may
+need several observations but only one authorized recovery decision.
 
-That personalization is a view over AgentOS and its native authorities. It does not create a
-second task system, copy every transcript into a new ledger or silently turn a recommendation into
-accepted work.
+A useful responsibility path distinguishes three roles:
 
-## A useful employee loop
+- **contributors** provide context, critique, options or recommendations;
+- **the accountable owner** carries the bounded outcome and closes the loop;
+- **the authorized human role** approves a consequence when policy requires it.
+
+Those roles may overlap, but the interface must not assume that visibility grants authority. The
+released AgentOS decision path records exact consequential choices through the Captain role, which
+may be held by a person or team. A richer multi-person AgentOS workplace is a product direction,
+not a shipped automatic people-routing feature.
+
+## One front door, many forms of work
+
+The same workplace may present a UI direction for visual review, a backend architecture as a data
+flow, a code change as a diff, an incident as a timeline or a launch decision as evidence and
+tradeoffs. It can prepare the relevant context before someone arrives and let a local Agent explain,
+inspect or revise the work within granted capabilities.
 
 ```text
-relevant attention and context
-  → a decision-specific interface
-  → local agent-assisted retrieval or revision
-  → explicit human approval
+bounded work and current evidence
+  → configured responsibility path
+  → views shaped for the relevant people
+  → context, critique or exact approval
   → approved AgentOS intake
   → First Mate reconciliation
   → accountable Fleet work or recorded decision
 ```
 
-A future interface Agent could explain evidence, pull already-approved context, update a draft or
-ask First Mate a question through capabilities it has actually been granted. Human approval still
-governs consequential intent. First Mate remains responsible for reconciling that intent with the
-truthful company view.
+First Mate remains responsible for reconciling returned intent with the truthful company view. An
+external event may preserve a contribution and wake reconciliation, but it does not accept work or
+grant authority by itself.
 
 ## What stays replaceable
 
-- layout, navigation and the form used to explain a decision;
+- layout, navigation and the form used to inspect work or explain a decision;
 - which relevant context is assembled for the current person;
 - local drafts, interface preferences and temporary presentation state;
 - the local Agent, model and approved interface capabilities.
@@ -56,23 +67,24 @@ truthful company view.
 - Git commits and provider review artifacts for delivered source.
 
 The surface may cache enough local state to stay responsive. It must not mirror those authorities
-into a competing company model. Read [Native authorities](/docs/concepts/native-authorities) and
-[Organizational attention](/docs/concepts/organizational-attention) for the underlying boundaries.
+into a competing company model. Read [Native authorities](/docs/concepts/native-authorities),
+[Organizational attention](/docs/concepts/organizational-attention) and
+[Authority and decisions](/docs/concepts/authority-decisions) for the underlying boundaries.
 
-## Flect as the first adopter
+## Flect as an adaptable workplace
 
-[Flect](https://github.com/akua-dev/flect) is an open-source, agent-native interface shell whose
-running UI can be shaped from inside itself. Its public developer preview already demonstrates a
-protected composer, validated previews, explicit keep or reject, rollback and safe-mode recovery.
-Its wider vision is to let a product ship an excellent default without making that interface a
-permanent boundary.
+[Flect](https://github.com/akua-dev/flect) is an open-source, agent-native interface shell. Its
+public developer preview already lets someone shape a local interface in Edit mode, keep or reject
+the result, then use the product with a separate App Agent in Run mode. Installing Flect therefore
+provides an adaptable local workplace today, without requiring AgentOS.
 
-AgentOS is a natural first dogfooding adopter because it already has meaningful agents, work,
-events, decisions and organizational history to surface. A future AgentOS experience could prepare
-an employee's attention, let Flect present the current decision appropriately, revise feedback
-with the built-in Agent and send approved intent to First Mate.
+AgentOS is a natural first dogfooding adopter because it has meaningful agents, work, events,
+decisions and organizational history to surface. A future integration could assemble the work and
+context, ask the relevant people for their contribution, let Flect's built-in Agent help inspect or
+revise it, and return bounded approved intent to First Mate.
 
-That AgentOS adopter experience is a concept, not a shipped integration. Flect remains useful beyond
-AgentOS as a standalone/local interface shell; product and API adapters are future work, not shipped.
-People can also [see its current shaping demo](https://github.com/akua-dev/flect#see-it-shape) and
-start locally without AgentOS.
+An early adapter could present an approved existing product through a bounded embedded browser or
+iframe before deeper product integration exists. That is a future integration path, not a shipped
+Flect or AgentOS capability. Product and API adapters are also future work. People can
+[see what Flect supports today](https://github.com/akua-dev/flect#what-works-today) and start
+locally without AgentOS.

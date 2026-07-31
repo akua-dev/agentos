@@ -363,6 +363,8 @@ Report the PR URL, required checks, findings, and every pipeline fix. Do not mer
 **Files:**
 - Modify: `website/apps/docs/components/landing-page.test.tsx`
 - Modify: `website/apps/docs/components/flect-workplace.test.tsx`
+- Modify: `website/apps/docs/components/layouts/default/default-layout.test.tsx`
+- Modify: `website/apps/docs/components/layouts/default/index.tsx`
 - Modify: `website/apps/docs/app/(home)/page.tsx`
 - Modify: `website/apps/docs/app/(home)/flect-workplace.tsx`
 - Modify: `website/apps/docs/content/docs/operate/continue-local-work.mdx`
@@ -432,10 +434,12 @@ Expected: all commands exit 0; the README remains within its funnel target and a
 
 Serve the built site and inspect `/`, `/docs/operate/continue-local-work`, `/docs/concepts/human-work-surfaces`, and `/learn/01-first-outcome/hand-off-local-work` at desktop and 390 px widths. Confirm the wider story, honest future labels, one official Flect visual, no horizontal overflow, correct headings and links, and no console errors.
 
+If the docs article collapses at mobile width, first update `default-layout.test.tsx` to require the sidebar and table-of-contents widths to remain absent from inline style while the desktop breakpoint classes remain present. Verify the test fails because inline variables override Fumadocs' responsive values. Then move `18.5rem` to `md:[--fd-sidebar-width:18.5rem]!`, move `16rem` to `xl:[--fd-toc-width:16rem]!`, keep only `--fd-layout-width: 100vw` inline, rerun the test, rebuild, and repeat the 390 px and desktop inspections. The important modifier is required because Fumadocs' generated `:has(...)` rule otherwise restores its default 268 px rails after the direct utility.
+
 - [ ] **Step 8: Commit and re-run no-mistakes**
 
 ```console
-git add README.md docs/superpowers/plans/2026-07-31-local-agent-handoff.md website/apps/docs/app/\(home\)/page.tsx website/apps/docs/app/\(home\)/flect-workplace.tsx website/apps/docs/components/landing-page.test.tsx website/apps/docs/components/flect-workplace.test.tsx website/apps/docs/content/docs/operate/continue-local-work.mdx website/apps/docs/content/docs/concepts/human-work-surfaces.mdx website/apps/docs/content/learn/01-first-outcome/hand-off-local-work.mdx
+git add README.md docs/superpowers/plans/2026-07-31-local-agent-handoff.md website/apps/docs/app/\(home\)/page.tsx website/apps/docs/app/\(home\)/flect-workplace.tsx website/apps/docs/components/landing-page.test.tsx website/apps/docs/components/flect-workplace.test.tsx website/apps/docs/components/layouts/default/default-layout.test.tsx website/apps/docs/components/layouts/default/index.tsx website/apps/docs/content/docs/operate/continue-local-work.mdx website/apps/docs/content/docs/concepts/human-work-surfaces.mdx website/apps/docs/content/learn/01-first-outcome/hand-off-local-work.mdx
 git commit -m "docs(website): broaden handoff to company work"
 no-mistakes axi run --yes --intent "Expand AgentOS PR #73 so handoff covers any bounded product or company work, not only coding-agent phases. Show that a company can organize work and decisions around the people with relevant context, expertise, and authority while preserving one accountable owner and exact authority boundaries. Present Flect as an adaptable local workplace today and a truthful future AgentOS front door; a bounded embedded browser or iframe may be an early future adapter, but AgentOS integration and arbitrary embedded-product control are not shipped. Keep the official Flect hero as the only workflow visual, preserve canonical handoff mechanics, validate the full site, update the existing PR, and do not merge."
 ```

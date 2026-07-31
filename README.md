@@ -55,29 +55,28 @@ a persistent Agent that keeps the truthful company view while work continues.
 
 [Run your first outcome in AgentOS Learn →](https://agentos.akua.dev/learn)
 
-## Start locally. Finish with the Fleet.
+## Start anywhere. Bring in the Fleet.
 
-Plan, prototype, diagnose or partially implement with the local Agent where you
-think fastest. When the result deserves durable ownership, hand First Mate the
-desired outcome, evidence, artifact references, constraints and authority
-boundary. Accepted work becomes a Task with one accountable Assignment; Fleet
+Shape a UI, sketch backend architecture, research, implement, test or review
+where you think fastest. When the result deserves accountable follow-through,
+hand First Mate the desired outcome, evidence, artifact references, constraints
+and authority boundary. Accepted work gets one accountable Assignment; Fleet
 evidence returns for your next local review or iteration.
 
 [Learn the local-to-Fleet handoff workflow →](https://agentos.akua.dev/docs/operate/continue-local-work)
 
-## Bring your own workplace
+## Give the company a workplace
 
 People should not have to accept one permanent Agent dashboard. A future
-purpose-built interface could prepare each employee's relevant decisions and
-context, present a choice in the form that fits it, help revise feedback with a
-local Agent and send only approved intent to First Mate.
+purpose-built interface could assemble the work, ask the people with relevant
+context, expertise or authority for their contribution, help inspect or revise
+it with a local Agent and return only bounded, approved intent to First Mate.
 
 [Flect](https://github.com/akua-dev/flect) is a public developer-preview
-interface shell and a natural first AgentOS dogfooding adopter. The proposed
-AgentOS experience is not a shipped integration: Flect remains useful beyond
-AgentOS as a standalone/local interface shell, while product/API adapters are
-future work and AgentOS remains the durable company authority beneath any
-surface.
+interface shell and a natural first AgentOS dogfooding adopter. Installing it
+provides an adaptable local workplace today. The AgentOS experience—including
+any embedded browser or iframe bridge—is future work; AgentOS remains the
+durable company authority beneath any surface.
 
 [Explore human work surfaces and the Flect concept →](https://agentos.akua.dev/docs/concepts/human-work-surfaces)
 
