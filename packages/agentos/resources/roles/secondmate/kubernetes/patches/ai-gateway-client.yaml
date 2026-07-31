@@ -9,6 +9,7 @@ spec:
         agentos.akua.dev/ai-gateway-client: "true"
     spec:
       initContainers:
+        - name: install-tools
         - name: prepare-home
           env:
             - name: AGENTOS_PI_PROVIDER_MODE

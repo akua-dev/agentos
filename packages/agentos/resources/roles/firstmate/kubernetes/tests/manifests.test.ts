@@ -492,6 +492,10 @@ describe("First Mate Kubernetes resources", () => {
       ),
     );
 
+    expect(
+      pod.initContainers.map(({ name }: { name: string }) => name),
+    ).toEqual(["install-tools", "prepare-home"]);
+
     expect(spec.template.metadata.labels).toMatchObject({
       "agentos.akua.dev/ai-gateway-client": "true",
     });
@@ -541,6 +545,10 @@ describe("First Mate Kubernetes resources", () => {
         ({ name, value }: { name: string; value: string }) => [name, value],
       ),
     );
+
+    expect(
+      pod.initContainers.map(({ name }: { name: string }) => name),
+    ).toEqual(["install-tools", "prepare-home"]);
 
     expect(prepareEnvironment.AGENTOS_PI_PROVIDER_MODE).toBe("direct");
     expect(prepareEnvironment.AI_GATEWAY_URL).toBeUndefined();
