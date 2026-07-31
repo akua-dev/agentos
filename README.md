@@ -74,9 +74,10 @@ send only approved intent to First Mate.
 
 [Flect](https://github.com/akua-dev/flect) is a public developer-preview
 interface shell and a natural first AgentOS dogfooding adopter. The proposed
-AgentOS experience is not a shipped integration: Flect remains useful for other
-products and personal interfaces, while AgentOS remains the durable company
-authority beneath any surface.
+AgentOS experience is not a shipped integration: Flect remains useful beyond
+AgentOS as a standalone/local interface shell, while product/API adapters are
+future work and AgentOS remains the durable company authority beneath any
+surface.
 
 [Explore human work surfaces and the Flect concept →](https://agentos.akua.dev/docs/concepts/human-work-surfaces)
 

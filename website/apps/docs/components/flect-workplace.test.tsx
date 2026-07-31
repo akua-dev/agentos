@@ -23,6 +23,8 @@ describe('FlectWorkplace', () => {
     expect(screen.getByText('Flect public developer preview')).not.toBeNull();
     expect(screen.getByText(/future direction, not a shipped integration/)).not.toBeNull();
     expect(screen.getByText(/personalized context and decisions/)).not.toBeNull();
+    expect(screen.getByText(/standalone\/local interface shell/)).not.toBeNull();
+    expect(screen.getByText(/product and API adapters are future work, not shipped/)).not.toBeNull();
     expect(
       screen.getByRole('link', { name: 'Design a human work surface' }).getAttribute('href'),
     ).toBe('/docs/concepts/human-work-surfaces');

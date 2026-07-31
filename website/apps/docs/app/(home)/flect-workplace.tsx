@@ -50,8 +50,8 @@ export function FlectWorkplace() {
 
       <div className={styles.storyFooter}>
         <p>
-          Flect works beyond AgentOS: the same open interface shell can serve another product, API,
-          or personal workplace.
+          Flect works beyond AgentOS as a standalone/local interface shell; product and API adapters
+          are future work, not shipped.
         </p>
         <div className={styles.storyLinks}>
           <Link href="/docs/concepts/human-work-surfaces">

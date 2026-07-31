@@ -4,6 +4,14 @@ AgentOS itself is licensed under the MIT License.
 Release artifacts may redistribute separate third-party programs under their own licenses.
 The release build and its bill of materials determine which notices apply to a particular artifact.
 
+## Flect hero asset
+
+The website redistributes the unmodified
+`website/apps/docs/public/assets/flect-hero.png`, copied from
+[`akua-dev/flect/assets/flect-hero.png`](https://github.com/akua-dev/flect/blob/main/assets/flect-hero.png).
+Flect is licensed under the [Apache License 2.0](https://github.com/akua-dev/flect/blob/main/LICENSE);
+the upstream license applies to this copied asset.
+
 ## Bun
 
 AgentOS images include Bun, and the temporary
