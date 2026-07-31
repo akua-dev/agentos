@@ -17,6 +17,12 @@ retiring the gateway. It keeps server-owned provider OAuth and quota-aware routi
 deliberate service boundary. Client Agents receive only the scoped connection material intended
 for them.
 
+Clients may live in `agentos` or a labeled Second-Mate domain namespace. They call
+`ai-gateway.agentos.svc.cluster.local`; the Gateway NetworkPolicy requires both the Fleet Namespace
+label and the client Pod label. Kubernetes Secret references remain namespace-local, so First Mate
+places the approved client token in each selected domain and treats it as visible to that domain’s
+Second Mate. Provider OAuth and the Gateway vault never leave the core namespace.
+
 ## What it does not own
 
 The gateway does not create Agent identity, Assignments, human authority or provider-neutral model

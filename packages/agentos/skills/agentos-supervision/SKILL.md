@@ -135,8 +135,9 @@ canonical definition of work nor logic inside the Pi guard.
      reports. Pod readiness and harness status are different evidence; for the
      current Crewmate runtime, a live Herdr server does not prove the worker
      harness still exists. Use the Mate's kubelet-rotated projected
-     ServiceAccount identity and the exact-child grant established by
-     `$agentos-runtime`. If that mount or grant is absent, denied or revoked,
+     ServiceAccount identity and managed-domain Role established by
+     `$agentos-runtime`. If that mount, domain ownership or Role is absent,
+     denied or revoked,
      wake and report the supervision gap; never mint or persist an expiring
      bearer token to keep the wait alive.
    - Use another installed native CLI when it already provides the required

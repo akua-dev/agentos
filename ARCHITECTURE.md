@@ -792,14 +792,35 @@ Kubernetes owns pod existence, phase, readiness and failure state.
 Each workload uses an explicit namespace, ServiceAccount, PVC mapping and immutable AgentOS image reference.
 
 Persistent Mates that supervise child Pods use the kubelet-rotated projected
-ServiceAccount identity mounted by their dedicated Pod. A reviewed per-Agent
-overlay grants only the owning Mate's exact child Pod names the narrowly needed
-`get`, `list` and `watch` access, with `pods/exec` only when an approved native
-launch, attach, doorbell or recovery path requires it. It never grants
-label-wide, sibling or wildcard access and never mints or persists a separate
-expiring supervision bearer token. This is a Kubernetes supervision boundary,
+ServiceAccount identity mounted by their dedicated Pod. First Mate provisions
+one labeled domain namespace per persistent Second Mate and binds that Second
+Mate to a reviewed namespaced workload Role. The Role permits native creation
+and operation of Crewmate StatefulSets, Services and ServiceAccounts plus Pod
+inspection, replacement and approved exec, but excludes Namespace, Secret,
+RBAC, quota, LimitRange, NetworkPolicy and cluster-scoped mutation. Kubernetes
+RBAC cannot constrain `create` by a future resource name, so namespace
+ownership replaces the previous exact-child-name model. A Second Mate may mount
+any Secret placed in its namespace through a child workload even without
+`get secrets`; First Mate therefore keeps Fleet-root credentials in `agentos`
+and places only domain-visible credentials in a domain namespace.
+
+The domain Namespace enforces the restricted Pod Security profile, carries a
+bounded object and storage quota, and applies ingress isolation that admits only
+same-namespace Pods. It deliberately defines no egress policy: Agents retain
+ordinary internet access. Labeled domain clients reach only explicitly
+admitting Fleet services through fully qualified names under
+`agentos.svc.cluster.local`. Sibling namespaces have neither Kubernetes RBAC
+nor ingress reachability. First Mate is bound into every domain for credential,
+policy, inspect, attach, stop and repair operations. All steady-state access
+uses projected ServiceAccount identity; AgentOS never mints or persists a
+separate supervision bearer token. This is a Kubernetes supervision boundary,
 not the broader provider-credential mediation proposed in [the workload-identity
 exploration](https://github.com/akua-dev/agentos/issues/27), which remains open.
+
+StatefulSet deletion and replacement retain Agent homes. Domain retirement
+removes active workloads and authority but leaves the Namespace while retained
+PVCs exist. Deleting the Namespace is a separate destructive action because it
+deletes its PVC objects regardless of StatefulSet retention policy.
 
 After explicit RBAC approval, the default dedicated-cluster path grants First Mate cluster-administrator access so it can inspect and recover agents.
 Shared or sensitive clusters must offer a scoped mode and explain which recovery operations become unavailable.

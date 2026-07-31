@@ -16,6 +16,19 @@ Only First Mate manages this lifecycle. It inspects the selected release for imp
 charter, provisioning and recovery primitives. If the release cannot express the requested
 boundary, it reports the capability gap instead of inventing metadata or manifests.
 
+First Mate provisions one labeled domain namespace containing the persistent Second Mate and all
+of its Crewmates. The Second Mate uses its projected ServiceAccount identity and native `kubectl`
+to create and operate Crewmate StatefulSets, Services and ServiceAccounts there. It cannot change
+the Namespace, Secrets, RBAC, quota, Pod Security controls, NetworkPolicy or cluster resources,
+and it has no authority in a sibling domain. First Mate remains bound into the namespace for
+credential, policy, attach, stop and recovery work.
+
+Domain ingress accepts only same-namespace Pods. Egress remains open for ordinary Agent internet
+access. Explicitly allowed Fleet services use fully qualified names under
+`agentos.svc.cluster.local` and require both the Fleet Namespace label and their client Pod label.
+Every Secret placed in the domain must be considered visible to its Second Mate because a child
+workload can mount it even when Secret reads are denied.
+
 ## Charter test
 
 “Own checkout reliability for the payments repository, including diagnosis and reviewed delivery;
@@ -27,4 +40,6 @@ creates another Second Mate. First Mate routes matching Tasks through the durabl
 humans continue speaking to the company surface.
 
 Change, recovery, work transfer and retirement all preserve active Assignments, the home PVC and
-unlanded work. Force is a Captain-approved discard path, not routine cleanup.
+unlanded work. Retiring the workload leaves retained PVCs and therefore leaves the domain
+Namespace in place. Namespace and PVC deletion is a separate Captain-approved discard path, not
+routine cleanup.
