@@ -69,14 +69,17 @@ evidence returns for your next local review or iteration.
 
 People should not have to accept one permanent Agent dashboard.
 [Flect](https://github.com/akua-dev/flect) is the adaptable human interface for
-AgentOS. It assembles the work, brings in the people with relevant context,
-expertise or authority, and lets its built-in Agent help inspect or revise a
-draft before bounded, approved intent returns to First Mate.
+AgentOS. The name comes from Latin *flectere*: to bend, curve or turn. Flect
+makes that literal by letting the running interface bend around the person,
+task and decision. Shape a working UI from inside the product, keep or reject
+it safely, then use it with a dedicated App Agent.
 
-Install Flect today to enter the company workplace. It can surface existing
-products through an embedded browser or iframe and connect through product or
-API adapters, while AgentOS remains the durable authority for accepted work,
-decisions and ownership.
+Install Flect today to enter the company workplace. It assembles work, brings
+in the people with relevant context, expertise or authority, and helps revise a
+draft before bounded, approved intent returns to First Mate. AgentOS remains
+the durable authority for accepted work, decisions and ownership. Existing
+products can enter the same workplace through an embedded browser, iframe or
+deeper product and API adapter.
 
 [Explore the AgentOS workplace powered by Flect →](https://agentos.akua.dev/docs/concepts/human-work-surfaces)
 

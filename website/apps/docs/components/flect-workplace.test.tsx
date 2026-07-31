@@ -21,7 +21,13 @@ describe('FlectWorkplace', () => {
         .getAttribute('src'),
     ).toContain('flect-hero.png');
     expect(screen.getByText('Available today')).not.toBeNull();
-    expect(screen.getByText(/enter an adaptable AgentOS workplace today/)).not.toBeNull();
+    expect(screen.getByText('Flect /flekt/').tagName).toBe('DFN');
+    expect(screen.getByText(/from Latin flectere: to bend, curve, or turn/)).not.toBeNull();
+    expect(screen.getByText(/Flect makes that idea software/)).not.toBeNull();
+    expect(screen.getByText(/running interface bends around the person, task, and decision/)).not.toBeNull();
+    expect(screen.getByText(/shape a working UI from inside the product/)).not.toBeNull();
+    expect(screen.getByText(/keep or reject it safely/)).not.toBeNull();
+    expect(screen.getByText(/dedicated App Agent/)).not.toBeNull();
     expect(screen.getByText(/personalized context and decisions/)).not.toBeNull();
     expect(screen.getByText(/context, expertise, or authority/)).not.toBeNull();
     expect(screen.getByText(/embedded browser or iframe/)).not.toBeNull();

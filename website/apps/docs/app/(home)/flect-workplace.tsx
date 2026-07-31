@@ -10,11 +10,17 @@ export function FlectWorkplace() {
         <div>
           <p className={styles.conceptLabel}>AgentOS × Flect</p>
           <h2 id="flect-workplace-title">One front door to the work of your company.</h2>
-          <p className={styles.introduction}>
-            Install Flect and enter an adaptable AgentOS workplace today. Flect shapes each view
-            around the work and the person while AgentOS keeps ownership, decisions, and delivery
-            durable.
-          </p>
+          <div className={styles.introduction}>
+            <p>
+              <dfn>Flect /flekt/</dfn> — from Latin flectere: to bend, curve, or turn.
+            </p>
+            <p>
+              Flect makes that idea software. Its running interface bends around the person, task,
+              and decision: shape a working UI from inside the product, keep or reject it safely,
+              then use it with a dedicated App Agent. Install it today while AgentOS keeps
+              ownership, decisions, and delivery durable.
+            </p>
+          </div>
         </div>
         <p className={styles.previewStatus}>Available today</p>
       </div>

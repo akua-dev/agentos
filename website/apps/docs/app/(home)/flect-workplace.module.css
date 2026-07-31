@@ -57,6 +57,16 @@
   text-wrap: pretty;
 }
 
+.introduction p + p {
+  margin-top: 0.7rem;
+}
+
+.introduction dfn {
+  color: var(--flect-ink);
+  font-style: normal;
+  font-weight: 620;
+}
+
 .previewStatus {
   width: fit-content;
   border-left: 2px solid var(--flect-rose);
