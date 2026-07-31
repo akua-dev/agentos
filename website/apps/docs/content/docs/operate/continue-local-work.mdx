@@ -1,0 +1,94 @@
+---
+title: Continue local work with the Fleet
+description: Turn local exploration into bounded, accountable Fleet work without pretending a transcript is authority.
+canonical:
+  - label: Chain-of-custody architecture
+    path: ARCHITECTURE.md
+  - label: Delegation procedure
+    path: packages/agentos/skills/agentos-delegation/SKILL.md
+  - label: External event schema
+    path: database/migrations/0000_initial_fleet_schema.sql
+---
+
+A local coding Agent is often the fastest place to think. It can explore a repository, sketch a
+plan, reproduce a defect or prove a small idea while you stay close to the work. Hand the outcome
+to the Fleet when it deserves durable ownership, parallel execution, reviewed delivery or the
+ability to continue after your local session ends.
+
+## Recognize the handoff moment
+
+Four moments recur:
+
+- **Planning:** the approach is clear enough that another Agent can own making it true.
+- **Prototyping:** the experiment answered its question and production work now needs normal review.
+- **Diagnosis:** the cause is falsifiable and the smallest implementation boundary is known.
+- **Partial implementation:** useful code exists, but finishing, testing or delivery should become
+  accountable Fleet work.
+
+You can also take Fleet evidence back into a local session, refine the direction and hand off a new
+bounded outcome. The boundary is responsibility, not which tool opened the first file.
+
+## Package the outcome
+
+A useful handoff contains five things:
+
+1. **Desired outcome:** what should become true and how a reviewer will recognize it.
+2. **Current evidence:** what was inspected, reproduced, measured or ruled out.
+3. **Durable artifact references:** the branch, commit, patch, issue, report or other inspectable
+   material that carries code state beyond the local session.
+4. **Constraints:** compatibility, scope, delivery posture and facts that must remain true.
+5. **Authority boundary:** actions that still require a human, such as credentials, cost or merge.
+
+```text
+Outcome: Stop checkout address changes from bypassing server validation.
+Evidence: Reproduced on main; the update route trusts the client-only schema.
+Artifacts: issue 214, diagnosis report, commit abc123 on branch diagnosis/address-validation.
+Constraints: Preserve the public API and existing checkout payloads.
+Authority: Open a pull request; do not merge.
+```
+
+A transcript can help explain how you arrived there, but it is context rather than authority. An
+uncommitted working tree is not a durable delivery artifact.
+
+## Choose the current intake
+
+Give the package to First Mate directly when you are already in its native session. First Mate
+reconciles the request with existing projects, Tasks, authority and current ownership before it
+accepts more work.
+
+An organization may also have an approved integration that preserves the package as an external
+event. That is useful when First Mate is already occupied: PostgreSQL can retain the complete
+evidence and wake the responsible Mate, which pulls and reconciles it when attention is available.
+AgentOS does not ship a universal local-agent submit command or transcript importer.
+
+<Callout title="Preservation is not acceptance">
+An external event is durable evidence. It does not become a Task, grant authority or start a
+worker merely because it was inserted.
+</Callout>
+
+## Know when work is accepted
+
+First Mate decides whether the handoff maps to existing intent, should become a new outcome or
+needs no Fleet action. Accepted execution has a Task and exactly one active accountable Assignment.
+The Assignment brief carries the complete bounded outcome; the responsible Agent then uses the
+project's existing delivery workflow.
+
+Watch each fact in its native authority:
+
+- PostgreSQL: accepted outcome, owner, status and decisions;
+- Kubernetes and Herdr: live worker and harness session;
+- Git and the provider: durable code and review artifact.
+
+Read [Delegate an outcome](/docs/operate/delegate-outcome) for the Fleet side and
+[External events and reconciliation](/docs/architecture/external-events) for durable provider
+intake.
+
+## Continue the loop
+
+The Fleet returns evidence: a diagnosis report, reviewed pull request, open decision or explicit
+blocker. Review that result wherever you work best. If your feedback changes the outcome, send a
+new bounded package rather than asking an old local transcript to stand in for current Fleet state.
+
+```text
+local exploration → bounded handoff → accountable Fleet work → evidence back
+```
