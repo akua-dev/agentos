@@ -30,6 +30,7 @@ const groupRoutes = {
     ['concepts/tasks-assignments', 'Tasks and Assignments'],
     ['concepts/authority-decisions', 'Authority and decisions'],
     ['concepts/organizational-attention', 'Organizational attention'],
+    ['concepts/human-work-surfaces', 'Human work surfaces'],
     ['concepts/native-authorities', 'Native authorities'],
     ['concepts/persistence-recovery', 'Persistence and recovery'],
     ['concepts/composition', 'Composition'],
@@ -38,6 +39,7 @@ const groupRoutes = {
   operate: [
     ['operate', 'Operate a Fleet'],
     ['operate/delegate-outcome', 'Delegate an outcome'],
+    ['operate/continue-local-work', 'Continue local work with the Fleet'],
     ['operate/create-second-mate', 'Create a Second Mate'],
     ['operate/supervise-steer', 'Supervise and steer'],
     ['operate/ask-for-decision', 'Ask for a decision'],
