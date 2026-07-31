@@ -132,14 +132,17 @@ describe("Fleet OTEL workload contract", () => {
       expect(env.K8S_POD_NAME?.valueFrom?.fieldRef?.fieldPath).toBe(
         "metadata.name",
       );
+      expect(env.AGENTOS_VERSION?.valueFrom?.fieldRef?.fieldPath).toBe(
+        "metadata.labels['app.kubernetes.io/version']",
+      );
       expect(env.K8S_CONTAINER_NAME?.value).toBe(container.name);
       expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
         "service.namespace=agentos",
       );
+      expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
+        "service.version=$(AGENTOS_VERSION)",
+      );
       if ("runtime" in workload) {
-        expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
-          "service.version=0.1.0",
-        );
         expect(env.OTEL_RESOURCE_ATTRIBUTES?.value).toContain(
           "agentos.ai.runtime=$(AGENTOS_AI_RUNTIME)",
         );

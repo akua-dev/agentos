@@ -78,10 +78,14 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: AGENTOS_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app.kubernetes.io/version']
             - name: OTEL_SERVICE_NAME
               value: agentos-ai-gateway
             - name: OTEL_RESOURCE_ATTRIBUTES
-              value: service.namespace=agentos,service.version=0.1.0,deployment.environment.name=default,agentos.fleet.name=default,k8s.cluster.name=agentos,k8s.namespace.name=$(K8S_NAMESPACE),k8s.pod.name=$(K8S_POD_NAME),k8s.container.name=$(K8S_CONTAINER_NAME),k8s.workload.name=ai-gateway
+              value: service.namespace=agentos,service.version=$(AGENTOS_VERSION),deployment.environment.name=default,agentos.fleet.name=default,k8s.cluster.name=agentos,k8s.namespace.name=$(K8S_NAMESPACE),k8s.pod.name=$(K8S_POD_NAME),k8s.container.name=$(K8S_CONTAINER_NAME),k8s.workload.name=ai-gateway
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://agentos-otel-collector:4318
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
