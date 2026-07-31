@@ -30,9 +30,16 @@ patches:
               fieldPath: metadata.name
       - op: add
         path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AGENTOS_VERSION
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['app.kubernetes.io/version']
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
         value: &otel-resources
           name: OTEL_RESOURCE_ATTRIBUTES
-          value: service.namespace=agentos,service.version=0.1.0,deployment.environment.name=default,agentos.fleet.name=default,agentos.ai.runtime=$(AGENTOS_AI_RUNTIME),agentos.ai.runtime.version=$(AGENTOS_AI_RUNTIME_VERSION),k8s.cluster.name=agentos,k8s.namespace.name=$(K8S_NAMESPACE),k8s.pod.name=$(K8S_POD_NAME),k8s.container.name=$(K8S_CONTAINER_NAME),k8s.workload.name=agentos-$(AGENTOS_AGENT_NAME)
+          value: service.namespace=agentos,service.version=$(AGENTOS_VERSION),deployment.environment.name=default,agentos.fleet.name=default,agentos.ai.runtime=$(AGENTOS_AI_RUNTIME),agentos.ai.runtime.version=$(AGENTOS_AI_RUNTIME_VERSION),k8s.cluster.name=agentos,k8s.namespace.name=$(K8S_NAMESPACE),k8s.pod.name=$(K8S_POD_NAME),k8s.container.name=$(K8S_CONTAINER_NAME),k8s.workload.name=agentos-$(AGENTOS_AGENT_NAME)
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value: &otel-endpoint
