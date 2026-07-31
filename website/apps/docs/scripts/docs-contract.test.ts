@@ -17,6 +17,12 @@ describe('documentationRoutes', () => {
         }),
       ]),
     );
+    expect(documentationRoutes).toContainEqual({
+      path: '/docs/concepts/progressive-planning',
+      title: 'Progressive planning',
+      group: 'concepts',
+      canonicalRequired: true,
+    });
     expect(documentationRoutes.at(-1)).toMatchObject({
       path: '/docs/contribute/releases',
       title: 'Release model',

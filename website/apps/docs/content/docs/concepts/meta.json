@@ -6,6 +6,7 @@
     "models-agents-harnesses",
     "crew",
     "tasks-assignments",
+    "progressive-planning",
     "authority-decisions",
     "organizational-attention",
     "human-work-surfaces",

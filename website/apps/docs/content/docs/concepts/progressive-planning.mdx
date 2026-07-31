@@ -1,0 +1,108 @@
+---
+title: Progressive planning
+description: Let current evidence expose the next accountable work without predeclaring a workflow graph.
+canonical:
+  - label: Architecture
+    path: ARCHITECTURE.md
+  - label: Delegation procedure
+    path: packages/agentos/skills/agentos-delegation/SKILL.md
+  - label: Supervision procedure
+    path: packages/agentos/skills/agentos-supervision/SKILL.md
+  - label: Durable coordination migrations
+    path: database/migrations
+---
+
+## Start with the outcome
+
+Tell First Mate what should become true, what evidence will prove it and where authority stops.
+Do not turn every expected implementation step into an Agent instruction.
+
+```text
+Human outcome
+  → Task
+  → inspect current reality
+      → Assignment when work is actionable
+      → Scout when a bounded uncertainty needs evidence
+      → Captain decision when authority belongs to a person
+      → dependency when another outcome must land first
+  → verified result
+  → next distinct outcome, only when evidence justifies one
+```
+
+This is not planning without structure. The outcome, acceptance evidence, ownership and authority
+are exact. The internal path can change when the repository, tracker, runtime or delivered evidence
+contradicts an earlier assumption.
+
+## Let evidence expose the next work
+
+First Mate reads the authorities that already own the facts before accepting or routing work. A
+repository can reveal a prerequisite. A failed test can narrow the cause. A provider issue can make
+an intended change unnecessary. A worker report can expose a separate outcome that deserves its
+own Task.
+
+That last boundary matters: a new Task represents genuinely distinct intent the organization
+should preserve. AgentOS does not create a decomposition tree merely to narrate every tool call or
+implementation step.
+
+## Separate uncertainty from accepted work
+
+Conversation can clarify intent without creating durable Fleet work. An unassigned Task is
+deliberate backlog, not accepted asynchronous execution. Active work begins only when AgentOS
+creates the first accountable [Assignment](/docs/concepts/tasks-assignments).
+
+When the next action is not honest yet, the organization preserves the uncertainty:
+
+- a **Scout** returns evidence about one bounded question;
+- a **Captain decision** records a consequential choice that belongs to a person; or
+- a **dependency** states which other outcome must complete first.
+
+Investigation should reduce uncertainty, not create another ship worker racing the accountable
+owner.
+
+## Preserve one accountable owner
+
+Every accepted outcome has exactly one active Assignment owner. If responsibility changes, the
+Task keeps its identity while an atomic handoff ends the prior Assignment and creates its
+replacement. History remains intact instead of being rewritten around the new plan.
+
+Direct steering can correct a stale assumption in the live native session. The responsible Mate
+then reconciles the correction into durable state so later supervision still sees truthful
+ownership and boundaries.
+
+## Keep every fact in its authority
+
+AgentOS connects authorities without copying all of them into a planning database:
+
+- the selected tracker owns human planning and provider workflow;
+- PostgreSQL owns durable Tasks, Assignments and Captain decisions;
+- Kubernetes owns live workload state;
+- Herdr owns native harness sessions;
+- an Agent's PVC owns its home and unfinished work; and
+- Git and its remote own delivered source and review artifacts.
+
+Raw reasoning, conversation, issue bodies and terminal output stay where they belong. Stable
+references form the chain of custody. See [Native authorities](/docs/concepts/native-authorities)
+for the complete boundary.
+
+## Know what AgentOS does not claim
+
+Progressive planning does not mean that an Agent predicts every future task. It does not replace
+the project tracker, turn memory into authority or make status activity count as delivery. It also
+does not remove human judgment: consequential decisions remain with the people who own them.
+
+The benefit is narrower and more useful. Intent and accountability survive while current evidence
+changes the route to the outcome.
+
+## What to inspect
+
+Ask the authority that can prove the current claim:
+
+1. Does the Task still express the accepted outcome?
+2. Which Assignment has the one active owner?
+3. Is uncertainty represented as a Scout, decision or dependency?
+4. Did new work become a distinct Task for a concrete reason?
+5. Which native artifact proves delivery?
+6. Which action still belongs to a human?
+
+[Organizational attention](/docs/concepts/organizational-attention) explains how the Fleet wakes
+the right owner and returns material decisions without turning a person into its polling loop.
