@@ -620,18 +620,53 @@ export const ResponseUsageSchema = z
       value.output_tokens_details !== undefined,
   );
 
-export const NativeCompactionStateSchema = z
+const NativeReplacementInputSchema = ResponseItemsSchema.min(1).refine(
+  (value) =>
+    value.filter((item) => item.type === "compaction").length === 1,
+);
+
+export const NativeCompactionStateV1Schema = z
   .object({
     version: z.literal(1),
     provider: z.string().min(1),
     model: z.string().min(1),
-    replacementInput: ResponseItemsSchema.min(1),
+    replacementInput: NativeReplacementInputSchema,
     usage: ResponseUsageSchema.optional(),
   })
-  .catchall(JsonValueSchema)
-  .refine(
-    (value) => value.replacementInput.filter((item) => item.type === "compaction").length === 1,
-  );
+  .strict();
+
+const NativeCompactionStateV2Base = {
+  version: z.literal(2),
+  implementation: z.literal("responses_compaction_v2"),
+  model: z.string().min(1),
+  replacementInput: NativeReplacementInputSchema,
+  usage: ResponseUsageSchema.optional(),
+};
+
+export const NativeCompactionStateV2Schema = z.discriminatedUnion(
+  "provider",
+  [
+    z
+      .object({
+        ...NativeCompactionStateV2Base,
+        provider: z.literal("openai"),
+        api: z.literal("openai-responses"),
+      })
+      .strict(),
+    z
+      .object({
+        ...NativeCompactionStateV2Base,
+        provider: z.literal("openai-codex"),
+        api: z.literal("openai-codex-responses"),
+      })
+      .strict(),
+  ],
+);
+
+export const NativeCompactionStateSchema = z.union([
+  NativeCompactionStateV1Schema,
+  NativeCompactionStateV2Schema,
+]);
 
 export const ProviderRequestPayloadSchema = z
   .object({
@@ -681,7 +716,16 @@ export type CompactionArtifact = Zod.infer<typeof CompactionArtifactSchema>;
 export type OpaqueProviderItem = Zod.infer<typeof OpaqueProviderItemSchema>;
 export type ResponseItem = Zod.infer<typeof ResponseItemSchema>;
 export type ResponseUsage = Zod.infer<typeof ResponseUsageSchema>;
+export type NativeCompactionStateV1 = Zod.infer<
+  typeof NativeCompactionStateV1Schema
+>;
+export type NativeCompactionStateV2 = Zod.infer<
+  typeof NativeCompactionStateV2Schema
+>;
 export type NativeCompactionState = Zod.infer<typeof NativeCompactionStateSchema>;
+export type NativeCompactionProvider =
+  NativeCompactionStateV2["provider"];
+export type NativeCompactionApi = NativeCompactionStateV2["api"];
 export type ProviderRequestPayload = Zod.infer<typeof ProviderRequestPayloadSchema>;
 export type ProviderEvent = Zod.infer<typeof ProviderEventSchema>;
 

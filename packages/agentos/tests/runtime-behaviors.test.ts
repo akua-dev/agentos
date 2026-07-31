@@ -10,6 +10,7 @@ import { createFakePi } from "./fake-pi.ts";
 describe("released AgentOS Pi registrations", () => {
   test("exports every released behavior as a replaceable registration", () => {
     expect(defaultAgentOSRuntime.map(({ id }) => id)).toEqual([
+      "@akua-dev/agentos:observability",
       "@akua-dev/agentos:background-tasks",
       "@akua-dev/agentos:mate-memory",
       "@akua-dev/agentos:openai-server-compaction",
@@ -45,7 +46,7 @@ describe("released AgentOS Pi registrations", () => {
     const withoutCompaction = defaultAgentOSRuntime.filter(
       ({ id }) => id !== "@akua-dev/agentos:openai-server-compaction",
     );
-    expect(withoutCompaction).toHaveLength(3);
+    expect(withoutCompaction).toHaveLength(4);
     expect(() => preflightAgentOSRegistrations(withoutCompaction)).not.toThrow();
   });
 });

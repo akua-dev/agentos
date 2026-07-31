@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import type { Message } from "@earendil-works/pi-ai";
-import { isResponseItem, messagesToResponseItems } from "../messages.ts";
-import { parseResponseUsage } from "../schemas.ts";
+import {
+  isResponseItem,
+  messagesToResponseItems,
+  normalizeResponseItemsForPrompt,
+} from "../messages.ts";
+import {
+  parseResponseItems,
+  parseResponseUsage,
+  type ResponseItem,
+} from "../schemas.ts";
 
 const usage = {
   input: 10,
@@ -11,6 +19,12 @@ const usage = {
   totalTokens: 15,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
+
+function responseItems(value: unknown): ResponseItem[] {
+  const parsed = parseResponseItems(value);
+  if (!parsed) throw new Error("Invalid response item fixture.");
+  return parsed;
+}
 
 describe("Responses message conversion", () => {
   test("accepts only JSON-safe opaque provider items", () => {
@@ -294,5 +308,192 @@ describe("Responses message conversion", () => {
         ],
       },
     ]);
+  });
+
+  test("synthesizes aborted outputs and removes orphan client outputs", () => {
+    const input = responseItems([
+      {
+        type: "function_call",
+        call_id: "function-1",
+        name: "read",
+        arguments: "{}",
+      },
+      {
+        type: "local_shell_call",
+        id: "shell-1",
+        call_id: "shell-call-1",
+        action: { type: "exec", command: ["pwd"], env: {} },
+        status: "completed",
+      },
+      {
+        type: "custom_tool_call",
+        call_id: "custom-1",
+        name: "patch",
+        input: "change",
+      },
+      {
+        type: "tool_search_call",
+        id: "search-1",
+        call_id: "search-call-1",
+        arguments: { query: "docs" },
+        execution: "client",
+        status: "completed",
+      },
+      {
+        type: "function_call_output",
+        call_id: "orphan-function",
+        output: "remove",
+      },
+      {
+        type: "custom_tool_call_output",
+        call_id: "orphan-custom",
+        output: "remove",
+      },
+      {
+        type: "tool_search_output",
+        id: "orphan-client",
+        call_id: "orphan-search",
+        execution: "client",
+        status: "completed",
+        tools: [],
+      },
+      {
+        type: "tool_search_output",
+        id: "server-search",
+        call_id: null,
+        execution: "server",
+        status: "completed",
+        tools: [{ type: "web_search" }],
+      },
+    ]);
+
+    expect(
+      normalizeResponseItemsForPrompt(input, { input: ["text"] }),
+    ).toEqual([
+      input[0]!,
+      {
+        type: "function_call_output",
+        call_id: "function-1",
+        output: "aborted",
+      },
+      input[1]!,
+      {
+        type: "local_shell_call_output",
+        id: "shell-call-1",
+        output: "aborted",
+      },
+      input[2]!,
+      {
+        type: "custom_tool_call_output",
+        call_id: "custom-1",
+        output: "aborted",
+      },
+      input[3]!,
+      {
+        type: "tool_search_output",
+        id: "search-1-output",
+        call_id: "search-call-1",
+        execution: "client",
+        status: "completed",
+        tools: [],
+      },
+      input[7]!,
+    ]);
+  });
+
+  test("removes ghost snapshots and adapts images without mutating input", () => {
+    const input = responseItems([
+      {
+        type: "ghost_snapshot",
+        snapshot: { private: "remove" },
+      },
+      {
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "inspect" },
+          {
+            type: "input_image",
+            detail: "auto",
+            image_url: "data:image/png;base64,aW1hZ2U=",
+          },
+        ],
+      },
+      {
+        type: "function_call",
+        call_id: "image-call",
+        name: "inspect",
+        arguments: "{}",
+      },
+      {
+        type: "function_call_output",
+        call_id: "image-call",
+        output: [
+          {
+            type: "input_image",
+            detail: "high",
+            image_url: "data:image/jpeg;base64,aW1hZ2U=",
+          },
+        ],
+      },
+      {
+        type: "image_generation_call",
+        id: "generated-image",
+        status: "completed",
+        result: "provider-image",
+      },
+    ]);
+
+    const imageCapable = normalizeResponseItemsForPrompt(input, {
+      input: ["text", "image"],
+    });
+    expect(imageCapable).toEqual(input.slice(1));
+    expect(imageCapable[0]).not.toBe(input[1]);
+
+    const textOnly = normalizeResponseItemsForPrompt(input, {
+      input: ["text"],
+    });
+    expect(textOnly).toEqual([
+      {
+        type: "message",
+        role: "user",
+        content: [
+          { type: "input_text", text: "inspect" },
+          {
+            type: "input_text",
+            text: "image content omitted because you do not support image input",
+          },
+        ],
+      },
+      input[2]!,
+      {
+        type: "function_call_output",
+        call_id: "image-call",
+        output: [
+          {
+            type: "input_text",
+            text: "image content omitted because you do not support image input",
+          },
+        ],
+      },
+      {
+        type: "image_generation_call",
+        id: "generated-image",
+        status: "completed",
+        result: "",
+      },
+    ]);
+    expect(input[1]).toEqual({
+      type: "message",
+      role: "user",
+      content: [
+        { type: "input_text", text: "inspect" },
+        {
+          type: "input_image",
+          detail: "auto",
+          image_url: "data:image/png;base64,aW1hZ2U=",
+        },
+      ],
+    });
   });
 });

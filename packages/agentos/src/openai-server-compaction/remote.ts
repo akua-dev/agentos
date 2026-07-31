@@ -1,23 +1,36 @@
+import { randomUUID } from "node:crypto";
+import {
+  link,
+  mkdir,
+  readFile,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import type { Api, Model, TSchema } from "@earendil-works/pi-ai";
 import {
   isCompactionArtifact,
   type CompactionArtifact,
+  type ResponseContentItem,
   type ResponseItem,
 } from "./messages.ts";
 import {
-  DirectCompactResponseSchema,
   JsonObjectSchema,
+  DirectCompactResponseSchema,
   OutputItemDoneEventSchema,
   ProviderEventSchema,
   TerminalEventSchema,
   parseResponseItems,
   parseResponseUsage,
+  type JsonObject,
   type ProviderEvent,
   type ResponseUsage,
 } from "./schemas.ts";
 
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 const REMOTE_COMPACTION_FEATURE = "remote_compaction_v2";
+const RETAINED_MESSAGE_TOKEN_BUDGET = 20_000;
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_TIMEOUT_MS = 600_000;
 
@@ -55,11 +68,24 @@ export type ServerCompactionRequest = {
   input: ResponseItem[];
   instructions?: string;
   tools: OpenAICompactionTool[];
-  reasoning?: OpenAICompactionReasoning;
+  reasoning?: JsonObject;
+  text?: JsonObject;
   signal?: AbortSignal;
   timeoutMs?: number;
   fetchImpl?: FetchLike;
+  codexInstallationId?: () => string | Promise<string>;
+  route?: "direct" | "ai_gateway";
 };
+
+export class OpenAICompactionHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`OpenAI server compaction request failed with HTTP ${status}.`);
+    this.name = "OpenAICompactionHttpError";
+    this.status = status;
+  }
+}
 
 export function supportsServerCompaction(
   model: Model<Api> | undefined,
@@ -120,6 +146,59 @@ function isCodexModel(
   model: OpenAICompactionModel,
 ): model is OpenAICompactionModel & { provider: "openai-codex" } {
   return model.provider === "openai-codex";
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function canonicalUuid(value: string): string | undefined {
+  const trimmed = value.trim();
+  return UUID_PATTERN.test(trimmed) ? trimmed.toLowerCase() : undefined;
+}
+
+function defaultCodexHome(): string {
+  const configured = process.env.CODEX_HOME?.trim();
+  return configured ? resolve(configured) : join(homedir(), ".codex");
+}
+
+export async function resolveCodexInstallationId(
+  codexHome = defaultCodexHome(),
+): Promise<string> {
+  const installationPath = join(codexHome, "installation_id");
+  try {
+    await mkdir(codexHome, { recursive: true });
+    try {
+      const existing = canonicalUuid(await readFile(installationPath, "utf8"));
+      return existing ?? randomUUID();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+
+    const installationId = randomUUID();
+    const temporaryPath = join(codexHome, `.installation_id-${randomUUID()}.tmp`);
+    try {
+      await writeFile(temporaryPath, installationId, {
+        encoding: "utf8",
+        flag: "wx",
+        mode: 0o644,
+      });
+      try {
+        await link(temporaryPath, installationPath);
+        return installationId;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        return (
+          canonicalUuid(await readFile(installationPath, "utf8")) ??
+          randomUUID()
+        );
+      }
+    } finally {
+      await unlink(temporaryPath).catch(() => undefined);
+    }
+  } catch {
+    // Installation identity is affinity metadata; failure must not block AI.
+    return randomUUID();
+  }
 }
 
 function normalizedTimeout(value: number | undefined): number {
@@ -190,26 +269,10 @@ function awaitWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T>
   });
 }
 
-async function parseCompactResponse(text: string): Promise<ServerCompactionResult> {
-  let parsed: ReturnType<typeof DirectCompactResponseSchema.safeParse>;
-  try {
-    parsed = DirectCompactResponseSchema.safeParse(JSON.parse(text));
-  } catch {
-    throw new Error("OpenAI server compaction returned invalid JSON.");
-  }
-  if (!parsed.success) {
-    throw new Error("OpenAI server compaction returned an invalid compacted response.");
-  }
-  const output = parsed.data.output;
-  const artifacts = output.filter(artifactFrom);
-  if (artifacts.length !== 1) {
-    throw new Error(`OpenAI server compaction expected one artifact, received ${artifacts.length}.`);
-  }
-  const usage = requiredResponseUsage(parsed.data.usage);
-  return { output, ...(usage ? { usage } : {}) };
-}
-
-function requestHeaders(params: ServerCompactionRequest, endpoint: string): Headers {
+async function requestHeaders(
+  params: ServerCompactionRequest,
+  endpoint: string,
+): Promise<Headers> {
   const headers = new Headers(params.headers);
   if (params.apiKey) headers.set("authorization", `Bearer ${params.apiKey}`);
   if (!caseInsensitiveHeader(headers, "authorization")) {
@@ -217,32 +280,58 @@ function requestHeaders(params: ServerCompactionRequest, endpoint: string): Head
   }
   headers.set("content-type", "application/json");
 
-  if (!isCodexModel(params.model)) {
+  if (isCodexModel(params.model)) {
+    headers.set("accept", "text/event-stream");
+    const configured = (headers.get("x-codex-beta-features") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    headers.set(
+      "x-codex-beta-features",
+      [...new Set([...configured, REMOTE_COMPACTION_FEATURE])].join(","),
+    );
+  } else {
+    headers.set("accept", "application/json");
     headers.delete("x-codex-beta-features");
+  }
+  if (params.route !== "ai_gateway") {
+    for (const [name] of headers) {
+      if (name.toLowerCase().startsWith("x-agentos-")) {
+        headers.delete(name);
+      }
+    }
+  }
+
+  if (!isCodexModel(params.model)) {
     headers.delete("openai-beta");
     headers.delete("originator");
     headers.delete("session-id");
-    headers.set("accept", "application/json");
+    headers.delete("thread-id");
+    headers.delete("x-client-request-id");
+    headers.delete("x-codex-installation-id");
+    headers.delete("x-codex-window-id");
     return headers;
   }
-
-  headers.set("accept", "text/event-stream");
-
-  const configured = (headers.get("x-codex-beta-features") ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  headers.set(
-    "x-codex-beta-features",
-    [...new Set([...configured, REMOTE_COMPACTION_FEATURE])].join(","),
-  );
 
   if (params.model.provider === "openai-codex") {
     headers.set("originator", "pi");
     headers.set("OpenAI-Beta", "responses=experimental");
+    const installationId = canonicalUuid(
+      await (
+        params.codexInstallationId ??
+        resolveCodexInstallationId
+      )(),
+    );
+    if (installationId) {
+      headers.set("x-codex-installation-id", installationId);
+    } else {
+      headers.delete("x-codex-installation-id");
+    }
+    headers.set("x-client-request-id", randomUUID());
     if (params.sessionId) {
       headers.set("session-id", params.sessionId);
-      headers.set("x-client-request-id", params.sessionId);
+      headers.set("thread-id", params.sessionId);
+      headers.set("x-codex-window-id", `${params.sessionId}:0`);
     }
     const hostname = new URL(endpoint).hostname;
     if (hostname === "chatgpt.com" && !headers.has("chatgpt-account-id")) {
@@ -306,6 +395,79 @@ function parseSse(text: string): ProviderEvent[] {
 
 function artifactFrom(value: unknown): CompactionArtifact | undefined {
   return isCompactionArtifact(value) ? value : undefined;
+}
+
+function cloneResponseItem<T extends ResponseItem>(item: T): T {
+  return structuredClone(item);
+}
+
+function isRealUserMessage(item: ResponseItem): boolean {
+  return (
+    item.type === "message" &&
+    item.role === "user" &&
+    Array.isArray(item.content) &&
+    item.content.length > 0
+  );
+}
+
+function responseMessageText(item: ResponseItem): string {
+  if (item.type !== "message" || !Array.isArray(item.content)) return "";
+  return (item.content as ResponseContentItem[])
+    .flatMap((part) =>
+      "text" in part && typeof part.text === "string" ? [part.text] : [],
+    )
+    .join("");
+}
+
+function approximateMessageTokens(item: ResponseItem): number {
+  return Math.max(1, Math.ceil(responseMessageText(item).length / 4));
+}
+
+function truncateMessageToTokenBudget(
+  item: ResponseItem,
+  maxTokens: number,
+): ResponseItem | undefined {
+  if (item.type !== "message" || !Array.isArray(item.content)) {
+    return undefined;
+  }
+  let remainingCharacters = Math.max(0, maxTokens * 4);
+  const content = (item.content as ResponseContentItem[]).flatMap((part) => {
+    if (!("text" in part) || typeof part.text !== "string") {
+      return [structuredClone(part)];
+    }
+    if (remainingCharacters === 0) return [];
+    const text = part.text.slice(0, remainingCharacters);
+    remainingCharacters -= text.length;
+    return text ? [{ ...structuredClone(part), text }] : [];
+  });
+  return content.length > 0
+    ? ({ ...cloneResponseItem(item), content } as ResponseItem)
+    : undefined;
+}
+
+export function buildRemoteCompactionHistory(
+  input: ResponseItem[],
+  artifact: CompactionArtifact,
+): ResponseItem[] {
+  const retainedUserMessages = input.filter(isRealUserMessage);
+  let remainingTokens = RETAINED_MESSAGE_TOKEN_BUDGET;
+  const retainedReversed: ResponseItem[] = [];
+  for (const item of [...retainedUserMessages].reverse()) {
+    if (remainingTokens === 0) break;
+    const tokenCount = approximateMessageTokens(item);
+    if (tokenCount <= remainingTokens) {
+      retainedReversed.push(cloneResponseItem(item));
+      remainingTokens -= tokenCount;
+      continue;
+    }
+    const truncated = truncateMessageToTokenBudget(item, remainingTokens);
+    if (truncated) retainedReversed.push(truncated);
+    remainingTokens = 0;
+  }
+  return [
+    ...retainedReversed.reverse(),
+    cloneResponseItem(artifact),
+  ];
 }
 
 function requiredResponseUsage(value: unknown): ResponseUsage | undefined {
@@ -400,6 +562,29 @@ function parseCompactionEvents(events: ProviderEvent[]): ServerCompactionResult 
   return { output, ...(usage ? { usage } : {}) };
 }
 
+function parseDirectCompactionResponse(text: string): ServerCompactionResult {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new Error("OpenAI server compaction returned invalid compact response JSON.");
+  }
+  const parsed = DirectCompactResponseSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error("OpenAI server compaction returned an invalid compact response.");
+  }
+  const artifacts = parsed.data.output.filter(artifactFrom);
+  if (artifacts.length !== 1) {
+    throw new Error(
+      `OpenAI server compaction compact response expected one artifact, received ${artifacts.length}.`,
+    );
+  }
+  return {
+    output: parsed.data.output,
+    usage: parsed.data.usage,
+  };
+}
+
 export async function requestServerCompaction(
   params: ServerCompactionRequest,
 ): Promise<ServerCompactionResult> {
@@ -407,31 +592,30 @@ export async function requestServerCompaction(
   const deadline = deadlineSignal(params.signal, params.timeoutMs);
   try {
     if (deadline.signal.aborted) throw abortReason(deadline.signal);
-    const codex = isCodexModel(params.model);
-    const body = codex
+    const sharedBody = {
+      model: params.model.id,
+      input: params.input,
+      instructions: params.instructions,
+      tools: params.tools,
+      parallel_tool_calls: true,
+      ...(params.sessionId ? { prompt_cache_key: params.sessionId } : {}),
+      ...(params.reasoning ? { reasoning: params.reasoning } : {}),
+      ...(params.text ? { text: params.text } : {}),
+    };
+    const body = isCodexModel(params.model)
       ? {
-          model: params.model.id,
+          ...sharedBody,
           input: [...params.input, { type: "compaction_trigger" }],
-          instructions: params.instructions,
-          tools: params.tools,
-          parallel_tool_calls: true,
           tool_choice: "auto",
           stream: true,
           store: false,
           include: ["reasoning.encrypted_content"],
-          ...(params.sessionId ? { prompt_cache_key: params.sessionId } : {}),
-          ...(params.reasoning ? { reasoning: params.reasoning } : {}),
         }
-      : {
-          model: params.model.id,
-          input: params.input,
-          instructions: params.instructions,
-          ...(params.sessionId ? { prompt_cache_key: params.sessionId } : {}),
-        };
+      : sharedBody;
     const response = await awaitWithAbort(
       (params.fetchImpl ?? fetch)(endpoint, {
         method: "POST",
-        headers: requestHeaders(params, endpoint),
+        headers: await requestHeaders(params, endpoint),
         body: JSON.stringify(body),
         signal: deadline.signal,
       }),
@@ -439,10 +623,23 @@ export async function requestServerCompaction(
     );
     if (!response.ok) {
       void response.body?.cancel().catch(() => undefined);
-      throw new Error(`OpenAI server compaction request failed with HTTP ${response.status}.`);
+      throw new OpenAICompactionHttpError(response.status);
     }
     const responseText = await boundedResponseText(response, deadline.signal);
-    return codex ? parseCompactionEvents(parseSse(responseText)) : parseCompactResponse(responseText);
+    if (!isCodexModel(params.model)) {
+      return parseDirectCompactionResponse(responseText);
+    }
+    const result = parseCompactionEvents(parseSse(responseText));
+    const artifact = result.output
+      .map(artifactFrom)
+      .find((value): value is CompactionArtifact => value !== undefined);
+    if (!artifact) {
+      throw new Error("OpenAI server compaction returned no canonical artifact.");
+    }
+    return {
+      output: buildRemoteCompactionHistory(params.input, artifact),
+      ...(result.usage ? { usage: result.usage } : {}),
+    };
   } finally {
     deadline.cleanup();
   }

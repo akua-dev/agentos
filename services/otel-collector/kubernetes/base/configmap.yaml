@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentos-otel-collector
+  labels:
+    app.kubernetes.io/name: agentos-otel-collector
+    app.kubernetes.io/part-of: agentos
+data:
+  collector.yaml: |
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+      pprof:
+        endpoint: 127.0.0.1:1777
+      file_storage/queue:
+        directory: /var/lib/otelcol/storage
+        create_directory: true
+        compaction:
+          directory: /var/lib/otelcol/storage
+          on_start: true
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+            max_recv_msg_size_mib: 8
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 192
+        spike_limit_mib: 48
+      k8sattributes:
+        auth_type: serviceAccount
+        passthrough: false
+        filter:
+          node_from_env_var: K8S_NODE_NAME
+        pod_association:
+          - sources:
+              - from: connection
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.uid
+        extract:
+          metadata:
+            - k8s.namespace.name
+            - k8s.deployment.name
+            - k8s.statefulset.name
+            - k8s.daemonset.name
+            - k8s.replicaset.name
+            - k8s.pod.name
+            - k8s.container.name
+            - service.namespace
+            - service.name
+            - service.version
+      resource/privacy:
+        attributes:
+          - key: k8s.pod.uid
+            action: delete
+          - key: process.command_args
+            action: delete
+          - key: process.command_line
+            action: delete
+          - key: process.environment
+            action: delete
+          - key: user.email
+            action: delete
+          - key: enduser.id
+            action: delete
+          - key: authorization
+            action: delete
+          - key: cookie
+            action: delete
+          - key: http.request.body
+            action: delete
+          - key: http.response.body
+            action: delete
+          - key: http.request.header.authorization
+            action: delete
+          - key: http.request.header.cookie
+            action: delete
+          - key: http.response.header.set_cookie
+            action: delete
+          - key: gen_ai.prompt
+            action: delete
+          - key: gen_ai.completion
+            action: delete
+          - key: gen_ai.input.messages
+            action: delete
+          - key: gen_ai.output.messages
+            action: delete
+          - key: tool.arguments
+            action: delete
+          - key: tool.result
+            action: delete
+          - key: error.message
+            action: delete
+          - key: exception.message
+            action: delete
+          - key: exception.stacktrace
+            action: delete
+          - key: provider.account.id
+            action: delete
+          - key: provider.account.email
+            action: delete
+      attributes/privacy:
+        actions:
+          - key: authorization
+            action: delete
+          - key: cookie
+            action: delete
+          - key: http.request.body
+            action: delete
+          - key: http.response.body
+            action: delete
+          - key: http.request.header.authorization
+            action: delete
+          - key: http.request.header.cookie
+            action: delete
+          - key: http.response.header.set_cookie
+            action: delete
+          - key: gen_ai.prompt
+            action: delete
+          - key: gen_ai.completion
+            action: delete
+          - key: gen_ai.input.messages
+            action: delete
+          - key: gen_ai.output.messages
+            action: delete
+          - key: tool.arguments
+            action: delete
+          - key: tool.result
+            action: delete
+          - key: error.message
+            action: delete
+          - key: exception.message
+            action: delete
+          - key: exception.stacktrace
+            action: delete
+          - key: provider.account.id
+            action: delete
+          - key: provider.account.email
+            action: delete
+      batch:
+        send_batch_size: 512
+        send_batch_max_size: 1024
+        timeout: 1s
+
+    exporters:
+      nop: {}
+
+    service:
+      extensions:
+        - health_check
+        - pprof
+        - file_storage/queue
+      telemetry:
+        logs:
+          level: info
+          encoding: json
+        metrics:
+          level: normal
+          readers:
+            - pull:
+                exporter:
+                  prometheus:
+                    host: 127.0.0.1
+                    port: 8888
+      pipelines:
+        traces:
+          receivers:
+            - otlp
+          processors:
+            - memory_limiter
+            - k8sattributes
+            - resource/privacy
+            - attributes/privacy
+            - batch
+          exporters:
+            - nop
+        metrics:
+          receivers:
+            - otlp
+          processors:
+            - memory_limiter
+            - k8sattributes
+            - resource/privacy
+            - attributes/privacy
+            - batch
+          exporters:
+            - nop
+        logs:
+          receivers:
+            - otlp
+          processors:
+            - memory_limiter
+            - k8sattributes
+            - resource/privacy
+            - attributes/privacy
+            - batch
+          exporters:
+            - nop

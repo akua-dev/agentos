@@ -12,6 +12,13 @@ import {
   type MemoryActivityStore,
 } from "../memory/activity.ts";
 import { formatTopic, redactAuxiliaryInput } from "./prompts.ts";
+import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
+import {
+  safeAssistantFailure,
+  safeTokenCount,
+  startAgentOSAuxiliaryOperation,
+} from "../telemetry/auxiliary.ts";
+import type { AgentOSProviderAttempt } from "../telemetry/runtime.ts";
 
 export type HumanInputSource = "interactive" | "rpc" | "extension";
 
@@ -21,6 +28,7 @@ export interface MaintenanceRunContext {
   model: Model<any> | undefined;
   modelRegistry: ModelRegistry | undefined;
   signal?: AbortSignal;
+  telemetry?: AgentOSTelemetrySource;
 }
 
 export interface MaintenanceRunRequest extends MaintenanceRunContext {
@@ -30,6 +38,7 @@ export interface MaintenanceRunRequest extends MaintenanceRunContext {
   systemPrompt: string;
   prompt: string;
   tools: ToolDefinition[];
+  completeImpl?: typeof complete;
 }
 
 export interface MaintenanceRunResult {
@@ -625,6 +634,16 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = async (
   }
   const auth = await request.modelRegistry.getApiKeyAndHeaders(request.model);
   if (!auth.ok) throw new Error("maintenance model authentication unavailable");
+  const operation = await startAgentOSAuxiliaryOperation(
+    request.model,
+    request.telemetry,
+    "resumed",
+  );
+  const requestKind =
+    request.kind === "extraction"
+      ? "memory_extract"
+      : "memory_consolidate";
+  let currentAttempt: AgentOSProviderAttempt | undefined;
   const transcript = [
     request.prompt,
     "Return exactly one JSON object for each turn. Use {\"action\":\"call\",\"tool\":\"...\",\"arguments\":{...}} to invoke one available memory tool, or {\"action\":\"done\"} when maintenance is complete.",
@@ -636,57 +655,96 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = async (
       })),
     )}`,
   ];
-  for (let step = 0; step < MAX_MAINTENANCE_STEPS; step += 1) {
-    const response = await complete(
-      request.model,
-      {
-        systemPrompt: request.systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: transcript.join("\n\n"),
-            timestamp: Date.now(),
-          },
-        ],
-      },
-      {
-        apiKey: auth.apiKey,
-        headers: auth.headers,
-        env: auth.env,
-        signal: request.signal,
-        temperature: 0,
-        maxTokens: 2_048,
-      },
-    );
-    if (response.stopReason === "error" || response.stopReason === "aborted") {
-      throw new Error("maintenance model did not complete");
+  try {
+    for (let step = 0; step < MAX_MAINTENANCE_STEPS; step += 1) {
+      currentAttempt = operation.startProviderAttempt({
+        requestKind,
+        streamMode: "non_streaming",
+      });
+      const headers = { ...auth.headers };
+      currentAttempt.inject(headers);
+      const response = await (request.completeImpl ?? complete)(
+        request.model,
+        {
+          systemPrompt: request.systemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: transcript.join("\n\n"),
+              timestamp: Date.now(),
+            },
+          ],
+        },
+        {
+          apiKey: auth.apiKey,
+          headers,
+          env: auth.env,
+          signal: request.signal,
+          temperature: 0,
+          maxTokens: 2_048,
+        },
+      );
+      const failure = safeAssistantFailure(response.stopReason);
+      if (failure) {
+        currentAttempt.end({
+          status: 200,
+          error: failure,
+          streamOutcome:
+            response.stopReason === "aborted"
+              ? "aborted"
+              : "upstream_error",
+          inputTokens: safeTokenCount(response.usage.input),
+          outputTokens: safeTokenCount(response.usage.output),
+        });
+        currentAttempt = undefined;
+        throw new Error("maintenance model did not complete");
+      }
+      const text = response.content
+        .filter(
+          (part): part is Extract<typeof part, { type: "text" }> =>
+            part.type === "text",
+        )
+        .map(({ text }) => text)
+        .join("")
+        .trim();
+      const action = parseMaintenanceAction(text);
+      currentAttempt.end({
+        status: 200,
+        streamOutcome: "completed",
+        inputTokens: safeTokenCount(response.usage.input),
+        outputTokens: safeTokenCount(response.usage.output),
+      });
+      currentAttempt = undefined;
+      if (action.action === "done") {
+        operation.end({ status: 200 });
+        return { summary: "maintenance completed", touchedPaths: [] };
+      }
+      const tool = request.tools.find(({ name }) => name === action.tool);
+      if (!tool) {
+        throw new Error(
+          "maintenance model selected an unavailable tool",
+        );
+      }
+      const result = await tool.execute(
+        `maintenance-${step}`,
+        action.arguments as never,
+        undefined,
+        undefined,
+        {} as never,
+      );
+      transcript.push(
+        `Tool ${tool.name} result:\n${boundedToolResult(toolResultText(result))}`,
+      );
     }
-    const text = response.content
-      .filter(
-        (part): part is Extract<typeof part, { type: "text" }> =>
-          part.type === "text",
-      )
-      .map(({ text }) => text)
-      .join("")
-      .trim();
-    const action = parseMaintenanceAction(text);
-    if (action.action === "done") {
-      return { summary: "maintenance completed", touchedPaths: [] };
-    }
-    const tool = request.tools.find(({ name }) => name === action.tool);
-    if (!tool) throw new Error("maintenance model selected an unavailable tool");
-    const result = await tool.execute(
-      `maintenance-${step}`,
-      action.arguments as never,
-      undefined,
-      undefined,
-      {} as never,
-    );
-    transcript.push(
-      `Tool ${tool.name} result:\n${boundedToolResult(toolResultText(result))}`,
-    );
+    throw new Error("maintenance reached its operation limit");
+  } catch (error) {
+    currentAttempt?.end({
+      error,
+      streamOutcome: "upstream_error",
+    });
+    operation.end({ error });
+    throw error;
   }
-  throw new Error("maintenance reached its operation limit");
 };
 
 function textResult(text: string) {

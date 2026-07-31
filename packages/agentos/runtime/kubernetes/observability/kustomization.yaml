@@ -1,0 +1,100 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+    patch: |-
+      - op: add
+        path: /spec/template/metadata/labels/agentos.akua.dev~1otel-client
+        value: "true"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-service-name
+          name: OTEL_SERVICE_NAME
+          value: agentos-$(AGENTOS_AGENT_NAME)
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-namespace
+          name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-pod
+          name: K8S_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-resources
+          name: OTEL_RESOURCE_ATTRIBUTES
+          value: service.namespace=agentos,service.version=0.1.0,deployment.environment.name=default,agentos.fleet.name=default,agentos.ai.runtime=$(AGENTOS_AI_RUNTIME),agentos.ai.runtime.version=$(AGENTOS_AI_RUNTIME_VERSION),k8s.cluster.name=agentos,k8s.namespace.name=$(K8S_NAMESPACE),k8s.pod.name=$(K8S_POD_NAME),k8s.container.name=$(K8S_CONTAINER_NAME),k8s.workload.name=agentos-$(AGENTOS_AGENT_NAME)
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-endpoint
+          name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://agentos-otel-collector:4318
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-protocol
+          name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: http/protobuf
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-compression
+          name: OTEL_EXPORTER_OTLP_COMPRESSION
+          value: gzip
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-timeout
+          name: OTEL_EXPORTER_OTLP_TIMEOUT
+          value: "5000"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-propagators
+          name: OTEL_PROPAGATORS
+          value: tracecontext,baggage
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-sampler
+          name: OTEL_TRACES_SAMPLER
+          value: parentbased_traceidratio
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-sampler-arg
+          name: OTEL_TRACES_SAMPLER_ARG
+          value: "1"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-traces-exporter
+          name: OTEL_TRACES_EXPORTER
+          value: otlp
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-metrics-exporter
+          name: OTEL_METRICS_EXPORTER
+          value: otlp
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-logs-exporter
+          name: OTEL_LOGS_EXPORTER
+          value: otlp
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-sdk-disabled
+          name: OTEL_SDK_DISABLED
+          value: "false"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-bsp-queue
+          name: OTEL_BSP_MAX_QUEUE_SIZE
+          value: "2048"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: &otel-bsp-batch
+          name: OTEL_BSP_MAX_EXPORT_BATCH_SIZE
+          value: "512"

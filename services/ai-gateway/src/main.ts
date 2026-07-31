@@ -6,19 +6,29 @@ import type {
   OAuthCredentials,
   OAuthDeviceCodeInfo,
 } from "@earendil-works/pi-ai/oauth";
+import {
+  initializeAgentOSTelemetryFromEnvironment,
+  type AgentOSTelemetry,
+} from "@akua-dev/agentos";
 import { createAccountVault, createAccountVaultStore } from "./accounts.ts";
 import {
   loginOpenAICodexDeviceCode,
   refreshOpenAICodexToken,
 } from "./codex-oauth.ts";
 import { createAIGatewayService } from "./service.ts";
+import {
+  createGatewayTelemetry,
+  createNoopGatewayTelemetry,
+} from "./telemetry.ts";
 
 type Environment = Record<string, string | undefined>;
 type LoginImplementation = (options: {
   onDeviceCode(info: OAuthDeviceCodeInfo): void;
   signal?: AbortSignal;
 }) => Promise<OAuthCredentials>;
-type RefreshImplementation = (refreshToken: string) => Promise<OAuthCredentials>;
+type RefreshImplementation = (
+  refreshToken: string,
+) => Promise<OAuthCredentials>;
 type FetchImplementation = (
   input: string | URL | Request,
   init?: RequestInit,
@@ -35,6 +45,7 @@ export interface RunAIGatewayCliOptions {
   login?: LoginImplementation;
   refresh?: RefreshImplementation;
   fetchImpl?: FetchImplementation;
+  initializeTelemetry?: () => Promise<AgentOSTelemetry>;
   startServer?: (options: {
     hostname: string;
     port: number;
@@ -128,30 +139,51 @@ export async function runAIGatewayCli(
         writeError("AI_GATEWAY_TOKEN is required to serve");
         return 1;
       }
-      const service = await createAIGatewayService({
-        stateDirectory,
-        clientToken,
-        allowApiKeyFallback:
-          environment.AI_GATEWAY_ALLOW_API_KEY_FALLBACK?.trim() === "true",
-        ...(environment.OPENAI_API_KEY ? { openAIApiKey: environment.OPENAI_API_KEY } : {}),
-        oauth: { refresh },
-        fetchImpl: options.fetchImpl ?? fetch,
-      });
-      const hostname = environment.AI_GATEWAY_LISTEN_HOST?.trim() || "0.0.0.0";
-      const port = parsePort(environment.AI_GATEWAY_LISTEN_PORT);
-      const server = (options.startServer ?? defaultStartServer)({
-        hostname,
-        port,
-        fetch: service.fetch,
-      });
-      writeLine(`ai-gateway listening on ${hostname}:${port}`);
-      await (options.waitForShutdown ?? waitForShutdown)();
-      await server.stop(false);
-      return 0;
+      const telemetryRuntime = await (
+        options.initializeTelemetry ?? initializeAgentOSTelemetryFromEnvironment
+      )();
+      try {
+        const service = await createAIGatewayService({
+          stateDirectory,
+          clientToken,
+          allowApiKeyFallback:
+            environment.AI_GATEWAY_ALLOW_API_KEY_FALLBACK?.trim() === "true",
+          ...(environment.OPENAI_API_KEY
+            ? { openAIApiKey: environment.OPENAI_API_KEY }
+            : {}),
+          oauth: { refresh },
+          fetchImpl: options.fetchImpl ?? fetch,
+          telemetry: telemetryRuntime.enabled
+            ? createGatewayTelemetry()
+            : createNoopGatewayTelemetry(),
+        });
+        try {
+          const hostname =
+            environment.AI_GATEWAY_LISTEN_HOST?.trim() || "0.0.0.0";
+          const port = parsePort(environment.AI_GATEWAY_LISTEN_PORT);
+          const server = (options.startServer ?? defaultStartServer)({
+            hostname,
+            port,
+            fetch: service.fetch,
+          });
+          writeLine(`ai-gateway listening on ${hostname}:${port}`);
+          await (options.waitForShutdown ?? waitForShutdown)();
+          await server.stop(false);
+          return 0;
+        } finally {
+          await service.close();
+        }
+      } finally {
+        await telemetryRuntime.shutdown();
+      }
     }
 
-    writeLine("Usage: ai-gateway <serve|login [label]|list|status|remove <id>>");
-    return command === "help" || command === "--help" || command === "-h" ? 0 : 2;
+    writeLine(
+      "Usage: ai-gateway <serve|login [label]|list|status|remove <id>>",
+    );
+    return command === "help" || command === "--help" || command === "-h"
+      ? 0
+      : 2;
   } catch (error) {
     const name = error instanceof Error ? error.name : "UnknownError";
     writeError(`ai-gateway ${command} failed (${name})`);
@@ -163,7 +195,9 @@ function parsePort(value: string | undefined): number {
   if (value === undefined) return 8787;
   const port = Number(value);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error("AI_GATEWAY_LISTEN_PORT must be an integer from 1 to 65535");
+    throw new Error(
+      "AI_GATEWAY_LISTEN_PORT must be an integer from 1 to 65535",
+    );
   }
   return port;
 }

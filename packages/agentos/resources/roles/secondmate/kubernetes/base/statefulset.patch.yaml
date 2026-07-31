@@ -33,12 +33,18 @@ spec:
               value: secondmate
             - name: AGENTOS_AGENT_ROLE
               value: second_mate
+            - name: AGENTOS_AI_RUNTIME
+              value: pi
+            - name: AGENTOS_AI_RUNTIME_VERSION
+              value: 0.81.1
             - name: AGENTOS_DATABASE_URL
               value: postgresql://runtime_secondmate@agentos-postgres-rw.agentos.svc:5432/agentos?sslmode=require
             - name: AGENTOS_PGPASS_SOURCE
               value: /var/run/secrets/agentos/pgpass
             - name: HERDR_SESSION
               value: agentos-secondmate
+            - name: K8S_CONTAINER_NAME
+              value: agentos
             - name: PGPASSFILE
               value: /home/agent/.pgpass
         - name: prepare-home

@@ -15,6 +15,23 @@ import {
   registerAgentosSupervisionGuard,
   type AgentOSSupervisionGuardOptions,
 } from "./supervision-guard/extension.ts";
+import {
+  registerAgentOSObservability,
+  type AgentOSObservabilityDependencies,
+} from "./telemetry/pi-extension.ts";
+
+export function createAgentOSObservabilityRegistration(
+  dependencies: AgentOSObservabilityDependencies = {},
+): AgentOSRegistrationV1 {
+  return {
+    version: 1,
+    id: "@akua-dev/agentos:observability",
+    names: { version: 1 },
+    register(pi) {
+      registerAgentOSObservability(pi, dependencies);
+    },
+  };
+}
 
 export function createAgentOSBackgroundTasksRegistration(
   options: AgentOSBackgroundTasksOptions = {},
@@ -95,6 +112,7 @@ export function createAgentOSSupervisionGuardRegistration(
 
 export const defaultAgentOSRuntime: readonly AgentOSRegistrationV1[] =
   Object.freeze([
+    createAgentOSObservabilityRegistration(),
     createAgentOSBackgroundTasksRegistration(),
     createAgentOSMateMemoryRegistration(),
     createAgentOSOpenAIServerCompactionRegistration(),

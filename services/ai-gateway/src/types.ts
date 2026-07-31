@@ -14,9 +14,7 @@ export interface UsageSnapshot {
 }
 
 export interface AccountBlock {
-  accountId: string;
   kind: "quota" | "transient";
-  blockedAt: number;
   retryAt?: number;
 }
 
@@ -26,6 +24,7 @@ export interface Candidate {
   usage?: UsageSnapshot;
   needsReauth: boolean;
   block?: AccountBlock;
+  activeReservations?: number;
 }
 
 export interface CandidateExplanation {
@@ -54,26 +53,6 @@ export interface RoutingConfig {
     shortWindowMinimumPercent: number;
     weeklyMinimumPercent: number;
   };
-}
-
-export interface Reservation {
-  accountId: string;
-  leaseToken: string;
-  createdAt: number;
-  expiresAt: number;
-}
-
-export interface SessionAssignment {
-  sessionKey: string;
-  accountId: string;
-  updatedAt: number;
-}
-
-export interface RoutingStateFile {
-  version: 1;
-  reservations: Reservation[];
-  assignments: SessionAssignment[];
-  blocks: AccountBlock[];
 }
 
 export type RouteLease =

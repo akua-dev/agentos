@@ -32,6 +32,7 @@ import {
   MateMemoryMaintenance,
   type MaintenanceAgentRunner,
 } from "./maintenance.ts";
+import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
 
 const STATE_ENTRY = "agentos-mate-memory-state";
 const CONTEXT_MESSAGE = "agentos-mate-memory-context";
@@ -48,6 +49,7 @@ export interface MateMemoryExtensionDependencies {
   store?: MateMemoryStore;
   activity?: MemoryActivityStore;
   maintenanceRunner?: MaintenanceAgentRunner;
+  telemetry?: AgentOSTelemetrySource;
 }
 
 interface PendingNativeWrite {
@@ -127,6 +129,7 @@ export function registerMateMemoryExtension(
       model: context.model,
       modelRegistry: context.modelRegistry,
       signal: context.signal,
+      telemetry: dependencies.telemetry,
     };
     maintenance.afterAgentSettled(maintenanceContext);
     void maintenance.maybeDream(
@@ -240,6 +243,7 @@ export function registerMateMemoryExtension(
         model: context.model,
         modelRegistry: context.modelRegistry,
         signal: context.signal,
+        telemetry: dependencies.telemetry,
       });
       const allowed = new Set(
         startup.inventory

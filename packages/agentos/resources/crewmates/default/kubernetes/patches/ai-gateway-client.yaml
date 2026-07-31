@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-crewmate
+spec:
+  template:
+    metadata:
+      labels:
+        agentos.akua.dev/ai-gateway-client: "true"
+    spec:
+      containers:
+        - name: crewmate
+          env:
+            - name: AI_GATEWAY_URL
+              value: http://ai-gateway.agentos.svc.cluster.local:8787
+            - name: AI_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ai-gateway-client
+                  key: token

@@ -12,6 +12,9 @@ Before changing AgentOS:
   `AGENTS.md` that covers the files in scope.
 - Inspect the current worktree and preserve unrelated or unfinished work.
 - Keep the change inside the smallest component that owns the behavior.
+- When the scope imports or changes Effect code, load `$effect-ts` before
+  implementation. Its pinned reference source is the `.repos/effect`
+  submodule; initialize submodules rather than substituting remembered APIs.
 
 When evaluating AgentOS or another Agent organization, load
 `$agentos-evaluation`. Start `$agentos-improvement-review` only after its
@@ -35,6 +38,12 @@ Repository-wide constraints:
   design that requires it.
 - Keep runtime automation in Bun and TypeScript. Do not add repository-owned
   shell scripts or hide programs in shell-backed Mise task strings.
+- Keep every installed Effect package on one exact beta version. Effect
+  services, layers, schemas, typed errors, tests and observability follow
+  `$effect-ts`; do not create a second local Effect style guide.
+- Consume shared `codex-router` behavior only through its public root Git
+  package pinned to a full commit SHA. Keep AgentOS adapters thin and never
+  vendor or copy the routing implementation.
 - Never place credentials in Git, prompts, argv, persisted task requests,
   generated artifacts or logs. Use the authority's approved environment,
   file, secret or login mechanism.
