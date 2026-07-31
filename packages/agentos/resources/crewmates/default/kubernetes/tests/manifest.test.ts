@@ -187,7 +187,10 @@ describe("Crewmate Kubernetes base", () => {
     expect(pod.volumes).toEqual([
       {
         name: "database-credentials",
-        secret: { secretName: "agentos-crewmate-postgres" },
+        secret: {
+          defaultMode: 288,
+          secretName: "agentos-crewmate-postgres",
+        },
       },
     ]);
   });

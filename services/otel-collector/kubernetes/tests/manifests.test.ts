@@ -257,6 +257,15 @@ describe("Fleet OpenTelemetry Collector", () => {
       name: "remote-headers",
       readOnly: true,
     });
+    expect(statefulSet.template.spec.securityContext.fsGroup).toBe(10001);
+    expect(statefulSet.template.spec.volumes).toContainEqual({
+      name: "remote-headers",
+      secret: {
+        defaultMode: 288,
+        items: [{ key: "headers.yaml", path: "headers.yaml" }],
+        secretName: "agentos-otel-remote",
+      },
+    });
   });
 
   test("enables a bounded local archive only in its explicit overlay", async () => {
