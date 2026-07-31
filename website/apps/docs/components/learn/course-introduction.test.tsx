@@ -29,6 +29,8 @@ describe('CourseIntroduction', () => {
       screen.getByRole('heading', { name: 'What you will be able to run' }),
     ).toBeTruthy();
     expect(screen.getByText(/persistent First Mate/i)).toBeTruthy();
+    expect(screen.getByText(/first six chapters/i)).toBeTruthy();
+    expect(screen.getByText(/eleven short chapters/i)).toBeTruthy();
 
     const progressionHeading = screen.getByRole('heading', {
       name: 'From one answer to a company',

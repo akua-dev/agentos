@@ -49,7 +49,7 @@ export function CourseIntroduction({ firstLessonUrl }: { firstLessonUrl: string 
             connect each concept to.
           </p>
           <p className="mt-3 max-w-[60ch] text-sm leading-6 text-fd-muted-foreground">
-            The first five chapters take you from installation to one review-ready outcome. The
+            The first six chapters take you from installation to one review-ready outcome. The
             remaining five teach you to grow and upgrade that working company without losing
             control.
           </p>
@@ -173,7 +173,7 @@ export function CourseIntroduction({ firstLessonUrl }: { firstLessonUrl: string 
           Build first. Learn each layer when it becomes useful.
         </h2>
         <p className="mt-4 leading-7 text-fd-foreground/90">
-          Ten short chapters form one path: run the first outcome, grow it into a company, then
+          Eleven short chapters form one path: run the first outcome, grow it into a company, then
           upgrade it without surrendering control. Learn explains why each layer exists;{' '}
           <Link href="/docs" className="font-medium text-brand hover:underline">
             Documentation

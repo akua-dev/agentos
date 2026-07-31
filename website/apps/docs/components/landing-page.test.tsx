@@ -88,4 +88,20 @@ describe('landing page', () => {
       ],
     });
   });
+
+  it('connects progressive planning to its explanation and hands-on lesson', () => {
+    render(<Page />);
+
+    expect(
+      screen.getByRole('heading', { name: 'The plan emerges from evidence.' }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: 'Understand progressive planning' })
+        .getAttribute('href'),
+    ).toBe('/docs/concepts/progressive-planning');
+    expect(
+      screen.getByRole('link', { name: 'Try it with a real outcome' }).getAttribute('href'),
+    ).toBe('/learn/01-first-outcome/let-plan-emerge');
+  });
 });

@@ -28,6 +28,8 @@ const groupRoutes = {
     ['concepts/models-agents-harnesses', 'Models, Agents and harnesses'],
     ['concepts/crew', 'The crew'],
     ['concepts/tasks-assignments', 'Tasks and Assignments'],
+    ['concepts/progressive-planning', 'Progressive planning'],
+    ['concepts/progressive-planning-in-practice', 'Progressive planning in practice'],
     ['concepts/authority-decisions', 'Authority and decisions'],
     ['concepts/organizational-attention', 'Organizational attention'],
     ['concepts/human-work-surfaces', 'Human work surfaces'],

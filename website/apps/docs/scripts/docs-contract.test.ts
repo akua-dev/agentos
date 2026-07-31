@@ -3,7 +3,7 @@ import { documentationRoutes } from './docs-contract';
 
 describe('documentationRoutes', () => {
   it('defines the complete ordered AgentOS documentation map', () => {
-    expect(documentationRoutes).toHaveLength(57);
+    expect(documentationRoutes).toHaveLength(59);
     expect(documentationRoutes[0]).toMatchObject({ path: '/docs', title: 'AgentOS documentation' });
     expect(documentationRoutes).toEqual(
       expect.arrayContaining([
@@ -17,6 +17,18 @@ describe('documentationRoutes', () => {
         }),
       ]),
     );
+    expect(documentationRoutes).toContainEqual({
+      path: '/docs/concepts/progressive-planning',
+      title: 'Progressive planning',
+      group: 'concepts',
+      canonicalRequired: true,
+    });
+    expect(documentationRoutes).toContainEqual({
+      path: '/docs/concepts/progressive-planning-in-practice',
+      title: 'Progressive planning in practice',
+      group: 'concepts',
+      canonicalRequired: true,
+    });
     expect(documentationRoutes.at(-1)).toMatchObject({
       path: '/docs/contribute/releases',
       title: 'Release model',
