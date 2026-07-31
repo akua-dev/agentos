@@ -140,12 +140,18 @@ does not substitute another model and its real OpenAI response remains visible.
 
 ## Connect a selected Agent
 
-Patch only explicitly approved or standing-authorized client Pods with all
-three values:
+Patch only explicitly approved or standing-authorized client Pods with this
+common client boundary:
 
 - label `agentos.akua.dev/ai-gateway-client: "true"`;
 - `AI_GATEWAY_URL=http://ai-gateway.agentos.svc.cluster.local:8787`;
 - `AI_GATEWAY_TOKEN` from `Secret/ai-gateway-client` key `token`.
+
+The First- and Second-Mate patches additionally set
+`AGENTOS_PI_PROVIDER_MODE=ai-gateway` on `prepare-home` and the Mate runtime so
+the retained Pi configuration has one explicit transport authority. The Codex
+Crewmate uses its native provider configuration below and does not receive Pi
+provider mode.
 
 The client Namespace must carry the same `agentos.akua.dev/fleet` label as the
 core `agentos` Namespace or the Gateway NetworkPolicy denies it. Kubernetes
@@ -200,11 +206,17 @@ a real process/Pod restart; Pi `/reload` cannot change environment. Ask before
 interrupting a Mate and preserve its native session reference through the
 normal recovery procedure.
 
-Configure Pi's built-in `openai-codex` provider in the Agent's persistent
-`~/.pi/agent/models.json`; the built-in model catalog and Codex transport remain
-owned by Pi. The shared AgentOS session-lifecycle extension independently adds
-server-side compaction while preserving that transport; its artifact and
-fallback contract is documented in [`ARCHITECTURE.md`](../../../../ARCHITECTURE.md):
+For First and Second Mate, the additive client patch sets
+`AGENTOS_PI_PROVIDER_MODE=ai-gateway` on `prepare-home`. Before Pi can start,
+AgentOS atomically reconciles only its marker-owned `openai-codex` transport
+override in `~/.pi/agent/models.json`, validates the staged file with the pinned
+native Pi runtime, and records non-secret ownership in
+`~/.local/state/agentos/pi-provider.json`. It preserves unrelated providers,
+settings, and direct `auth.json`. An existing unmarked `openai-codex` entry or a
+divergent marked entry is an ownership collision and stops startup; never adopt
+or overwrite it manually.
+
+The reconciled provider entry is:
 
 ```json
 {
@@ -221,13 +233,22 @@ fallback contract is documented in [`ARCHITECTURE.md`](../../../../ARCHITECTURE.
 ```
 
 The JWT-shaped value is a public, non-secret transport placeholder required for
-Pi to construct Codex headers. The dedicated header carries the Secret-backed
-Fleet credential; the gateway strips both before injecting the selected
-upstream account. Merge this provider entry with existing `models.json` content
-instead of replacing unrelated provider settings. Opening `/model` reloads the
-file. Select and verify the intended `openai-codex/<model>` explicitly; do not
-rewrite a saved model default. Remove this provider override to return Pi to
-direct authentication.
+Pi to construct Codex headers. The dedicated header resolves
+`AI_GATEWAY_TOKEN` only in memory; the token is never written to the PVC. The
+gateway strips both before injecting the selected upstream account.
+
+The Gateway patch never chooses a model or thinking level. When the Captain has
+selected either axis, follow `$agentos-harnesses` and add
+`AGENTOS_MODEL=openai-codex/<model>` and, if selected,
+`AGENTOS_THINKING=<level>` to the reviewed `prepare-home` overlay separately.
+The reconciler requires an exact pinned Pi provider/model and fails before
+commit on an unknown selection. Verify the effective live provider/model after
+the rollout; readiness itself makes no model request. Do not edit the managed
+provider entry or ownership marker directly.
+
+The shared AgentOS session-lifecycle extension independently adds server-side
+compaction while preserving Pi's built-in transport; its artifact and fallback
+contract is documented in [`ARCHITECTURE.md`](../../../../ARCHITECTURE.md).
 
 A selected Mate may retain its direct Pi login as a recovery path while a
 Codex process used by no-mistakes or another trusted automation explicitly uses
@@ -266,21 +287,31 @@ gateway.
 When a direct `pi -ne` control succeeds but First Mate fails through the
 Gateway, change only the Gateway client boundary:
 
-1. Preserve the current `~/.pi/agent/models.json` and effective StatefulSet
+1. Preserve the non-secret shape of `~/.pi/agent/models.json`,
+   `~/.local/state/agentos/pi-provider.json`, and the effective StatefulSet
    render as rollback evidence without recording Secret values.
-2. Remove only the `openai-codex` Gateway provider override from
-   `models.json`, then select the native direct provider. Do not remove the
+2. Replace `ai-gateway-client.yaml` in First Mate's overlay with
+   `patches/ai-gateway-direct-auth.yaml`. That patch supplies only
+   `AGENTOS_PI_PROVIDER_MODE=direct` to `prepare-home`; the reconciler removes
+   only its marker-owned provider entry and ownership marker while preserving
+   `auth.json`, unrelated providers, saved model/thinking settings, and every
+   AgentOS extension. Do not edit either JSON file by hand.
+3. Render the replacement and confirm it removes `AI_GATEWAY_URL`,
+   `AI_GATEWAY_TOKEN`, and `agentos.akua.dev/ai-gateway-client`, keeps the
+   standard `OTEL_*` environment, and does not remove the
    `@akua-dev/agentos` package or its `agentos-observability`, `mate-memory`,
    `openai-server-compaction`, background-task, or supervision registrations.
-3. Remove `AI_GATEWAY_URL`, `AI_GATEWAY_TOKEN`, and the
-   `agentos.akua.dev/ai-gateway-client` label only from First Mate's workload
-   patch. Keep the standard `OTEL_*` environment unchanged.
 4. Keep `AGENTOS_OPENAI_SERVER_COMPACTION_ENABLED` unset or true so portable
    summary plus direct-provider server compaction remains active and observable.
-5. Restart only the First Mate Pod after rendering the exact patch, resume its
-   native session, verify the direct provider/model, and run one short fixed
-   no-tool response. Compare the same fresh/resumed session matrix before
-   attributing the fault to the Gateway.
+5. Roll out only First Mate, verify that `pi-provider.json` and only the managed
+   `openai-codex` override are absent, resume its native session, select the
+   direct provider/model, and run one short fixed no-tool response.
+6. After that successful direct reconciliation, remove
+   `ai-gateway-direct-auth.yaml`, roll out once more, and repeat the direct
+   provider/model check. Removing the Gateway patch before this handoff causes
+   `prepare-home` to fail closed instead of silently retaining stale routing.
+   Compare the same fresh/resumed session matrix before attributing the fault
+   to the Gateway.
 
 This recovery does not disable a generic “Mate AI extension”: the Gateway is a
 provider transport override, while AgentOS behavior remains independently

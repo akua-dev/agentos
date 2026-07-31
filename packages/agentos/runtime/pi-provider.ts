@@ -580,7 +580,9 @@ export const reconcilePiConfiguration = Effect.fn(
           : configurationError("Invalid selected Pi defaults"),
     });
 
-    yield* writePrivateJson(modelsNext, desiredModels);
+    if (models !== undefined || Object.keys(desiredModels).length > 0) {
+      yield* writePrivateJson(modelsNext, desiredModels);
+    }
     yield* writePrivateJson(settingsNext, desiredSettings);
     yield* writePrivateJson(validationAuth, {});
     yield* validateWithPi({

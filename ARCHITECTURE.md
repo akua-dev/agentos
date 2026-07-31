@@ -427,8 +427,14 @@ on another account; upstream `401`, `429`, timeout and provider failures remain
 visible to Pi or Codex and affect only later selection.
 
 Pi routes its built-in `openai-codex` provider through the gateway with native
-`models.json` base-URL, authentication and header settings. Codex uses native
-`model_providers` configuration. Independently, the persistent First- and
+`models.json` base-URL, authentication and header settings. For First and
+Second Mate, `prepare-home` atomically reconciles only an AgentOS-marker-owned
+provider override, validates the staged provider and any separately selected
+exact model with pinned Pi before commit, preserves `auth.json` and unrelated
+configuration, and resolves the Secret-backed Gateway header only in memory.
+The Gateway client patch never selects a provider/model merely because the
+service exists. Codex uses native `model_providers` configuration.
+Independently, the persistent First- and
 Second-Mate Pi projects load one shared AgentOS-owned session-lifecycle
 extension that asks OpenAI for a native compaction result and persists the
 complete canonical compact output—including its opaque compaction artifact and
@@ -475,11 +481,15 @@ reviewed Skill and RBAC without owning the component's source directory.
 Each default role owns an additive `ai-gateway-client.yaml` patch in its
 Kubernetes `patches/` directory. A reviewed per-Agent overlay composes that
 patch only for an approved client; it adds the selected-client label, private
-Service URL and Secret-backed Fleet client token without choosing a provider,
-model or thinking level. Composing every approved client produces the pooled
-posture; composing selected clients only produces the mixed posture. Removing
-the patch returns that workload to its independent native-authentication
-environment without changing its retained home.
+Service URL, Secret-backed Fleet client token and explicit Gateway provider
+mode without choosing a model or thinking level. Composing every approved
+client produces the pooled posture; composing selected clients only produces
+the mixed posture. A First or Second Mate returns to direct authentication by
+replacing the client patch with its role's `ai-gateway-direct-auth.yaml` for one
+successful rollout. That reconciliation removes only the owned provider entry
+and marker while preserving direct authentication and unrelated retained-home
+state; only then is the rollback patch removed. Omitting both modes while the
+marker remains fails startup rather than retaining an ambiguous route.
 
 An exceptional AgentOS client may use a standalone Cloudflare Worker only as a
 separate external credential and routing authority. The Worker never forwards

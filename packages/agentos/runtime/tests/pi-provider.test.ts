@@ -75,6 +75,22 @@ const managedGatewayProvider = {
 };
 
 describe("Pi provider reconciliation", () => {
+  test("selects a native direct model on a fresh PVC without creating provider state", async () => {
+    const paths = await fixture();
+
+    await run(paths, {
+      AGENTOS_MODEL: "openai-codex/gpt-5.6-sol",
+      AGENTOS_PI_PROVIDER_MODE: "direct",
+    });
+
+    expect(await json(paths.settings)).toEqual({
+      defaultModel: "gpt-5.6-sol",
+      defaultProvider: "openai-codex",
+    });
+    expect(await Bun.file(paths.models).exists()).toBe(false);
+    expect(await Bun.file(paths.marker).exists()).toBe(false);
+  });
+
   test("creates a private native Gateway provider and exact selected defaults", async () => {
     const paths = await fixture();
 
@@ -293,6 +309,13 @@ describe("Pi provider reconciliation", () => {
       run(paths, { AGENTOS_PI_PROVIDER_MODE: "ai-gateway" }),
     ).rejects.toThrow("AI_GATEWAY_URL must be configured");
     expect(await Bun.file(paths.models).exists()).toBe(false);
+
+    await writeFile(paths.models, "{\n", { mode: 0o600 });
+    await expect(run(paths, gatewayEnvironment)).rejects.toThrow(
+      "models.json must contain valid JSON",
+    );
+    expect(await readFile(paths.models, "utf8")).toBe("{\n");
+    expect(await Bun.file(paths.marker).exists()).toBe(false);
   });
 
   test("rejects unsupported modes, unsafe URLs, wrong providers, and unknown models", async () => {
