@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { FlectWorkplace } from '@/app/(home)/flect-workplace';
 
 afterEach(() => {
@@ -32,5 +32,19 @@ describe('FlectWorkplace', () => {
     expect(
       screen.getByRole('link', { name: 'See the current Flect preview' }).getAttribute('href'),
     ).toBe('https://github.com/akua-dev/flect#what-works-today');
+  });
+
+  it('shows an accessible animated handoff sequence', () => {
+    render(<FlectWorkplace />);
+
+    const sequence = screen.getByRole('list', { name: 'Adaptive workplace handoff' });
+    const steps = within(sequence).getAllByRole('listitem');
+
+    expect(sequence.getAttribute('data-animation')).toBe('flect-handoff');
+    expect(steps).toHaveLength(4);
+    expect(sequence.textContent).toContain('Personalized decisions');
+    expect(sequence.textContent).toContain('Agent-assisted revision');
+    expect(sequence.textContent).toContain('Human approval');
+    expect(sequence.textContent).toContain('Handoff to First Mate');
   });
 });

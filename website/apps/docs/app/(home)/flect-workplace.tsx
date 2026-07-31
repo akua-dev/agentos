@@ -28,6 +28,55 @@ export function FlectWorkplace() {
         />
       </div>
 
+      <div className={styles.handoff}>
+        <div className={styles.handoffHeader}>
+          <p className={styles.surfaceLabel}>An adaptive workplace in motion</p>
+          <p className={styles.handoffNote}>A concept sequence with every decision visible.</p>
+        </div>
+        <ol
+          className={styles.handoffSequence}
+          aria-label="Adaptive workplace handoff"
+          data-animation="flect-handoff"
+        >
+          <li className={styles.handoffStep}>
+            <span className={styles.stepNumber} aria-hidden="true">
+              01
+            </span>
+            <div>
+              <p className={styles.stepTitle}>Personalized decisions</p>
+              <p>Flect brings the right context into the surface for this person and moment.</p>
+            </div>
+          </li>
+          <li className={styles.handoffStep}>
+            <span className={styles.stepNumber} aria-hidden="true">
+              02
+            </span>
+            <div>
+              <p className={styles.stepTitle}>Agent-assisted revision</p>
+              <p>An Agent helps shape the next draft while the human keeps the intent.</p>
+            </div>
+          </li>
+          <li className={styles.handoffStep}>
+            <span className={styles.stepNumber} aria-hidden="true">
+              03
+            </span>
+            <div>
+              <p className={styles.stepTitle}>Human approval</p>
+              <p>The Captain reviews the consequential decision before anything is accepted.</p>
+            </div>
+          </li>
+          <li className={styles.handoffStep}>
+            <span className={styles.stepNumber} aria-hidden="true">
+              04
+            </span>
+            <div>
+              <p className={styles.stepTitle}>Handoff to First Mate</p>
+              <p>Accepted intent crosses into AgentOS as owned work with durable authority.</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+
       <div className={styles.storyBody}>
         <div>
           <p className={styles.surfaceLabel}>A possible future workflow</p>
