@@ -125,7 +125,7 @@ describe('auditSite', () => {
 
   it('defines the complete Landing, Docs, Learn, discovery, and removal contract', () => {
     const paths = routeExpectations.map((expectation) => expectation.path);
-    expect(paths).toHaveLength(88);
+    expect(paths).toHaveLength(91);
     expect(paths).toContain('/favicon.ico');
     expect(paths).toContain('/icon.png');
     expect(paths).toContain('/apple-icon.png');
