@@ -106,8 +106,10 @@ The GitHub App client secret is not used for installation-token authentication
 and must not be transferred. Inventory the non-secret App ID, installation ID,
 effective repository selection and permissions. Have the Captain place the App
 private key in a mode-`0600` file outside the repository. With explicit
-credential and workload-mutation approval, stream that file into a Secret named
-`agentos-github-app` in the owning namespace with these keys:
+credential and workload-mutation approval, use `$agentos-secrets` to create or
+rotate `Secret/agentos-github-app` in the owning namespace with owner
+`firstmate`, scope `github-app-installation`, schema `github-app-v1`, and these
+keys:
 
 - `app-id`
 - `installation-id`
@@ -185,9 +187,11 @@ fields, ambiguous repository selectors, empty selection arrays and more than
 provider expiry and granted scope but never the token.
 
 Create or update one uniquely named Kubernetes Secret for the Agent and
-Assignment by streaming `kubectl create secret generic --from-file ...
---dry-run=client -o json` into `kubectl apply -f -`; neither command receives a
-credential value in argv or prints the rendered Secret. In the reviewed
+Assignment through `$agentos-secrets`, using the Agent as owner, the Assignment
+as scope, schema `github-installation-token-v1`, and keys `token` and
+`metadata.json`. Its create-on-absence and resourceVersion-guarded replacement
+keep credentials out of argv and output, preserve UID during rotation, and
+reject conflicting ownership, scope, key sets, or annotations. In the reviewed
 per-Agent Kustomize overlay, mount that Secret read-only without `subPath` at
 `/var/run/secrets/agentos/github`, set `GITHUB_TOKEN_FILE` to its `token` file
 and `GITHUB_TOKEN_METADATA_FILE` to its `metadata.json` file, and expose neither
