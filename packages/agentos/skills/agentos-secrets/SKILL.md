@@ -148,10 +148,12 @@ kubectl --context "$AGENTOS_SECRET_CONTEXT" --namespace "$AGENTOS_SECRET_NAMESPA
     replace --filename=- >/dev/null
 ```
 
-After replacement, verify that the UID is unchanged, resourceVersion changed,
-the exact labels and key-name set remain, and the annotation key-name query is
-empty. A changed UID means deletion and recreation occurred; stop because a
-different object now owns the name.
+After replacement, verify that the UID is unchanged, the exact labels and
+key-name set remain, and the annotation key-name query is empty. Kubernetes may
+keep the resourceVersion unchanged for a byte-identical exact retry. A rotation
+or rollback whose non-secret projection marker changed must advance it. A
+changed UID means deletion and recreation occurred; stop because a different
+object now owns the name.
 
 ## Project and prove takeover
 
