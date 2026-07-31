@@ -14,7 +14,10 @@ spec:
     - Egress
   ingress:
     - from:
-        - podSelector:
+        - namespaceSelector:
+            matchLabels:
+              agentos.akua.dev/fleet: default
+          podSelector:
             matchLabels:
               agentos.akua.dev/otel-client: "true"
       ports:

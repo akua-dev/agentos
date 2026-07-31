@@ -95,6 +95,9 @@ describe("First Mate Kubernetes resources", () => {
       "ServiceAccount/agentos-firstmate",
       "StatefulSet/agentos-firstmate",
     ]);
+    expect(resource(resources, "Namespace", "agentos").metadata.labels).toEqual({
+      "agentos.akua.dev/fleet": "default",
+    });
 
     const service = resource(resources, "Service", "agentos-firstmate");
     expect(service.spec).toEqual({
