@@ -147,12 +147,13 @@ and dogfooded. AgentOS remains the durable authority for accepted work,
 decisions, evidence and handoff.
 
 Use semantic image alt text and links to Flect's repository/current preview and
-the canonical human-work-surfaces docs. Use an accessible CSS-only native web
-animation with a `prefers-reduced-motion` fallback to make the four future
-steps legible; it remains explanatory copy, not fabricated product state.
-Remove scenario state, the fabricated workspace, built-in-agent rail, and
-second mock/demo section. No new animation dependency, autoplay video,
-cross-origin runtime media, or runtime/intake mechanism is needed.
+the canonical human-work-surfaces docs. The official hero is the section's
+only product or workflow visual. Describe the possible future workflow in
+prose; do not animate, diagram, or mock an AgentOS integration before a real
+dogfooded workflow exists. Remove scenario state, the fabricated workspace,
+built-in-agent rail, animated handoff sequence, and second mock/demo section.
+No new animation dependency, autoplay video, cross-origin runtime media, or
+runtime/intake mechanism is needed.
 
 ### README overview funnel
 

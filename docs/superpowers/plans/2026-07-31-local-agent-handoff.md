@@ -15,6 +15,7 @@
 - Label the section `AgentOS × Flect concept`; do not claim current integration behavior.
 - Use the official `akua-dev/flect` `main` README hero copied to `website/apps/docs/public/assets/flect-hero.png`; do not hotlink it or recreate the product UI.
 - State that Flect is a public developer preview, works beyond AgentOS, and is a natural future AgentOS dogfooding adopter. State that the AgentOS × Flect workflow is future direction only.
+- Keep the official Flect hero as the section's only product or workflow visual; describe the future AgentOS workflow in prose without an animation, diagram, or mock interface.
 - Add no CLI, API, webhook receiver, database mechanic, Skill, agent instruction, animation dependency, autoplay video, or cross-origin runtime media.
 - A local transcript is context, an external event is evidence, and accepted execution starts only with an accountable Assignment.
 - Preserve the exact bootstrap prompt, benchmark headline, source links, contribution path, and licenses.
@@ -99,7 +100,9 @@ expect(screen.getByRole('link', { name: 'Explore Flect' })).toHaveAttribute(
 
 Create `flect-workplace.test.tsx` with Testing Library and assert the official
 hero image, meaningful alt text, public-preview status, future-direction copy,
-and the repository/current-preview and human-work-surfaces links.
+and the repository/current-preview and human-work-surfaces links. Assert that
+the official hero is the only workflow visual and no animated handoff list is
+rendered.
 
 - [ ] **Step 3: Verify RED**
 
@@ -120,8 +123,8 @@ meaningful alt text, status copy, and links to Flect's repository/current
 preview and `/docs/concepts/human-work-surfaces`. Explain the future workflow
 as personalized context and decisions, agent-assisted revision, explicit human
 approval, and bounded handoff to First Mate after a real integration is built
-and dogfooded. Keep the semantic four-step sequence as an accessible, CSS-only
-native animation with a `prefers-reduced-motion` fallback; remove all scenario
+and dogfooded. Keep that workflow in prose and use the official hero as the
+only product or workflow visual; remove the animated sequence, all scenario
 state, mock workspace and agent rail.
 
 - [ ] **Step 5: Compose the landing stories**
@@ -340,7 +343,7 @@ Expected: no whitespace errors, clean worktree, and only task commits.
 
 ```console
 no-mistakes axi
-no-mistakes axi run --intent "Make AgentOS's local-to-Fleet handoff recognizable across the landing page, Learn, canonical docs, and a README reduced by at least 30% into a website funnel. Give Flect one restrained AgentOS × Flect landing section using the official Flect README hero copied into local public assets. Present Flect accurately as a public developer preview and natural future AgentOS dogfooding adopter, make clear the integration is not shipped and Flect works beyond AgentOS, keep AgentOS as durable authority, and add no new runtime or intake mechanism. Do not merge."
+no-mistakes axi run --intent "Make AgentOS's local-to-Fleet handoff recognizable across the landing page, Learn, canonical docs, and a README reduced by at least 30% into a website funnel. Give Flect one restrained AgentOS × Flect landing section using the official Flect README hero copied into local public assets as the only product or workflow visual. Describe the possible future workflow in prose without an animation, diagram, or mock interface. Present Flect accurately as a public developer preview and natural future AgentOS dogfooding adopter, make clear the integration is not shipped and Flect works beyond AgentOS, keep AgentOS as durable authority, and add no new runtime or intake mechanism. Do not merge."
 ```
 
 - [ ] **Step 2: Drive gates**
