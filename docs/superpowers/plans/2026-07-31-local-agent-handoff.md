@@ -120,8 +120,9 @@ meaningful alt text, status copy, and links to Flect's repository/current
 preview and `/docs/concepts/human-work-surfaces`. Explain the future workflow
 as personalized context and decisions, agent-assisted revision, explicit human
 approval, and bounded handoff to First Mate after a real integration is built
-and dogfooded. Remove all scenario state, mock workspace, agent rail, and
-handoff animation/CSS.
+and dogfooded. Keep the semantic four-step sequence as an accessible, CSS-only
+native animation with a `prefers-reduced-motion` fallback; remove all scenario
+state, mock workspace and agent rail.
 
 - [ ] **Step 5: Compose the landing stories**
 
