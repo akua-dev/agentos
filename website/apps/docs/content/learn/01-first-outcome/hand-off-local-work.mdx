@@ -1,0 +1,90 @@
+---
+title: Hand off local work
+description: Carry work shaped locally into accountable Fleet work without treating a transcript as durable ownership.
+courseId: first-outcome
+courseTitle: Run your first outcome
+courseOrder: 1
+lessonId: hand-off-local-work
+lessonOrder: 3
+estimatedMinutes: 5
+canonical:
+  - label: Delegation procedure
+    path: packages/agentos/skills/agentos-delegation/SKILL.md
+  - label: Chain-of-custody architecture
+    path: ARCHITECTURE.md
+---
+
+## Recognize the moment
+
+You do not have to begin every outcome inside the Fleet. A local Agent, design surface, editor or
+product preview can be the fastest place to work while you are actively shaping the question.
+
+The handoff moment usually arrives after one of these:
+
+- a **UI direction** or prototype is ready for implementation and review;
+- a **backend architecture** or technical design is ready to be challenged and made concrete;
+- **research or diagnosis** established evidence another Agent can continue from;
+- an **implementation, test result or code review** needs accountable follow-through.
+
+Hand off when the next step deserves a durable owner, not merely another chat turn.
+
+## Hand off the outcome, not the transcript
+
+Suppose your local Agent reproduces a checkout defect and finds that one update route trusts
+client-only validation. Do not ask First Mate to “continue this chat.” Use the
+[handoff guide](/docs/operate/continue-local-work) for the reusable package and acceptance
+mechanics, then give First Mate a concrete note such as:
+
+```text
+The checkout update route accepts payloads rejected by the create route. Please stop address
+changes from bypassing server validation. The reproduction is on main; see Issue 214 and
+commit abc123 on diagnosis/address-validation. Preserve the public API and existing payloads.
+Open a pull request through the repository's checks, but do not merge.
+```
+
+The transcript may remain useful background, but the handoff stands on an outcome, inspectable
+evidence and explicit boundaries. If code matters, commit it to a branch, produce a patch or point
+to another durable artifact. An uncommitted local working tree cannot carry the responsibility.
+
+## Let First Mate accept responsibility
+
+Give the note to First Mate through the interface your Fleet actually provides. A connected local
+Agent may use an approved integration to preserve it as an external event when First Mate is
+already working. Preservation is not acceptance: the event remains evidence until reconciliation.
+The [handoff guide](/docs/operate/continue-local-work) explains the package and boundary; the
+[delegation guide](/docs/operate/delegate-outcome) points to the procedure that owns the intake
+and acceptance mechanics that turn accepted intent into accountable Fleet work.
+
+That boundary prevents a useful local idea from silently becoming duplicate work or exceeding the
+authority you meant to grant.
+
+## Take the evidence back
+
+The Fleet can return a diagnosis report, a reviewed pull request, a blocker or one exact decision.
+Review that result locally if that is where you work best. You can ask your local Agent to compare
+the evidence, refine the direction or prototype the next question, then send another bounded
+handoff.
+
+```text
+local exploration
+  → bounded handoff
+  → accountable Fleet work
+  → evidence back
+  → review or refine locally
+```
+
+Each loop starts from current durable evidence. It does not assume an earlier transcript still
+describes the company.
+
+## Bring the company into the loop
+
+Some work needs more than an owner. It needs customer context, domain expertise, technical
+critique or an exact human decision. The Flect workplace assembles the work and seeks wisdom from
+the relevant people while keeping contribution, accountable ownership and authority distinct. Its
+built-in Agent helps inspect or revise a draft before approved intent returns to First Mate. Read
+[Human work surfaces](/docs/concepts/human-work-surfaces) for that wider interface pattern and
+[Continue local work with the Fleet](/docs/operate/continue-local-work) for the reusable handoff
+checklist.
+
+Next, [watch and steer the work](/learn/01-first-outcome/watch-and-steer) after the Fleet accepts
+the outcome.

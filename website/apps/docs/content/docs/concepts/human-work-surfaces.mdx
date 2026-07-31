@@ -1,0 +1,105 @@
+---
+title: Human work surfaces
+description: Bring work to the people whose context, expertise or authority matters without creating another organizational authority.
+canonical:
+  - label: Vision
+    path: VISION.md
+  - label: Architecture
+    path: ARCHITECTURE.md
+---
+
+AgentOS should not require every person to supervise a wall of chats or accept one permanent
+dashboard. A focused internal tool, tracker, local assistant or adaptive workplace can all be human
+interfaces to the same company. The surface may change for the work and the person; accountable
+ownership and authority must remain legible underneath it.
+
+## Bring work to the relevant people
+
+One accountable owner does not imply one person has all the wisdom. A product decision may need
+customer context, engineering constraints, design judgment and an exact approval. A code review
+may need a security specialist without transferring ownership of the delivery. An incident may
+need several observations but only one authorized recovery decision.
+
+A useful responsibility path distinguishes three roles:
+
+- **contributors** provide context, critique, options or recommendations;
+- **the accountable owner** carries the bounded outcome and closes the loop;
+- **the authorized human role** approves a consequence when policy requires it.
+
+Those roles may overlap, but the interface must not assume that visibility grants authority. The
+released AgentOS decision path records exact consequential choices through the Captain role, which
+may be held by a person or team. A company configures responsibility paths so its workplace can
+bring each question to the people with relevant context, expertise or authority without confusing
+their contribution with ownership or approval.
+
+## One front door, many forms of work
+
+The same workplace may present a UI direction for visual review, a backend architecture as a data
+flow, a code change as a diff, an incident as a timeline or a launch decision as evidence and
+tradeoffs. It can prepare the relevant context before someone arrives and let a local Agent explain,
+inspect or revise the work within granted capabilities.
+
+```text
+bounded work and current evidence
+  → configured responsibility path
+  → views shaped for the relevant people
+  → context, critique or exact approval
+  → approved AgentOS intake
+  → First Mate reconciliation
+  → accountable Fleet work or recorded decision
+```
+
+First Mate remains responsible for reconciling returned intent with the truthful company view. An
+external event may preserve a contribution and wake reconciliation, but it does not accept work or
+grant authority by itself.
+
+## What stays replaceable
+
+- layout, navigation and the form used to inspect work or explain a decision;
+- which relevant context is assembled for the current person;
+- local drafts, interface preferences and temporary presentation state;
+- the local Agent, model and approved interface capabilities.
+
+## What stays durable
+
+- the tracker or provider selected for human planning;
+- PostgreSQL Tasks, Assignments, Inbox decisions and authority;
+- Kubernetes and Herdr evidence about live work;
+- Git commits and provider review artifacts for delivered source.
+
+The surface may cache enough local state to stay responsive. It must not mirror those authorities
+into a competing company model. Read [Native authorities](/docs/concepts/native-authorities),
+[Organizational attention](/docs/concepts/organizational-attention) and
+[Authority and decisions](/docs/concepts/authority-decisions) for the underlying boundaries.
+
+## Flect as an adaptable workplace
+
+[Flect](https://github.com/akua-dev/flect) is an open-source, agent-native interface shell. Its
+Edit mode lets someone shape a local interface, keep or reject the result, then use the product with
+a separate App Agent in Run mode. Installing Flect provides an adaptable workplace today, with or
+without AgentOS.
+
+### Why the name Flect?
+
+**Flect** is pronounced _flekt_. [Merriam-Webster traces the obsolete English verb _flect_](https://www.merriam-webster.com/dictionary/flector)
+to Latin _flectere_, “to bend”; the Latin verb also means
+[to bend, curve or turn](https://www.latin-dictionary.net/search/latin/flectere). Flect makes that
+root a product principle: software should bend around the person, task and decision instead of
+forcing every person and kind of work through one fixed interface.
+
+The technology makes that practical. Flect can reshape its running UI from inside itself, validate
+the result before someone keeps it, recover through reject, rollback or safe mode, and separate the
+Shaper that edits the interface from the App Agent that uses the resulting product. In short:
+**Flect helps you turn intent into the interface the moment needs—without losing a protected way
+back.** See [what works today](https://github.com/akua-dev/flect#what-works-today) for the current
+implemented surface.
+
+Flect is the human interface for AgentOS. It assembles work, events, decisions and organizational
+context; brings the relevant people into the loop; lets its built-in Agent help inspect or revise
+the draft; and returns bounded approved intent to First Mate. AgentOS keeps the resulting work,
+ownership, decisions and evidence durable beneath the adaptive view.
+
+An existing product can appear inside the workplace through a bounded embedded browser or iframe.
+Product and API adapters bring deeper capabilities into the same surface. People can
+[install Flect today](https://github.com/akua-dev/flect#what-works-today) and shape the workplace
+around their own company.

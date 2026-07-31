@@ -3,8 +3,20 @@ import { documentationRoutes } from './docs-contract';
 
 describe('documentationRoutes', () => {
   it('defines the complete ordered AgentOS documentation map', () => {
-    expect(documentationRoutes).toHaveLength(55);
+    expect(documentationRoutes).toHaveLength(57);
     expect(documentationRoutes[0]).toMatchObject({ path: '/docs', title: 'AgentOS documentation' });
+    expect(documentationRoutes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: '/docs/concepts/human-work-surfaces',
+          title: 'Human work surfaces',
+        }),
+        expect.objectContaining({
+          path: '/docs/operate/continue-local-work',
+          title: 'Continue local work with the Fleet',
+        }),
+      ]),
+    );
     expect(documentationRoutes.at(-1)).toMatchObject({
       path: '/docs/contribute/releases',
       title: 'Release model',

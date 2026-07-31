@@ -1,0 +1,100 @@
+---
+title: Continue local work with the Fleet
+description: Turn work shaped locally into bounded, accountable Fleet work without pretending a transcript is authority.
+canonical:
+  - label: Chain-of-custody architecture
+    path: ARCHITECTURE.md
+  - label: Delegation procedure
+    path: packages/agentos/skills/agentos-delegation/SKILL.md
+  - label: External event schema
+    path: database/migrations/0000_initial_fleet_schema.sql
+---
+
+Work often starts in the tool closest to the question: a coding Agent, design surface, editor,
+browser or product preview. You may shape an interface, sketch an architecture, investigate a
+defect, implement a slice or review someone else's change while you stay close to the work. Hand
+the outcome to the Fleet when it deserves durable ownership, independent review, parallel
+execution, tested delivery or the ability to continue after your local session ends.
+
+## Recognize the handoff moment
+
+Four broad moments recur:
+
+- **Interface shaping:** a UI direction or prototype is clear enough for implementation and review.
+- **Architecture and design:** a backend boundary, data flow or technical choice is ready to be
+  challenged and made concrete.
+- **Research and diagnosis:** evidence has narrowed the question enough for another Agent to own the
+  next outcome.
+- **Implementation, testing and review:** useful work exists, but completion, independent review,
+  verification or delivery should become accountable Fleet work.
+
+You can also take Fleet evidence back into a local session, refine the direction and hand off a new
+bounded outcome. The boundary is responsibility, not the activity, artifact type or tool that
+started the work.
+
+## Package the outcome
+
+A useful handoff contains five things:
+
+1. **Desired outcome:** what should become true and how a reviewer will recognize it.
+2. **Current evidence:** what was inspected, reproduced, measured or ruled out.
+3. **Durable artifact references:** the design file, branch, commit, patch, issue, report, test
+   result or other inspectable material that carries the work beyond the local session.
+4. **Constraints:** compatibility, scope, delivery posture and facts that must remain true.
+5. **Authority boundary:** actions that still require a human, such as credentials, cost or merge.
+
+```text
+Outcome: Turn the approved account-settings prototype into a production-ready flow.
+Evidence: The prototype validates the UI direction; review found the update route still trusts a
+client-only schema.
+Artifacts: design file 42, review report, issue 214, commit abc123 on branch settings-flow.
+Constraints: Preserve the public API, accessibility baseline and existing payloads.
+Authority: Implement and open a pull request; do not merge.
+```
+
+A transcript can help explain how you arrived there, but it is context rather than authority. An
+uncommitted working tree is not a durable delivery artifact. The same rule applies to a mockup,
+architecture sketch or review note that only exists in an ephemeral local session.
+
+## Choose the current intake
+
+Give the package to First Mate directly when you are already in its native session. From the Flect
+workplace, send the same package into AgentOS. First Mate reconciles the request with existing
+projects, Tasks, authority and current ownership before it accepts more work.
+
+When First Mate is already occupied, Flect preserves the package as an external event. PostgreSQL
+retains the complete evidence and wakes the responsible Mate, which pulls and reconciles it when
+attention is available. The package crosses a durable boundary without turning a local transcript
+into hidden company state.
+
+<Callout title="Preservation is not acceptance">
+An external event is durable evidence. It does not become a Task, grant authority or start a
+worker merely because it was inserted.
+</Callout>
+
+## Know when work is accepted
+
+First Mate decides whether the handoff maps to existing intent, should become a new outcome or
+needs no Fleet action. Accepted execution has a Task and exactly one active accountable Assignment.
+The Assignment brief carries the complete bounded outcome; the responsible Agent then uses the
+project's existing delivery workflow.
+
+Watch each fact in its native authority:
+
+- PostgreSQL: accepted outcome, owner, status and decisions;
+- Kubernetes and Herdr: live worker and harness session;
+- Git and the provider: durable code and review artifact.
+
+Read [Delegate an outcome](/docs/operate/delegate-outcome) for the Fleet side and
+[External events and reconciliation](/docs/architecture/external-events) for durable provider
+intake.
+
+## Continue the loop
+
+The Fleet returns evidence: a diagnosis report, reviewed pull request, open decision or explicit
+blocker. Review that result wherever you work best. If your feedback changes the outcome, send a
+new bounded package rather than asking an old local transcript to stand in for current Fleet state.
+
+```text
+local exploration → bounded handoff → accountable Fleet work → evidence back
+```

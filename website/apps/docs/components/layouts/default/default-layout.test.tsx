@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 describe('documentation layout', () => {
-  it('anchors the desktop navigation rails to the viewport edges', () => {
+  it('anchors desktop navigation rails without overriding mobile widths inline', () => {
     const { container } = render(
       <FrameworkProvider
         Link={({ href, children, ...props }) => (
@@ -54,7 +54,9 @@ describe('documentation layout', () => {
 
     expect(shell).not.toBeNull();
     expect(shell?.style.getPropertyValue('--fd-layout-width')).toBe('100vw');
-    expect(shell?.style.getPropertyValue('--fd-sidebar-width')).toBe('18.5rem');
-    expect(shell?.style.getPropertyValue('--fd-toc-width')).toBe('16rem');
+    expect(shell?.style.getPropertyValue('--fd-sidebar-width')).toBe('');
+    expect(shell?.style.getPropertyValue('--fd-toc-width')).toBe('');
+    expect(shell?.classList.contains('md:[--fd-sidebar-width:18.5rem]!')).toBe(true);
+    expect(shell?.classList.contains('xl:[--fd-toc-width:16rem]!')).toBe(true);
   });
 });
