@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make local-to-Fleet handoff and adaptive Flect work surfaces obvious across the AgentOS landing page, Learn, docs, and a shorter README funnel.
+**Goal:** Make local-to-Fleet handoff and a truthful future Flect work-surface direction obvious across the AgentOS landing page, Learn, docs, and a shorter README funnel.
 
-**Architecture:** Keep operating truth in one handoff guide and interface boundaries in one concept page. Add an isolated client-side Flect concept component with a CSS module for accessible scenario switching and restrained motion; the server landing page only composes it and the local-handoff story. Existing Learn and Docs contracts remain the route/navigation authorities.
+**Architecture:** Keep operating truth in one handoff guide and interface boundaries in one concept page. Add one restrained server-rendered Flect concept section that presents the official README hero from a local public asset and future-status copy; the server landing page composes it with the local-handoff story. Existing Learn and Docs contracts remain the route/navigation authorities.
 
 **Tech Stack:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, CSS Modules, Fumadocs MDX, Vitest, Testing Library, Bun.
 
@@ -12,13 +12,15 @@
 
 - AgentOS remains the authority for Tasks, Assignments, Inbox decisions, authority, and durable evidence; the interface remains a replaceable surface.
 - Flect is a public developer preview and natural dogfooding adopter, not a bundled AgentOS dependency or shipped AgentOS integration.
-- Label the visual `AgentOS × Flect concept`; do not claim current integration behavior.
+- Label the section `AgentOS × Flect concept`; do not claim current integration behavior.
+- Use the official `akua-dev/flect` `main` README hero copied to `website/apps/docs/public/assets/flect-hero.png`; do not hotlink it or recreate the product UI.
+- State that Flect is a public developer preview, works beyond AgentOS, and is a natural future AgentOS dogfooding adopter. State that the AgentOS × Flect workflow is future direction only.
 - Add no CLI, API, webhook receiver, database mechanic, Skill, agent instruction, animation dependency, autoplay video, or cross-origin runtime media.
 - A local transcript is context, an external event is evidence, and accepted execution starts only with an accountable Assignment.
 - Preserve the exact bootstrap prompt, benchmark headline, source links, contribution path, and licenses.
 - Reduce `README.md` from 228 lines to at most 159 lines.
-- Essential content must render without JavaScript. Disable non-essential movement under `prefers-reduced-motion: reduce`.
-- Use native interactive semantics, meaningful names, keyboard access, and visible focus.
+- Essential content must render without JavaScript.
+- Use meaningful image alt text, canonical links, and no fabricated interactive workflow.
 
 ---
 
@@ -60,14 +62,15 @@ Expected: all existing focused suites pass before feature edits.
 **Files:**
 - Modify: `website/apps/docs/components/landing-page.test.tsx`
 - Create: `website/apps/docs/components/flect-workplace.test.tsx`
-- Create: `website/apps/docs/app/(home)/flect-workplace.tsx`
-- Create: `website/apps/docs/app/(home)/flect-workplace.module.css`
+- Modify: `website/apps/docs/app/(home)/flect-workplace.tsx`
+- Modify: `website/apps/docs/app/(home)/flect-workplace.module.css`
+- Create: `website/apps/docs/public/assets/flect-hero.png`
 - Modify: `website/apps/docs/app/(home)/page.tsx`
 
 **Interfaces:**
 - Produces: `FlectWorkplace(): ReactElement`.
-- Produces scenario controls named `Product decision`, `Incident response`, and `Research review`.
-- Produces canonical Learn, operating-guide, work-surface, and Flect links.
+- Produces the official Flect hero with meaningful alt text.
+- Produces canonical Learn, operating-guide, work-surface, and Flect links plus honest future-status copy.
 
 - [ ] **Step 1: Write failing landing-route assertions**
 
@@ -92,23 +95,11 @@ expect(screen.getByRole('link', { name: 'Explore Flect' })).toHaveAttribute(
 );
 ```
 
-- [ ] **Step 2: Write the failing Flect interaction test**
+- [ ] **Step 2: Write the failing Flect content test**
 
-Create `flect-workplace.test.tsx` with Testing Library and `userEvent`:
-
-```tsx
-it('adapts the decision view while preserving the human approval path', async () => {
-  const user = userEvent.setup();
-  render(<FlectWorkplace />);
-
-  expect(screen.getByRole('heading', { name: 'Approve the launch scope' })).toBeVisible();
-  await user.click(screen.getByRole('button', { name: 'Incident response' }));
-  expect(screen.getByRole('heading', { name: 'Choose the recovery path' })).toBeVisible();
-  expect(screen.getByText('Human approval')).toBeVisible();
-  expect(screen.getByText('First Mate')).toBeVisible();
-  expect(screen.getByText('Durable Fleet work')).toBeVisible();
-});
-```
+Create `flect-workplace.test.tsx` with Testing Library and assert the official
+hero image, meaningful alt text, public-preview status, future-direction copy,
+and the repository/current-preview and human-work-surfaces links.
 
 - [ ] **Step 3: Verify RED**
 
@@ -118,91 +109,21 @@ Run:
 bun run --cwd website/apps/docs test components/landing-page.test.tsx components/flect-workplace.test.tsx
 ```
 
-Expected: FAIL because the component, links, and scenario controls are missing.
+Expected: FAIL because the official hero, copy, and links are missing.
 
-- [ ] **Step 4: Implement the Flect component**
+- [ ] **Step 4: Implement the Flect component and asset**
 
-Use this data contract in `flect-workplace.tsx`:
+Copy the official `https://raw.githubusercontent.com/akua-dev/flect/main/assets/flect-hero.png`
+into `website/apps/docs/public/assets/flect-hero.png`. Render one restrained
+section with the `AgentOS × Flect concept` label, the official hero image,
+meaningful alt text, status copy, and links to Flect's repository/current
+preview and `/docs/concepts/human-work-surfaces`. Explain the future workflow
+as personalized context and decisions, agent-assisted revision, explicit human
+approval, and bounded handoff to First Mate after a real integration is built
+and dogfooded. Remove all scenario state, mock workspace, agent rail, and
+handoff animation/CSS.
 
-```tsx
-const previews = [
-  {
-    id: 'product',
-    label: 'Product decision',
-    title: 'Approve the launch scope',
-    summary: 'The release is ready. One reliability tradeoff still belongs to you.',
-    signal: '2 reviewed changes · 1 open decision',
-    evidence: ['Checkout errors down 38%', 'Rollback rehearsed', 'EU rollout still excluded'],
-    draft: 'Keep the smaller rollout. Ask First Mate to schedule the EU follow-up.',
-  },
-  {
-    id: 'incident',
-    label: 'Incident response',
-    title: 'Choose the recovery path',
-    summary: 'The Fleet contained the failure. Recovery speed now trades against data certainty.',
-    signal: 'Service stable · decision due in 14 min',
-    evidence: ['Writes are paused', 'Replica is healthy', 'Backfill needs review'],
-    draft: 'Restore reads now. Keep writes paused until the backfill report is reviewed.',
-  },
-  {
-    id: 'research',
-    label: 'Research review',
-    title: 'Select the next bet',
-    summary: 'Three investigations returned evidence. The strategic choice remains human.',
-    signal: '3 reports reconciled · no execution accepted',
-    evidence: ['Option A: fastest proof', 'Option B: strongest moat', 'Option C: lowest cost'],
-    draft: 'Fund a bounded Option B prototype and keep Option A as the fallback.',
-  },
-] as const;
-```
-
-Render:
-
-1. A dark `AgentOS × Flect concept` section headed `The interface to your AgentOS company.`.
-2. Native scenario buttons using `aria-pressed`.
-3. An `aria-live="polite"` decision panel with evidence and a feedback draft.
-4. An ordered chain: `Prepared for you → Human approval → First Mate → Durable Fleet work`.
-5. A second section headed `Flect works beyond AgentOS.` with `Start with AgentOS` and `Start with Flect`.
-6. Links named `Design a human work surface`, `See Flect shape`, and `Explore Flect`; use `https://github.com/akua-dev/flect#see-it-shape` for the real demo.
-
-- [ ] **Step 5: Add scoped art direction and motion**
-
-In the CSS module, use Flect's documented Midnight Drafting Desk tokens:
-
-```css
-.story {
-  --flect-void: oklch(0.095 0 0);
-  --flect-canvas: oklch(0.125 0.004 340);
-  --flect-surface: oklch(0.165 0.006 340);
-  --flect-raised: oklch(0.205 0.008 340);
-  --flect-ink: oklch(0.955 0.006 340);
-  --flect-muted: oklch(0.69 0.012 340);
-  --flect-line: oklch(0.3 0.01 340);
-  --flect-rose: oklch(0.63 0.18 340);
-  color: var(--flect-ink);
-  background: var(--flect-void);
-  border-radius: 16px;
-}
-
-.panel {
-  animation: surface-arrives 480ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes surface-arrives {
-  from { opacity: 0; transform: translateY(10px); clip-path: inset(0 0 12% 0); }
-  to { opacity: 1; transform: translateY(0); clip-path: inset(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .panel,
-  .signal,
-  .handoffPulse { animation: none; }
-}
-```
-
-Complete a 12-column desktop surface and stacked mobile surface. Use visible focus rings, no essential color-only state, no radius above 16px, and no border-plus-wide-shadow decoration.
-
-- [ ] **Step 6: Compose the landing stories**
+- [ ] **Step 5: Compose the landing stories**
 
 Immediately after the bootstrap demo, add a full-width local-handoff section:
 
@@ -212,14 +133,15 @@ Plan · Prototype · Diagnose · Partially implement
 Local evidence → bounded handoff → accountable Fleet work → reviewed result
 ```
 
-Add links `Hand off local work` and `Use the handoff guide`, then render `<FlectWorkplace />` before `Proof before promises.`.
+Add links `Hand off local work` and `Use the handoff guide`, then render the
+single `<FlectWorkplace />` section before `Proof before promises.`.
 
-- [ ] **Step 7: Verify GREEN and commit**
+- [ ] **Step 6: Verify GREEN and commit**
 
 Run the focused tests, then:
 
 ```console
-git add website/apps/docs/app/\(home\) website/apps/docs/components/landing-page.test.tsx website/apps/docs/components/flect-workplace.test.tsx
+git add website/apps/docs/app/\(home\) website/apps/docs/public/assets/flect-hero.png website/apps/docs/components/landing-page.test.tsx website/apps/docs/components/flect-workplace.test.tsx
 git commit -m "feat(website): show local handoff and Flect workplace"
 ```
 
@@ -331,8 +253,8 @@ Insert the new lesson after `give-fleet-outcome` in the contract and metadata. S
 Use standard course-one frontmatter, `estimatedMinutes: 5`, delegation and architecture canonical sources, and sections:
 
 - `Recognize the moment`: planning, prototype, diagnosis, partial implementation.
-- `Hand off the outcome, not the transcript`: one diagnosis using the five-part package.
-- `Let First Mate accept responsibility`: evidence/event versus Task/Assignment.
+- `Hand off the outcome, not the transcript`: one concrete diagnosis example, linked to the canonical guide for the reusable package.
+- `Let First Mate accept responsibility`: link to the canonical guide for evidence/event versus Task/Assignment acceptance mechanics; do not restate that procedure.
 - `Take the evidence back`: review locally, refine, and issue another bounded handoff.
 - `Beyond coding agents`: link `/docs/concepts/human-work-surfaces`.
 
@@ -399,7 +321,7 @@ Expected: exit 0.
 
 - [ ] **Step 3: Perform browser QA**
 
-Run `bun run site:dev` and inspect with `chrome-devtools-axi` near 1440 px and 390 px. Verify all scenarios, keyboard focus, heading hierarchy, contrast, reduced motion, overflow, and every new internal/external destination.
+Run `bun run site:dev` and inspect with `chrome-devtools-axi` near 1440 px and 390 px. Verify the official hero, status and future-direction copy, image alt text, heading hierarchy, contrast, overflow, and every new internal/external destination.
 
 - [ ] **Step 4: Confirm a clean branch**
 
@@ -417,7 +339,7 @@ Expected: no whitespace errors, clean worktree, and only task commits.
 
 ```console
 no-mistakes axi
-no-mistakes axi run --intent "Make AgentOS's local-to-Fleet handoff recognizable across the landing page, Learn, canonical docs, and a README reduced by at least 30% into a website funnel. Give Flect one immersive adaptive-workplace section and one broader-platform section using an accessible native web animation that shows personalized decisions, agent-assisted revision, human approval, and handoff to First Mate. Present Flect accurately as a public developer preview and natural first AgentOS dogfooding adopter, while making clear the AgentOS integration is a concept, Flect works beyond AgentOS, and AgentOS remains durable authority. Add no new runtime or intake mechanism and do not merge."
+no-mistakes axi run --intent "Make AgentOS's local-to-Fleet handoff recognizable across the landing page, Learn, canonical docs, and a README reduced by at least 30% into a website funnel. Give Flect one restrained AgentOS × Flect landing section using the official Flect README hero copied into local public assets. Present Flect accurately as a public developer preview and natural future AgentOS dogfooding adopter, make clear the integration is not shipped and Flect works beyond AgentOS, keep AgentOS as durable authority, and add no new runtime or intake mechanism. Do not merge."
 ```
 
 - [ ] **Step 2: Drive gates**

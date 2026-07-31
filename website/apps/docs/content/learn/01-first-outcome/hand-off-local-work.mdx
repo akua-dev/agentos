@@ -31,24 +31,15 @@ Hand off when the next step deserves a durable owner, not merely another chat tu
 ## Hand off the outcome, not the transcript
 
 Suppose your local Agent reproduces a checkout defect and finds that one update route trusts
-client-only validation. Do not ask First Mate to “continue this chat.” Package what another
-accountable Agent needs:
+client-only validation. Do not ask First Mate to “continue this chat.” Use the
+[handoff guide](/docs/operate/continue-local-work) for the reusable package and acceptance
+mechanics, then give First Mate a concrete note such as:
 
 ```text
-Desired outcome
-Stop checkout address changes from bypassing server validation.
-
-Current evidence
-Reproduced on main. The update route accepts payloads rejected by the create route.
-
-Durable artifacts
-Issue 214 and diagnosis commit abc123 on branch diagnosis/address-validation.
-
-Constraints
-Preserve the public API and existing checkout payloads.
-
-Authority boundary
-Open a pull request through the repository's checks. Do not merge.
+The checkout update route accepts payloads rejected by the create route. Please stop address
+changes from bypassing server validation. The reproduction is on main; see Issue 214 and
+commit abc123 on diagnosis/address-validation. Preserve the public API and existing payloads.
+Open a pull request through the repository's checks, but do not merge.
 ```
 
 The transcript may remain useful background, but the handoff stands on an outcome, inspectable
@@ -57,14 +48,11 @@ to another durable artifact. An uncommitted local working tree cannot carry the 
 
 ## Let First Mate accept responsibility
 
-Give the package to First Mate through the interface your Fleet actually provides. A connected
-local Agent may use an approved integration to preserve the same package as an external event when
-First Mate is already working. AgentOS does not invent one universal handoff command.
-
-Preservation is not acceptance. An external event records evidence for later reconciliation; it
-does not automatically create work. First Mate first checks current projects, Tasks, ownership and
-authority. Accepted execution begins when AgentOS records a Task and one active accountable
-Assignment.
+Give the note to First Mate through the interface your Fleet actually provides. A connected local
+Agent may use an approved integration to preserve it as an external event when First Mate is
+already working. Preservation is not acceptance: the event remains evidence until reconciliation.
+The [handoff guide](/docs/operate/continue-local-work) owns the current intake and acceptance
+mechanics that turn accepted intent into accountable Fleet work.
 
 That boundary prevents a useful local idea from silently becoming duplicate work or exceeding the
 authority you meant to grant.

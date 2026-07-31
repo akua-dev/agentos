@@ -101,12 +101,14 @@ operating pages instead of duplicating their contracts.
 
 Add a lesson after “Give the Fleet a real outcome” named “Hand off local work.”
 The lesson uses four short examples—planning, prototype, diagnosis, and partial
-implementation—to help readers recognize the moment. It walks through one
-diagnosis handoff and links to the operating guide for the reusable checklist.
+implementation—to help readers recognize the moment. It keeps one concrete
+diagnosis example, but does not reproduce the reusable handoff checklist or
+acceptance procedure; it links those mechanics to the canonical operating
+guide.
 
-The lesson does not invent a universal command. It shows a portable request
-shape and explains that a connected local agent may submit the same bounded
-package through an approved durable intake.
+The lesson does not invent a universal command. It explains that a connected
+local agent may submit the bounded package through an approved durable intake,
+with the operating guide owning the package and acceptance mechanics.
 
 End the lesson with a short “beyond coding agents” callout: the same bounded
 handoff can originate in a custom employee workplace that prepares relevant
@@ -129,42 +131,26 @@ card, type, spacing, and button system.
 
 ### Landing-page Flect story
 
-Give Flect its own paced product-story moment after the local-handoff section,
-using two connected sections:
+Give Flect one restrained AgentOS × Flect concept section after the
+local-handoff section. Its only product visual is the genuine official Flect
+README hero from `akua-dev/flect` `main`, copied into the website's public
+assets as `assets/flect-hero.png`; the page does not recreate Flect's product
+or hotlink a runtime image.
 
-1. **The interface to your AgentOS company.** An immersive, dark Flect surface
-   demonstrates the proposed employee loop:
+The section labels Flect as a public developer preview and AgentOS as a
+natural future dogfooding adopter. It explicitly says that the AgentOS × Flect
+workflow is a future direction, not a shipped integration, and that Flect works
+beyond AgentOS. The copy describes a future demonstration as showing
+personalized context and decisions, agent-assisted revision, explicit human
+approval, and bounded handoff to First Mate only after the integration is built
+and dogfooded. AgentOS remains the durable authority for accepted work,
+decisions, evidence and handoff.
 
-   ```text
-   personalized attention → decision-specific review → agent-assisted revision
-   → human approval → First Mate → durable Fleet work
-   ```
-
-   The visual is an accessible native React/CSS concept preview rather than a
-   static dashboard mock. A person can switch between a product decision, an
-   incident response, and a research review; the surface changes its
-   presentation while preserving the same AgentOS chain of custody. Motion
-   uses transforms, opacity, clipping, and restrained state signals, never
-   hides essential content, and has a complete `prefers-reduced-motion`
-   alternative.
-
-2. **Flect works beyond AgentOS.** A quieter follow-on explains the two Flect
-   starting points: use the thoughtful AgentOS experience unchanged or shape
-   it for one person; use the same open interface shell for another product,
-   API, or personal workplace. Link to Flect's current public preview, actual
-   shaping demo, and repository.
-
-The first section may borrow Flect's documented “Midnight Drafting Desk”
-palette and precise rose agency signal as one deliberately art-directed island
-inside the established AgentOS page. The rest of the landing page remains in
-the AgentOS visual system. The preview is labeled “AgentOS × Flect concept” so
-its proposed integration cannot be mistaken for current product behavior.
-
-Use no new animation dependency, autoplay video, cross-origin runtime media,
-or heavyweight shader. The DOM remains meaningful without JavaScript, manual
-scenario controls remain keyboard accessible, and decorative motion pauses
-under reduced-motion preference. Link to Flect's real v0.2 demo rather than
-copying it or replacing its product truth with a generated marketing video.
+Use semantic image alt text and links to Flect's repository/current preview and
+the canonical human-work-surfaces docs. Remove scenario state, the fabricated
+workspace, built-in-agent rail, animated approval/handoff marker, and second
+mock/demo section. No new animation dependency, autoplay video, cross-origin
+runtime media, or runtime/intake mechanism is needed.
 
 ### README overview funnel
 
@@ -219,9 +205,8 @@ links, or license references.
 - Extend the landing-page component test to verify that the new use case
   exposes Learn, operating-guide, and work-surface destinations through
   accessible links and accurately labels Flect's status and concept boundary.
-- Add an observable component test for the Flect scenario controls: selecting
-  another decision changes the visible, labeled decision surface while
-  preserving the approval-to-First-Mate path.
+- Add an observable component test for the official hero, honest future-status
+  copy, image alt text, and canonical Flect/work-surface links.
 - Register the Learn lesson in course metadata and the curriculum contract so
   existing source, navigation, and progress tests exercise it.
 - Run the website docs, Learn, metadata, discovery, and site-contract tests.

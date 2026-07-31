@@ -2,7 +2,6 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { FlectWorkplace } from '@/app/(home)/flect-workplace';
 
 afterEach(() => {
@@ -10,17 +9,28 @@ afterEach(() => {
 });
 
 describe('FlectWorkplace', () => {
-  it('adapts the decision view while preserving the human approval path', async () => {
-    const user = userEvent.setup();
+  it('shows the official hero and honest future-direction links', () => {
     render(<FlectWorkplace />);
 
-    expect(screen.getByRole('heading', { name: 'Approve the launch scope' })).not.toBeNull();
-
-    await user.click(screen.getByRole('button', { name: 'Incident response' }));
-
-    expect(screen.getByRole('heading', { name: 'Choose the recovery path' })).not.toBeNull();
-    expect(screen.getByText('Human approval')).not.toBeNull();
-    expect(screen.getByText('First Mate')).not.toBeNull();
-    expect(screen.getByText('Durable Fleet work')).not.toBeNull();
+    expect(
+      screen.getByRole('heading', { name: 'The interface to your AgentOS company.' }),
+    ).not.toBeNull();
+    expect(
+      screen
+        .getByRole('img', { name: 'Flect adapting across product interfaces' })
+        .getAttribute('src'),
+    ).toContain('flect-hero.png');
+    expect(screen.getByText('Flect public developer preview')).not.toBeNull();
+    expect(screen.getByText(/future direction, not a shipped integration/)).not.toBeNull();
+    expect(screen.getByText(/personalized context and decisions/)).not.toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Design a human work surface' }).getAttribute('href'),
+    ).toBe('/docs/concepts/human-work-surfaces');
+    expect(screen.getByRole('link', { name: 'Explore Flect' }).getAttribute('href')).toBe(
+      'https://github.com/akua-dev/flect',
+    );
+    expect(
+      screen.getByRole('link', { name: 'See the current Flect preview' }).getAttribute('href'),
+    ).toBe('https://github.com/akua-dev/flect#what-works-today');
   });
 });
