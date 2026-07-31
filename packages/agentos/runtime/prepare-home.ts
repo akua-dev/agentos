@@ -8,6 +8,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readdir,
   readlink,
   readFile,
   rename,
@@ -296,14 +297,20 @@ async function reconcileDefaultDistributionRuntime() {
   try {
     const current = await lstat(checkoutDist);
     if (!current.isSymbolicLink()) return;
-    if ((await readlink(checkoutDist)) === releaseDist) return;
+    if ((await readlink(checkoutDist)) !== releaseDist) return;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 
   const next = `${checkoutDist}.agentos-next`;
   await rm(next, { force: true, recursive: true });
-  await symlink(releaseDist, next, "dir");
+  await mkdir(next, { mode: 0o700 });
+  for (const entry of await readdir(releaseDist)) {
+    const source = join(releaseDist, entry);
+    const type = (await lstat(source)).isDirectory() ? "dir" : "file";
+    await symlink(source, join(next, entry), type);
+  }
+  await rm(checkoutDist, { force: true, recursive: true });
   await rename(next, checkoutDist);
 }
 

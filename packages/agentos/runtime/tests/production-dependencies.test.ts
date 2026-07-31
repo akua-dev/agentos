@@ -226,4 +226,10 @@ test("the production image can prepare a persistent Mate home", async () => {
     { cwd: roleDirectory, env },
   );
   expect(extension.exitCode, extension.stderr).toBe(0);
+
+  const checkoutStatus = await run(
+    ["git", "-C", checkout, "status", "--porcelain"],
+    { cwd: checkout, env },
+  );
+  expect(checkoutStatus).toEqual({ exitCode: 0, stderr: "", stdout: "" });
 }, 30_000);
