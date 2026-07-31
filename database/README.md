@@ -135,14 +135,16 @@ Function creates neither PostgreSQL roles nor Kubernetes resources.
 
 `0005_durable_coordination_contracts.sql` makes core Mate artifacts explicit.
 Assignments store their authoritative brief,
-resolved dispatch profile, final or handoff report and append-only handoff
+historical dispatch profile, final or handoff report and append-only handoff
 link. `agentos.handoff_task_assignment` preserves one Task identity across an
 atomic, idempotent transfer. Captain choices remain Inbox deliveries under a
 stable unique `decision_key`; Scout and review Assignments attest the exact
 open key set before completion, and resolution stores the exact answer while
 releasing matching Task dependency edges in the same transaction. There is no
-new decisions table or service. `tests/coordination-contracts.test.ts` exercises
-these contracts against the full ordered migration chain in PGlite.
+new decisions table or service. The later `0016` forward migration removes the
+obsolete dispatch-profile surface without rewriting this published migration.
+`tests/coordination-contracts.test.ts` exercises these contracts against the
+full ordered migration chain in PGlite.
 
 `0006_fleet_notifications.sql` adds transactional wake hints for actionable
 coordination tables. Payloads contain only schema version, table and operation;
@@ -181,28 +183,40 @@ adding the receipt primitive must not erase Second Mate's later Captain-domain,
 Assignment-artifact or durable-coordination privileges. The full authorization
 and coordination suites exercise the preserved grants with real roles.
 
-`0011_atomic_task_acceptance.sql` adds the idempotent
+`0011_agent_composition.sql` is retained byte-for-byte because it shipped in a
+published release. Its composition columns, validators and Functions are
+removed only by the append-only `0016` migration.
+
+`0012_atomic_task_acceptance.sql` adds the idempotent
 `agentos.create_task_with_assignment` and `agentos.accept_backlog_task`
 Functions. A new accepted outcome or a deliberately accepted backlog Task gets
 its first accountable Assignment in one transaction; an unassigned Task
 remains backlog. `tests/atomic-acceptance.test.ts` exercises the acceptance and
 retry paths.
 
-`0012_current_mate_bearings.sql` adds the read-only
+`0013_current_mate_bearings.sql` adds the read-only
 `agentos.current_mate_bearings()` projection for an authenticated Mate's
 durable reconciliation references. It excludes message bodies, external
 payloads, runtime health and routing decisions. `tests/current-mate-bearings.test.ts`
 exercises its shape and authorization.
 
-`0013_targeted_mate_notifications.sql` routes transactional table-and-operation
+`0014_targeted_mate_notifications.sql` routes transactional table-and-operation
 wake hints to deterministic responsible Mate channels instead of the global
 channel. The hints remain non-secret routing signals; durable rows remain the
 source of truth. `tests/targeted-notifications.test.ts` exercises routing,
 rollback and channel isolation.
 
-`0014_mate_memory.sql` removes the legacy shared Captain preference table
+`0015_mate_memory.sql` removes the legacy shared Captain preference table
 after failing closed when any active row still needs preservation. Private
 context instead belongs to each persistent Mate's PVC. Exact Captain choices
 remain durable Inbox speech acts. The migration updates notifications,
 bearings, runtime grants and RLS references while leaving existing Tasks and
 Assignments unchanged.
+
+`0016_unify_agentos_package.sql` removes the superseded persistent-composition
+and dispatch-profile database surface after AgentOS customization moved to one
+Pi-native package. It preserves Tasks, Assignments, handoff history and
+idempotent acceptance evidence, migrates stored acceptance requests to the
+new signature, and reapplies runtime grants. The published-history test locks
+all first 16 migration tags, timestamps and checksums; the package-unification
+test exercises the forward upgrade from that exact historical schema.

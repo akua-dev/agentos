@@ -1,72 +1,262 @@
-DO $$
-DECLARE
-  v_conflicts text;
-BEGIN
-  SELECT string_agg(
-           format(
-             'Task %s has active Assignments: %s',
-             conflict.task_id,
-             conflict.assignment_details
-           ),
-           '; ' ORDER BY conflict.task_id
-         )
-    INTO v_conflicts
-    FROM (
-      SELECT assignment.task_id,
-             string_agg(
-               format(
-                 '%s (Agent %s, status %s)',
-                 assignment.id,
-                 assignment.agent_id,
-                 assignment.status
-               ),
-               ', ' ORDER BY assignment.id
-             ) AS assignment_details
-        FROM agentos.task_assignments AS assignment
-       WHERE assignment.ended_at IS NULL
-       GROUP BY assignment.task_id
-      HAVING count(*) > 1
-    ) AS conflict;
+DROP FUNCTION agentos.resolve_agent_composition_decision(
+  uuid, boolean, text, text
+);
+DROP FUNCTION agentos.hold_agent_composition_decision(
+  uuid, uuid, jsonb, text, text, text, text
+);
+DROP FUNCTION agentos.replace_agent_composition(
+  uuid, jsonb, uuid, text
+);
+DROP FUNCTION agentos.repair_agent_composition(
+  uuid, jsonb, uuid, text
+);
+DROP FUNCTION agentos.change_agent_composition(
+  uuid, jsonb, uuid, text, text
+);
+DROP FUNCTION agentos.repair_task_assignment_dispatch(
+  uuid, text, jsonb, text
+);
 
-  IF v_conflicts IS NOT NULL THEN
-    RAISE EXCEPTION
-      'Migration 0011 cannot enforce one active Assignment per Task; reconcile the listed active Assignments by ending or handing off ownership without deleting work, then retry. Conflicts: %',
-      v_conflicts;
-  END IF;
-END;
-$$;
+DROP FUNCTION agentos.handoff_task_assignment(
+  uuid, uuid, text, text, text, jsonb
+);
+DROP FUNCTION agentos.create_task_with_assignment(
+  uuid, uuid, uuid, uuid, uuid, text, text, text, text, text,
+  jsonb, jsonb, jsonb, text, text, text, text, jsonb, jsonb
+);
+DROP FUNCTION agentos.accept_backlog_task(
+  uuid, uuid, uuid, text, text, text, text, text, text, jsonb, jsonb
+);
 
-ALTER TABLE agentos.task_assignments
-  ADD COLUMN acceptance_request jsonb
-    CHECK (
-      acceptance_request IS NULL
-      OR jsonb_typeof(acceptance_request) = 'object'
-    );
+DROP TRIGGER agents_composition_contract ON agentos.agents;
+DROP TRIGGER task_assignments_composition_contract
+  ON agentos.task_assignments;
 
-COMMENT ON COLUMN agentos.task_assignments.acceptance_request IS
-  'Immutable canonical input for an idempotent first-Assignment acceptance Function; null on historical and non-acceptance Assignments.';
-
-CREATE UNIQUE INDEX task_assignments_one_active_owner_idx
-  ON agentos.task_assignments (task_id)
-  WHERE ended_at IS NULL;
-
-CREATE FUNCTION agentos.protect_assignment_acceptance_request()
+CREATE OR REPLACE FUNCTION agentos.enforce_task_assignment_contract()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = agentos, pg_temp
 AS $$
+DECLARE
+  v_open_decision_keys text[];
 BEGIN
-  IF NEW.acceptance_request IS DISTINCT FROM OLD.acceptance_request THEN
-    RAISE EXCEPTION 'Task Assignment acceptance request is immutable';
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.brief IS NULL OR length(btrim(NEW.brief)) = 0 THEN
+      RAISE EXCEPTION 'Task Assignment requires a durable brief';
+    END IF;
+  END IF;
+
+  IF NEW.ended_at IS NOT NULL
+     AND (TG_OP = 'INSERT' OR OLD.ended_at IS NULL) THEN
+    IF NEW.report IS NULL OR length(btrim(NEW.report)) = 0 THEN
+      RAISE EXCEPTION 'ending a Task Assignment requires a durable report';
+    END IF;
+
+    IF NEW.assignment_role IN ('scout', 'review')
+       AND NEW.status IN ('completed', 'done') THEN
+      SELECT coalesce(
+               array_agg(delivery.decision_key ORDER BY delivery.decision_key),
+               ARRAY[]::text[]
+             )
+        INTO v_open_decision_keys
+        FROM agentos.inbox AS delivery
+       WHERE delivery.task_id = NEW.task_id
+         AND delivery.kind = 'captain_decision'
+         AND delivery.resolved_at IS NULL;
+
+      IF NEW.decision_keys IS NULL
+         OR NEW.decision_keys IS DISTINCT FROM v_open_decision_keys THEN
+        RAISE EXCEPTION 'Scout or review completion requires an exact Captain-decision attestation';
+      END IF;
+    END IF;
   END IF;
 
   RETURN NEW;
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION agentos.protect_completed_task_assignment()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = agentos, pg_temp
+AS $$
+BEGIN
+  IF OLD.ended_at IS NOT NULL AND ROW(
+    NEW.task_id,
+    NEW.agent_id,
+    NEW.assigned_by_agent_id,
+    NEW.assignment_role,
+    NEW.status,
+    NEW.status_text,
+    NEW.metadata,
+    NEW.started_at,
+    NEW.ended_at,
+    NEW.brief,
+    NEW.report,
+    NEW.supersedes_assignment_id,
+    NEW.decision_keys,
+    NEW.decisions_attested_at,
+    NEW.decisions_attested_by_agent_id
+  ) IS DISTINCT FROM ROW(
+    OLD.task_id,
+    OLD.agent_id,
+    OLD.assigned_by_agent_id,
+    OLD.assignment_role,
+    OLD.status,
+    OLD.status_text,
+    OLD.metadata,
+    OLD.started_at,
+    OLD.ended_at,
+    OLD.brief,
+    OLD.report,
+    OLD.supersedes_assignment_id,
+    OLD.decision_keys,
+    OLD.decisions_attested_at,
+    OLD.decisions_attested_by_agent_id
+  ) THEN
+    RAISE EXCEPTION 'completed Task assignment is immutable; create a new assignment';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER TABLE agentos.agents
+  DROP CONSTRAINT agents_resolved_composition_check;
+ALTER TABLE agentos.task_assignments
+  DROP CONSTRAINT task_assignments_composition_manifest_check;
+
+ALTER TABLE agentos.agents
+  DROP COLUMN resolved_composition;
+ALTER TABLE agentos.task_assignments
+  DROP COLUMN dispatch_profile;
+
+DROP FUNCTION agentos.enforce_agent_composition();
+DROP FUNCTION agentos.enforce_assignment_composition();
+DROP FUNCTION agentos.valid_composition_manifest(jsonb);
+DROP FUNCTION agentos.valid_composition_reference(jsonb);
+DROP FUNCTION agentos.valid_composition_origin(jsonb);
+DROP FUNCTION agentos.valid_composition_path(text);
+
+DROP TRIGGER task_assignments_protect_acceptance_request
+  ON agentos.task_assignments;
+UPDATE agentos.task_assignments
+   SET acceptance_request = jsonb_set(
+         acceptance_request,
+         '{assignment}',
+         (acceptance_request -> 'assignment') - 'dispatch_profile'
+       )
+ WHERE acceptance_request IS NOT NULL
+   AND acceptance_request -> 'assignment' ? 'dispatch_profile';
 CREATE TRIGGER task_assignments_protect_acceptance_request
 BEFORE UPDATE OF acceptance_request ON agentos.task_assignments
-FOR EACH ROW EXECUTE FUNCTION agentos.protect_assignment_acceptance_request();
+FOR EACH ROW
+EXECUTE FUNCTION agentos.protect_assignment_acceptance_request();
+
+CREATE FUNCTION agentos.handoff_task_assignment(
+  p_assignment_id uuid,
+  p_destination_agent_id uuid,
+  p_brief text,
+  p_report text,
+  p_status_text text
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = agentos, pg_temp
+AS $$
+DECLARE
+  v_actor_id uuid := agentos.current_agent_id();
+  v_previous agentos.task_assignments%ROWTYPE;
+  v_replacement_id uuid;
+BEGIN
+  IF v_actor_id IS NULL
+     OR agentos.current_agent_role() NOT IN ('first_mate', 'second_mate') THEN
+    RAISE EXCEPTION 'Task handoff requires an authenticated Mate';
+  END IF;
+
+  IF p_brief IS NULL OR length(btrim(p_brief)) = 0
+     OR p_report IS NULL OR length(btrim(p_report)) = 0
+     OR p_status_text IS NULL OR length(btrim(p_status_text)) = 0 THEN
+    RAISE EXCEPTION 'Task handoff requires a complete brief, report and status text';
+  END IF;
+
+  SELECT assignment.*
+    INTO v_previous
+    FROM agentos.task_assignments AS assignment
+   WHERE assignment.id = p_assignment_id
+   FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Task handoff requires an existing Assignment';
+  END IF;
+
+  IF v_previous.ended_at IS NOT NULL THEN
+    SELECT assignment.id
+      INTO v_replacement_id
+      FROM agentos.task_assignments AS assignment
+     WHERE assignment.supersedes_assignment_id = p_assignment_id
+       AND assignment.agent_id = p_destination_agent_id
+       AND assignment.brief = btrim(p_brief)
+       AND assignment.status_text = btrim(p_status_text)
+       AND v_previous.report = btrim(p_report);
+
+    IF v_replacement_id IS NOT NULL THEN
+      RETURN v_replacement_id;
+    END IF;
+
+    RAISE EXCEPTION 'Task handoff cannot replace an ended Assignment';
+  END IF;
+
+  IF NOT agentos.can_manage_task_assignment(p_assignment_id)
+     OR NOT agentos.can_manage_agent(p_destination_agent_id) THEN
+    RAISE EXCEPTION 'Task handoff requires a managed Assignment and destination Agent';
+  END IF;
+
+  IF v_previous.agent_id = p_destination_agent_id THEN
+    RAISE EXCEPTION 'Task handoff destination must differ from the current Agent';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM agentos.agents AS destination
+     WHERE destination.id = p_destination_agent_id
+       AND destination.retired_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Task handoff destination must be an active Agent';
+  END IF;
+
+  UPDATE agentos.task_assignments
+     SET status = 'handed_off',
+         status_text = btrim(p_status_text),
+         report = btrim(p_report),
+         ended_at = transaction_timestamp()
+   WHERE id = p_assignment_id;
+
+  INSERT INTO agentos.task_assignments (
+    task_id,
+    agent_id,
+    assigned_by_agent_id,
+    assignment_role,
+    status,
+    status_text,
+    brief,
+    supersedes_assignment_id
+  ) VALUES (
+    v_previous.task_id,
+    p_destination_agent_id,
+    v_actor_id,
+    v_previous.assignment_role,
+    'assigned',
+    btrim(p_status_text),
+    btrim(p_brief),
+    p_assignment_id
+  )
+  RETURNING id INTO v_replacement_id;
+
+  RETURN v_replacement_id;
+END;
+$$;
 
 CREATE FUNCTION agentos.create_task_with_assignment(
   p_task_id uuid,
@@ -470,6 +660,9 @@ COMMENT ON FUNCTION agentos.accept_backlog_task(
 ) IS
   'Atomically accepts a deliberately recorded backlog Task by creating its first accountable Assignment with immutable exact-retry evidence.';
 
+REVOKE ALL ON FUNCTION agentos.handoff_task_assignment(
+  uuid, uuid, text, text, text
+) FROM PUBLIC;
 REVOKE ALL ON FUNCTION agentos.create_task_with_assignment(
   uuid, uuid, uuid, uuid, uuid, text, text, text, text, text,
   jsonb, jsonb, jsonb, text, text, text, text, jsonb
@@ -501,15 +694,7 @@ BEGIN
     p_database_role
   );
   EXECUTE format(
-    'REVOKE INSERT (id, topic, content, source, recorded_by_agent_id, metadata, archived_at, scope, scope_agent_id) ON agentos.captain FROM %I',
-    p_database_role
-  );
-  EXECUTE format(
-    'REVOKE UPDATE (topic, content, source, metadata, archived_at) ON agentos.captain FROM %I',
-    p_database_role
-  );
-  EXECUTE format(
-    'REVOKE EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text), agentos.create_task_with_assignment(uuid, uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb, text, text, text, text, jsonb), agentos.accept_backlog_task(uuid, uuid, uuid, text, text, text, text, text, text, jsonb) FROM %I',
+    'REVOKE EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text), agentos.create_task_with_assignment(uuid, uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb, text, text, text, text, jsonb), agentos.accept_backlog_task(uuid, uuid, uuid, text, text, text, text, text, text, jsonb), agentos.current_mate_bearings() FROM %I',
     p_database_role
   );
   EXECUTE format(
@@ -536,15 +721,7 @@ BEGIN
       p_database_role
     );
     EXECUTE format(
-      'GRANT INSERT (id, topic, content, source, recorded_by_agent_id, metadata, archived_at, scope, scope_agent_id) ON agentos.captain TO %I',
-      p_database_role
-    );
-    EXECUTE format(
-      'GRANT UPDATE (topic, content, source, metadata, archived_at) ON agentos.captain TO %I',
-      p_database_role
-    );
-    EXECUTE format(
-      'GRANT EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text), agentos.create_task_with_assignment(uuid, uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb, text, text, text, text, jsonb), agentos.accept_backlog_task(uuid, uuid, uuid, text, text, text, text, text, text, jsonb) TO %I',
+      'GRANT EXECUTE ON FUNCTION agentos.retire_agent(uuid, text), agentos.provision_agent(text, text, text, text, text, jsonb), agentos.handoff_task_assignment(uuid, uuid, text, text, text), agentos.hold_captain_decision(uuid, text, text, text, text), agentos.link_task_decision(uuid, text, text), agentos.attest_assignment_decisions(uuid, text[]), agentos.resolve_captain_decision(uuid, text, text), agentos.create_task_with_assignment(uuid, uuid, uuid, uuid, uuid, text, text, text, text, text, jsonb, jsonb, jsonb, text, text, text, text, jsonb), agentos.accept_backlog_task(uuid, uuid, uuid, text, text, text, text, text, text, jsonb), agentos.current_mate_bearings() TO %I',
       p_database_role
     );
     EXECUTE format(
@@ -554,11 +731,6 @@ BEGIN
   END IF;
 END;
 $$;
-
-COMMENT ON TABLE agentos.tasks IS
-  'Durable backlog and accepted outcomes. A Task becomes accepted execution when its first accountable Assignment is created.';
-COMMENT ON TABLE agentos.inbox IS
-  'Direct delivery to an Agent. A request becomes accepted execution only when its first accountable Assignment is created.';
 
 DO $$
 DECLARE

@@ -15,7 +15,7 @@ beforeAll(async () => {
   const files = (await readdir(migrationsDirectory))
     .filter(
       (file) =>
-        /^\d+_.+\.sql$/.test(file) && Number.parseInt(file, 10) <= 10,
+        /^\d+_.+\.sql$/.test(file) && Number.parseInt(file, 10) <= 11,
     )
     .sort();
 
@@ -61,17 +61,19 @@ beforeAll(async () => {
 
     INSERT INTO agentos.task_assignments (
       id, task_id, agent_id, assigned_by_agent_id, assignment_role,
-      status, status_text, brief
+      status, status_text, brief, dispatch_profile
     ) VALUES
       (
         '${firstAssignmentId}', '${taskId}', '${firstAgentId}',
         '${root.rows[0]!.id}', 'ship', 'active', 'Agent A owns the work',
-        '# Agent A brief'
+        '# Agent A brief',
+        '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb
       ),
       (
         '${secondAssignmentId}', '${taskId}', '${secondAgentId}',
         '${root.rows[0]!.id}', 'ship', 'active', 'Agent B also owns the work',
-        '# Agent B brief'
+        '# Agent B brief',
+        '{"version":1,"harness":"codex","materials":[],"settings":{}}'::jsonb
       );
   `);
 });
@@ -82,7 +84,7 @@ afterAll(async () => {
 
 test("fails closed on duplicate active owners without discarding work", async () => {
   const migration = await import(
-    new URL("0011_atomic_task_acceptance.sql", migrationsDirectory).href,
+    new URL("0012_atomic_task_acceptance.sql", migrationsDirectory).href,
     { with: { type: "text" } },
   );
 
@@ -94,7 +96,7 @@ test("fails closed on duplicate active owners without discarding work", async ()
   }
   const migrationErrorMessage = String(migrationError);
   expect(migrationErrorMessage).toContain(
-    "Migration 0011 cannot enforce one active Assignment per Task; reconcile the listed active Assignments by ending or handing off ownership without deleting work, then retry",
+    "Migration 0012 cannot enforce one active Assignment per Task; reconcile the listed active Assignments by ending or handing off ownership without deleting work, then retry",
   );
   expect(migrationErrorMessage).toContain(taskId);
   expect(migrationErrorMessage).toContain(firstAssignmentId);
