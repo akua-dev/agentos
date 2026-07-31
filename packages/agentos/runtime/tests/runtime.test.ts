@@ -493,21 +493,6 @@ describe("Mate runtime", () => {
       AGENTOS_RELEASE_ROOT: releaseRoot,
       NODE_PATH: "",
     });
-    const distributionRoot = join(
-      state,
-      "persistent-checkout",
-      "packages",
-      "agentos",
-    );
-    const agentCwd = join(
-      distributionRoot,
-      "resources",
-      "roles",
-      "firstmate",
-    );
-    await mkdir(agentCwd, { recursive: true });
-    env.AGENTOS_AGENT_CWD = agentCwd;
-    env.AGENTOS_DISTRIBUTION_ROOT = distributionRoot;
     const child = Bun.spawn([process.execPath, runMate], {
       env,
       stderr: "pipe",
