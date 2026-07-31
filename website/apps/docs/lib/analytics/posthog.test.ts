@@ -82,7 +82,7 @@ describe('initializePostHog', () => {
     expect(init).toHaveBeenCalledOnce();
   });
 
-  it('initializes cookieless analytics through the CNAP first-party host', () => {
+  it('initializes cookie-based analytics through the CNAP first-party host', () => {
     const init = vi.fn();
 
     expect(
@@ -97,7 +97,6 @@ describe('initializePostHog', () => {
     expect(init).toHaveBeenCalledWith('phc_public_project_token', {
       api_host: DEFAULT_POSTHOG_HOST,
       capture_pageview: 'history_change',
-      cookieless_mode: 'always',
       defaults: '2026-05-30',
       disable_session_recording: true,
       person_profiles: 'identified_only',
