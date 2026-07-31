@@ -475,7 +475,21 @@ describe("Mate runtime", () => {
   test("gives a persistent checkout access to release-installed dependencies", async () => {
     const releaseRoot = await mkdtemp(join(tmpdir(), "agentos-release-"));
     temporaryDirectories.push(releaseRoot);
+    const persistentCheckout = await mkdtemp(
+      join(tmpdir(), "agentos-checkout-"),
+    );
+    temporaryDirectories.push(persistentCheckout);
+    const distributionRoot = join(persistentCheckout, "packages", "agentos");
+    const agentCwd = join(
+      distributionRoot,
+      "resources",
+      "roles",
+      "firstmate",
+    );
+    await mkdir(agentCwd, { recursive: true });
     const { env, state } = await createHarness([], {
+      AGENTOS_AGENT_CWD: agentCwd,
+      AGENTOS_DISTRIBUTION_ROOT: distributionRoot,
       AGENTOS_RELEASE_ROOT: releaseRoot,
       NODE_PATH: "",
     });
@@ -516,6 +530,13 @@ describe("Mate runtime", () => {
     expect(await readFile(join(state, "server-node-path"), "utf8")).toBe(
       join(releaseRoot, "node_modules"),
     );
+    expect(
+      (await readCalls(state)).filter(
+        (call) => call[0] === "agent" && call[1] === "start",
+      ),
+    ).toEqual([
+      expect.arrayContaining(["--cwd", agentCwd]),
+    ]);
   });
 
   test("resolves a release dependency from a persistent Pi extension child", async () => {
