@@ -52,7 +52,7 @@ Set `NEXT_PUBLIC_SITE_URL` to the public origin when building for a different
 host. It defaults to `https://agentos.akua.dev` for production builds and to
 localhost during development.
 
-Anonymous website analytics use PostHog's cookieless mode, create no anonymous
+Anonymous website analytics use PostHog's cookie-based mode, create no anonymous
 person profiles, honor Do Not Track, disable session recording and send through
 CNAP's first-party `https://ph.akua.dev` endpoint. Production builds on `main` use
 CNAP's public PostHog project token by default. Non-production Workers Builds previews stay
@@ -60,9 +60,9 @@ disabled unless `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` explicitly overrides the
 project. Set `NEXT_PUBLIC_POSTHOG_HOST` only to override the first-party
 endpoint. Development stays disabled when no token override is present.
 
-The selected PostHog project must enable the stateful **Cookieless server hash
-mode** under **Project Settings → Web analytics**. PostHog accepts the browser
-requests but ignores their events while that project setting is disabled.
+The selected PostHog project must keep the stateful **Cookieless server hash
+mode** disabled under **Project Settings → Web analytics**. This client relies on
+browser cookies for anonymous visitors.
 
 Both PostHog values are public browser configuration, not server secrets.
 When overriding them in Cloudflare Workers Builds, remember that Next.js
