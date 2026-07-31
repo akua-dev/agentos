@@ -128,8 +128,31 @@ export const routeExpectations: readonly RouteExpectation[] = [
         route.title,
         'Canonical sources',
         `${productionOrigin}${route.path}`,
+        ...(route.path === '/learn/01-first-outcome/let-plan-emerge'
+          ? [
+              'Observed in a real Fleet',
+              '15 durable Tasks',
+              '57 public sources',
+              '8,721 SSE events',
+              'five persistent Mates',
+              'no competing pull request',
+            ]
+          : []),
       ],
-      excludes: ['Fumadocs'],
+      excludes: [
+        'Fumadocs',
+        ...(route.path === '/learn/01-first-outcome/let-plan-emerge'
+          ? [
+              'Wayfinder',
+              '$1B',
+              'PR #49',
+              'v0.1.14',
+              'v0.1.15',
+              'openai-codex',
+              '/home/agent',
+            ]
+          : []),
+      ],
     }),
   ),
   {

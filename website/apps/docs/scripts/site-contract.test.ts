@@ -10,6 +10,7 @@ const renderedRoutePaths = [
   '/docs/does-not-exist',
   '/learn/does-not-exist',
 ] as const;
+const realFleetEvidencePath = '/learn/01-first-outcome/let-plan-emerge';
 
 async function findAvailablePort(): Promise<number> {
   const server = createServer();
@@ -218,6 +219,23 @@ describe('rendered site contract', () => {
       checked: renderedRoutePaths.length,
       failures: [],
     });
+  }, 120_000);
+
+  it('renders sanitized evidence from a real Fleet', async () => {
+    const expectations = routeExpectations.filter(
+      (expectation) => expectation.path === realFleetEvidencePath,
+    );
+
+    expect(expectations).toHaveLength(1);
+    const renderedExpectations = expectations.map((expectation) => ({
+      ...expectation,
+      includes: expectation.includes.filter(
+        (required) => required !== `https://agentos.akua.dev${realFleetEvidencePath}`,
+      ),
+    }));
+    const result = await auditSite(siteBaseUrl, renderedExpectations);
+
+    expect(result).toEqual({ checked: 1, failures: [] });
   }, 120_000);
 
   it('emits one robots directive for each rendered 404', async () => {
