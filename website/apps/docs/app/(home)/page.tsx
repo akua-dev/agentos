@@ -278,7 +278,7 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
         >
           <div className="grid gap-px bg-brand-secondary-foreground/15 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
             <div className="bg-brand-secondary p-6 md:p-9">
-              <p className="mb-4 font-mono text-xs font-medium tracking-wide uppercase opacity-75">
+              <p className="mb-4 font-mono text-xs font-medium tracking-wide uppercase">
                 Outcome first
               </p>
               <h2
@@ -289,7 +289,8 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
               </h2>
               <p className="mb-8 max-w-[58ch] text-base leading-7">
                 You define what should become true, how it will be proven and where authority
-                stops. First Mate reads current reality, makes only actionable work durable and
+                stops. First Mate reads current reality, keeps deliberate backlog durable and
+                unassigned, gives accepted asynchronous work one accountable Assignment and
                 returns the decisions that still belong to you.
               </p>
               <div className="flex flex-wrap gap-3">
@@ -326,7 +327,7 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
 
           <div className="grid border-t border-brand-secondary-foreground/15 lg:grid-cols-2">
             <article className="border-b border-brand-secondary-foreground/15 p-6 lg:border-r lg:border-b-0 md:p-8">
-              <p className="mb-3 font-mono text-xs tracking-wide uppercase opacity-70">
+              <p className="mb-3 font-mono text-xs tracking-wide uppercase">
                 Predeclared workflow
               </p>
               <h3 className={cn(headingVariants({ variant: 'h3' }), 'mb-4')}>
@@ -338,7 +339,7 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
               </p>
             </article>
             <article className="p-6 md:p-8">
-              <p className="mb-3 font-mono text-xs tracking-wide uppercase opacity-70">AgentOS</p>
+              <p className="mb-3 font-mono text-xs tracking-wide uppercase">AgentOS</p>
               <h3 className={cn(headingVariants({ variant: 'h3' }), 'mb-4')}>
                 The organization maintains responsibility.
               </h3>
