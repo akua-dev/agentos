@@ -5,6 +5,8 @@ resources:
   - serviceaccount.yaml
   - service.yaml
   - ../../../../../runtime/kubernetes/base
+components:
+  - ../../../../../runtime/kubernetes/observability
 patches:
   - path: statefulset.patch.yaml
     target:

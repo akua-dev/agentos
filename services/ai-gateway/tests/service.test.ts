@@ -4,10 +4,13 @@ import { tmpdir } from "node:os";
 import { describe, expect, test } from "bun:test";
 import type { OAuthCredentials } from "@earendil-works/pi-ai/oauth";
 import { createAIGatewayService } from "../src/service.ts";
+import type { GatewayTelemetry } from "../src/telemetry.ts";
 
 function accessToken(accountId: string, suffix = ""): string {
   const payload = Buffer.from(
-    JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: accountId } }),
+    JSON.stringify({
+      "https://api.openai.com/auth": { chatgpt_account_id: accountId },
+    }),
   ).toString("base64url");
   return `header.${payload}.signature${suffix}`;
 }
@@ -23,7 +26,10 @@ function credentials(accountId: string, suffix = ""): OAuthCredentials {
 function proxyRequest(path = "/responses", token = "fleet-token") {
   return new Request(`http://gateway.test${path}`, {
     method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
     body: JSON.stringify({ model: "gpt-test", input: "hello" }),
   });
 }
@@ -39,9 +45,15 @@ describe("AI gateway service", () => {
       fetchImpl: fetch,
     });
 
-    expect((await service.fetch(new Request("http://gateway.test/healthz"))).status).toBe(200);
-    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(503);
-    expect((await service.fetch(new Request("http://gateway.test/status"))).status).toBe(401);
+    expect(
+      (await service.fetch(new Request("http://gateway.test/healthz"))).status,
+    ).toBe(200);
+    expect(
+      (await service.fetch(new Request("http://gateway.test/readyz"))).status,
+    ).toBe(503);
+    expect(
+      (await service.fetch(new Request("http://gateway.test/status"))).status,
+    ).toBe(401);
     expect(
       (
         await service.fetch(
@@ -52,10 +64,42 @@ describe("AI gateway service", () => {
       ).status,
     ).toBe(200);
 
-    const accountId = await service.vault.addFromOAuth("Primary", credentials("provider-a"));
-    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(200);
+    const accountId = await service.vault.addFromOAuth(
+      "Primary",
+      credentials("provider-a"),
+    );
+    expect(
+      (await service.fetch(new Request("http://gateway.test/readyz"))).status,
+    ).toBe(200);
     await service.vault.markNeedsReauth(accountId);
-    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(503);
+    expect(
+      (await service.fetch(new Request("http://gateway.test/readyz"))).status,
+    ).toBe(503);
+
+    const unavailable = await service.fetch(proxyRequest());
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toEqual({ error: "no_eligible_account" });
+    const protectedStatus = await service.fetch(
+      new Request("http://gateway.test/status", {
+        headers: { authorization: "Bearer fleet-token" },
+      }),
+    );
+    expect(await protectedStatus.json()).toMatchObject({
+      routing: {
+        lastSelection: {
+          reason: "no_eligible_accounts",
+          candidates: [
+            {
+              accountId,
+              eligible: false,
+              freshness: "unknown",
+              rejectionCode: "reauthentication_required",
+            },
+          ],
+        },
+      },
+    });
+    await service.close();
   });
 
   test("uses the explicitly enabled API-key fallback without storing it in status", async () => {
@@ -68,7 +112,8 @@ describe("AI gateway service", () => {
       openAIApiKey: "api-secret",
       oauth: { refresh: async () => credentials("provider-a") },
       fetchImpl: async (input, init) => {
-        if (String(input).includes("wham/usage")) throw new Error("unexpected usage request");
+        if (String(input).includes("wham/usage"))
+          throw new Error("unexpected usage request");
         upstreamAuth = new Request(
           input instanceof Request ? input.url : input.toString(),
           init,
@@ -77,8 +122,12 @@ describe("AI gateway service", () => {
       },
     });
 
-    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(200);
-    expect(await (await service.fetch(proxyRequest())).text()).toBe("fallback-ok");
+    expect(
+      (await service.fetch(new Request("http://gateway.test/readyz"))).status,
+    ).toBe(200);
+    expect(await (await service.fetch(proxyRequest())).text()).toBe(
+      "fallback-ok",
+    );
     expect(upstreamAuth as unknown).toBe("Bearer api-secret");
     const status = await service.fetch(
       new Request("http://gateway.test/status", {
@@ -88,11 +137,19 @@ describe("AI gateway service", () => {
     const body = await status.text();
     const parsed = JSON.parse(body) as {
       apiKeyFallback: boolean;
-      routing?: { activeReservations: number; reservationsByAccount: Record<string, number> };
+      routing?: {
+        activeReservations: number;
+        reservationsByAccount: Record<string, number>;
+      };
     };
     expect(parsed.apiKeyFallback).toBe(true);
-    expect(parsed.routing).toEqual({ activeReservations: 0, reservationsByAccount: {} });
+    expect(parsed.routing).toMatchObject({
+      activeReservations: 0,
+      reservationsByAccount: {},
+      lastSelection: { reason: "no_eligible_accounts" },
+    });
     expect(body).not.toContain("api-secret");
+    await service.close();
   });
 
   test("routes through an OAuth account and makes a visible 429 ineligible for the next request", async () => {
@@ -122,13 +179,15 @@ describe("AI gateway service", () => {
         }
         responseCalls += 1;
         expect(
-          new Request(input instanceof Request ? input.url : input.toString(), init).headers.get(
-            "authorization",
-          ),
-        ).toBe(
-          `Bearer ${accessToken("provider-a")}`,
-        );
-        return new Response("quota reached", { status: 429, headers: { "retry-after": "60" } });
+          new Request(
+            input instanceof Request ? input.url : input.toString(),
+            init,
+          ).headers.get("authorization"),
+        ).toBe(`Bearer ${accessToken("provider-a")}`);
+        return new Response("quota reached", {
+          status: 429,
+          headers: { "retry-after": "60" },
+        });
       },
     });
     await service.vault.addFromOAuth("Primary", credentials("provider-a"));
@@ -139,6 +198,54 @@ describe("AI gateway service", () => {
     const second = await service.fetch(proxyRequest());
     expect(second.status).toBe(503);
     expect(responseCalls).toBe(1);
+    await service.close();
+  });
+
+  test("records bounded quota observation age and freshness during acquisition", async () => {
+    const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-service-"));
+    let now = 1_000_000;
+    const observations: Array<[number, boolean]> = [];
+    let usageCalls = 0;
+    const service = await createAIGatewayService({
+      stateDirectory,
+      clientToken: "fleet-token",
+      allowApiKeyFallback: false,
+      oauth: { refresh: async () => credentials("provider-a") },
+      clock: () => now,
+      telemetry: recordingQuotaTelemetry(observations),
+      fetchImpl: async (input) => {
+        if (String(input).includes("wham/usage")) {
+          usageCalls += 1;
+          if (usageCalls === 2) throw new Error("usage unavailable");
+          return Response.json({
+            rate_limit: {
+              primary_window: {
+                used_percent: 10,
+                limit_window_seconds: 18_000,
+                reset_at: Math.floor((now + 3_600_000) / 1_000),
+              },
+              secondary_window: {
+                used_percent: 20,
+                limit_window_seconds: 604_800,
+                reset_at: Math.floor((now + 86_400_000) / 1_000),
+              },
+            },
+          });
+        }
+        return new Response("ok");
+      },
+    });
+    await service.vault.addFromOAuth("Primary", credentials("provider-a"));
+
+    expect((await service.fetch(proxyRequest())).status).toBe(200);
+    now += 61_000;
+    expect((await service.fetch(proxyRequest())).status).toBe(200);
+
+    expect(observations).toEqual([
+      [0, false],
+      [61, true],
+    ]);
+    await service.close();
   });
 
   test("recovers the same OAuth account after a visible 401 and fresh login", async () => {
@@ -179,12 +286,15 @@ describe("AI gateway service", () => {
     expect(await rejected.text()).toBe("expired credential");
 
     await service.vault.addFromOAuth("Primary", credentials("provider-a"));
-    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(200);
+    expect(
+      (await service.fetch(new Request("http://gateway.test/readyz"))).status,
+    ).toBe(200);
 
     const recovered = await service.fetch(proxyRequest());
     expect(recovered.status).toBe(200);
     expect(await recovered.text()).toBe("recovered");
     expect(responseCalls).toBe(2);
+    await service.close();
   });
 
   test("does not let a late usage 401 invalidate a fresh same-account login", async () => {
@@ -205,11 +315,16 @@ describe("AI gateway service", () => {
       allowApiKeyFallback: false,
       oauth: { refresh: async () => credentials("provider-a", "-refresh") },
       fetchImpl: async (input, init) => {
-        const request = new Request(input instanceof Request ? input.url : input.toString(), init);
+        const request = new Request(
+          input instanceof Request ? input.url : input.toString(),
+          init,
+        );
         if (request.url.includes("wham/usage")) {
           usageCalls += 1;
           if (usageCalls === 1) {
-            expect(request.headers.get("authorization")).toBe(`Bearer ${accessToken("provider-a")}`);
+            expect(request.headers.get("authorization")).toBe(
+              `Bearer ${accessToken("provider-a")}`,
+            );
             usageProbeStarted();
             await usageProbeGate;
             return new Response("expired credential", { status: 401 });
@@ -243,16 +358,48 @@ describe("AI gateway service", () => {
 
     const inFlightProbe = service.fetch(proxyRequest());
     await usageProbeStartedSignal;
-    await service.vault.addFromOAuth("Primary", credentials("provider-a", "-fresh"));
+    await service.vault.addFromOAuth(
+      "Primary",
+      credentials("provider-a", "-fresh"),
+    );
     releaseUsageProbe();
 
     expect((await inFlightProbe).status).toBe(503);
-    expect((await service.fetch(new Request("http://gateway.test/readyz"))).status).toBe(200);
+    expect(
+      (await service.fetch(new Request("http://gateway.test/readyz"))).status,
+    ).toBe(200);
 
     const recovered = await service.fetch(proxyRequest());
     expect(recovered.status).toBe(200);
     expect(await recovered.text()).toBe("recovered");
     expect(usageCalls).toBe(2);
     expect(responseCalls).toBe(1);
+    await service.close();
   });
 });
+
+function recordingQuotaTelemetry(
+  observations: Array<[number, boolean]>,
+): GatewayTelemetry {
+  return {
+    enabled: true,
+    startRequest() {
+      return {
+        attemptId: "gateway-test",
+        authenticate() {},
+        routeStarted() {},
+        routeEnded() {},
+        quotaObservation(ageSeconds, stale) {
+          observations.push([ageSeconds, stale]);
+        },
+        upstreamStarted() {},
+        upstreamHeaders() {},
+        upstreamFailed() {},
+        streamChunk() {},
+        routeReleaseStarted() {},
+        routeReleased() {},
+        end() {},
+      };
+    },
+  };
+}

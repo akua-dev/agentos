@@ -1,14 +1,19 @@
 import {
   compact,
+  convertToLlm,
+  serializeConversation,
   type CompactionResult,
   type ExtensionAPI,
   type ExtensionContext,
   type SessionBeforeCompactEvent,
+  type SessionMessageEntry,
   type ToolInfo,
 } from "@earendil-works/pi-coding-agent";
 import { calculateCost, type Usage } from "@earendil-works/pi-ai";
+import { complete } from "@earendil-works/pi-ai/compat";
 import {
   requestServerCompaction,
+  OpenAICompactionHttpError,
   supportsServerCompaction,
   type OpenAICompactionModel,
   type OpenAICompactionReasoning,
@@ -16,6 +21,7 @@ import {
   type ServerCompactionRequest,
   type ServerCompactionResult,
 } from "./remote.ts";
+import { normalizeResponseItemsForPrompt } from "./messages.ts";
 import {
   JsonObjectSchema,
   JsonValueSchema,
@@ -28,6 +34,17 @@ import {
   NATIVE_DETAILS_KEY,
   rewriteResponsesPayload,
 } from "./session.ts";
+import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
+import {
+  agentOSRouteForModel,
+  safeAssistantFailure,
+  safeTokenCount,
+  startAgentOSAuxiliaryOperation,
+} from "../telemetry/auxiliary.ts";
+import type {
+  AgentOSProviderAttempt,
+  AgentOSProviderAttemptOutcome,
+} from "../telemetry/runtime.ts";
 
 type ResolvedAuth = {
   apiKey?: string;
@@ -37,16 +54,29 @@ type ResolvedAuth = {
 
 type PiThinkingLevel = ReturnType<ExtensionAPI["getThinkingLevel"]>;
 
-type LocalCompactionRequest = {
+export type LocalCompactionRequest = {
   event: SessionBeforeCompactEvent;
   model: OpenAICompactionModel;
   auth: ResolvedAuth;
   thinkingLevel: PiThinkingLevel;
+  telemetry?: LocalCompactionTelemetry;
+};
+
+export type LocalCompactionTelemetry = {
+  currentAttempt(): AgentOSProviderAttempt;
+  startFallbackAttempt(): void;
+};
+
+type LocalSummaryImplementations = {
+  complete: typeof complete;
+  compact: typeof compact;
+  now: () => number;
 };
 
 export type OpenAIServerCompactionDependencies = {
   runLocalCompaction(request: LocalCompactionRequest): Promise<CompactionResult>;
   runServerCompaction(request: ServerCompactionRequest): Promise<ServerCompactionResult>;
+  telemetry?: AgentOSTelemetrySource;
 };
 
 function isEnabled(): boolean {
@@ -100,23 +130,130 @@ function reasoningFor(
   return { effort, summary: "auto" };
 }
 
-function compactionInstructions(systemPrompt: string, customInstructions: string | undefined): string {
+function portableSummaryPrompt(
+  conversation: string,
+  customInstructions: string | undefined,
+): string {
   const custom = customInstructions?.trim();
-  return custom ? `${systemPrompt}\n\n${custom}` : systemPrompt;
+  const instructionSuffix = custom
+    ? `\n\nAdditional summarization instructions:\n${custom}`
+    : "";
+  return `Summarize this conversation for future continuation in pi. Preserve goals, decisions, important facts, file paths, open questions, and next steps. Be concise but include information needed to continue work.${instructionSuffix}\n\n<conversation>\n${conversation}\n</conversation>`;
 }
 
-async function defaultLocalCompaction(request: LocalCompactionRequest): Promise<CompactionResult> {
-  return compact(
-    request.event.preparation,
-    request.model,
-    request.auth.apiKey,
-    request.auth.headers,
-    request.event.customInstructions,
-    request.event.signal,
-    request.thinkingLevel,
-    undefined,
-    request.auth.env,
-  );
+function portableFallbackSummary(model: OpenAICompactionModel): string {
+  let hostname = "api.openai.com";
+  try {
+    if (model.baseUrl) hostname = new URL(model.baseUrl).hostname;
+  } catch {
+    // A malformed custom base URL should not prevent portable fallback text.
+  }
+  return `OpenAI remote compaction applied for ${model.provider}/${model.id} via ${hostname}. Pi keeps this textual summary for portability, while compatible future OpenAI turns can use provider-native replacement history stored in compaction details.`;
+}
+
+const localSummaryDefaults: LocalSummaryImplementations = {
+  complete,
+  compact,
+  now: Date.now,
+};
+
+export async function generateBestEffortLocalSummary(
+  request: LocalCompactionRequest,
+  implementations: LocalSummaryImplementations = localSummaryDefaults,
+): Promise<CompactionResult> {
+  let portableAttemptEnded = false;
+  try {
+    const messages = request.event.branchEntries
+      .filter(
+        (entry): entry is SessionMessageEntry =>
+          entry.type === "message" && "message" in entry,
+      )
+      .map((entry) => entry.message);
+    const conversation = serializeConversation(convertToLlm(messages));
+    const response = await implementations.complete(
+      request.model,
+      {
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: portableSummaryPrompt(
+                  conversation,
+                  request.event.customInstructions,
+                ),
+              },
+            ],
+            timestamp: implementations.now(),
+          },
+        ],
+      },
+      {
+        apiKey: request.auth.apiKey,
+        headers: request.auth.headers,
+        maxTokens: 4096,
+        signal: request.event.signal,
+        env: request.auth.env,
+      },
+    );
+    const failure = safeAssistantFailure(response.stopReason);
+    if (failure) {
+      portableAttemptEnded = true;
+      request.telemetry?.currentAttempt().end({
+        status: 200,
+        error: failure,
+        streamOutcome:
+          response.stopReason === "aborted" ? "aborted" : "upstream_error",
+        inputTokens: safeTokenCount(response.usage.input),
+        outputTokens: safeTokenCount(response.usage.output),
+      });
+      request.telemetry?.startFallbackAttempt();
+      throw new Error(
+        response.stopReason === "aborted"
+          ? "OpenAI portable compaction aborted"
+          : "OpenAI portable compaction failed",
+      );
+    }
+    const summary = response.content
+      .filter(
+        (item): item is Extract<typeof item, { type: "text" }> =>
+          item.type === "text",
+      )
+      .map((item) => item.text)
+      .join("\n")
+      .trim();
+    return {
+      summary: summary || portableFallbackSummary(request.model),
+      firstKeptEntryId: request.event.preparation.firstKeptEntryId,
+      tokensBefore: request.event.preparation.tokensBefore,
+    };
+  } catch (error) {
+    if (!portableAttemptEnded) {
+      request.telemetry?.currentAttempt().end({
+        error,
+        streamOutcome: "upstream_error",
+      });
+      request.telemetry?.startFallbackAttempt();
+    }
+    return implementations.compact(
+      request.event.preparation,
+      request.model,
+      request.auth.apiKey,
+      request.auth.headers,
+      request.event.customInstructions,
+      request.event.signal,
+      request.thinkingLevel,
+      undefined,
+      request.auth.env,
+    );
+  }
+}
+
+async function defaultLocalCompaction(
+  request: LocalCompactionRequest,
+): Promise<CompactionResult> {
+  return generateBestEffortLocalSummary(request);
 }
 
 const defaults: OpenAIServerCompactionDependencies = {
@@ -188,6 +325,7 @@ function combinedUsage(local: Usage | undefined, remote: Usage | undefined): Usa
 async function handleCompaction(
   pi: ExtensionAPI,
   dependencies: OpenAIServerCompactionDependencies,
+  requestShapes: Map<string, ProviderRequestShape>,
   event: SessionBeforeCompactEvent,
   ctx: ExtensionContext,
 ) {
@@ -202,26 +340,90 @@ async function handleCompaction(
   if (!resolved.apiKey && !hasAuthorization) return undefined;
 
   const thinkingLevel = pi.getThinkingLevel();
-  const localRequest = { event, model, auth: resolved, thinkingLevel };
+  const telemetryOperation = await startAgentOSAuxiliaryOperation(
+    model,
+    dependencies.telemetry,
+    "resumed",
+  );
+  const startPortableAttempt = () =>
+    telemetryOperation.startProviderAttempt({
+      compactionPath: "portable_summary",
+      requestKind: "compaction",
+      streamMode: "non_streaming",
+    });
+  let localAttempt = startPortableAttempt();
+  const remoteAttempt = telemetryOperation.startProviderAttempt({
+    compactionPath: "native_server",
+    requestKind: "compaction",
+    streamMode: model.provider === "openai-codex" ? "streaming" : "non_streaming",
+  });
+  const baseHeaders = mergedHeaders(model.headers, resolved.headers);
+  const localHeaders = { ...baseHeaders };
+  const remoteHeaders = { ...baseHeaders };
+  localAttempt.inject(localHeaders);
+  remoteAttempt.inject(remoteHeaders);
+  const localRequest = {
+    event,
+    model,
+    auth: { ...resolved, headers: localHeaders },
+    thinkingLevel,
+    telemetry: {
+      currentAttempt: () => localAttempt,
+      startFallbackAttempt: () => {
+        localAttempt = startPortableAttempt();
+        localAttempt.inject(localHeaders);
+      },
+    },
+  };
+  const requestShape = requestShapes.get(requestShapeKey(ctx));
+  requestShapes.delete(requestShapeKey(ctx));
   const remoteRequest: ServerCompactionRequest = {
     model,
+    route: agentOSRouteForModel(model),
     apiKey: resolved.apiKey,
-    headers: mergedHeaders(model.headers, resolved.headers),
+    headers: remoteHeaders,
     sessionId: ctx.sessionManager.getSessionId(),
-    input: buildCompactionInput(event.branchEntries, model.provider, model.id),
-    instructions: compactionInstructions(ctx.getSystemPrompt(), event.customInstructions),
+    input: normalizeResponseItemsForPrompt(
+      buildCompactionInput(
+        event.branchEntries,
+        model.provider,
+        model.api,
+        model.id,
+      ),
+      model,
+    ),
+    instructions: ctx.getSystemPrompt(),
     tools: toolsPayload(pi.getAllTools(), pi.getActiveTools()),
-    reasoning: reasoningFor(thinkingLevel, model),
+    reasoning: requestShape?.reasoning ?? reasoningFor(thinkingLevel, model),
+    text: requestShape?.text,
     signal: event.signal,
     timeoutMs: configuredRemoteTimeout(),
   };
 
   const [local, remote] = await Promise.allSettled([
-    dependencies.runLocalCompaction(localRequest),
-    dependencies.runServerCompaction(remoteRequest),
+    observeCompactionAttempt(
+      () => localAttempt,
+      () => dependencies.runLocalCompaction(localRequest),
+      (result) => ({
+        inputTokens: safeTokenCount(result.usage?.input),
+        outputTokens: safeTokenCount(result.usage?.output),
+      }),
+    ),
+    observeCompactionAttempt(
+      remoteAttempt,
+      () => dependencies.runServerCompaction(remoteRequest),
+      (result) => ({
+        inputTokens: safeTokenCount(result.usage?.input_tokens),
+        outputTokens: safeTokenCount(result.usage?.output_tokens),
+      }),
+    ),
   ]);
 
-  if (local.status !== "fulfilled") return undefined;
+  if (local.status !== "fulfilled") {
+    telemetryOperation.end({ error: local.reason });
+    return undefined;
+  }
+  telemetryOperation.end({ status: 200 });
   if (remote.status !== "fulfilled") {
     if (!event.signal.aborted && ctx.hasUI) {
       ctx.ui.notify("OpenAI server compaction unavailable; using Pi's portable summary.", "warning");
@@ -231,6 +433,7 @@ async function handleCompaction(
 
   const native = nativeCompactionDetails(
     model.provider,
+    model.api,
     model.id,
     remote.value.output,
     remote.value.usage,
@@ -244,23 +447,103 @@ async function handleCompaction(
   };
 }
 
+async function observeCompactionAttempt<T>(
+  attempt: AgentOSProviderAttempt | (() => AgentOSProviderAttempt),
+  run: () => Promise<T>,
+  counts: (
+    result: T,
+  ) => Pick<
+    AgentOSProviderAttemptOutcome,
+    "inputTokens" | "outputTokens"
+  >,
+): Promise<T> {
+  try {
+    const result = await run();
+    resolveAttempt(attempt).end({
+      status: 200,
+      streamOutcome: "completed",
+      ...counts(result),
+    });
+    return result;
+  } catch (error) {
+    resolveAttempt(attempt).end({
+      ...(error instanceof OpenAICompactionHttpError
+        ? { status: error.status }
+        : {}),
+      error,
+      streamOutcome: "upstream_error",
+    });
+    throw error;
+  }
+}
+
+function resolveAttempt(
+  attempt: AgentOSProviderAttempt | (() => AgentOSProviderAttempt),
+): AgentOSProviderAttempt {
+  return typeof attempt === "function" ? attempt() : attempt;
+}
+
+type ProviderRequestShape = {
+  reasoning?: JsonObject;
+  text?: JsonObject;
+};
+
+function requestShapeKey(ctx: ExtensionContext): string {
+  const model = ctx.model;
+  const sessionId = (
+    ctx.sessionManager as { getSessionId?: () => string }
+  ).getSessionId?.() ?? "";
+  return [
+    sessionId,
+    model?.provider,
+    model?.api,
+    model?.id,
+  ].join("\u0000");
+}
+
+function requestShapeFromPayload(payload: unknown): ProviderRequestShape | undefined {
+  const parsed = JsonObjectSchema.safeParse(payload);
+  if (!parsed.success) return undefined;
+  const reasoning = JsonObjectSchema.safeParse(parsed.data.reasoning);
+  const text = JsonObjectSchema.safeParse(parsed.data.text);
+  if (!reasoning.success && !text.success) return undefined;
+  return {
+    ...(reasoning.success ? { reasoning: reasoning.data } : {}),
+    ...(text.success ? { text: text.data } : {}),
+  };
+}
+
 export function createOpenAIServerCompactionExtension(
   dependencies: OpenAIServerCompactionDependencies = defaults,
 ) {
   return (pi: ExtensionAPI) => {
+    const requestShapes = new Map<string, ProviderRequestShape>();
     pi.on("session_before_compact", (event, ctx) =>
-      handleCompaction(pi, dependencies, event, ctx),
+      handleCompaction(pi, dependencies, requestShapes, event, ctx),
     );
     pi.on("before_provider_request", (event, ctx) => {
       const model = ctx.model;
       if (!isEnabled() || !supportsServerCompaction(model)) return undefined;
+      const key = requestShapeKey(ctx);
+      requestShapes.delete(key);
+      const requestShape = requestShapeFromPayload(event.payload);
+      if (requestShape) requestShapes.set(key, requestShape);
       return rewriteResponsesPayload(
         event.payload,
         ctx.sessionManager.getBranch(),
         model.provider,
+        model.api,
         model.id,
       );
     });
+    pi.on("session_start", () => requestShapes.clear());
+    pi.on("session_before_switch", () => requestShapes.clear());
+    pi.on("session_before_fork", () => requestShapes.clear());
+    pi.on("session_before_tree", () => requestShapes.clear());
+    pi.on("session_tree", () => requestShapes.clear());
+    pi.on("session_compact", () => requestShapes.clear());
+    pi.on("model_select", () => requestShapes.clear());
+    pi.on("session_shutdown", () => requestShapes.clear());
   };
 }
 

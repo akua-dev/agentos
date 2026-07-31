@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentOS Observability"
+  short_description: "Diagnose Fleet AI calls with safe OTEL evidence"
+  default_prompt: "Use $agentos-observability to diagnose this Fleet AI failure with controlled direct and extension-loaded trials."

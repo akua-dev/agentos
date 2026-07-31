@@ -30,8 +30,14 @@ spec:
               value: firstmate
             - name: AGENTOS_AGENT_ROLE
               value: first_mate
+            - name: AGENTOS_AI_RUNTIME
+              value: pi
+            - name: AGENTOS_AI_RUNTIME_VERSION
+              value: 0.81.1
             - name: HERDR_SESSION
               value: agentos-firstmate
+            - name: K8S_CONTAINER_NAME
+              value: agentos
         - name: prepare-home
           workingDir: /opt/agentos/packages/agentos/resources/roles/firstmate
           args:
