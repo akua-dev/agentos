@@ -1,10 +1,10 @@
-# Local-agent handoff and Flect workplace implementation plan
+# Work handoff and Flect workplace implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make local-to-Fleet handoff and a truthful future Flect work-surface direction obvious across the AgentOS landing page, Learn, docs, and a shorter README funnel.
+**Goal:** Make any-work-to-Fleet handoff, human responsibility routing, and a truthful future Flect workplace direction obvious across the AgentOS landing page, Learn, docs, and a shorter README funnel.
 
-**Architecture:** Keep operating truth in one handoff guide and interface boundaries in one concept page. Add one restrained server-rendered Flect concept section that presents the official README hero from a local public asset and future-status copy; the server landing page composes it with the local-handoff story. Existing Learn and Docs contracts remain the route/navigation authorities.
+**Architecture:** Keep operating truth in one handoff guide and interface boundaries in one concept page. Treat handoff as a responsibility boundary that can carry product or company work, and treat human routing as a configured contribution-and-authority path rather than a second ownership model. Keep one restrained server-rendered Flect concept section with the official README hero and explicit current-versus-future copy; existing Learn and Docs contracts remain the route/navigation authorities.
 
 **Tech Stack:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, CSS Modules, Fumadocs MDX, Vitest, Testing Library, Bun.
 
@@ -18,6 +18,10 @@
 - Keep the official Flect hero as the section's only product or workflow visual; describe the future AgentOS workflow in prose without an animation, diagram, or mock interface.
 - Add no CLI, API, webhook receiver, database mechanic, Skill, agent instruction, animation dependency, autoplay video, or cross-origin runtime media.
 - A local transcript is context, an external event is evidence, and accepted execution starts only with an accountable Assignment.
+- Handoff may carry UI work, backend architecture, research, implementation, testing, diagnosis, or review; a local coding Agent is one entry point rather than the workflow boundary.
+- Relevant people may contribute context, critique, or recommendations without becoming the accountable owner or granting authority they do not hold.
+- The configured Captain role or exact standing authorization remains the decision boundary for consequential action.
+- Installing Flect provides its current standalone/local interface-shaping experience. AgentOS adapters and arbitrary embedded browser or iframe control remain future integration concepts.
 - Preserve the exact bootstrap prompt, benchmark headline, source links, contribution path, and licenses.
 - Reduce `README.md` from 228 lines to at most 159 lines.
 - Essential content must render without JavaScript.
@@ -353,3 +357,87 @@ Approve no-op findings, authorize low-risk auto-fixes through `axi respond --act
 - [ ] **Step 3: Stop at `checks-passed`**
 
 Report the PR URL, required checks, findings, and every pipeline fix. Do not merge.
+
+### Task 7: Broaden the finished story from coding handoff to company work
+
+**Files:**
+- Modify: `website/apps/docs/components/landing-page.test.tsx`
+- Modify: `website/apps/docs/components/flect-workplace.test.tsx`
+- Modify: `website/apps/docs/app/(home)/page.tsx`
+- Modify: `website/apps/docs/app/(home)/flect-workplace.tsx`
+- Modify: `website/apps/docs/content/docs/operate/continue-local-work.mdx`
+- Modify: `website/apps/docs/content/docs/concepts/human-work-surfaces.mdx`
+- Modify: `website/apps/docs/content/learn/01-first-outcome/hand-off-local-work.mdx`
+- Modify: `README.md`
+
+**Interfaces:**
+- Preserves the existing routes, component exports, official Flect hero, and canonical source boundaries.
+- Expands the observable landing copy from coding phases to UI, architecture, research, implementation, testing, diagnosis, and review.
+- Separates relevant human contribution from accountable ownership and consequential authority.
+- Separates Flect's current local interface-shaping experience from future AgentOS and embedded-product adapters.
+
+- [ ] **Step 1: Add failing observable-content tests**
+
+In `landing-page.test.tsx`, render `Page` and assert the heading `Start anywhere. Bring in the Fleet when the outcome matters.` plus visible examples `UI direction`, `backend architecture`, and `code review`.
+
+In `flect-workplace.test.tsx`, render `FlectWorkplace` and assert the heading `One front door to the work of your company.`, current-state copy containing `adaptable local workplace today`, relevant-person copy containing `context, expertise, or authority`, and future-state copy containing `embedded browser or iframe` and `future integration path, not a shipped capability`.
+
+- [ ] **Step 2: Verify RED**
+
+```console
+bun run --cwd website/apps/docs test components/landing-page.test.tsx components/flect-workplace.test.tsx
+```
+
+Expected: FAIL because the current rendered page still limits the examples to planning, prototyping, diagnosis, and partial implementation and does not expose the broader Flect workplace contract.
+
+- [ ] **Step 3: Update the landing page and Flect section**
+
+Change the handoff heading to `Start anywhere. Bring in the Fleet when the outcome matters.` Explain that someone may shape a UI, sketch backend architecture, research, implement, diagnose, test, or review locally before handing off accountable follow-through. Keep the existing four-step evidence/acceptance loop, but make its first step cover a UI direction, architecture sketch, research finding, patch, or review.
+
+Change the Flect heading to `One front door to the work of your company.` State that installing Flect provides an adaptable local workplace today. Describe a future AgentOS adopter that assembles the work and context, seeks contributions from people with relevant context, expertise, or authority, supports Agent-assisted inspection and revision, and returns bounded approved intent. State that a bounded embedded browser or iframe could be an early adapter before deeper product integration and label it as a future integration path, not a shipped capability.
+
+- [ ] **Step 4: Verify GREEN**
+
+```console
+bun run --cwd website/apps/docs test components/landing-page.test.tsx components/flect-workplace.test.tsx
+```
+
+Expected: both suites pass with the new content rendered through the public components.
+
+- [ ] **Step 5: Broaden canonical guidance, Learn, and README**
+
+In the operating guide, replace the four coding-phase examples with interface shaping, architecture/design, research/diagnosis, and implementation/testing/review. Preserve the five-item handoff package and current intake/acceptance mechanics.
+
+In the work-surface concept, add responsibility-path guidance: interfaces may seek wisdom from several relevant people, but contribution, accountable ownership, and authority remain distinct. Add a future bounded browser/iframe bridge and current Flect local-workplace status without claiming either AgentOS integration or arbitrary browser control ships today.
+
+In Learn, broaden the recognition examples and replace `Beyond coding agents` with `Bring the company into the loop`. Keep the concrete checkout diagnosis and link to the canonical pages instead of duplicating mechanics.
+
+In README, rename the handoff and workplace sections to match the broader funnel, include representative UI/backend/review work, and explain relevant-person contribution in concise future-direction language while staying at or below 159 lines.
+
+- [ ] **Step 6: Run content and site verification**
+
+```console
+bun run --cwd website/apps/docs test components/landing-page.test.tsx components/flect-workplace.test.tsx scripts/docs-contract.test.ts scripts/learn-contract.test.ts scripts/site-contract.test.ts
+bun run site:test
+bun run site:lint
+bun run site:typecheck
+bun run site:build
+test "$(wc -l < README.md)" -le 159
+git diff --check
+```
+
+Expected: all commands exit 0; the README remains within its funnel target and all routes/contracts remain intact.
+
+- [ ] **Step 7: Perform production browser QA**
+
+Serve the built site and inspect `/`, `/docs/operate/continue-local-work`, `/docs/concepts/human-work-surfaces`, and `/learn/01-first-outcome/hand-off-local-work` at desktop and 390 px widths. Confirm the wider story, honest future labels, one official Flect visual, no horizontal overflow, correct headings and links, and no console errors.
+
+- [ ] **Step 8: Commit and re-run no-mistakes**
+
+```console
+git add README.md docs/superpowers/plans/2026-07-31-local-agent-handoff.md website/apps/docs/app/\(home\)/page.tsx website/apps/docs/app/\(home\)/flect-workplace.tsx website/apps/docs/components/landing-page.test.tsx website/apps/docs/components/flect-workplace.test.tsx website/apps/docs/content/docs/operate/continue-local-work.mdx website/apps/docs/content/docs/concepts/human-work-surfaces.mdx website/apps/docs/content/learn/01-first-outcome/hand-off-local-work.mdx
+git commit -m "docs(website): broaden handoff to company work"
+no-mistakes axi run --yes --intent "Expand AgentOS PR #73 so handoff covers any bounded product or company work, not only coding-agent phases. Show that a company can organize work and decisions around the people with relevant context, expertise, and authority while preserving one accountable owner and exact authority boundaries. Present Flect as an adaptable local workplace today and a truthful future AgentOS front door; a bounded embedded browser or iframe may be an early future adapter, but AgentOS integration and arbitrary embedded-product control are not shipped. Keep the official Flect hero as the only workflow visual, preserve canonical handoff mechanics, validate the full site, update the existing PR, and do not merge."
+```
+
+Drive the pipeline until `checks-passed`, list every pipeline-authored fix, and leave PR #73 open for human review.
