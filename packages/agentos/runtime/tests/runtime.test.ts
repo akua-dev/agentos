@@ -473,7 +473,8 @@ describe("Mate runtime", () => {
   });
 
   test("gives a persistent checkout access to release-installed dependencies", async () => {
-    const releaseRoot = "/opt/agentos-test";
+    const releaseRoot = await mkdtemp(join(tmpdir(), "agentos-release-"));
+    temporaryDirectories.push(releaseRoot);
     const { env, state } = await createHarness([], {
       AGENTOS_RELEASE_ROOT: releaseRoot,
       NODE_PATH: "",
@@ -503,8 +504,11 @@ describe("Mate runtime", () => {
       if (child.exitCode !== null) {
         throw new Error(await new Response(child.stderr).text());
       }
-      return (await readCalls(state)).some(
-        (call) => call[0] === "agent" && call[1] === "start",
+      return (
+        (await Bun.file(join(state, "server-ready")).exists()) &&
+        (await readCalls(state)).some(
+          (call) => call[0] === "agent" && call[1] === "start",
+        )
       );
     });
     child.kill("SIGTERM");
