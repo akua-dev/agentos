@@ -144,8 +144,19 @@ describe("Second Mate Kubernetes base", () => {
     const container = pod.containers.find(
       ({ name }: { name: string }) => name === "agentos",
     );
+    const prepare = pod.initContainers.find(
+      ({ name }: { name: string }) => name === "prepare-home",
+    );
     const environment = Object.fromEntries(
       container.env.map(
+        ({ name, value, valueFrom }: Record<string, unknown>) => [
+          name,
+          value ?? valueFrom,
+        ],
+      ),
+    );
+    const prepareEnvironment = Object.fromEntries(
+      prepare.env.map(
         ({ name, value, valueFrom }: Record<string, unknown>) => [
           name,
           value ?? valueFrom,
@@ -162,8 +173,57 @@ describe("Second Mate Kubernetes base", () => {
     expect(environment.AI_GATEWAY_TOKEN).toEqual({
       secretKeyRef: { key: "token", name: "ai-gateway-client" },
     });
+    expect(environment.AGENTOS_PI_PROVIDER_MODE).toBe("ai-gateway");
+    expect(prepareEnvironment).toMatchObject({
+      AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
+      AI_GATEWAY_TOKEN: {
+        secretKeyRef: { key: "token", name: "ai-gateway-client" },
+      },
+      AI_GATEWAY_URL:
+        "http://ai-gateway.agentos.svc.cluster.local:8787",
+    });
+    expect(environment.AGENTOS_MODEL).toBeUndefined();
+    expect(environment.AGENTOS_THINKING).toBeUndefined();
+    expect(prepareEnvironment.AGENTOS_MODEL).toBeUndefined();
+    expect(prepareEnvironment.AGENTOS_THINKING).toBeUndefined();
     expect(pod.serviceAccountName).toBe("agentos-secondmate");
     expect(spec.volumeClaimTemplates[0].metadata.name).toBe("home");
+  });
+
+  test("renders an explicit one-rollout return to direct Pi auth", async () => {
+    const resources = await render(
+      join(kubernetes, "tests", "fixtures", "ai-gateway-direct-auth"),
+    );
+    const statefulSet = resource(resources, "StatefulSet");
+    const pod = statefulSet.spec!.template.spec;
+    const prepare = pod.initContainers.find(
+      ({ name }: { name: string }) => name === "prepare-home",
+    );
+    const runtimeContainer = pod.containers.find(
+      ({ name }: { name: string }) => name === "agentos",
+    );
+    const prepareEnvironment = Object.fromEntries(
+      prepare.env.map(({ name, value }: { name: string; value: string }) => [
+        name,
+        value,
+      ]),
+    );
+    const runtimeEnvironment = Object.fromEntries(
+      runtimeContainer.env.map(
+        ({ name, value }: { name: string; value: string }) => [name, value],
+      ),
+    );
+
+    expect(prepareEnvironment.AGENTOS_PI_PROVIDER_MODE).toBe("direct");
+    expect(prepareEnvironment.AI_GATEWAY_URL).toBeUndefined();
+    expect(prepareEnvironment.AI_GATEWAY_TOKEN).toBeUndefined();
+    expect(prepareEnvironment.AGENTOS_MODEL).toBeUndefined();
+    expect(runtimeEnvironment.AGENTOS_PI_PROVIDER_MODE).toBeUndefined();
+    expect(runtimeEnvironment.AI_GATEWAY_URL).toBeUndefined();
+    expect(runtimeEnvironment.AI_GATEWAY_TOKEN).toBeUndefined();
+    expect(statefulSet.spec!.template.metadata.labels).not.toHaveProperty(
+      "agentos.akua.dev/ai-gateway-client",
+    );
   });
 
   test("renders the same persistent Mate base into isolated domain namespaces", async () => {

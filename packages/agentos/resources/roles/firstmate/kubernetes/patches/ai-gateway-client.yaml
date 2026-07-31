@@ -8,9 +8,23 @@ spec:
       labels:
         agentos.akua.dev/ai-gateway-client: "true"
     spec:
+      initContainers:
+        - name: prepare-home
+          env:
+            - name: AGENTOS_PI_PROVIDER_MODE
+              value: ai-gateway
+            - name: AI_GATEWAY_URL
+              value: http://ai-gateway.agentos.svc.cluster.local:8787
+            - name: AI_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ai-gateway-client
+                  key: token
       containers:
         - name: agentos
           env:
+            - name: AGENTOS_PI_PROVIDER_MODE
+              value: ai-gateway
             - name: AI_GATEWAY_URL
               value: http://ai-gateway.agentos.svc.cluster.local:8787
             - name: AI_GATEWAY_TOKEN
