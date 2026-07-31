@@ -82,6 +82,7 @@ describe("installed default distribution discovery", () => {
     expect(commands).toContain("memory");
     expect(commands).toContain("skill:agentos-supervision");
     expect(commands).toContain("skill:agentos-observability");
+    expect(commands).toContain("skill:agentos-secrets");
     expect(commands).toContain("skill:agentos-bootstrap");
     expect(commands).toContain("skill:agentos-upgrade");
   });
@@ -92,6 +93,7 @@ describe("installed default distribution discovery", () => {
     expect(commands).toContain("memory");
     expect(commands).toContain("skill:agentos-supervision");
     expect(commands).toContain("skill:agentos-observability");
+    expect(commands).toContain("skill:agentos-secrets");
     expect(commands).toContain("skill:agentos-upgrade");
     expect(commands).not.toContain("skill:agentos-bootstrap");
     expect(commands).not.toContain("skill:agentos-secondmates");

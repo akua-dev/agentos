@@ -131,4 +131,5 @@ spec:
       volumes:
         - name: database-credentials
           secret:
+            defaultMode: 0440
             secretName: agentos-crewmate-postgres
