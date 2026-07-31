@@ -16,109 +16,46 @@ canonical:
     path: ARCHITECTURE.md
 ---
 
-## Give First Mate a boundary, not a graph
+## Give the outcome, not the workflow
 
-Use the real outcome from the previous chapter. State what should become true, the evidence that
-will prove it, the repository or operational boundary and the authority that remains yours. Leave
-the internal Agent choreography open.
+Use the outcome from the previous chapter. Tell First Mate what should become true, what evidence
+will prove it and which decisions still belong to you.
 
-Keep that boundary exact as the Fleet learns more. Do not prescribe worker count, implementation
-steps or a merge decision that remains outside the accepted authority.
+Do not choose the worker count or prescribe every implementation step. First Mate will inspect the
+current project, tracker and Fleet before deciding what work is honest to accept.
 
-You supplied the acceptance boundary and excluded authority. You did not decide in advance how
-many workers exist, which implementation path will be necessary or which evidence will reveal the
-cause.
+## Let First Mate choose the next honest state
 
-## Watch current reality shape the work
+Current evidence leads to one of four simple states:
 
-First Mate reads the project instructions, tracker and current delivery posture before it accepts
-or routes work. The evidence may make one ship Assignment immediately honest. It may instead show
-that the organization needs one bounded fact, one human choice or another outcome first.
+- **Assignment:** the work is ready and one Agent owns returning the evidence.
+- **Scout:** one bounded question needs evidence before implementation is honest.
+- **Captain decision:** a consequential choice belongs to you.
+- **dependency:** another outcome must finish first.
 
-The original intent should remain recognizable while the route changes. AgentOS is preserving an
-outcome, not executing a frozen graph.
+The route can change as the Fleet learns. The outcome and your authority boundary do not.
 
-## Distinguish four honest outcomes
+## One real example
 
-Look for the smallest truthful next state:
+In one authorized Fleet, a Captain asked First Mate for an evidence-backed long-range company
+strategy. First Mate began with two Scouts: one for the private company baseline and one for the
+public market landscape.
 
-1. **Assignment:** the work is actionable and one Agent owns returning the accepted evidence.
-2. **Scout:** one bounded uncertainty needs investigation before ship work is honest.
-3. **Captain decision:** a consequential choice exceeds the delegated authority and comes back to
-   you with its complete options.
-4. **Dependency:** another distinct outcome must land before this one can proceed.
+The public Scout returned ranked openings, confidence and evidence that could disprove each one.
+It did not make the final company choice because customer, pipeline, product-usage, cost, channel
+and capability evidence remained outside its authority. First Mate made those missing inputs
+explicit instead of hiding them behind a confident recommendation.
 
-A Scout is not a second implementation worker racing the owner. A dependency is not a vague
-“blocked” label. Each state says what evidence or decision can change it.
-
-## Observed in a real Fleet
-
-The snapshots below are faithfully shortened from records in one authorized Fleet observed on
-31 July 2026. Identifying details were replaced, while the ownership, authority boundaries and
-measured results were preserved. They are separate observed outcomes, not a composite story.
-
-### Turn an ambitious strategy into honest evidence
-
-One Captain outcome asked the Fleet to chart an evidence-backed long-range company strategy. The
-resulting graph held **15 durable Tasks**: 2 completed, 2 active, 3 blocked and 8 waiting on
-dependencies. First Mate chose the smallest honest initial split: one Scout for the private
-company baseline and one for the public market landscape.
-
-The public Scout returned a 43,638-character report grounded in **57 public sources**. It ranked
-candidate openings, attached confidence to each and named evidence that would falsify them. It
-also refused to make the final company-specific choice: customer, pipeline, product-usage, cost,
-channel and capability evidence remained outside its authorized evidence boundary. Instead of
-hiding that gap behind a confident recommendation, the Fleet made the missing inputs durable.
-
-### Repair, prove and roll out a production path
-
-Two linked Tasks kept implementation proof separate from production authority:
-
-1. **AI Gateway repair Task.** The owner added bounded, privacy-safe stream-failure telemetry and prevented
-   cancellation or cleanup from masking the provider outcome. An authenticated long-stream test
-   then reproduced 384 SSE events and 798,994 bytes byte for byte.
-2. **Separately authorized release/rollout Task.** A separate owner, with its own Captain authorization,
-   published an immutable release and replaced only the Gateway, preserving its durable storage,
-   routing state and active Agent identities. A corrected production request completed with 2,480,890
-   bytes across 7,003 chunks and **8,721 SSE events**.
-   One persistent Mate then completed a canary in its existing native session. The
-   broader rollout remained separately gated.
-
-### Upgrade persistent workers without erasing the company
-
-Another outcome upgraded **five persistent Mates** serially. Each replacement retained its Agent
-identity, storage, native session, active Tasks and Assignments, private memory and child-workload
-boundary. The operator replaced one Mate at a time and would stop at the first unverified
-boundary. All five reached the reviewed release and reported evidence upward; credentials,
-charters, ownership and unrelated external systems stayed untouched.
-
-> **The useful non-event.** One accepted outcome asked for an approved CLI in the default Mate
-> image. Inspection proved that an equivalent reviewed change was already in the published
-> release, so coordination closed with no implementation and **no competing pull request**. Live
-> rollout remained a separate Captain-gated outcome.
-
-Together, these outcomes show the company loop: decide where to go, repair and ship the product,
-operate persistent workers safely and avoid work that current evidence has made unnecessary.
+The Captain supplied the outcome and boundary. Evidence revealed the next work.
 
 ## Check what became durable
 
-A Task can preserve deliberate backlog, but a Task without an Assignment is not accepted
-asynchronous work. Once execution is accepted, exactly one active Assignment names the accountable
-owner.
+Before moving on, verify three things:
 
-New evidence may justify another Task, but only for a genuinely distinct outcome the organization
-should preserve. Routine tool calls, implementation steps and raw reasoning stay in their native
-session instead of becoming a shadow planning tree.
+1. The original outcome is still recognizable.
+2. Accepted work has exactly one Assignment owner.
+3. Every Scout, Captain decision or dependency says what evidence or decision can resolve it.
 
-Inspect the accepted Task, its active Assignment, any Scout, decision or dependency, and the native
-artifact that will prove delivery. Activity alone is not evidence.
-
-## Know what good looks like
-
-You can still identify the original outcome and authority boundary. Accepted work has one owner.
-Uncertainty is explicit rather than hidden behind confident status. Every claim points to the
-system that can prove it, and merge still belongs to you.
-
-That is progressive planning: current evidence can change the route without losing intent,
-responsibility or human control. Next, [watch and steer the
+For deeper production evidence, see [Progressive planning in
+practice](/docs/concepts/progressive-planning-in-practice). Next, [watch and steer the
 work](/learn/01-first-outcome/watch-and-steer) when a new fact makes an assumption stale.

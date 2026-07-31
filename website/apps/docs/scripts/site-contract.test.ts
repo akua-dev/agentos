@@ -10,7 +10,8 @@ const renderedRoutePaths = [
   '/docs/does-not-exist',
   '/learn/does-not-exist',
 ] as const;
-const realFleetEvidencePath = '/learn/01-first-outcome/let-plan-emerge';
+const realFleetEvidencePath = '/docs/concepts/progressive-planning-in-practice';
+const simplifiedTutorialPath = '/learn/01-first-outcome/let-plan-emerge';
 
 async function findAvailablePort(): Promise<number> {
   const server = createServer();
@@ -126,7 +127,7 @@ describe('auditSite', () => {
 
   it('defines the complete Landing, Docs, Learn, discovery, and removal contract', () => {
     const paths = routeExpectations.map((expectation) => expectation.path);
-    expect(paths).toHaveLength(93);
+    expect(paths).toHaveLength(94);
     expect(paths).toContain('/favicon.ico');
     expect(paths).toContain('/icon.png');
     expect(paths).toContain('/apple-icon.png');
@@ -231,6 +232,23 @@ describe('rendered site contract', () => {
       ...expectation,
       includes: expectation.includes.filter(
         (required) => required !== `https://agentos.akua.dev${realFleetEvidencePath}`,
+      ),
+    }));
+    const result = await auditSite(siteBaseUrl, renderedExpectations);
+
+    expect(result).toEqual({ checked: 1, failures: [] });
+  }, 120_000);
+
+  it('renders the simplified progressive-planning tutorial', async () => {
+    const expectations = routeExpectations.filter(
+      (expectation) => expectation.path === simplifiedTutorialPath,
+    );
+
+    expect(expectations).toHaveLength(1);
+    const renderedExpectations = expectations.map((expectation) => ({
+      ...expectation,
+      includes: expectation.includes.filter(
+        (required) => required !== `https://agentos.akua.dev${simplifiedTutorialPath}`,
       ),
     }));
     const result = await auditSite(siteBaseUrl, renderedExpectations);
