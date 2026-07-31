@@ -116,8 +116,33 @@ export const routeExpectations: readonly RouteExpectation[] = [
         route.title,
         'Canonical sources',
         `${productionOrigin}${route.path}`,
+        ...(route.path === '/docs/concepts/progressive-planning-in-practice'
+          ? [
+              'Observed in a real Fleet',
+              '15 durable Tasks',
+              '57 public sources',
+              'AI Gateway repair Task',
+              'Separately authorized release/rollout Task',
+              '8,721 SSE events',
+              'five persistent Mates',
+              'no competing pull request',
+            ]
+          : []),
       ],
-      excludes: ['Fumadocs'],
+      excludes: [
+        'Fumadocs',
+        ...(route.path === '/docs/concepts/progressive-planning-in-practice'
+          ? [
+              'Wayfinder',
+              '$1B',
+              'PR #49',
+              'v0.1.14',
+              'v0.1.15',
+              'openai-codex',
+              '/home/agent',
+            ]
+          : []),
+      ],
     }),
   ),
   ...learningRoutes.map(
@@ -128,8 +153,39 @@ export const routeExpectations: readonly RouteExpectation[] = [
         route.title,
         'Canonical sources',
         `${productionOrigin}${route.path}`,
+        ...(route.path === '/learn/01-first-outcome/let-plan-emerge'
+          ? [
+              'Give the outcome, not the workflow',
+              'Assignment',
+              'Scout',
+              'Captain decision',
+              'dependency',
+              'One real example',
+              'Check what became durable',
+            ]
+          : []),
       ],
-      excludes: ['Fumadocs'],
+      excludes: [
+        'Fumadocs',
+        ...(route.path === '/learn/01-first-outcome/let-plan-emerge'
+          ? [
+              'Wayfinder',
+              '$1B',
+              'PR #49',
+              'v0.1.14',
+              'v0.1.15',
+              'openai-codex',
+              '/home/agent',
+              '15 durable Tasks',
+              '43,638-character',
+              '57 public sources',
+              'AI Gateway repair Task',
+              '8,721 SSE events',
+              'five persistent Mates',
+              'no competing pull request',
+            ]
+          : []),
+      ],
     }),
   ),
   {
