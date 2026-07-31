@@ -206,10 +206,23 @@ describe("Second Mate Kubernetes base", () => {
         "agentos.akua.dev/managed-by": "agentos-firstmate",
         "agentos.akua.dev/owner-agent-id": fixture.ownerAgentId,
         "pod-security.kubernetes.io/audit": "restricted",
+        "pod-security.kubernetes.io/audit-version": "v1.35",
         "pod-security.kubernetes.io/enforce": "restricted",
-        "pod-security.kubernetes.io/enforce-version": "latest",
+        "pod-security.kubernetes.io/enforce-version": "v1.35",
         "pod-security.kubernetes.io/warn": "restricted",
+        "pod-security.kubernetes.io/warn-version": "v1.35",
       });
+      const statefulSet = namedResource(
+        fixture.resources,
+        "StatefulSet",
+        "agentos-secondmate",
+      );
+      const environment = Object.fromEntries(
+        statefulSet.spec?.template.spec.containers[0].env.map(
+          ({ name, value }: { name: string; value: string }) => [name, value],
+        ),
+      );
+      expect(environment.AGENTOS_AGENT_ID).toBe(fixture.ownerAgentId);
     }
 
     const workloadIdentities = rendered.map(({ namespace, resources }) => {

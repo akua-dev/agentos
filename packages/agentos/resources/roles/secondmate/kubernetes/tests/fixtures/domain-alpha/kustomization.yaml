@@ -24,3 +24,18 @@ patches:
       - op: replace
         path: /subjects/0/namespace
         value: agentos-domain-alpha
+  - target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: agentos-secondmate
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/initContainers/0/env/2/value
+        value: 00000000-0000-4000-8000-00000000000a
+      - op: replace
+        path: /spec/template/spec/initContainers/1/env/2/value
+        value: 00000000-0000-4000-8000-00000000000a
+      - op: replace
+        path: /spec/template/spec/containers/0/env/2/value
+        value: 00000000-0000-4000-8000-00000000000a
