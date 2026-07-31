@@ -133,6 +133,8 @@ export const routeExpectations: readonly RouteExpectation[] = [
               'Observed in a real Fleet',
               '15 durable Tasks',
               '57 public sources',
+              'AI Gateway repair Task',
+              'Separately authorized release/rollout Task',
               '8,721 SSE events',
               'five persistent Mates',
               'no competing pull request',

@@ -74,12 +74,13 @@ hiding that gap behind a confident recommendation, the Fleet made the missing in
 
 Two linked Tasks kept implementation proof separate from production authority:
 
-1. **Repair Task.** The owner added bounded, privacy-safe stream-failure telemetry and prevented
+1. **AI Gateway repair Task.** The owner added bounded, privacy-safe stream-failure telemetry and prevented
    cancellation or cleanup from masking the provider outcome. An authenticated long-stream test
    then reproduced 384 SSE events and 798,994 bytes byte for byte.
-2. **Release and rollout Task.** A separate owner published an immutable release and replaced only
-   the Gateway, preserving its durable storage, routing state and active Agent identities. A
-   corrected production request completed with 2,480,890 bytes across 7,003 chunks and **8,721 SSE events**.
+2. **Separately authorized release/rollout Task.** A separate owner, with its own Captain authorization,
+   published an immutable release and replaced only the Gateway, preserving its durable storage,
+   routing state and active Agent identities. A corrected production request completed with 2,480,890
+   bytes across 7,003 chunks and **8,721 SSE events**.
    One persistent Mate then completed a canary in its existing native session. The
    broader rollout remained separately gated.
 
