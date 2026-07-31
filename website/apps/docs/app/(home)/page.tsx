@@ -272,6 +272,84 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
 
         <Progression />
 
+        <section
+          aria-labelledby="progressive-planning-heading"
+          className={cn(cardVariants({ variant: 'secondary' }), 'col-span-full overflow-hidden p-0')}
+        >
+          <div className="grid gap-px bg-brand-secondary-foreground/15 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            <div className="bg-brand-secondary p-6 md:p-9">
+              <p className="mb-4 font-mono text-xs font-medium tracking-wide uppercase opacity-75">
+                Outcome first
+              </p>
+              <h2
+                id="progressive-planning-heading"
+                className={cn(headingVariants({ variant: 'h2' }), 'mb-5 max-w-[16ch]')}
+              >
+                The plan emerges from evidence.
+              </h2>
+              <p className="mb-8 max-w-[58ch] text-base leading-7">
+                You define what should become true, how it will be proven and where authority
+                stops. First Mate reads current reality, makes only actionable work durable and
+                returns the decisions that still belong to you.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/docs/concepts/progressive-planning"
+                  className={buttonVariants()}
+                >
+                  Understand progressive planning
+                </Link>
+                <Link
+                  href="/learn/01-first-outcome/let-plan-emerge"
+                  className={buttonVariants({ variant: 'secondary' })}
+                >
+                  Try it with a real outcome
+                </Link>
+              </div>
+            </div>
+
+            <div className="bg-brand-secondary p-4 md:p-7">
+              <StaticCodeBlock
+                lang="text"
+                code={`human outcome + authority
+  → inspect current reality
+      ├─ actionable → Assignment
+      ├─ uncertain  → Scout
+      ├─ consequential → Captain decision
+      └─ prerequisite → dependency
+  → evidence
+  → next distinct outcome`}
+                codeblock={{ title: 'The route stays honest' }}
+              />
+            </div>
+          </div>
+
+          <div className="grid border-t border-brand-secondary-foreground/15 lg:grid-cols-2">
+            <article className="border-b border-brand-secondary-foreground/15 p-6 lg:border-r lg:border-b-0 md:p-8">
+              <p className="mb-3 font-mono text-xs tracking-wide uppercase opacity-70">
+                Predeclared workflow
+              </p>
+              <h3 className={cn(headingVariants({ variant: 'h3' }), 'mb-4')}>
+                The human maintains the graph.
+              </h3>
+              <p className="leading-7">
+                Expected steps become nodes. Unexpected work escapes the model, orchestration owns
+                a shadow of state and the human watches execution.
+              </p>
+            </article>
+            <article className="p-6 md:p-8">
+              <p className="mb-3 font-mono text-xs tracking-wide uppercase opacity-70">AgentOS</p>
+              <h3 className={cn(headingVariants({ variant: 'h3' }), 'mb-4')}>
+                The organization maintains responsibility.
+              </h3>
+              <p className="leading-7">
+                Agents reason from authoritative reality. New evidence can become owned work while
+                native systems keep the facts and people keep consequential authority.
+              </p>
+            </article>
+          </div>
+        </section>
+
         <h2
           className={cn(
             headingVariants({ variant: 'h2' }),
