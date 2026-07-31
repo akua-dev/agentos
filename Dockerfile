@@ -110,6 +110,7 @@ COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
 COPY services/otel-collector/package.json services/otel-collector/package.json
+COPY website/apps/docs/package.json website/apps/docs/package.json
 COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
 COPY clis/pg-listen/pg-listen.ts clis/pg-listen/pg-listen.ts
 
@@ -136,6 +137,8 @@ COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY services/otel-collector/package.json services/otel-collector/package.json
+COPY website/apps/docs/package.json website/apps/docs/package.json
 COPY packages/agentos/tsconfig.build.json packages/agentos/tsconfig.build.json
 COPY packages/agentos/build.ts packages/agentos/build.ts
 COPY packages/agentos/src packages/agentos/src
