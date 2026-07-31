@@ -16,6 +16,15 @@ vi.mock('@/app/(home)/page.client', () => ({
   Writing: () => null,
 }));
 
+vi.mock('@/app/(home)/flect-workplace', () => ({
+  FlectWorkplace: () => (
+    <section>
+      <a href="/docs/concepts/human-work-surfaces">Design a human work surface</a>
+      <a href="https://github.com/akua-dev/flect">Explore Flect</a>
+    </section>
+  ),
+}));
+
 afterEach(() => {
   cleanup();
 });
@@ -31,6 +40,23 @@ describe('landing page', () => {
       '/learn',
       '/learn',
     ]);
+  });
+
+  it('routes local work and adaptive workplaces to their canonical guides', () => {
+    render(<Page />);
+
+    expect(
+      screen.getByRole('link', { name: 'Hand off local work' }).getAttribute('href'),
+    ).toBe('/learn/01-first-outcome/hand-off-local-work');
+    expect(
+      screen.getByRole('link', { name: 'Use the handoff guide' }).getAttribute('href'),
+    ).toBe('/docs/operate/continue-local-work');
+    expect(
+      screen.getByRole('link', { name: 'Design a human work surface' }).getAttribute('href'),
+    ).toBe('/docs/concepts/human-work-surfaces');
+    expect(screen.getByRole('link', { name: 'Explore Flect' }).getAttribute('href')).toBe(
+      'https://github.com/akua-dev/flect',
+    );
   });
 
   it('renders the canonical AgentOS structured-data graph', () => {

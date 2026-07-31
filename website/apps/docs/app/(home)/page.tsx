@@ -20,6 +20,7 @@ import {
   serializeStructuredData,
 } from '@/lib/structured-data';
 import { Marquee } from '@/app/(home)/marquee';
+import { FlectWorkplace } from './flect-workplace';
 import { AgnosticBackground, CreateAppAnimation, Hero, Writing } from './page.client';
 
 const headingVariants = cva('font-medium tracking-tight text-balance', {
@@ -168,6 +169,59 @@ Help me bring AgentOS online — check my setup first, ask before changing anyth
             </div>
           </div>
         </section>
+
+        <section className="col-span-full overflow-hidden rounded-2xl bg-brand-secondary text-brand-secondary-foreground">
+          <div className="grid lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="p-7 md:p-10 lg:p-12">
+              <p className="mb-4 font-medium">The local agent you already use is a starting point.</p>
+              <h2 className="max-w-[18ch] text-3xl leading-[1.04] font-medium tracking-[-0.03em] text-balance md:text-5xl">
+                Start where you think fastest. Hand off when the outcome matters.
+              </h2>
+              <p className="mt-6 max-w-[60ch] text-pretty">
+                Plan, prototype, diagnose or partially implement locally. Package the desired
+                result and durable evidence, then let First Mate turn accepted intent into owned,
+                accountable Fleet work.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href="/learn/01-first-outcome/hand-off-local-work"
+                  className={buttonVariants()}
+                >
+                  Hand off local work
+                </Link>
+                <Link
+                  href="/docs/operate/continue-local-work"
+                  className={buttonVariants({ variant: 'secondary' })}
+                >
+                  Use the handoff guide
+                </Link>
+              </div>
+            </div>
+            <div className="grid border-t border-brand-secondary-foreground/20 bg-brand-secondary-foreground/7 lg:border-t-0 lg:border-l">
+              {[
+                ['Local evidence', 'A plan, diagnosis, branch, patch or reviewed prototype.'],
+                ['Bounded handoff', 'Outcome, evidence, constraints and exact authority boundary.'],
+                ['Accountable Fleet work', 'A Task and one active Assignment after acceptance.'],
+                ['Reviewed result', 'Delivery evidence returns for your next decision or iteration.'],
+              ].map(([title, detail], index) => (
+                <div
+                  key={title}
+                  className="grid grid-cols-[2rem_1fr] gap-4 border-b border-brand-secondary-foreground/20 p-6 last:border-b-0 md:p-7"
+                >
+                  <span className="grid size-8 place-items-center rounded-full bg-brand-secondary-foreground text-xs font-semibold text-brand-secondary">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <h3 className="font-medium">{title}</h3>
+                    <p className="mt-1 text-sm opacity-80">{detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <FlectWorkplace />
 
         <section className={cn(cardVariants(), 'flex flex-col justify-between')}>
           <div>

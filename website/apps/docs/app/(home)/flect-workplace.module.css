@@ -1,0 +1,568 @@
+.story {
+  --flect-void: oklch(0.095 0 0);
+  --flect-canvas: oklch(0.125 0.004 340);
+  --flect-surface: oklch(0.165 0.006 340);
+  --flect-raised: oklch(0.205 0.008 340);
+  --flect-ink: oklch(0.955 0.006 340);
+  --flect-muted: oklch(0.69 0.012 340);
+  --flect-line: oklch(0.3 0.01 340);
+  --flect-rose: oklch(0.63 0.18 340);
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--flect-void);
+  color: var(--flect-ink);
+  padding: clamp(1.5rem, 4vw, 4rem);
+}
+
+.story::before {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 82% 12%, oklch(0.63 0.18 340 / 0.13), transparent 24%),
+    radial-gradient(circle at 18% 85%, oklch(0.46 0.09 250 / 0.12), transparent 28%);
+  content: '';
+  pointer-events: none;
+}
+
+.storyHeader,
+.scenarioControls,
+.workspace,
+.handoff,
+.storyLinks {
+  position: relative;
+}
+
+.storyHeader {
+  display: grid;
+  align-items: start;
+  gap: 1.5rem;
+}
+
+.conceptLabel {
+  width: fit-content;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--flect-line);
+  border-radius: 999px;
+  background: var(--flect-surface);
+  padding: 0.45rem 0.75rem;
+  color: var(--flect-muted);
+  font-size: 0.75rem;
+  font-weight: 560;
+}
+
+.storyHeader h2 {
+  max-width: 14ch;
+  font-size: clamp(2.2rem, 5.5vw, 5.25rem);
+  font-weight: 590;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.introduction {
+  max-width: 60ch;
+  margin-top: 1.4rem;
+  color: var(--flect-muted);
+  font-size: clamp(1rem, 1.4vw, 1.15rem);
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.previewStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: fit-content;
+  color: var(--flect-muted);
+  font-size: 0.8rem;
+}
+
+.statusDot,
+.signal span {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--flect-rose);
+}
+
+.statusDot {
+  animation: signal-breathes 2.8s ease-in-out infinite;
+}
+
+.scenarioControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: clamp(2.5rem, 5vw, 4.5rem);
+}
+
+.scenarioControls button {
+  border-radius: 8px;
+  background: var(--flect-surface);
+  padding: 0.65rem 0.9rem;
+  color: var(--flect-muted);
+  font-size: 0.8rem;
+  font-weight: 560;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.scenarioControls button:hover {
+  background: var(--flect-raised);
+  color: var(--flect-ink);
+}
+
+.scenarioControls button[aria-pressed='true'] {
+  background: var(--flect-ink);
+  color: var(--flect-void);
+}
+
+.scenarioControls button:focus-visible,
+.storyLinks a:focus-visible {
+  outline: 2px solid var(--flect-rose);
+  outline-offset: 3px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.72fr) minmax(340px, 1.5fr) minmax(210px, 0.9fr);
+  min-height: 31rem;
+  margin-top: 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--flect-line);
+  border-radius: 12px;
+  background: var(--flect-canvas);
+}
+
+.attention,
+.panel,
+.agentRail {
+  min-width: 0;
+  padding: clamp(1rem, 2.2vw, 1.6rem);
+}
+
+.attention {
+  border-right: 1px solid var(--flect-line);
+  background: var(--flect-void);
+}
+
+.surfaceLabel {
+  color: var(--flect-muted);
+  font-size: 0.72rem;
+  font-weight: 560;
+}
+
+.queueSummary {
+  margin-top: 0.7rem;
+  color: var(--flect-ink);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.attention ol {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1.4rem;
+}
+
+.attention li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  border-radius: 8px;
+  padding: 0.7rem;
+  color: var(--flect-muted);
+}
+
+.attention li[data-active='true'] {
+  background: var(--flect-surface);
+  color: var(--flect-ink);
+}
+
+.attention li > span {
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.3rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+
+.attention li[data-active='true'] > span {
+  border-color: var(--flect-rose);
+  background: var(--flect-rose);
+}
+
+.attention strong,
+.attention small {
+  display: block;
+}
+
+.attention strong {
+  font-size: 0.75rem;
+  font-weight: 560;
+}
+
+.attention small {
+  margin-top: 0.2rem;
+  color: var(--flect-muted);
+  font-size: 0.66rem;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--flect-line);
+  animation: surface-arrives 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.panelHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.signal {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--flect-muted);
+  font-size: 0.68rem;
+  text-align: right;
+}
+
+.panel h3 {
+  max-width: 16ch;
+  margin-top: 2rem;
+  font-size: clamp(1.65rem, 3vw, 2.5rem);
+  font-weight: 590;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.summary {
+  max-width: 52ch;
+  margin-top: 0.9rem;
+  color: var(--flect-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.evidenceBlock {
+  margin-top: 2rem;
+}
+
+.evidenceBlock ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.evidenceBlock li {
+  min-height: 4rem;
+  border-radius: 8px;
+  background: var(--flect-surface);
+  padding: 0.75rem;
+  color: var(--flect-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.draft {
+  margin-top: auto;
+  border-radius: 12px;
+  background: var(--flect-raised);
+  padding: 1rem;
+}
+
+.draft > p:last-child {
+  margin-top: 0.55rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.agentRail {
+  display: flex;
+  flex-direction: column;
+  background: var(--flect-surface);
+}
+
+.agentIdentity {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.agentIdentity > span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--flect-rose);
+  color: var(--flect-ink);
+  font-weight: 650;
+}
+
+.agentIdentity strong,
+.agentIdentity small {
+  display: block;
+}
+
+.agentIdentity strong {
+  font-size: 0.8rem;
+}
+
+.agentIdentity small {
+  margin-top: 0.15rem;
+  color: var(--flect-muted);
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.agentRail > p {
+  margin-top: 1.6rem;
+  color: var(--flect-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.agentCapabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1rem;
+}
+
+.agentCapabilities span {
+  border-radius: 999px;
+  background: var(--flect-raised);
+  padding: 0.4rem 0.6rem;
+  color: var(--flect-ink);
+  font-size: 0.66rem;
+  font-weight: 560;
+}
+
+.authorityNote {
+  margin-top: auto !important;
+  border-top: 1px solid var(--flect-line);
+  padding-top: 1rem;
+  color: var(--flect-ink) !important;
+}
+
+.handoff {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--flect-line);
+  border-radius: 12px;
+  background: var(--flect-canvas);
+}
+
+.handoff::after {
+  position: absolute;
+  top: 50%;
+  left: 2%;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--flect-rose);
+  box-shadow: 0 0 8px var(--flect-rose);
+  content: '';
+  animation: handoff-travels 5.5s cubic-bezier(0.32, 0, 0.18, 1) infinite;
+}
+
+.handoff li {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 4.5rem;
+  border-right: 1px solid var(--flect-line);
+  padding: 0.85rem;
+  color: var(--flect-muted);
+  font-size: 0.72rem;
+}
+
+.handoff li:last-child {
+  border-right: 0;
+}
+
+.handoff li > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--flect-surface);
+  color: var(--flect-ink);
+  font-size: 0.64rem;
+}
+
+.storyLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.storyLinks a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--flect-ink);
+  font-size: 0.8rem;
+  font-weight: 560;
+}
+
+.storyLinks a:hover {
+  color: var(--flect-rose);
+}
+
+.storyLinks svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+@keyframes surface-arrives {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 12% 0);
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes signal-breathes {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes handoff-travels {
+  0%,
+  12% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+
+  22% {
+    opacity: 1;
+  }
+
+  78% {
+    opacity: 1;
+  }
+
+  88%,
+  100% {
+    opacity: 0;
+    transform: translateX(calc(96vw - 5rem));
+  }
+}
+
+@media (min-width: 900px) {
+  .storyHeader {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 1040px) {
+  .workspace {
+    grid-template-columns: 0.7fr 1.3fr;
+  }
+
+  .panel {
+    border-right: 0;
+  }
+
+  .agentRail {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--flect-line);
+  }
+}
+
+@media (max-width: 700px) {
+  .storyHeader h2 {
+    font-size: clamp(2.15rem, 12vw, 3.5rem);
+  }
+
+  .scenarioControls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .scenarioControls button {
+    text-align: left;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .attention {
+    display: none;
+  }
+
+  .panel {
+    min-height: 31rem;
+  }
+
+  .evidenceBlock ul {
+    grid-template-columns: 1fr;
+  }
+
+  .evidenceBlock li {
+    min-height: 0;
+  }
+
+  .handoff {
+    grid-template-columns: 1fr;
+  }
+
+  .handoff::after {
+    display: none;
+  }
+
+  .handoff li {
+    min-height: 3.25rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--flect-line);
+  }
+
+  .handoff li:last-child {
+    border-bottom: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .statusDot,
+  .handoff::after {
+    animation: none;
+  }
+
+  .scenarioControls button {
+    transition: none;
+  }
+}
