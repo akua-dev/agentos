@@ -70,6 +70,47 @@ async function copyProductionInstallInputs(destination: string) {
   );
 }
 
+async function declaredWorkspaceManifests() {
+  const rootPackage = JSON.parse(
+    await readFile(join(repository, "package.json"), "utf8"),
+  ) as { workspaces: string[] };
+  const manifests = new Set<string>();
+  for (const workspace of rootPackage.workspaces) {
+    const glob = new Bun.Glob(`${workspace}/package.json`);
+    for await (const manifest of glob.scan({
+      cwd: repository,
+      onlyFiles: true,
+    })) {
+      manifests.add(manifest);
+    }
+  }
+  return [...manifests].sort();
+}
+
+test("the Docker install stages include every Bun workspace manifest", async () => {
+  const dockerfile = await readFile(join(repository, "Dockerfile"), "utf8");
+  const manifests = await declaredWorkspaceManifests();
+
+  for (const stage of [
+    "agentos-runtime-dependencies",
+    "agentos-package-build",
+  ]) {
+    const start = dockerfile.indexOf(` AS ${stage}\n`);
+    expect(start, `Dockerfile stage ${stage} must exist`).toBeGreaterThanOrEqual(
+      0,
+    );
+    const nextStage = dockerfile.indexOf("\nFROM ", start + 1);
+    const contents = dockerfile.slice(
+      start,
+      nextStage === -1 ? undefined : nextStage,
+    );
+    const missing = manifests.filter(
+      (manifest) => !contents.includes(`COPY ${manifest} ${manifest}`),
+    );
+    expect(missing, `${stage} is missing workspace manifests`).toEqual([]);
+  }
+});
+
 test("the production image can prepare a persistent Mate home", async () => {
   const sandbox = await mkdtemp(join(tmpdir(), "agentos-production-runtime-"));
   temporaryDirectories.push(sandbox);
