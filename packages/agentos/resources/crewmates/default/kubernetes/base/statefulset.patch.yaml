@@ -57,7 +57,7 @@ spec:
             - name: AGENTOS_BRIEF_PATH
               value: /home/agent/brief.md
             - name: AGENTOS_DATABASE_URL
-              value: postgresql://runtime_crewmate@agentos-postgres-rw.agentos.svc:5432/agentos?sslmode=require
+              value: postgresql://runtime_crewmate@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos?sslmode=require
             - name: AGENTOS_PGPASS_SOURCE
               value: /var/run/secrets/agentos/pgpass
             - name: AGENTOS_TASK_ID

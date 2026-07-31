@@ -3,7 +3,11 @@ import { join } from "node:path";
 
 type Resource = {
   kind: string;
-  metadata: { labels?: Record<string, string>; name: string };
+  metadata: {
+    labels?: Record<string, string>;
+    name: string;
+    namespace?: string;
+  };
   spec?: Record<string, any>;
 };
 
@@ -48,6 +52,9 @@ describe("Second Mate Kubernetes base", () => {
       "ServiceAccount",
       "StatefulSet",
     ]);
+    expect(
+      resources.every(({ metadata }) => metadata.namespace === undefined),
+    ).toBe(true);
 
     const statefulSet = resource(resources, "StatefulSet");
     expect(statefulSet.metadata.name).toBe("agentos-secondmate");
@@ -87,6 +94,12 @@ describe("Second Mate Kubernetes base", () => {
       "/home/agent/projects/agentos/packages/agentos",
     );
     expect(environment.AGENTOS_AGENT_ROLE).toBe("second_mate");
+    expect(environment.AGENTOS_DATABASE_URL).toContain(
+      "@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos",
+    );
+    expect(environment.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+      "http://agentos-otel-collector.agentos.svc.cluster.local:4318",
+    );
     expect(environment.AGENTOS_MODEL).toBeUndefined();
     expect(environment.AGENTOS_THINKING).toBeUndefined();
     expect(container.args).toEqual(["run", "--skip-tools", "secondmate:run"]);

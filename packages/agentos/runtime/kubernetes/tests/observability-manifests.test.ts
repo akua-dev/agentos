@@ -112,7 +112,7 @@ describe("Fleet OTEL workload contract", () => {
       const env = environment(container.env ?? []);
       expect(env.OTEL_SERVICE_NAME?.value).toBe(workload.serviceName);
       expect(env.OTEL_EXPORTER_OTLP_ENDPOINT?.value).toBe(
-        "http://agentos-otel-collector:4318",
+        "http://agentos-otel-collector.agentos.svc.cluster.local:4318",
       );
       expect(env.OTEL_EXPORTER_OTLP_PROTOCOL?.value).toBe("http/protobuf");
       expect(env.OTEL_EXPORTER_OTLP_COMPRESSION?.value).toBe("gzip");
