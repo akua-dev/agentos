@@ -12,6 +12,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const repository = resolve(import.meta.dir, "../../../..");
 const temporaryDirectories: string[] = [];
@@ -211,4 +212,18 @@ test("the production image can prepare a persistent Mate home", async () => {
   expect(await readFile(join(home, "memory", "MEMORY.md"), "utf8")).toBe(
     "# Memory index\n",
   );
+
+  const extension = await run(
+    [
+      process.execPath,
+      "-e",
+      `await import(${JSON.stringify(
+        pathToFileURL(
+          join(distributionRoot, "extensions", "agentos.ts"),
+        ).href,
+      )})`,
+    ],
+    { cwd: roleDirectory, env },
+  );
+  expect(extension.exitCode, extension.stderr).toBe(0);
 }, 30_000);

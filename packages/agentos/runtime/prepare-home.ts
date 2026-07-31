@@ -5,12 +5,15 @@ import {
   chmod,
   copyFile,
   cp,
+  lstat,
   mkdir,
   mkdtemp,
+  readlink,
   readFile,
   rename,
   rm,
   stat,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import {
@@ -71,6 +74,7 @@ await Promise.all(
 if (usesPi) {
   await ensureAgentosCheckout();
   await ensureSelectedDistribution();
+  await reconcileDefaultDistributionRuntime();
 }
 if (usesPi) await createMateMemoryStore(home).ensureLayout();
 
@@ -269,6 +273,38 @@ async function ensureSelectedDistribution() {
   } finally {
     await rm(temporaryParent, { force: true, recursive: true });
   }
+}
+
+async function reconcileDefaultDistributionRuntime() {
+  const distribution = mateDistribution!;
+  const defaultDistribution = join(agentCheckout, "packages", "agentos");
+  if (distribution.distributionRoot !== defaultDistribution) return;
+
+  const releaseDist = join(
+    releaseRoot,
+    "packages",
+    "agentos",
+    "dist",
+  );
+  if (!(await exists(releaseDist))) {
+    throw new Error(
+      `The immutable AgentOS release is missing its compiled package at ${releaseDist}`,
+    );
+  }
+
+  const checkoutDist = join(distribution.distributionRoot, "dist");
+  try {
+    const current = await lstat(checkoutDist);
+    if (!current.isSymbolicLink()) return;
+    if ((await readlink(checkoutDist)) === releaseDist) return;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+
+  const next = `${checkoutDist}.agentos-next`;
+  await rm(next, { force: true, recursive: true });
+  await symlink(releaseDist, next, "dir");
+  await rename(next, checkoutDist);
 }
 
 async function copyReleaseRemotes() {
