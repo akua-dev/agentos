@@ -1,20 +1,30 @@
-# Local-agent handoff, adaptive work surfaces, and README funnel design
+# Work handoff, human responsibility routing, and adaptive work surfaces design
 
 ## Problem
 
 AgentOS explains persistent crews, accountable work, and durable delivery, but
-it does not yet make one common adoption moment obvious: someone starts with a
-local coding agent for fast planning, diagnosis, prototyping, or partial
-implementation, then wants AgentOS to take responsibility for finishing the
-outcome.
+it does not yet make one common adoption moment obvious: someone starts work
+wherever thinking is fastest, then wants the company to take responsibility for
+finishing, reviewing, testing, implementing, or delivering the outcome. That
+work may be interface design, backend architecture, research, diagnosis,
+implementation, quality assurance, or code review. A local coding Agent is one
+useful starting point, not the boundary of the workflow.
 
-The same gap appears at a larger scale inside a company. An employee may want
-an interface that has already assembled the decisions and context relevant to
-them, presents each decision in the most useful form, lets them review or
-revise a draft with a local built-in agent, and then sends their approved
-intent back to First Mate. AgentOS provides the durable organizational
-substrate for that workflow, but its public story does not yet show that its
-human work surfaces can be purpose-built, replaceable, and personal.
+The same gap appears at a larger scale inside a company. Work and decisions
+often need wisdom from several people: the person with customer context, the
+engineer who understands the constraint, the domain owner who can judge the
+risk, and the human role authorized to approve the consequence. A company
+should be able to configure AgentOS and its interfaces around those
+responsibility paths instead of forcing every question through one generic
+dashboard or treating visibility as authority.
+
+An employee may want an interface that has already assembled the work,
+decisions, and context relevant to them; presents each item in the form that
+makes it easiest to judge; lets them inspect a product, review evidence, or
+revise a draft with a local built-in Agent; and returns their contribution to
+the accountable company loop. AgentOS provides the durable organizational
+substrate for that direction, while Flect provides a concrete adaptable local
+workplace today. The AgentOS integration remains future work.
 
 The repository README also carries much of the product explanation itself.
 That makes it long, duplicates material the public website can explain better,
@@ -22,13 +32,19 @@ and weakens its job as an overview funnel.
 
 ## Goals
 
-- Make “start locally, finish with the Fleet” a recognizable AgentOS use case.
+- Make “start anywhere, hand off accountable follow-through” a recognizable
+  AgentOS use case.
+- Show that the handoff may carry any bounded product or company outcome,
+  including interface work, architecture, research, implementation, testing,
+  diagnosis, or review.
 - Teach a truthful handoff that works with current AgentOS surfaces.
 - Show the return loop: Fleet evidence comes back to the human, who can refine
   locally and hand off another bounded outcome.
 - Show how a custom or adaptive employee interface can prepare personalized
-  attention, context, drafts, and decision views while AgentOS remains the
-  accountable system beneath it.
+  work, attention, context, drafts, and decision views while AgentOS remains
+  the accountable system beneath it.
+- Explain the broader human loop: relevant people contribute context and
+  judgment, while the configured accountable role retains decision authority.
 - Present Flect as a concrete public developer preview of a general interface
   layer and as a natural first AgentOS dogfooding adopter, without claiming a
   shipped AgentOS integration or dependency.
@@ -44,6 +60,9 @@ and weakens its job as an overview funnel.
 - Implement or promise an AgentOS–Flect integration, make Flect an AgentOS
   dependency, or present the proposed AgentOS adopter experience as available
   today.
+- Claim that AgentOS currently discovers every relevant person, exposes a
+  first-class multi-person approval workflow, or that Flect currently controls
+  arbitrary embedded products, browsers, or iframes.
 - Make one UI, including Flect, the required AgentOS workplace.
 - Claim that AgentOS can import an arbitrary local transcript or working tree
   automatically.
@@ -60,7 +79,9 @@ and weakens its job as an overview funnel.
 Add `website/apps/docs/content/docs/operate/continue-local-work.mdx` as the
 single detailed user-facing guide. It owns:
 
-- when a local-to-Fleet handoff is useful;
+- when a local-to-Fleet handoff is useful across product and company work;
+- why the boundary is responsibility rather than activity, artifact type, or
+  which tool started the work;
 - the minimum handoff package: desired outcome, current evidence, durable
   artifact references, constraints, and authority boundary;
 - the current intake paths: give the package to First Mate directly, or let an
@@ -83,13 +104,18 @@ owns:
 
 - why people should be able to use a purpose-built interface without creating
   a second organizational authority;
-- the experience loop: AgentOS attention and context are selected for the
-  employee, the interface presents the decision appropriately, a local
-  built-in agent helps retrieve context or revise a draft, the human approves,
-  and the resulting intent returns through an approved AgentOS intake;
+- the experience loop: a configured responsibility path identifies the people
+  whose context, expertise, or authority matters; the interface presents the
+  work appropriately; a local built-in Agent helps inspect, retrieve, or
+  revise; contributors provide advice or approval within their role; and the
+  result returns through an approved AgentOS intake;
+- the distinction between contributing wisdom and granting authority: several
+  people may inform a decision, while the configured accountable human role
+  resolves the consequence;
 - the boundary between replaceable presentation/local working state and
   durable Tasks, Assignments, decisions, evidence, and authority;
-- examples ranging from a focused internal tool to an adaptive workplace;
+- examples ranging from UI and backend work to research, review, approvals,
+  and a focused internal tool or adaptive workplace;
 - Flect as a public developer preview of an agent-native interface layer that
   could surface AgentOS work while remaining useful beyond AgentOS.
 
@@ -100,20 +126,21 @@ operating pages instead of duplicating their contracts.
 ### Learn scenario
 
 Add a lesson after “Give the Fleet a real outcome” named “Hand off local work.”
-The lesson uses four short examples—planning, prototype, diagnosis, and partial
-implementation—to help readers recognize the moment. It keeps one concrete
-diagnosis example, but does not reproduce the reusable handoff checklist or
-acceptance procedure; it links those mechanics to the canonical operating
-guide.
+The lesson uses examples from interface shaping, backend architecture,
+prototyping, diagnosis, implementation, testing, and review to help readers
+recognize the moment. It keeps one concrete diagnosis example, but does not
+reproduce the reusable handoff checklist or acceptance procedure; it links
+those mechanics to the canonical operating guide.
 
 The lesson does not invent a universal command. It explains that a connected
 local agent may submit the bounded package through an approved durable intake,
 with the operating guide owning the package and acceptance mechanics.
 
-End the lesson with a short “beyond coding agents” callout: the same bounded
-handoff can originate in a custom employee workplace that prepares relevant
-decisions and context. Link to the canonical work-surface concept rather than
-teaching a second workflow in the lesson.
+End the lesson with a short “bring the company into the loop” callout: the same
+bounded handoff can originate in a custom employee workplace that prepares
+relevant work and seeks judgment from the appropriate people. Link to the
+canonical work-surface concept rather than teaching a second workflow in the
+lesson.
 
 ### Landing-page local handoff
 
@@ -125,9 +152,9 @@ from the Fleet:
 local exploration → bounded handoff → accountable Fleet work → evidence back
 ```
 
-The section names planning, prototyping, diagnosis, and partial implementation,
-and links to the Learn lesson and operating guide. It uses the existing AgentOS
-card, type, spacing, and button system.
+The section names UI work, backend architecture, implementation, diagnosis,
+testing, and code review, and links to the Learn lesson and operating guide. It
+uses the existing AgentOS card, type, spacing, and button system.
 
 ### Landing-page Flect story
 
@@ -140,11 +167,14 @@ or hotlink a runtime image.
 The section labels Flect as a public developer preview and AgentOS as a
 natural future dogfooding adopter. It explicitly says that the AgentOS × Flect
 workflow is a future direction, not a shipped integration, and that Flect works
-beyond AgentOS. The copy describes a future demonstration as showing
-personalized context and decisions, agent-assisted revision, explicit human
-approval, and bounded handoff to First Mate only after the integration is built
-and dogfooded. AgentOS remains the durable authority for accepted work,
-decisions, evidence and handoff.
+beyond AgentOS. The copy positions Flect as an adaptable front door to product
+and company work: shape a workspace locally today; eventually assemble the
+right context, let relevant people and the built-in Agent inspect or revise the
+work, and return approved intent to the Fleet. An early integration may present
+an approved existing product through a bounded embedded browser or iframe
+before deeper product adapters exist, but neither path is claimed as shipped.
+AgentOS remains the durable authority for accepted work, decisions, evidence,
+and handoff.
 
 Use semantic image alt text and links to Flect's repository/current preview and
 the canonical human-work-surfaces docs. The official hero is the section's
@@ -162,8 +192,8 @@ Refactor the README into a shorter sequence:
 1. Hero and product definition.
 2. The attention problem and AgentOS outcome.
 3. Get started.
-4. Start locally, finish with the Fleet.
-5. Bring your own workplace.
+4. Start anywhere, hand off accountable follow-through.
+5. Give the company an adaptable workplace.
 6. Public proof.
 7. How the company works.
 8. Ownership and architecture.
@@ -175,11 +205,11 @@ keeps only enough detail to establish the idea and earn the click. Detailed
 benchmarks, role explanations, adoption guidance, and architectural mechanics
 move behind their existing website routes.
 
-“Bring your own workplace” remains brief: it explains that an interface may
-personalize attention and presentation while AgentOS keeps durable authority,
-then links to the canonical work-surface concept. It may name Flect as a
-public developer-preview example and natural dogfooding adopter, not as a
-bundled AgentOS feature.
+The workplace section remains brief: it explains that an interface may
+personalize work, attention, and presentation; invite the people with relevant
+context or authority; and return their contribution while AgentOS keeps durable
+authority. It may name Flect as a public developer-preview example and natural
+dogfooding adopter, not as a bundled AgentOS feature.
 
 The target is at least a 30% reduction in README line count without removing
 the canonical bootstrap prompt, benchmark result headline, source repository
@@ -200,6 +230,13 @@ links, or license references.
 - A built-in interface agent can retrieve, explain, and revise within its
   granted capabilities. Human approval and AgentOS intake still govern
   consequential action.
+- Relevant contributors can provide context, critique, or recommendations
+  without becoming the accountable owner or granting authority they do not
+  hold. The configured Captain role or exact standing authorization remains the
+  decision boundary for consequences.
+- Flect works as a standalone/local interface shell today. AgentOS adapters and
+  arbitrary embedded-product control are future integration concepts, not
+  current capabilities.
 - The guide describes current capabilities and labels integrations as optional,
   not shipped universal intake.
 
