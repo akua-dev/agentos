@@ -10,10 +10,13 @@
 
 AgentOS must let a First Mate delegate broad domains to Second Mates, let each Second Mate create and supervise Crewmates without cross-domain RBAC failures, and keep the Fleet recoverable when identities, credentials, providers, Pods, sessions, storage, or streams fail.
 
-The approved design adds two connected programs to the existing resilience epic:
+The approved design adds four connected programs to the existing resilience epic:
 
 1. workload-identity provider access with reusable, dynamically managed authorization profiles; and
-2. an incremental migration of AgentOS-owned effectful TypeScript to Effect.
+2. an incremental migration of AgentOS-owned effectful TypeScript to Effect;
+3. eval-gated hybrid retrieval for private per-Mate memory; and
+4. privacy-preserving operational observability across delegation, memory,
+   provider access, cost, and recovery.
 
 The existing namespace, readiness, credential-safety, operation-journal, supervision, observability, and failure-conformance work remains part of the program.
 
@@ -70,14 +73,14 @@ AgentOS will use an explicit provider-access plane. It is not a transparent prox
 Mate Pod
   | projected short-lived ServiceAccount JWT (dedicated audience)
   v
-agentgateway explicit provider route
+agentgateway policy-enforcement route
   | ext-auth request
   v
 AgentOS Effect authorizer
   | TokenReview + ServiceAccount UID + Pod/Mate/Assignment resolution
   | OpenFGA capability check
   v
-provider adapter / backend credential policy
+provider-scoped credential-delivery adapter
   | provider-specific Secret mounted only here
   v
 upstream API
@@ -87,9 +90,68 @@ Normal outbound Internet remains available to Agents. AgentOS will not set a uni
 
 Agentgateway standalone is the recommended data plane because it supports generic HTTP/gRPC routes, CEL and external authorization, multiple backend credential mechanisms, OAuth token exchange, and dynamic configuration. The initial integration pins a tested release and does not install its Kubernetes controller or CRDs.
 
+The access plane separates three responsibilities:
+
+- agentgateway is the policy-enforcement point and never decides AgentOS
+  hierarchy or Assignment semantics;
+- the Effect authorizer plus OpenFGA is the policy-decision point and never
+  receives an upstream credential; and
+- each provider-scoped adapter is a credential-delivery point that injects
+  only that provider's credential after an allow decision.
+
+One gateway process must not become a vault containing a universal token or
+every provider's root credential. Providers that implement compatible OAuth
+token exchange may use agentgateway backend authentication directly. Providers
+such as GitHub that cannot exchange the projected Kubernetes identity use a
+narrow provider adapter. Compromise of one delivery adapter must not expose an
+unrelated provider credential.
+
 The existing AI Gateway remains responsible for AI-specific pooled quota, provider, and OAuth semantics during the migration. The first spike must prove whether agentgateway belongs in front of it, alongside it, or only in the generic provider path. It must not silently replace working AI Gateway behavior.
 
-Native GitHub tools are a special case. `git`, `gh`, and `gh-axi` need short-lived Assignment-scoped credentials or a provider-aware broker; a generic HTTPS proxy cannot safely inject authorization through CONNECT without TLS interception.
+Native GitHub tools are a special case. `git`, `gh`, and `gh-axi` use an
+internal GitHub-compatible endpoint plus a credential helper that reads the
+current projected ServiceAccount token. The endpoint validates that workload
+identity, authorizes the repository and operation, strips the AgentOS token,
+and injects a GitHub App installation token upstream. Provider tokens never
+return to the Mate. A generic HTTPS proxy cannot inspect methods and paths or
+inject authorization through CONNECT without TLS interception; `HTTP_PROXY`
+and `HTTPS_PROXY` therefore are not the GitHub credential solution.
+
+### Native OpenAI compaction
+
+AgentOS keeps its Pi session-lifecycle compaction extension. The extension
+already invokes OpenAI's native `/v1/responses/compact` or Codex compaction
+transport, validates the terminal response and opaque `encrypted_content`
+artifact, persists compatible replay state, and retains a portable Pi summary
+as fallback. Agentgateway routes and authenticates both `/responses` and
+`/responses/compact`; it does not take ownership of compaction triggering,
+persistence, model/provider compatibility, replay, or fallback.
+
+Agentgateway's announced `contextCompression` extension is a generic,
+request-local `/v1/compress` hook. Its message-rewrite contract does not return
+OpenAI's opaque compaction artifact to Pi for later session replay, and the
+feature was described as upcoming when this design was approved. It is not a
+replacement for the AgentOS extension. A later spike may benchmark it for
+stateless or non-Pi routes only. Adoption requires better end-to-end task
+success and total-session cost, not merely fewer tokens in one request.
+
+### Additional agentgateway capabilities
+
+The first access-plane release also evaluates:
+
+- per-Mate, per-Assignment, and per-profile request, token, and spend budgets;
+- surgical revocation and rate-class-zero kill switches that do not interrupt
+  unrelated Mates or ordinary Internet access;
+- MCP federation with profile-scoped tool catalogs and authorization on the
+  MCP tool plus bounded resource arguments; and
+- token and cost telemetry exported through the Fleet OpenTelemetry pipeline.
+
+Model routing remains pinned for a persistent session or Assignment. Silent
+per-turn semantic routing or cross-model failover can invalidate native
+compaction replay, prompt caching, and behavior expectations. It may be piloted
+later for disposable stateless Crewmates with task-success evals. Stateful
+behavioral guardrails may later consume the operation journal as
+defense-in-depth, but they do not replace OpenFGA capability checks.
 
 ### Workload identity
 
@@ -149,6 +211,91 @@ AgentOS keeps Kustomize for first-party Fleet manifests and overlays. A reposito
 
 Helm may be used as an upstream packaging mechanism for third-party dependencies when that is their supported installation path. AgentOS pins and tests those dependencies, then integrates their stable Services, configuration, identities, and policy through its existing Kustomize overlays. If the agentgateway and OpenFGA spike finds that rendered upstream charts are less reproducible than owned manifests, AgentOS will vendor or generate reviewed manifests instead. This is a hybrid packaging decision, not a Helm rewrite.
 
+## Private Mate memory retrieval
+
+The existing memory authority remains the typed Markdown topic set and concise
+`MEMORY.md` index on each persistent Mate's PVC. Memory remains private,
+fallible context and never proves identity, authority, approval, current state,
+or permission. Automatic extraction, Dream consolidation, pause, correction,
+forgetting, routed proposals, attachment limits, and the current LLM relevance
+selector remain valid behavior.
+
+The current selector sees the redacted human request, index, and bounded topic
+inventory, then spends a model call selecting up to five topic paths. This is a
+sound fallback but can miss a useful topic when its index hook or metadata is
+weak, and it adds provider latency and cost to recall. AgentOS will evaluate a
+rebuildable per-Mate hybrid retrieval cache:
+
+1. establish a fixed privacy-safe corpus and measure the current selector;
+2. add local lexical/BM25 retrieval over bounded topic chunks;
+3. evaluate optional local embeddings and vector similarity;
+4. combine lexical, semantic, metadata, and bounded recency signals with a
+   deterministic, versioned ranker; and
+5. retain the current selector as a fallback or measured reranker until the
+   replacement proves better.
+
+Markdown remains the only memory truth. Any lexical or vector index is a
+derivative cache on the owning Mate's PVC, carries source hashes and schema,
+chunker, model, and ranker versions, and can be deleted and rebuilt. It is not
+stored in PostgreSQL, shared across Mates, or treated as proof that a memory is
+current. A corrupt, stale, unavailable, or resource-constrained index degrades
+to the existing bounded recall path without blocking the main turn.
+
+Real memory content does not leave the Mate Pod for embedding by default. The
+initial vector evaluation uses a local model and synthetic or explicitly
+approved evaluation data. A remote embedding provider would be a separate,
+explicit provider-access capability and privacy decision, not an implicit
+consequence of enabling memory. Pause and forget must prevent recall
+immediately and remove or invalidate corresponding derivative chunks before
+the operation is acknowledged.
+
+The evaluation gate measures recall and precision at the configured attachment
+budget, downstream task success, added latency, provider calls, prompt and
+embedding cost, CPU and memory pressure, index size, rebuild time, corruption
+recovery, and forgetting correctness. AgentOS does not add mandatory semantic
+indexing unless the hybrid path materially beats the present selector without
+weakening privacy or recovery.
+
+## Full operational observability
+
+AgentOS extends its existing content-free OpenTelemetry contract and
+Fleet-local Collector rather than adopting agentgateway's request-log database
+as another authority. Full observability means that an operator can follow an
+operation across Mate, Assignment, memory lifecycle, authorizer, TokenReview,
+OpenFGA decision, agentgateway, credential adapter, MCP or HTTP operation, and
+provider outcome. It does not mean recording the Agent's private content.
+
+The versioned telemetry contract covers:
+
+- trace propagation and safe correlation across Fleet, Mate, Assignment, Pod,
+  native session, access profile version, route, and provider operation;
+- authorization allows and denials, revocation latency, policy version,
+  readiness, and dependency failures;
+- requests, tokens, cached tokens, cost, rate-limit state, budget consumption,
+  streaming, cancellation, retries, and provider outcomes;
+- memory extraction, Dream, selector/index method, candidate and attachment
+  counts, bounded bytes/tokens, latency, degradation reason, index freshness,
+  rebuilds, and forget invalidation; and
+- topology decisions, operation-journal recovery, retry exhaustion, and the
+  semantic readiness signals needed by dashboards, alerts, and runbooks.
+
+Dynamic identifiers and provider resources appear only in protected spans,
+correlated logs, or audit events. Metrics use bounded dimensions and never use
+Mate, Assignment, session, trace, request, profile name, repository, or
+provider-resource identifiers as labels. The instrumentation and Collector
+both reject prompts, system prompts, transcripts, memory bodies, request or
+response bodies, tool arguments or results, authorization headers, tokens,
+cookies, credentials, provider identities, and arbitrary exception bodies.
+
+Agentgateway exports native traces and metrics to the same Collector with the
+canonical workload identity added from validated claims. AgentOS uses the
+gateway's model-cost catalog where useful but exports the resulting bounded
+token and cost measures through OpenTelemetry. Agentgateway SQLite request
+logs, prompt logging, and content-bearing analytics remain disabled or outside
+the supported production posture. Telemetry stays asynchronous and fail-open;
+authorization and budget enforcement remain fail-closed independently of
+telemetry availability.
+
 ## Effect migration
 
 ### Target boundary
@@ -195,6 +342,13 @@ The access plane fails closed for credentialed provider routes but does not take
 - retries are bounded and preserve idempotency; and
 - logs, traces, and journals exclude tokens and request/response bodies by default.
 
+Memory retrieval fails open to the current bounded selector or index-only
+startup context. A missing, stale, corrupt, or incompatible derivative index
+never hides the authoritative Markdown topic set, blocks the main turn, or
+prevents an explicit correction or forget operation. Telemetry failure may
+drop diagnostic signals but cannot allow a denied provider operation, consume
+the gateway credential volume, or change workload readiness.
+
 The gateway, authorizer, and OpenFGA require readiness checks that prove useful semantics, not merely open ports. Their disruption and recovery paths join the existing disposable-Fleet failure-conformance matrix.
 
 ## Acceptance criteria
@@ -213,7 +367,42 @@ The gateway, authorizer, and OpenFGA require readiness checks that prove useful 
 - Assignment end, identity deletion, binding revocation, and ceiling reduction deny subsequent credentialed calls within a defined revocation SLO.
 - Upstream credentials never appear in Agent namespaces, responses, logs, traces, journals, or persisted gateway configuration.
 - Native AI and GitHub clients retain their meaningful provider errors and Assignment attribution.
+- Native OpenAI compaction remains replay-compatible across restarts and is not
+  replaced by request-local gateway compression.
+- Each provider credential is isolated to its delivery adapter; compromising
+  one adapter does not grant another provider's capability.
+- Per-Mate and per-Assignment kill switches and budgets deny only the intended
+  identity/profile and leave unrelated Mates and ordinary Internet working.
 - Ordinary Internet access continues when the credentialed access plane is unavailable.
+
+### Memory
+
+- A reproducible evaluation compares the current LLM selector, local lexical
+  retrieval, and optional local hybrid retrieval on identical bounded inputs.
+- The selected path improves retrieval quality or downstream task success
+  without regressing latency, cost, privacy, or Pod resource limits beyond its
+  declared budget.
+- Markdown topics remain authoritative and every derivative index can be
+  deleted and rebuilt from source files plus versioned configuration.
+- Pause and forget prevent stale lexical or vector hits immediately, including
+  after interruption or index corruption.
+- Cross-Mate memory retrieval and unapproved remote embedding are impossible.
+
+### Observability
+
+- One trace can correlate a Mate/Assignment operation with memory work,
+  authorization, gateway, adapter, MCP or HTTP operation, and provider outcome
+  without recording content.
+- Operators can distinguish identity, policy, credential, budget, rate-limit,
+  gateway, provider, stream, memory-index, compaction, and telemetry-pipeline
+  failures.
+- Token and cost measures are attributable through protected traces and
+  bounded aggregate metrics without turning dynamic IDs into metric labels.
+- Dashboards, alerts, and runbooks cover access denials, revocation SLO,
+  budget exhaustion, provider health, memory degradation, topology recovery,
+  and Collector/exporter health.
+- Automated privacy, cardinality, trace-continuity, restart, queue-exhaustion,
+  and content-rejection tests gate the supported deployment.
 
 ### Effect
 
@@ -238,6 +427,19 @@ The gateway, authorizer, and OpenFGA require readiness checks that prove useful 
 - Transparent `HTTP_PROXY` enforcement was rejected: HTTPS credential injection implies TLS interception and would block or distort normal Internet use.
 - Provider-specific brokers alone remain useful for native clients, especially GitHub, but would duplicate common authentication, authorization, audit, and routing mechanics if used for every HTTP API.
 
+### Memory retrieval approaches
+
+- **Eval-gated local hybrid cache — recommended:** keep private Markdown as
+  truth, add rebuildable lexical retrieval first, and enable local vector
+  similarity only when it wins the quality/resource evaluation. This preserves
+  the current selector as a safe migration and failure path.
+- **Keep only the LLM selector:** operationally simple and already private, but
+  adds a model request to recall and depends heavily on the quality of the
+  concise index hook and topic metadata.
+- **Replace memory with a shared vector service:** rejected because it creates
+  a new cross-Mate content authority and availability/privacy boundary. A
+  remote embedding service is not implied by the provider access plane.
+
 ## Source references
 
 - [Agentgateway standalone overview](https://agentgateway.dev/docs/standalone/main/)
@@ -247,6 +449,14 @@ The gateway, authorizer, and OpenFGA require readiness checks that prove useful 
 - [Agentgateway backend authentication](https://agentgateway.dev/docs/standalone/latest/configuration/security/backend-authn/)
 - [Agentgateway OAuth token exchange](https://agentgateway.dev/docs/standalone/latest/configuration/security/backend-authn/oauth-token-exchange/)
 - [Agentgateway dynamic configuration](https://agentgateway.dev/docs/standalone/latest/configuration/static-configuration/)
+- [Agentgateway credential injection and credential-broker analysis](https://agentgateway.dev/blog/2026-07-27-credential-injection-ai-agent-egress-cb4a/)
+- [Agentgateway context-compression extension](https://agentgateway.dev/blog/2026-07-27-optimize-token-cost-with-context-compression/)
+- [Agentgateway multi-agent kill switches, memory, budgets, and observability](https://agentgateway.dev/blog/2026-02-21-kill-switch/)
+- [Agentgateway tracing](https://agentgateway.dev/docs/standalone/latest/reference/observability/traces/)
+- [Agentgateway metrics](https://agentgateway.dev/docs/standalone/latest/reference/observability/metrics/)
+- [Agentgateway cost and token analytics](https://agentgateway.dev/blog/2026-06-24-agentgateway-cost-tokenomics-dashboard/)
+- [OpenAI native Responses compaction](https://developers.openai.com/cookbook/examples/gpt-5/codex_prompting_guide#compaction)
+- [OpenClaw built-in hybrid memory engine](https://github.com/openclaw/openclaw/blob/main/docs/concepts/memory-builtin.md)
 - [OpenFGA roles and permissions](https://openfga.dev/docs/modeling/roles-and-permissions)
 - [OpenFGA custom roles](https://openfga.dev/docs/modeling/custom-roles)
 - [OpenFGA conditions](https://openfga.dev/docs/modeling/conditions)
@@ -260,6 +470,12 @@ The gateway, authorizer, and OpenFGA require readiness checks that prove useful 
 
 ## Issue decomposition
 
-The resilience epic remains the top-level program. Existing issue #27 becomes the nested provider-access epic. A new nested Effect migration epic tracks the TypeScript program. Both own independently releasable subissues with explicit acceptance criteria; the parent resilience epic owns cross-cutting ordering and conformance.
+The resilience epic remains the top-level program. Existing issue #27 is the
+nested provider-access epic, #56 is broadened from AI-only telemetry into the
+privacy-preserving operational-observability epic, #86 tracks the Effect
+migration, and #108 owns private-memory retrieval evaluation and any later
+lexical/vector implementation. Each owns
+independently releasable subissues with explicit acceptance criteria; the
+parent resilience epic owns cross-cutting ordering and conformance.
 
 Implementation plans must be written per subissue after this design is reviewed. The agentgateway spike is a decision gate: production rollout and controller adoption are not implied by selecting it for evaluation.
