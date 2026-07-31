@@ -38,6 +38,32 @@ describe("Codex quota observations", () => {
     });
   });
 
+  test("normalizes a weekly-only plan through the canonical decoder", () => {
+    expect(
+      parseCodexUsage(
+        {
+          plan_type: "pro",
+          rate_limit: {
+            primary_window: {
+              used_percent: 35,
+              limit_window_seconds: 604_800,
+              reset_at: 2_000_100_000,
+            },
+          },
+        },
+        1_000,
+        "managed-a",
+      ),
+    ).toEqual({
+      accountId: "managed-a",
+      observedAt: 1_000,
+      shortWindow: { usedPercent: 0 },
+      weeklyWindow: { usedPercent: 35, resetsAt: 2_000_100_000_000 },
+      stale: false,
+      planType: "pro",
+    });
+  });
+
   test("rejects an unknown provider payload shape", () => {
     expect(() => parseCodexUsage({ rate_limit: {} }, 1_000, "managed-a")).toThrow(
       CodexUsageParseError,
