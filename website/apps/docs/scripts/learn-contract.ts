@@ -14,6 +14,7 @@ const courses = [
       ['bring-agentos-online', 'Bring AgentOS online'],
       ['give-fleet-outcome', 'Give the Fleet a real outcome'],
       ['hand-off-local-work', 'Hand off local work'],
+      ['let-plan-emerge', 'Let the plan emerge'],
       ['watch-and-steer', 'Watch and steer the work'],
       ['make-human-decision', 'Make the human decision'],
       ['deliver-and-recover', 'Deliver and recover the outcome'],
