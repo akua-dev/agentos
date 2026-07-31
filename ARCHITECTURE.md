@@ -231,6 +231,18 @@ expiry and Secret references may be recorded. Repository permissions are a
 Captain-reviewed provider boundary, not Fleet authority; the accepted delivery
 workflow still controls which write or merge is allowed.
 
+Credential bytes that AgentOS places in Kubernetes follow one managed-Secret
+lifecycle: create only when absent, retry or rotate through a
+resourceVersion-guarded replacement that preserves UID, and require explicit
+takeover for conflicting ownership, scope, schema, key sets or annotations.
+Managed Secrets contain non-secret ownership labels and no annotations;
+generated objects stream directly to the API and are never retained. File
+projections are read-only `0440` under an explicit workload `fsGroup` (or an
+atomic runtime-owned `0600` file where a group projection is impossible).
+Verification observes metadata, key names, projection rollover and provider
+health without reading credential values. `$agentos-secrets` owns the native
+operational procedure, including rollback and revocation.
+
 ## Pi-native customization
 
 Pi's native package and resource configuration is the extension boundary for a

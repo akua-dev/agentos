@@ -77,6 +77,23 @@ describe("Second Mate Kubernetes base", () => {
     const pod = statefulSet.spec?.template.spec;
     expect(pod.serviceAccountName).toBe("agentos-secondmate");
     expect(pod.automountServiceAccountToken).toBe(true);
+    expect(pod.securityContext).toEqual({
+      fsGroup: 1000,
+      fsGroupChangePolicy: "OnRootMismatch",
+      runAsGroup: 1000,
+      runAsNonRoot: true,
+      runAsUser: 1000,
+      seccompProfile: { type: "RuntimeDefault" },
+    });
+    expect(pod.volumes).toEqual([
+      {
+        name: "database-credentials",
+        secret: {
+          defaultMode: 288,
+          secretName: "agentos-secondmate-postgres",
+        },
+      },
+    ]);
     expect(pod.initContainers).toHaveLength(2);
     expect(pod.containers).toHaveLength(1);
     const container = pod.containers[0];

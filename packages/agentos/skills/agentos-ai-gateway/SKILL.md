@@ -90,14 +90,15 @@ Use the reviewed topology at
 apply. It must remain one non-root replica, a ClusterIP without Ingress, a
 retained ReadWriteOnce PVC and the selected-client NetworkPolicy.
 
-Create a high-entropy client token in a mode-`0600` file outside Git. Pass its
-path—not its value—to native kubectl, and pipe the generated Secret directly
-into the API rather than rendering it to the terminal or a normal file:
+Create a high-entropy client token in a mode-`0600` file outside Git. Use
+`$agentos-secrets` with owner `ai-gateway`, scope `fleet-client`, schema
+`token-v1`, and key `token` to create, retry, rotate, take over, or revoke
+`Secret/ai-gateway-client`. That lifecycle keeps the value out of argv and
+terminal output, rejects conflicting metadata, preserves UID during rotation,
+and never adds a credential-bearing annotation. Then install the service from
+the reviewed render:
 
 ```console
-kubectl --context <context> --namespace agentos create secret generic ai-gateway-client \
-  --from-file=token=<private-token-file> --dry-run=client --output=json | \
-  kubectl --context <context> --namespace agentos apply --filename=-
 kubectl --context <context> kustomize services/ai-gateway/kubernetes
 kubectl --context <context> --namespace agentos apply --filename <reviewed-render>
 kubectl --context <context> --namespace agentos rollout status statefulset/ai-gateway
@@ -149,7 +150,9 @@ three values:
 The client Namespace must carry the same `agentos.akua.dev/fleet` label as the
 core `agentos` Namespace or the Gateway NetworkPolicy denies it. Kubernetes
 Secret references are namespace-local, so First Mate creates the approved
-`Secret/ai-gateway-client` in each selected domain without printing the token.
+`Secret/ai-gateway-client` in each selected domain through `$agentos-secrets`
+without printing the token. Use that domain's stable owner identity and keep
+the `fleet-client` scope plus `token-v1` schema unchanged.
 Treat that token as visible to the domain's Second Mate: its workload-create
 authority can mount every Secret in its namespace. Do not copy the Gateway's
 OAuth vault, provider accounts or Fleet-root credentials into a domain.
