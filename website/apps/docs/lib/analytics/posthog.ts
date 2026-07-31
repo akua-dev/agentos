@@ -60,7 +60,6 @@ export function initializePostHog(
   client.init(projectToken, {
     api_host: environment.host?.trim() || DEFAULT_POSTHOG_HOST,
     capture_pageview: 'history_change',
-    cookieless_mode: 'always',
     defaults: '2026-05-30',
     disable_session_recording: true,
     person_profiles: 'identified_only',

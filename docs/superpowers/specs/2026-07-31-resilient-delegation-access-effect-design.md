@@ -10,13 +10,17 @@
 
 AgentOS must let a First Mate delegate broad domains to Second Mates, let each Second Mate create and supervise Crewmates without cross-domain RBAC failures, and keep the Fleet recoverable when identities, credentials, providers, Pods, sessions, storage, or streams fail.
 
-The approved design adds four connected programs to the existing resilience epic:
+The approved design adds six connected programs to the existing resilience epic:
 
-1. workload-identity provider access with reusable, dynamically managed authorization profiles; and
+1. workload-identity provider access with reusable, dynamically managed authorization profiles;
 2. an incremental migration of AgentOS-owned effectful TypeScript to Effect;
 3. eval-gated hybrid retrieval for private per-Mate memory; and
 4. privacy-preserving operational observability across delegation, memory,
-   provider access, cost, and recovery.
+   provider access, cost, and recovery;
+5. typed, reviewable Agent workload declarations that retain native Kubernetes
+   resources and repair-forward lifecycle custody; and
+6. structured ACP harness control plus PostgreSQL-first, authorized A2A
+   delivery without adopting another Agent runtime authority.
 
 The existing namespace, readiness, credential-safety, operation-journal, supervision, observability, and failure-conformance work remains part of the program.
 
@@ -29,6 +33,12 @@ The live First Mate session and cluster inspection exposed concrete failure mode
 - credential refresh and Secret projection depended on manual and unsafe paths;
 - capacity, PVC topology, listener state, native-session state, and retry exhaustion were not represented as durable, actionable readiness or recovery states; and
 - ordinary transport and stream failures were collapsed into generic failure signals.
+- per-Agent workload overlays required many manually patched placeholders whose
+  desired inputs, rendered digest, and recovery relationship were not one typed
+  contract; and
+- terminal delivery is intentionally only a wake hint, while AgentOS lacks a
+  structured, protocol-neutral harness-control surface or an optional A2A
+  delivery edge for authorized interoperability.
 
 The design keeps the repository's native-tools-first boundaries: Kubernetes owns runtime truth, PostgreSQL owns custody and workflow truth, native sessions own execution truth, PVCs own unfinished work, and Git owns delivered code. It does not introduce an AgentOS Kubernetes operator or a shadow runtime database.
 
@@ -211,6 +221,126 @@ AgentOS keeps Kustomize for first-party Fleet manifests and overlays. A reposito
 
 Helm may be used as an upstream packaging mechanism for third-party dependencies when that is their supported installation path. AgentOS pins and tests those dependencies, then integrates their stable Services, configuration, identities, and policy through its existing Kustomize overlays. If the agentgateway and OpenFGA spike finds that rendered upstream charts are less reproducible than owned manifests, AgentOS will vendor or generate reviewed manifests instead. This is a hybrid packaging decision, not a Helm rewrite.
 
+### Typed Agent workload declarations
+
+AgentOS retains ordinary Kubernetes resources and its one-Agent workload
+boundary. Persistent First and Second Mates and interactive Pi or Codex
+Crewmates continue to use a one-replica StatefulSet, dedicated ServiceAccount,
+retained home PVC, headless Service, database identity, and pod-local Herdr
+server. A generic switch to Deployment would discard the stable identity and
+retained-home lifecycle that make replacement and native-session recovery
+inspectable.
+
+The reviewed exception to the current no-render-wrapper rule is one pure,
+non-applying workload compiler. AgentOS defines a versioned
+`AgentWorkloadSpec` with Effect Schema. It contains only deterministic launch
+inputs such as Agent and Assignment references, owning namespace, immutable
+image digest, harness, workload profile, home and storage selection, resource
+requests, ServiceAccount, database Secret reference, provider-access profile
+references, readiness, and optional protocol capabilities. It contains no
+literal credential or Secret value, terminal output, free-form Kubernetes
+object, or policy decision.
+
+The compiler validates that contract and emits a small per-Agent Kustomize
+overlay plus a safe plan summary. It does not call Kubernetes, choose a model
+or organizational topology, launch a harness, or hide `kubectl`. The owning
+Mate still reviews the complete `kubectl kustomize` result, performs
+server-side dry-run and diff, applies with native `kubectl`, waits for the
+native workload, verifies Kubernetes and Herdr, and records only proven
+locators. Invalid or unsupported specifications fail before apply.
+
+The SQL-backed runtime operation journal records the workload-spec version and
+digest, rendered-manifest digest, operation identity, and observed lifecycle
+phase. PostgreSQL does not store rendered YAML or mirror Kubernetes status.
+An exact retry reuses the same desired input; a conflicting spec requires a
+new or explicitly superseding operation. This joins declaration ergonomics to
+repair-forward recovery without adding an AgentOS CRD, controller, daemon, or
+third runtime authority.
+
+Workload profiles remain a finite, versioned set of deterministic mechanics:
+
+- `persistent-mate` retains the released Pi Mate StatefulSet and supervision
+  identity;
+- `interactive-crewmate` retains a resumable home, pod-local Herdr, and stable
+  single-writer harness lifecycle; and
+- a future `stateless-job` is eligible only when the Assignment explicitly
+  needs no resumable home, native attach, follow-up turn, or retained worktree.
+
+Profile selection is judgment recorded in the Assignment dispatch settings;
+the compiler only proves that the selected mechanics are internally valid and
+admissible under the namespace controls.
+
+### ACP harness control and A2A delivery
+
+Agent Client Protocol and Agent-to-Agent solve different boundaries. ACP is a
+client-to-coding-agent protocol for session creation and loading, prompting,
+tool and plan events, permission requests, cancellation, and terminal
+operations. A2A is a service protocol for capability discovery, task delivery,
+progress, and artifacts between agents. ACP is therefore a candidate harness
+adapter; it is not the Fleet communication authority or a lateral Crewmate
+message bus.
+
+AgentOS pilots ACP behind `$agentos-harnesses` for Pi and Codex. A pinned
+adapter must pass the same supervised lifecycle as a native harness: first-run
+authentication and trust, isolated workspace, launch, structured busy/status,
+steer, interrupt, wake, native resume, permission handling, failure visibility,
+and safe teardown. During the pilot Herdr remains the human attach and fallback
+surface, native Pi or Codex session state remains authoritative, and exactly
+one client may write a session. AgentOS may record the ACP session locator and
+protocol version beside the native and Herdr locators, but it does not copy the
+ACP transcript or accept an adapter's private session store as Fleet truth.
+
+A2A is optional and additive. An owning Mate first commits the canonical Task,
+Assignment, or Inbox state in PostgreSQL. It may then send an authenticated A2A
+request containing only stable references, a bounded subject, and the
+authorized skill; the target loads the authoritative brief or speech act from
+PostgreSQL. A2A progress and artifacts are live delivery evidence, while the
+durable report, handoff, decision, and Git result remain in their existing
+authorities. Failure before receipt leaves discoverable PostgreSQL work and
+falls back to the released PostgreSQL listener or Herdr doorbell path.
+
+The hierarchy contract remains unchanged. Agent-authored delivery crosses one
+direct parent-child edge. A cross-domain request escalates to the common
+ancestor, which creates or routes work into the target subtree. Direct sibling
+or arbitrary Crewmate-to-Crewmate A2A is denied even if the network endpoint is
+reachable. Agent Cards expose only reviewed capabilities, and discovery,
+invoke, stream, cancel, and artifact access are authenticated from projected
+workload identity and authorized through the same AgentOS/OpenFGA ceilings used
+by the access plane.
+
+Agentgateway is the recommended A2A routing, policy, and telemetry plane; it
+does not declare or own Agent Pods. The spike decides whether an AgentOS A2A
+adapter belongs in the harness process, a narrow sidecar, or a separate
+ordinary Service. None of those choices may become a prompt queue, shadow Task
+store, or alternative Assignment scheduler.
+
+### Kagent interoperability boundary
+
+Kagent is useful as an interoperability reference and optional external Agent
+provider, not as the core AgentOS runtime. Its declarative `Agent` CRD is
+concise, and the BYO form accepts an image, existing ServiceAccount, volumes,
+sidecars, resources, security context, and scheduling fields. It nevertheless
+creates a Deployment whose container must serve A2A on port 8080; it does not
+model the AgentOS StatefulSet/PVC retention, Assignment custody, Herdr
+verification, or repair-forward launch handshake.
+
+Kagent's `AgentHarness` currently supports OpenClaw and Hermes and always runs
+on Agent Substrate. Substrate decouples actors from Pods, multiplexes them on
+pre-warmed workers, snapshots idle state to object storage, and adds its own
+controller, workflow store, routing layer, worker supervisor, and actor
+identity. Those mechanics may reduce idle capacity, but adopting them would
+replace the current one-Agent Pod, PVC, Herdr, and projected Kubernetes
+ServiceAccount boundary. That is a separate architecture decision, especially
+because the provider access plane depends on exact per-workload identity.
+
+AgentOS will run only a disposable interoperability and capacity spike. It may
+prove that a Kagent BYO Agent can participate as an external A2A provider or
+that actor suspension materially improves a large idle fleet. Kagent CRDs,
+controller, UI, memory, conversation loop, AgentHarness, and Substrate remain
+outside the supported core topology unless a later evidence-backed design
+proves recovery, privacy, attachability, workload identity, cost, and task
+success better than the native path.
+
 ## Private Mate memory retrieval
 
 The existing memory authority remains the typed Markdown topic set and concise
@@ -342,6 +472,15 @@ The access plane fails closed for credentialed provider routes but does not take
 - retries are bounded and preserve idempotency; and
 - logs, traces, and journals exclude tokens and request/response bodies by default.
 
+Workload-spec validation and compilation fail closed before Kubernetes apply.
+An interrupted render, apply, rollout, or harness launch resumes through the
+operation journal and observed Kubernetes/Herdr authorities; it never guesses
+success from a generated file. An ACP adapter failure during the pilot leaves
+the native harness session and Herdr fallback inspectable. A2A gateway or
+adapter failure cannot erase committed work, authorize a lateral hierarchy
+edge, or turn live protocol state into receipt evidence; the caller re-queries
+PostgreSQL and uses the existing wake path.
+
 Memory retrieval fails open to the current bounded selector or index-only
 startup context. A missing, stale, corrupt, or incompatible derivative index
 never hides the authoritative Markdown topic set, blocks the main turn, or
@@ -374,6 +513,39 @@ The gateway, authorizer, and OpenFGA require readiness checks that prove useful 
 - Per-Mate and per-Assignment kill switches and budgets deny only the intended
   identity/profile and leave unrelated Mates and ordinary Internet working.
 - Ordinary Internet access continues when the credentialed access plane is unavailable.
+
+### Workload declarations
+
+- A typed `AgentWorkloadSpec` deterministically emits the same reviewable
+  Kustomize overlay and manifest digest for the same canonical input.
+- Invalid identity, mutable image, literal secret-bearing value, unsupported
+  profile, impossible retained-home combination, or missing ownership
+  reference fails before apply.
+- Persistent and interactive profiles retain dedicated ServiceAccount, PVC,
+  stable workload, Herdr, readiness, and one-writer session semantics.
+- The compiler never calls `kubectl`, chooses a model or topology, stores YAML
+  in PostgreSQL, or bypasses server-side dry-run, diff, review, and observed
+  verification.
+- Exact retry and partial-failure recovery reconcile through the operation
+  journal without duplicate Agent, PVC, Pod, session, Assignment, or grant.
+
+### Agent protocols and interoperability
+
+- ACP control for Pi and Codex passes the supervised harness lifecycle or is
+  rejected without weakening the released native path.
+- ACP session, tool, plan, permission, cancellation, and failure events remain
+  correlated to the exact native and Herdr session without creating a second
+  writer or transcript authority.
+- A2A discovery and delivery require projected workload identity, effective
+  OpenFGA capability, active Assignment where scoped, and a valid direct
+  hierarchy edge.
+- A2A outage leaves committed work discoverable and recoverable through the
+  existing PostgreSQL listener or Herdr doorbell path.
+- A disposable Kagent comparison records exact versions and proves or rejects
+  BYO and Substrate against persistence, attachability, identity, privacy,
+  recovery, capacity, task-success, and operating-cost gates.
+- No Kagent controller, CRD, conversation loop, memory store, or Agent
+  Substrate component becomes a production dependency from the spike alone.
 
 ### Memory
 
@@ -427,6 +599,27 @@ The gateway, authorizer, and OpenFGA require readiness checks that prove useful 
 - Transparent `HTTP_PROXY` enforcement was rejected: HTTPS credential injection implies TLS interception and would block or distort normal Internet use.
 - Provider-specific brokers alone remain useful for native clients, especially GitHub, but would duplicate common authentication, authorization, audit, and routing mechanics if used for every HTTP API.
 
+### Agent workload and protocol approaches
+
+- **Typed native workload plan plus optional ACP/A2A adapters — recommended:**
+  preserve the standard Kubernetes, PostgreSQL, Herdr, PVC, and Git
+  authorities; reduce overlay mistakes with one pure Effect Schema compiler;
+  use ACP for harness control and A2A only for authorized live delivery.
+- **Kagent `Agent` or BYO as the AgentOS runtime:** rejected for the core path
+  because its controller-owned Deployment and A2A contract do not preserve the
+  released StatefulSet/PVC, Herdr, Assignment, and launch-reconciliation
+  semantics. It remains eligible as an external A2A provider.
+- **Kagent AgentHarness and Agent Substrate:** deferred to a disposable
+  benchmark. Idle suspension and gVisor isolation are promising, but the added
+  controller, worker-pool, object-storage, workflow-store, routing, and actor
+  identity authorities require a separate evidence-backed design.
+- **A2A as Fleet coordination truth:** rejected. Protocol task state, streams,
+  and artifacts cannot replace PostgreSQL Task, Assignment, Inbox, hierarchy,
+  or receipt semantics.
+- **ACP as inter-Agent messaging:** rejected. ACP is a coding-agent control
+  protocol; using it as lateral Fleet communication would blur session custody
+  and hierarchy authority.
+
 ### Memory retrieval approaches
 
 - **Eval-gated local hybrid cache — recommended:** keep private Markdown as
@@ -467,6 +660,16 @@ The gateway, authorizer, and OpenFGA require readiness checks that prove useful 
 - [Cerbos policies](https://docs.cerbos.dev/cerbos/latest/policies/index.html)
 - [OPA management and bundles](https://www.openpolicyagent.org/docs/management-introduction)
 - [Authorino Kubernetes TokenReview](https://docs.kuadrant.io/1.0.x/authorino/docs/user-guides/kubernetes-tokenreview/)
+- [Agentgateway Kubernetes A2A routing](https://agentgateway.dev/docs/kubernetes/main/agent/a2a/)
+- [Kagent architecture](https://kagent.dev/docs/kagent/concepts/architecture)
+- [Kagent API reference and BYO deployment fields](https://kagent.dev/docs/kagent/resources/api-ref)
+- [Kagent A2A agents](https://kagent.dev/docs/kagent/examples/a2a-agents)
+- [Kagent AgentHarness](https://kagent.dev/docs/kagent/concepts/agent-harness)
+- [Kagent Agent Substrate](https://kagent.dev/docs/kagent/concepts/agent-substrate)
+- [Agent Client Protocol introduction](https://agentclientprotocol.com/get-started/introduction)
+- [Agent Client Protocol v1 overview](https://agentclientprotocol.com/protocol/v1/overview)
+- [Codex ACP adapter](https://github.com/agentclientprotocol/codex-acp)
+- [acpx structured ACP client and adapter catalog](https://github.com/openclaw/acpx)
 
 ## Issue decomposition
 
@@ -477,5 +680,16 @@ migration, and #108 owns private-memory retrieval evaluation and any later
 lexical/vector implementation. Each owns
 independently releasable subissues with explicit acceptance criteria; the
 parent resilience epic owns cross-cutting ordering and conformance.
+
+Two additional nested programs own the approved workload and protocol work:
+
+- [#121](https://github.com/akua-dev/agentos/issues/121) owns the Effect
+  `AgentWorkloadSpec` and pure overlay compiler (#123), versioned workload
+  profiles and lifecycle eligibility (#124), and render/Kubernetes/recovery
+  conformance (#127).
+- [#122](https://github.com/akua-dev/agentos/issues/122) owns the Pi/Codex ACP
+  evaluation (#126), PostgreSQL-first A2A spike (#128), authorized A2A
+  implementation (#125), protocol conformance (#130), and non-adopting Kagent
+  interoperability/Agent Substrate benchmark (#129).
 
 Implementation plans must be written per subissue after this design is reviewed. The agentgateway spike is a decision gate: production rollout and controller adoption are not implied by selecting it for evaluation.
