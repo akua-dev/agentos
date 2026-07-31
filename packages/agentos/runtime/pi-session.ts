@@ -1,5 +1,7 @@
 import {
+  open,
   readFile,
+  readdir,
   realpath,
   rename,
   writeFile,
@@ -76,7 +78,6 @@ export async function preparePiSessionRelocation(
     targetDirectory = resolve(cwd, manager.getSessionDir());
     targetHeader = {
       ...header,
-      ...manager.getHeader(),
       cwd,
       parentSession: source,
       type: "session",
@@ -100,6 +101,40 @@ export async function preparePiSessionRelocation(
     true,
   );
   return target;
+}
+
+export async function findPreparedPiSessionRelocation(
+  cwd: string,
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<string | undefined> {
+  if (!isAbsolute(cwd)) {
+    throw new Error("A relocated Pi session working directory must be absolute.");
+  }
+  const directory = await resolvePiSessionDirectory(cwd, environment);
+  let names: string[];
+  try {
+    names = await readdir(directory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+
+  for (const name of names
+    .filter((candidate) => candidate.endsWith(".jsonl"))
+    .sort()
+    .reverse()
+    .slice(0, 32)) {
+    const path = join(directory, name);
+    const header = await readPiSessionHeaderPrefix(path);
+    if (
+      header?.cwd === cwd &&
+      typeof header.parentSession === "string" &&
+      isAbsolute(header.parentSession)
+    ) {
+      return path;
+    }
+  }
+  return undefined;
 }
 
 const piPackageName = "@earendil-works/pi-coding-agent";
@@ -153,6 +188,33 @@ async function resolvePiRuntime(
     );
   }
   return runtime as PiRuntime;
+}
+
+async function resolvePiSessionDirectory(
+  cwd: string,
+  environment: NodeJS.ProcessEnv,
+): Promise<string> {
+  const previousCwd = process.cwd();
+  try {
+    process.chdir(cwd);
+    const { SessionManager, SettingsManager } =
+      await loadPiRuntime(environment);
+    const settings = SettingsManager.create(
+      cwd,
+      environment.PI_CODING_AGENT_DIR || undefined,
+    );
+    const manager = SessionManager.create(
+      cwd,
+      environment.PI_CODING_AGENT_SESSION_DIR ||
+        settings.getSessionDir(),
+    );
+    return resolve(
+      cwd,
+      manager.getSessionDir(),
+    );
+  } finally {
+    process.chdir(previousCwd);
+  }
 }
 
 async function findPiPackageEntrypoint(path: string): Promise<string> {
@@ -224,6 +286,25 @@ export async function readPiSession(
     headerStart = lineBreak + 1;
   }
   throw new InvalidPiSessionHeaderError(path);
+}
+
+async function readPiSessionHeaderPrefix(
+  path: string,
+): Promise<PiSessionContents["header"] | undefined> {
+  const handle = await open(path, "r");
+  try {
+    const buffer = Buffer.alloc(64 * 1024);
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+    const contents = buffer.subarray(0, bytesRead).toString("utf8");
+    for (const line of contents.split("\n")) {
+      const candidate = parsePiSessionHeaderCandidate(line);
+      if (candidate.kind === "header") return candidate.header;
+      if (candidate.kind === "invalid") return undefined;
+    }
+    return undefined;
+  } finally {
+    await handle.close();
+  }
 }
 
 type PiSessionHeaderCandidate =

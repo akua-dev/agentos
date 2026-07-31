@@ -631,7 +631,12 @@ describe("Mate runtime", () => {
           type: "session",
           version: 3,
         }),
-        JSON.stringify({ message: "preserve me", type: "message" }),
+        JSON.stringify({
+          id: "message-1",
+          message: "preserve me",
+          parentId: "session-1",
+          type: "message",
+        }),
         "",
       ].join("\n"),
       "utf8",
@@ -680,11 +685,17 @@ describe("Mate runtime", () => {
       .split("\n");
     expect(JSON.parse(sessionLines[0]!)).toMatchObject({
       cwd: env.AGENTOS_AGENT_CWD,
+      id: "session-1",
       parentSession: persistedSession,
       type: "session",
       version: 3,
     });
-    expect(JSON.parse(sessionLines[1]!)).toEqual({ message: "preserve me", type: "message" });
+    expect(JSON.parse(sessionLines[1]!)).toEqual({
+      id: "message-1",
+      message: "preserve me",
+      parentId: "session-1",
+      type: "message",
+    });
   });
 
   test("resolves a relocated sessionDir from the target Mate cwd", async () => {
@@ -848,18 +859,22 @@ describe("Mate runtime", () => {
       ...env,
     };
     delete retryEnvironment.FAKE_HERDR_FAIL_START;
+    const startsBeforeRetry = (await readCalls(state)).filter(
+      (call) => call[0] === "agent" && call[1] === "start",
+    ).length;
     const recoveredStart = Bun.spawn([process.execPath, runMate], {
       env: retryEnvironment,
       stderr: "pipe",
       stdout: "pipe",
     });
+    const recoveredTarget = join(targetDirectory, targetSessions[0]!);
     await waitFor(async () =>
-      (await readCalls(state)).some(
+      (await readCalls(state)).filter(
         (call) =>
           call[0] === "agent" &&
           call[1] === "start" &&
-          call.at(-1) === "--continue",
-      ),
+          call.at(-1) === recoveredTarget,
+      ).length > startsBeforeRetry,
     );
     recoveredStart.kill("SIGTERM");
     expect(await recoveredStart.exited).toBe(0);
