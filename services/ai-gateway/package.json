@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@akua-dev/agentos": "workspace:*",
-    "@akua-dev/codex-router": "github:akua-dev/codex-router#489557ad72774fd0dd67f3fdec402fc246d5256e",
+    "@akua-dev/codex-router": "github:akua-dev/codex-router#01d5400e51925bae94056cda275e83071c43be83",
     "@earendil-works/pi-ai": "0.81.1",
     "@opentelemetry/api": "1.9.1",
     "effect": "4.0.0-beta.102",
