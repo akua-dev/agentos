@@ -19,7 +19,7 @@ vi.mock('@/app/(home)/page.client', () => ({
 vi.mock('@/app/(home)/flect-workplace', () => ({
   FlectWorkplace: () => (
     <section>
-      <a href="/docs/concepts/human-work-surfaces">Design a human work surface</a>
+      <a href="/docs/concepts/human-work-surfaces">See how the workplace works</a>
       <a href="https://github.com/akua-dev/flect">Explore Flect</a>
     </section>
   ),
@@ -52,7 +52,7 @@ describe('landing page', () => {
       screen.getByRole('link', { name: 'Use the handoff guide' }).getAttribute('href'),
     ).toBe('/docs/operate/continue-local-work');
     expect(
-      screen.getByRole('link', { name: 'Design a human work surface' }).getAttribute('href'),
+      screen.getByRole('link', { name: 'See how the workplace works' }).getAttribute('href'),
     ).toBe('/docs/concepts/human-work-surfaces');
     expect(screen.getByRole('link', { name: 'Explore Flect' }).getAttribute('href')).toBe(
       'https://github.com/akua-dev/flect',

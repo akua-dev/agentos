@@ -67,18 +67,18 @@ evidence returns for your next local review or iteration.
 
 ## Give the company a workplace
 
-People should not have to accept one permanent Agent dashboard. A future
-purpose-built interface could assemble the work, ask the people with relevant
-context, expertise or authority for their contribution, help inspect or revise
-it with a local Agent and return only bounded, approved intent to First Mate.
+People should not have to accept one permanent Agent dashboard.
+[Flect](https://github.com/akua-dev/flect) is the adaptable human interface for
+AgentOS. It assembles the work, brings in the people with relevant context,
+expertise or authority, and lets its built-in Agent help inspect or revise a
+draft before bounded, approved intent returns to First Mate.
 
-[Flect](https://github.com/akua-dev/flect) is a public developer-preview
-interface shell and a natural first AgentOS dogfooding adopter. Installing it
-provides an adaptable local workplace today. The AgentOS experience—including
-any embedded browser or iframe bridge—is future work; AgentOS remains the
-durable company authority beneath any surface.
+Install Flect today to enter the company workplace. It can surface existing
+products through an embedded browser or iframe and connect through product or
+API adapters, while AgentOS remains the durable authority for accepted work,
+decisions and ownership.
 
-[Explore human work surfaces and the Flect concept →](https://agentos.akua.dev/docs/concepts/human-work-surfaces)
+[Explore the AgentOS workplace powered by Flect →](https://agentos.akua.dev/docs/concepts/human-work-surfaces)
 
 ## Proof before promises
 

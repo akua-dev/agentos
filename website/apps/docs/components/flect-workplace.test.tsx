@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe('FlectWorkplace', () => {
-  it('shows the official hero and honest future-direction links', () => {
+  it('presents Flect as the available human interface for AgentOS', () => {
     render(<FlectWorkplace />);
 
     expect(
@@ -20,23 +20,21 @@ describe('FlectWorkplace', () => {
         .getByRole('img', { name: 'Flect adapting across product interfaces' })
         .getAttribute('src'),
     ).toContain('flect-hero.png');
-    expect(screen.getByText('Flect public developer preview')).not.toBeNull();
-    expect(screen.getByText(/future direction, not a shipped integration/)).not.toBeNull();
+    expect(screen.getByText('Available today')).not.toBeNull();
+    expect(screen.getByText(/enter an adaptable AgentOS workplace today/)).not.toBeNull();
     expect(screen.getByText(/personalized context and decisions/)).not.toBeNull();
-    expect(screen.getByText(/standalone\/local interface shell/)).not.toBeNull();
-    expect(screen.getByText(/product and API adapters are future work, not shipped/)).not.toBeNull();
-    expect(screen.getByText(/adaptable local workplace today/)).not.toBeNull();
     expect(screen.getByText(/context, expertise, or authority/)).not.toBeNull();
     expect(screen.getByText(/embedded browser or iframe/)).not.toBeNull();
-    expect(screen.getByText(/future integration path, not a shipped capability/)).not.toBeNull();
+    expect(screen.getByText(/human surface of AgentOS/)).not.toBeNull();
+    expect(screen.queryByText(/future direction|future work|not shipped/i)).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'Design a human work surface' }).getAttribute('href'),
+      screen.getByRole('link', { name: 'See how the workplace works' }).getAttribute('href'),
     ).toBe('/docs/concepts/human-work-surfaces');
     expect(screen.getByRole('link', { name: 'Explore Flect' }).getAttribute('href')).toBe(
       'https://github.com/akua-dev/flect',
     );
     expect(
-      screen.getByRole('link', { name: 'See the current Flect preview' }).getAttribute('href'),
+      screen.getByRole('link', { name: 'Install Flect' }).getAttribute('href'),
     ).toBe('https://github.com/akua-dev/flect#what-works-today');
   });
 
@@ -45,6 +43,6 @@ describe('FlectWorkplace', () => {
 
     expect(screen.getAllByRole('img')).toHaveLength(1);
     expect(screen.queryByRole('list', { name: 'Adaptive workplace handoff' })).toBeNull();
-    expect(screen.getByText(/A future AgentOS adapter could assemble/)).not.toBeNull();
+    expect(screen.getByText(/AgentOS assembles product work/)).not.toBeNull();
   });
 });
