@@ -2,12 +2,15 @@ import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
 import {
+  ProviderPolicyDecisionError,
   ProviderPolicyDecisionPoint,
+  type ProviderPolicyDecisionRefV1,
   type ProviderPolicyDecisionRequestV1,
 } from "../credential-delivery.ts";
 import {
   WorkloadIdentityAuthenticator,
   type WorkloadIdentityAuthenticationRequest,
+  type WorkloadIdentityV1,
 } from "../identity.ts";
 import {
   createProviderAuthorizationHttpHandler,
@@ -19,7 +22,7 @@ const AgentId = "10000000-0000-4000-8000-000000000001";
 const AssignmentId = "20000000-0000-4000-8000-000000000001";
 const now = 1_785_586_000_000;
 
-const identity = {
+const identity: WorkloadIdentityV1 = {
   schemaVersion: 1,
   agentId: AgentId,
   role: "crewmate",
@@ -31,9 +34,11 @@ const identity = {
   podUid: "pod-uid-1",
   serviceAccountName: "worker",
   serviceAccountUid: "service-account-uid-1",
-} as const;
+};
 
-function allowedDecision(expiresAtMillis = now + 15_000) {
+function allowedDecision(
+  expiresAtMillis = now + 15_000,
+): ProviderPolicyDecisionRefV1 {
   return {
     schemaVersion: 1,
     correlationId: "corr_44444444444444444444444444444444",
@@ -47,7 +52,7 @@ function allowedDecision(expiresAtMillis = now + 15_000) {
       revision: 9,
     },
     rateClass: "standard",
-  } as const;
+  };
 }
 
 function services(input?: {
@@ -56,7 +61,10 @@ function services(input?: {
   ) => Effect.Effect<typeof identity, never>;
   readonly decide?: (
     request: ProviderPolicyDecisionRequestV1,
-  ) => Effect.Effect<any, any>;
+  ) => Effect.Effect<
+    ProviderPolicyDecisionRefV1,
+    ProviderPolicyDecisionError
+  >;
 }) {
   return Layer.merge(
     Layer.succeed(WorkloadIdentityAuthenticator, {
@@ -246,6 +254,20 @@ describe("AgentGateway HTTP authorization contract", () => {
       assert.strictEqual(failure.code, "grant_expired");
     }).pipe(Effect.provide(services())));
 
+  it.effect("rejects caller-supplied authorization grant metadata", () =>
+    Effect.gen(function*() {
+      const handler = yield* createProviderAuthorizationHttpHandler({
+        clock: Effect.succeed(now),
+        id: Effect.succeed("44444444444444444444444444444444"),
+      });
+      const spoofed = request();
+      spoofed.headers.set(
+        "x-agentos-authz-decision-ref",
+        "decision_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      );
+      assert.strictEqual((yield* handler(spoofed)).status, 403);
+    }).pipe(Effect.provide(services())));
+
   it.effect("reports policy-decision dependency failures as unavailable", () =>
     Effect.gen(function*() {
       const handler = yield* createProviderAuthorizationHttpHandler({
@@ -259,14 +281,30 @@ describe("AgentGateway HTTP authorization contract", () => {
       });
     }).pipe(
       Effect.provide(services({
-        decide: (value) => Effect.fail({
-          schemaVersion: 1,
-          provider: value.provider,
-          credentialDomain: value.credentialDomain,
-          outcome: "credential_unavailable",
+        decide: () => Effect.fail(ProviderPolicyDecisionError.make({
+          outcome: "openfga_unavailable",
           retryable: true,
-          correlationId: value.correlationId,
-        }),
+        })),
+      })),
+    ));
+
+  it.effect("keeps policy denials distinct from dependency unavailability", () =>
+    Effect.gen(function*() {
+      const handler = yield* createProviderAuthorizationHttpHandler({
+        clock: Effect.succeed(now),
+        id: Effect.succeed("44444444444444444444444444444444"),
+      });
+      const response = yield* handler(request());
+      assert.strictEqual(response.status, 403);
+      assert.deepStrictEqual(yield* Effect.promise(() => response.json()), {
+        error: "forbidden",
+      });
+    }).pipe(
+      Effect.provide(services({
+        decide: () => Effect.fail(ProviderPolicyDecisionError.make({
+          outcome: "effective_policy_denied",
+          retryable: false,
+        })),
       })),
     ));
 });

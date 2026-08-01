@@ -96,6 +96,18 @@
       "test": "services/github-broker/tests/broker.effect.test.ts",
       "removalCondition": "Retain only while the GitHub broker remains a standalone Bun service entrypoint.",
       "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "services/egress-authz/src/main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The egress authorization service needs one reviewed Bun process entry boundary around its fully typed Effect Platform application.",
+      "ownerIssue": 96,
+      "test": "services/egress-authz/tests/main.effect.test.ts",
+      "removalCondition": "Retain only while the egress authorizer remains a standalone Bun service entrypoint.",
+      "expiresOn": null
     }
   ]
 }

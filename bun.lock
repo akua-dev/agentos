@@ -113,6 +113,22 @@
         "@types/proper-lockfile": "4.1.4",
       },
     },
+    "services/egress-authz": {
+      "name": "@agentos/egress-authz",
+      "version": "0.0.0",
+      "bin": {
+        "agentos-egress-authz": "./src/main.ts",
+      },
+      "dependencies": {
+        "@akua-dev/agentos": "workspace:*",
+        "@effect/platform-bun": "4.0.0-beta.102",
+        "@effect/sql-pg": "4.0.0-beta.102",
+        "effect": "4.0.0-beta.102",
+      },
+      "devDependencies": {
+        "yaml": "2.9.0",
+      },
+    },
     "services/github-broker": {
       "name": "@agentos/github-broker",
       "version": "0.0.0",
@@ -207,6 +223,8 @@
     "@agentos/ai-gateway": ["@agentos/ai-gateway@workspace:services/ai-gateway"],
 
     "@agentos/database": ["@agentos/database@workspace:database"],
+
+    "@agentos/egress-authz": ["@agentos/egress-authz@workspace:services/egress-authz"],
 
     "@agentos/github-app-token": ["@agentos/github-app-token@workspace:clis/github-app-token"],
 

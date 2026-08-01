@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentos-egress-authz
+  labels:
+    app.kubernetes.io/name: agentos-egress-authz
+    app.kubernetes.io/component: authorization
+    app.kubernetes.io/part-of: agentos
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: agentos-egress-authz
+  ports:
+    - name: http
+      port: 9001
+      targetPort: http
+      protocol: TCP
