@@ -4,7 +4,13 @@ import {
   Layer,
   Redacted,
   Schema,
+  Stream,
 } from "effect";
+import {
+  HttpClient,
+  HttpClientRequest,
+  HttpClientResponse,
+} from "effect/unstable/http";
 
 import {
   AGENTOS_OPENFGA_HEALTH_OBJECT,
@@ -88,10 +94,6 @@ export interface OpenFgaHttpTransportOptions {
   readonly presharedKey: Redacted.Redacted<string> | null;
   readonly timeoutMillis: number;
   readonly maximumResponseBytes: number;
-  readonly fetchImpl?: (
-    input: string | URL | Request,
-    init?: RequestInit,
-  ) => Promise<Response>;
 }
 
 export interface OpenFgaStoreV1 {
@@ -169,86 +171,88 @@ const MaximumPaginationPages = 100;
 export function makeOpenFgaHttpTransportLayer(
   options: OpenFgaHttpTransportOptions,
 ) {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  return Layer.succeed(OpenFgaHttpTransport)({
-    request: Effect.fn("agentos.openfga.http.request")(function*(request) {
-      const base = yield* Effect.try({
-        try: () => new URL(options.baseUrl),
-        catch: () => httpError(
-          request.operation,
-          "invalid_configuration",
-          null,
-        ),
-      });
-      if (base.protocol !== "http:" && base.protocol !== "https:") {
-        return yield* httpError(
-          request.operation,
-          "invalid_configuration",
-          null,
-        );
-      }
-      const url = yield* Effect.try({
-        try: () => new URL(request.path, ensureTrailingSlash(base)),
-        catch: () => httpError(
-          request.operation,
-          "invalid_configuration",
-          null,
-        ),
-      });
-
-      const headers = new Headers({ accept: "application/json" });
-      if (request.body !== undefined) {
-        headers.set("content-type", "application/json");
-      }
-      if (options.presharedKey !== null) {
-        headers.set(
-          "authorization",
-          `Bearer ${Redacted.value(options.presharedKey)}`,
-        );
-      }
-      const requestEffect = Effect.tryPromise({
-        try: (signal) =>
-          fetchImpl(url, {
-            method: request.method,
-            headers,
-            body: request.body === undefined
-              ? undefined
-              : JSON.stringify(request.body),
-            signal,
-          }),
-        catch: () =>
-          OpenFgaHttpError.make({
-            operation: request.operation,
-            code: "network_failure",
-            status: null,
-          }),
-      }).pipe(
-        Effect.flatMap((response) => {
-          if (!response.ok) {
-            void response.body?.cancel().catch(() => undefined);
-            return httpError(
+  return Layer.effect(
+    OpenFgaHttpTransport,
+    Effect.gen(function*() {
+      const client = HttpClient.withScope(yield* HttpClient.HttpClient);
+      return OpenFgaHttpTransport.of({
+        request: Effect.fn("agentos.openfga.http.request")(function*(request) {
+          const base = yield* Effect.try({
+            try: () => new URL(options.baseUrl),
+            catch: () => httpError(
               request.operation,
-              "unexpected_status",
-              response.status,
+              "invalid_configuration",
+              null,
+            ),
+          });
+          if (base.protocol !== "http:" && base.protocol !== "https:") {
+            return yield* httpError(
+              request.operation,
+              "invalid_configuration",
+              null,
             );
           }
-          return readBoundedJsonResponse(
-            response,
-            request.operation,
-            options.maximumResponseBytes,
+          const url = yield* Effect.try({
+            try: () => new URL(request.path, ensureTrailingSlash(base)),
+            catch: () => httpError(
+              request.operation,
+              "invalid_configuration",
+              null,
+            ),
+          });
+
+          let clientRequest = HttpClientRequest.make(request.method)(url).pipe(
+            HttpClientRequest.acceptJson,
+          );
+          if (options.presharedKey !== null) {
+            clientRequest = HttpClientRequest.setHeader(
+              clientRequest,
+              "authorization",
+              `Bearer ${Redacted.value(options.presharedKey)}`,
+            );
+          }
+          if (request.body !== undefined) {
+            clientRequest = yield* HttpClientRequest.bodyJson(
+              clientRequest,
+              request.body,
+            ).pipe(
+              Effect.mapError(() =>
+                httpError(request.operation, "invalid_configuration", null)
+              ),
+            );
+          }
+          const requestEffect = client.execute(clientRequest).pipe(
+            Effect.mapError(() =>
+              httpError(request.operation, "network_failure", null)
+            ),
+            Effect.flatMap((response) => {
+              if (response.status < 200 || response.status >= 300) {
+                return httpError(
+                  request.operation,
+                  "unexpected_status",
+                  response.status,
+                );
+              }
+              return readBoundedJsonResponse(
+                response,
+                request.operation,
+                options.maximumResponseBytes,
+              );
+            }),
+          );
+
+          return yield* requestEffect.pipe(
+            Effect.timeoutOrElse({
+              duration: options.timeoutMillis,
+              orElse: () =>
+                httpError(request.operation, "timeout", null),
+            }),
+            Effect.scoped,
           );
         }),
-      );
-
-      return yield* requestEffect.pipe(
-        Effect.timeoutOrElse({
-          duration: options.timeoutMillis,
-          orElse: () =>
-            httpError(request.operation, "timeout", null),
-        }),
-      );
+      });
     }),
-  });
+  );
 }
 
 export const OpenFgaManagementApiHttpLayer = Layer.effect(
@@ -537,53 +541,41 @@ function decodeManagementResponse<S extends Schema.Top>(
 }
 
 function readBoundedJsonResponse(
-  response: Response,
+  response: HttpClientResponse.HttpClientResponse,
   operation: typeof OpenFgaHttpOperation.Type,
   maximumResponseBytes: number,
 ) {
-  const declaredLength = Number(response.headers.get("content-length"));
+  const declaredLength = Number(response.headers["content-length"]);
   if (
     Number.isFinite(declaredLength) &&
     declaredLength > maximumResponseBytes
   ) {
-    void response.body?.cancel().catch(() => undefined);
     return Effect.fail(
       httpError(operation, "response_too_large", response.status),
     );
   }
-  return Effect.gen(function*() {
-    if (response.body === null) return "";
-    const reader = response.body.getReader();
-    const chunks: Array<Uint8Array> = [];
-    let length = 0;
-    while (true) {
-      const result = yield* Effect.tryPromise({
-        try: () => reader.read(),
-        catch: () => httpError(operation, "network_failure", response.status),
-      });
-      if (result.done) break;
-      length += result.value.byteLength;
-      if (length > maximumResponseBytes) {
-        yield* Effect.tryPromise({
-          try: () => reader.cancel(),
-          catch: () => httpError(operation, "network_failure", response.status),
-        }).pipe(Effect.ignore);
-        return yield* httpError(
-          operation,
-          "response_too_large",
-          response.status,
-        );
-      }
-      chunks.push(result.value);
-    }
-    const bytes = new Uint8Array(length);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return new TextDecoder().decode(bytes);
-  }).pipe(
+  return response.stream.pipe(
+    Stream.runFoldEffect(
+      emptyBoundedResponseBody,
+      (state, chunk) => {
+        const length = state.length + chunk.byteLength;
+        if (length > maximumResponseBytes) {
+          return Effect.fail(
+            httpError(operation, "response_too_large", response.status),
+          );
+        }
+        return Effect.succeed({
+          chunks: [...state.chunks, chunk],
+          length,
+        });
+      },
+    ),
+    Effect.mapError((error) =>
+      error instanceof OpenFgaHttpError
+        ? error
+        : httpError(operation, "network_failure", response.status)
+    ),
+    Effect.map(decodeBoundedResponseBody),
     Effect.flatMap((body) => {
       if (body.length === 0) return Effect.succeed(null);
       return Schema.decodeUnknownEffect(
@@ -595,6 +587,25 @@ function readBoundedJsonResponse(
       );
     }),
   );
+}
+
+interface BoundedResponseBody {
+  readonly chunks: ReadonlyArray<Uint8Array>;
+  readonly length: number;
+}
+
+function emptyBoundedResponseBody(): BoundedResponseBody {
+  return { chunks: [], length: 0 };
+}
+
+function decodeBoundedResponseBody(body: BoundedResponseBody) {
+  const bytes = new Uint8Array(body.length);
+  let offset = 0;
+  for (const chunk of body.chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 function toWireTuple(tuple: OpenFgaTupleV1) {

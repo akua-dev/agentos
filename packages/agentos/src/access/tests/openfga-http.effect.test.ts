@@ -1,5 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Layer, Redacted, Ref } from "effect";
+import { Effect, Layer, Redacted, Ref, Schema } from "effect";
+import {
+  HttpClient,
+  HttpClientRequest,
+  HttpClientResponse,
+} from "effect/unstable/http";
 
 import {
   AGENTOS_OPENFGA_HEALTH_OBJECT,
@@ -31,6 +36,23 @@ const canonicalModelRecord: OpenFgaAuthorizationModelRecordV1 = {
   id: ModelId,
   ...AgentOSOpenFgaAuthorizationModelV1,
 };
+
+function httpClientLayer(
+  execute: (
+    request: HttpClientRequest.HttpClientRequest,
+  ) => Effect.Effect<Response>,
+) {
+  return Layer.succeed(
+    HttpClient.HttpClient,
+    HttpClient.make((request) =>
+      execute(request).pipe(
+        Effect.map((response) =>
+          HttpClientResponse.fromWeb(request, response)
+        ),
+      )
+    ),
+  );
+}
 
 function managementLayer(input?: {
   readonly stores?: ReadonlyArray<OpenFgaStoreV1>;
@@ -130,8 +152,11 @@ describe("AgentOS OpenFGA HTTP and bootstrap", () => {
           },
         },
       });
+      const captured = yield* Schema.decodeUnknownEffect(Schema.Struct({
+        body: Schema.Record(Schema.String, Schema.Unknown),
+      }))((yield* Ref.get(requests))[0]);
       assert.notProperty(
-        ((yield* Ref.get(requests))[0] as { body: object }).body,
+        captured.body,
         "deletes",
       );
     }));
@@ -145,17 +170,19 @@ describe("AgentOS OpenFGA HTTP and bootstrap", () => {
         presharedKey: Redacted.make(secret),
         timeoutMillis: 1_000,
         maximumResponseBytes: 1_024,
-        fetchImpl: (_input, init) => {
-          const headers = new Headers(init?.headers);
-          return Effect.runPromise(
-            Ref.set(observedAuthorization, headers.get("authorization")),
-          ).then(() =>
-            new Response(`sensitive upstream response containing ${secret}`, {
-              status: 401,
-            })
-          );
-        },
-      });
+      }).pipe(
+        Layer.provide(httpClientLayer((request) =>
+          Ref.set(
+            observedAuthorization,
+            request.headers.authorization ?? null,
+          ).pipe(
+            Effect.as(new Response(
+              `sensitive upstream response containing ${secret}`,
+              { status: 401 },
+            )),
+          )
+        )),
+      );
 
       const failure = yield* Effect.gen(function*() {
         const transport = yield* OpenFgaHttpTransport;

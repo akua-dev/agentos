@@ -1,5 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Redacted, Ref } from "effect";
+import { Effect, Layer, Redacted, Ref, Schema } from "effect";
+import {
+  HttpClient,
+  HttpClientRequest,
+  HttpClientResponse,
+} from "effect/unstable/http";
 
 import type { OpenFgaBootstrapResultV1 } from "../../../packages/agentos/src/access/openfga-http.ts";
 import {
@@ -15,6 +20,41 @@ const result: OpenFgaBootstrapResultV1 = {
   modelCreated: true,
 };
 
+const UpdateBodySchema = Schema.Struct({
+  metadata: Schema.Struct({ resourceVersion: Schema.String }),
+});
+
+function httpClientLayer(
+  execute: (
+    request: HttpClientRequest.HttpClientRequest,
+  ) => Effect.Effect<Response>,
+) {
+  return Layer.succeed(
+    HttpClient.HttpClient,
+    HttpClient.make((request) =>
+      execute(request).pipe(
+        Effect.map((response) =>
+          HttpClientResponse.fromWeb(request, response)
+        ),
+      )
+    ),
+  );
+}
+
+function decodeRequestBody(request: HttpClientRequest.HttpClientRequest) {
+  if (request.body._tag !== "Uint8Array") return Effect.succeed(null);
+  return Schema.decodeUnknownEffect(
+    Schema.fromJsonString(Schema.Unknown),
+  )(new TextDecoder().decode(request.body.body)).pipe(Effect.orDie);
+}
+
+function takeResponse(responses: Ref.Ref<ReadonlyArray<Response>>) {
+  return Ref.modify(responses, (current) => [
+    current[0] ?? new Response(null, { status: 500 }),
+    current.slice(1),
+  ]);
+}
+
 describe("OpenFGA Kubernetes publication", () => {
   it.effect("creates a versioned deployment ConfigMap without publishing credentials", () =>
     Effect.gen(function*() {
@@ -24,32 +64,33 @@ describe("OpenFGA Kubernetes publication", () => {
         readonly authorization: string | null;
         readonly body: unknown;
       }>>([]);
-      const responses = [
+      const responses = yield* Ref.make<ReadonlyArray<Response>>([
         new Response("not found", { status: 404 }),
         new Response("{}", { status: 201 }),
-      ];
+      ]);
       const secret = "kubernetes-service-account-secret";
+      const client = httpClientLayer((request) =>
+        Effect.gen(function*() {
+          const body = yield* decodeRequestBody(request);
+          yield* Ref.update(requests, (values) => [
+            ...values,
+            {
+              url: request.url,
+              method: request.method,
+              authorization: request.headers.authorization ?? null,
+              body,
+            },
+          ]);
+          return yield* takeResponse(responses);
+        })
+      );
       yield* publishOpenFgaDeployment({
         apiBaseUrl: "https://kubernetes.default.svc",
         namespace: "agentos",
         serviceAccountToken: Redacted.make(secret),
         timeoutMillis: 1_000,
         maximumResponseBytes: 64 * 1_024,
-        fetchImpl: (input, init) => {
-          const headers = new Headers(init?.headers);
-          return Effect.runPromise(Ref.update(requests, (values) => [
-            ...values,
-            {
-              url: String(input),
-              method: init?.method ?? "GET",
-              authorization: headers.get("authorization"),
-              body: init?.body === undefined
-                ? null
-                : JSON.parse(String(init.body)),
-            },
-          ])).then(() => responses.shift() ?? new Response(null, { status: 500 }));
-        },
-      }, result);
+      }, result).pipe(Effect.provide(client));
 
       const captured = yield* Ref.get(requests);
       assert.lengthOf(captured, 2);
@@ -86,7 +127,10 @@ describe("OpenFGA Kubernetes publication", () => {
 
   it.effect("updates with resourceVersion and retries an optimistic conflict", () =>
     Effect.gen(function*() {
-      const requests = yield* Ref.make<ReadonlyArray<{ method: string; body: any }>>([]);
+      const requests = yield* Ref.make<ReadonlyArray<{
+        readonly method: string;
+        readonly body: unknown;
+      }>>([]);
       const existing = {
         apiVersion: "v1",
         kind: "ConfigMap",
@@ -97,7 +141,7 @@ describe("OpenFGA Kubernetes publication", () => {
         },
         data: {},
       };
-      const responses = [
+      const responses = yield* Ref.make<ReadonlyArray<Response>>([
         new Response(JSON.stringify(existing), { status: 200 }),
         new Response("conflict details must remain private", { status: 409 }),
         new Response(JSON.stringify({
@@ -105,21 +149,24 @@ describe("OpenFGA Kubernetes publication", () => {
           metadata: { ...existing.metadata, resourceVersion: "42" },
         }), { status: 200 }),
         new Response("{}", { status: 200 }),
-      ];
+      ]);
+      const client = httpClientLayer((request) =>
+        Effect.gen(function*() {
+          const body = yield* decodeRequestBody(request);
+          yield* Ref.update(requests, (values) => [
+            ...values,
+            { method: request.method, body },
+          ]);
+          return yield* takeResponse(responses);
+        })
+      );
       yield* publishOpenFgaDeployment({
         apiBaseUrl: "https://kubernetes.default.svc",
         namespace: "agentos",
         serviceAccountToken: Redacted.make("token"),
         timeoutMillis: 1_000,
         maximumResponseBytes: 64 * 1_024,
-        fetchImpl: (_input, init) => {
-          const body = init?.body === undefined ? null : JSON.parse(String(init.body));
-          return Effect.runPromise(Ref.update(requests, (values) => [
-            ...values,
-            { method: init?.method ?? "GET", body },
-          ])).then(() => responses.shift() ?? new Response(null, { status: 500 }));
-        },
-      }, result);
+      }, result).pipe(Effect.provide(client));
 
       const captured = yield* Ref.get(requests);
       assert.deepStrictEqual(captured.map(({ method }) => method), [
@@ -128,23 +175,31 @@ describe("OpenFGA Kubernetes publication", () => {
         "GET",
         "PUT",
       ]);
-      assert.strictEqual(captured[1]?.body.metadata.resourceVersion, "41");
-      assert.strictEqual(captured[3]?.body.metadata.resourceVersion, "42");
+      const firstUpdate = yield* Schema.decodeUnknownEffect(UpdateBodySchema)(
+        captured[1]?.body,
+      );
+      const secondUpdate = yield* Schema.decodeUnknownEffect(UpdateBodySchema)(
+        captured[3]?.body,
+      );
+      assert.strictEqual(firstUpdate.metadata.resourceVersion, "41");
+      assert.strictEqual(secondUpdate.metadata.resourceVersion, "42");
     }));
 
   it.effect("reports only stable codes when the API fails", () =>
     Effect.gen(function*() {
+      const client = httpClientLayer(() =>
+        Effect.succeed(new Response(
+          "sensitive Kubernetes response do-not-leak",
+          { status: 403 },
+        ))
+      );
       const failure = yield* publishOpenFgaDeployment({
         apiBaseUrl: "https://kubernetes.default.svc",
         namespace: "agentos",
         serviceAccountToken: Redacted.make("do-not-leak"),
         timeoutMillis: 1_000,
         maximumResponseBytes: 64 * 1_024,
-        fetchImpl: () => Promise.resolve(new Response(
-          "sensitive Kubernetes response do-not-leak",
-          { status: 403 },
-        )),
-      }, result).pipe(Effect.flip);
+      }, result).pipe(Effect.provide(client), Effect.flip);
       assert.instanceOf(failure, OpenFgaKubernetesError);
       assert.strictEqual(failure.code, "unexpected_status");
       assert.notInclude(String(failure), "do-not-leak");
