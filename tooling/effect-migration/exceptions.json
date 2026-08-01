@@ -99,6 +99,18 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "services/ai-gateway/src/main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The AI Gateway executable needs one reviewed Bun process entry boundary around its fully typed, scoped Effect Platform application.",
+      "ownerIssue": 105,
+      "test": "services/ai-gateway/tests/main.effect.test.ts",
+      "removalCondition": "Retain only while the AI Gateway remains a standalone Bun service and keep all domain behavior inside Effect.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "services/egress-authz/src/main.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",

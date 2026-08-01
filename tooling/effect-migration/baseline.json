@@ -1298,15 +1298,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/agentgateway/tests/conformance.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "services/ai-gateway/kubernetes/tests/manifests.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 5,
-      "digest": "d3d1767539dae174657d2f9da188faee4bb1ef3b56cfa2b3895ed9ccbb7e8ce7",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/kubernetes/tests/manifests.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/ai-gateway/src/accounts.ts",
       "slice": "provider-services",
       "issue": 105,
@@ -1332,15 +1323,6 @@
       "digest": "ed4b288765df6af9554516c13c7a4d7b77c5ad60cb0cf06489c9721f8a01aa2b",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/codex-oauth.ts under issue #105; never refresh touched debt."
-    },
-    {
-      "path": "services/ai-gateway/src/main.ts",
-      "slice": "provider-services",
-      "issue": 105,
-      "violationCount": 7,
-      "digest": "42e9a2852b2d59695e2fc126d697abb57998fe61b4c9578476c9394519c1c740",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/main.ts under issue #105; never refresh touched debt."
     },
     {
       "path": "services/ai-gateway/src/proxy.ts",
@@ -1422,15 +1404,6 @@
       "digest": "b6d7b1a4069c46b2d51b82c9ca6392f6244bbda67059948142eec7f430d23e98",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/codex-oauth.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "services/ai-gateway/tests/main.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 34,
-      "digest": "b111d77ecc938b0a0f9b1770bae164ef0bf736774756eae4f93fd979d8a0bc4e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/main.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "services/ai-gateway/tests/proxy.test.ts",
