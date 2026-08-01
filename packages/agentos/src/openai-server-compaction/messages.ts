@@ -23,12 +23,18 @@ const IMAGE_CONTENT_OMITTED_PLACEHOLDER =
 const JsonText = Schema.UnknownFromJsonString;
 
 export function isCompactionArtifact(value: unknown): value is CompactionArtifact {
-  const parsed = ResponseItemSchema.safeParse(value);
-  return parsed.success && parsed.data.type === "compaction";
+  const parsed = Schema.decodeUnknownOption(ResponseItemSchema, {
+    onExcessProperty: "preserve",
+  })(value);
+  return Option.isSome(parsed) && parsed.value.type === "compaction";
 }
 
 export function isResponseItem(value: unknown): value is ResponseItem {
-  return ResponseItemSchema.safeParse(value).success;
+  return Option.isSome(
+    Schema.decodeUnknownOption(ResponseItemSchema, {
+      onExcessProperty: "preserve",
+    })(value),
+  );
 }
 
 function cloneResponseItem<T extends ResponseItem>(item: T): T {
@@ -222,8 +228,10 @@ function stripImagesWhenUnsupported(
       Array.isArray(next.content)
     ) {
       const content = next.content.flatMap((value) => {
-        const parsed = ResponseContentItemSchema.safeParse(value);
-        return parsed.success ? [parsed.data] : [];
+        const parsed = Schema.decodeUnknownOption(ResponseContentItemSchema, {
+          onExcessProperty: "preserve",
+        })(value);
+        return Option.isSome(parsed) ? [parsed.value] : [];
       });
       return parsedResponseItemOr(
         next,
@@ -258,8 +266,12 @@ function parsedResponseItemOr(
   fallback: ResponseItem,
   value: unknown,
 ): ResponseItem {
-  const parsed = ResponseItemSchema.safeParse(value);
-  return parsed.success ? parsed.data : fallback;
+  return Option.getOrElse(
+    Schema.decodeUnknownOption(ResponseItemSchema, {
+      onExcessProperty: "preserve",
+    })(value),
+    () => fallback,
+  );
 }
 
 export function normalizeResponseItemsForPrompt(
@@ -322,9 +334,9 @@ function assistantTextMetadata(
   if (!signature) return { annotations: [] };
   const decoded = Schema.decodeUnknownOption(JsonText)(signature);
   if (Option.isNone(decoded)) return { annotations: [] };
-  const parsed = JsonObjectSchema.safeParse(decoded.value);
-  if (!parsed.success) return { annotations: [] };
-  const value = parsed.data;
+  const parsed = Schema.decodeUnknownOption(JsonObjectSchema)(decoded.value);
+  if (Option.isNone(parsed)) return { annotations: [] };
+  const value = parsed.value;
   const phase = value.phase === "commentary" || value.phase === "final_answer"
     ? value.phase
     : undefined;
@@ -339,8 +351,11 @@ function reasoningItem(signature: string | undefined): ResponseItem | undefined 
   if (!signature) return undefined;
   const decoded = Schema.decodeUnknownOption(JsonText)(signature);
   if (Option.isNone(decoded)) return undefined;
-  const parsed = ResponseReasoningItemSchema.safeParse(decoded.value);
-  return parsed.success ? parsed.data : undefined;
+  return Option.getOrUndefined(
+    Schema.decodeUnknownOption(ResponseReasoningItemSchema, {
+      onExcessProperty: "preserve",
+    })(decoded.value),
+  );
 }
 
 function messageToResponseItems(message: Message): ResponseItem[] {
