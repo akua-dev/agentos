@@ -85,6 +85,16 @@
       "status": "migrated"
     },
     {
+      "id": "agent-workload-compiler-effect-tests",
+      "issue": 123,
+      "pattern": "^packages/agentos/src/workloads/tests/.*\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "schema", "kubernetes-manifest"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
       "id": "effect-test-conformance",
       "issue": 102,
       "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",
@@ -93,6 +103,16 @@
       "io": ["test", "filesystem", "process", "http", "database", "kubernetes"],
       "migrationDependencies": [100, 101, 97, 98, 99, 104, 105],
       "status": "planned"
+    },
+    {
+      "id": "agent-workload-compiler",
+      "issue": 123,
+      "pattern": "^packages/agentos/src/workloads/(?!tests/)",
+      "runtime": "shared-bun-kubernetes-manifest",
+      "package": "@akua-dev/agentos",
+      "io": ["schema", "kubernetes-manifest"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
     },
     {
       "id": "pure-website-presentation",

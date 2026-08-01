@@ -127,21 +127,22 @@ delegation or database intake from this Skill.
    `roles/secondmate/kubernetes/admission` bundle once and verify both policies
    report no CEL type-check warnings. A Second Mate never applies that
    cluster-scoped bundle.
-3. Create `$HOME/.local/state/agentos/workloads/<handle>/kustomization.yaml`.
-   Reference the released child base and patch every placeholder: resource
-   names, matching workload/Pod Agent, owner, Task and Assignment UUID labels,
-   Herdr session, database URL and Secret, Task
-   and Assignment UUIDs where applicable, storage, selected image, image
-   pull policy, CPU/memory requests and limits, and explicit child
-   `automountServiceAccountToken: false`. Published images require an immutable
-   digest. A Crewmate
-   overlay contains only its dedicated ServiceAccount, headless Service and
-   retained one-replica StatefulSet; reject Namespace, Role, RoleBinding,
-   NetworkPolicy, ResourceQuota, LimitRange, Secret and cluster-scoped
-   resources. Its owner already receives the reviewed namespace-limited
-   workload authority from the domain composition. A Second-Mate overlay is
-   the one exception: First Mate composes the released domain assets and owns
-   every control resource in that render.
+3. Canonicalize `$HOME/.local/state/agentos/workloads/<handle>` and the released
+   distribution root, then construct the released `AgentWorkloadSpec` version
+   `1` from the reviewed inputs. Use `interactive-crewmate@v1` for a Crewmate
+   or `persistent-mate@v1` for a Second Mate and call the released pure
+   `compileAgentWorkloadSpec` Effect. Do not hand-author patches or permit an
+   arbitrary Kubernetes object in the spec. Inspect its credential-free
+   summary, retain its spec and overlay digests with the operation evidence,
+   and write exactly the returned relative files under the canonical overlay
+   root. Refuse unknown fields/profiles, a mutable image, literal Secret data,
+   identity or lifecycle conflicts, and changed output on an equivalent retry.
+   The interactive profile emits only its dedicated ServiceAccount, headless
+   Service and retained one-replica StatefulSet and disables its projected
+   ServiceAccount token. The persistent profile composes the released domain
+   Namespace and controls and enables its dedicated projected identity for
+   child supervision. The compiler performs no filesystem, Kubernetes or
+   database mutation; those remain native runtime-operation steps below.
 4. Render a review artifact with native kubectl:
 
    ```console
