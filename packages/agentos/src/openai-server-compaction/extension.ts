@@ -1,3 +1,7 @@
+import * as BunCrypto from "@effect/platform-bun/BunCrypto";
+import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
+import * as BunHttpClient from "@effect/platform-bun/BunHttpClient";
+import * as BunPath from "@effect/platform-bun/BunPath";
 import {
   compact,
   convertToLlm,
@@ -12,8 +16,17 @@ import {
 import { calculateCost, type Usage } from "@earendil-works/pi-ai";
 import { complete } from "@earendil-works/pi-ai/compat";
 import {
-  requestServerCompaction,
+  Clock,
+  Config,
+  Effect,
+  Layer,
+  Result,
+  Schema,
+} from "effect";
+
+import {
   OpenAICompactionHttpError,
+  requestServerCompaction,
   supportsServerCompaction,
   type OpenAICompactionModel,
   type OpenAICompactionReasoning,
@@ -34,6 +47,15 @@ import {
   NATIVE_DETAILS_KEY,
   rewriteResponsesPayload,
 } from "./session.ts";
+import {
+  isGatewaySecurityHeader,
+  resolvePiWorkloadIdentity,
+  type PiWorkloadIdentityOptions,
+} from "../access/pi-workload-identity.ts";
+import {
+  legacyEnvironmentConfigLayer,
+  runPromiseLegacy,
+} from "../shared/legacy.ts";
 import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
 import {
   agentOSRouteForModel,
@@ -45,12 +67,6 @@ import type {
   AgentOSProviderAttempt,
   AgentOSProviderAttemptOutcome,
 } from "../telemetry/runtime.ts";
-import {
-  isGatewaySecurityHeader,
-  resolvePiWorkloadIdentity,
-  type PiWorkloadIdentityOptions,
-} from "../access/pi-workload-identity.ts";
-import { runPromiseLegacy } from "../shared/legacy.ts";
 
 type ResolvedAuth = {
   apiKey?: string;
@@ -59,6 +75,7 @@ type ResolvedAuth = {
 };
 
 type PiThinkingLevel = ReturnType<ExtensionAPI["getThinkingLevel"]>;
+type CompleteResult = Awaited<ReturnType<typeof complete>>;
 
 export type LocalCompactionRequest = {
   event: SessionBeforeCompactEvent;
@@ -73,28 +90,89 @@ export type LocalCompactionTelemetry = {
   startFallbackAttempt(): void;
 };
 
-type LocalSummaryImplementations = {
-  complete: typeof complete;
-  compact: typeof compact;
-  now: () => number;
+export type LocalSummaryImplementations = {
+  complete(
+    ...args: Parameters<typeof complete>
+  ): Effect.Effect<CompleteResult, unknown>;
+  compact(
+    ...args: Parameters<typeof compact>
+  ): Effect.Effect<CompactionResult, unknown>;
+  readonly now: Effect.Effect<number>;
+};
+
+export type OpenAIServerCompactionConfig = {
+  readonly enabled: boolean;
+  readonly remoteTimeoutMs?: number;
 };
 
 export type OpenAIServerCompactionDependencies = {
-  runLocalCompaction(request: LocalCompactionRequest): Promise<CompactionResult>;
-  runServerCompaction(request: ServerCompactionRequest): Promise<ServerCompactionResult>;
-  telemetry?: AgentOSTelemetrySource;
-  workloadIdentity?: PiWorkloadIdentityOptions;
+  runLocalCompaction(
+    request: LocalCompactionRequest,
+  ): Effect.Effect<CompactionResult, unknown>;
+  runServerCompaction(
+    request: ServerCompactionRequest,
+  ): Effect.Effect<ServerCompactionResult, unknown>;
+  readonly config?: Effect.Effect<OpenAIServerCompactionConfig, unknown>;
+  readonly telemetry?: AgentOSTelemetrySource;
+  readonly workloadIdentity?: PiWorkloadIdentityOptions;
 };
 
-function isEnabled(): boolean {
-  const value = process.env.AGENTOS_OPENAI_SERVER_COMPACTION_ENABLED?.trim().toLowerCase();
-  return value === undefined || !["0", "false", "no", "off"].includes(value);
-}
+const LocalSummaryFailureCode = Schema.Literals([
+  "portable_provider_failed",
+  "portable_request_failed",
+]);
 
-function configuredRemoteTimeout(): number | undefined {
-  const value = Number(process.env.AGENTOS_OPENAI_SERVER_COMPACTION_TIMEOUT_MS?.trim());
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
-}
+class LocalSummaryFailure extends Schema.TaggedErrorClass<LocalSummaryFailure>()(
+  "LocalSummaryFailure",
+  {
+    cause: Schema.Unknown,
+    code: LocalSummaryFailureCode,
+    inputTokens: Schema.optional(Schema.Number),
+    outputTokens: Schema.optional(Schema.Number),
+    status: Schema.optional(Schema.Number),
+    streamOutcome: Schema.Literals(["aborted", "upstream_error"]),
+  },
+) {}
+
+const ExtensionFailureCode = Schema.Literals([
+  "model_registry_unavailable",
+  "telemetry_unavailable",
+]);
+
+export class OpenAIServerCompactionExtensionError extends Schema.TaggedErrorClass<OpenAIServerCompactionExtensionError>()(
+  "OpenAIServerCompactionExtensionError",
+  {
+    cause: Schema.Unknown,
+    code: ExtensionFailureCode,
+  },
+) {}
+
+const compactionPlatformLayer = Layer.mergeAll(
+  BunCrypto.layer,
+  BunFileSystem.layer,
+  BunHttpClient.layer,
+  BunPath.layer,
+);
+
+const openAIServerCompactionConfig = Config.all({
+  enabledValue: Config.string(
+    "AGENTOS_OPENAI_SERVER_COMPACTION_ENABLED",
+  ).pipe(Config.withDefault("")),
+  timeoutValue: Config.string(
+    "AGENTOS_OPENAI_SERVER_COMPACTION_TIMEOUT_MS",
+  ).pipe(Config.withDefault("")),
+}).pipe(
+  Effect.map(({ enabledValue, timeoutValue }) => {
+    const normalizedEnabled = enabledValue.trim().toLowerCase();
+    const timeout = Number(timeoutValue.trim());
+    return {
+      enabled: !["0", "false", "no", "off"].includes(normalizedEnabled),
+      ...(Number.isFinite(timeout) && timeout > 0
+        ? { remoteTimeoutMs: Math.floor(timeout) }
+        : {}),
+    } satisfies OpenAIServerCompactionConfig;
+  }),
+);
 
 function mergedHeaders(
   modelHeaders: Record<string, string> | undefined,
@@ -115,7 +193,10 @@ function mergedHeaders(
   return result;
 }
 
-function toolsPayload(allTools: ToolInfo[], activeTools: string[]): OpenAICompactionTool[] {
+function toolsPayload(
+  allTools: ToolInfo[],
+  activeTools: string[],
+): OpenAICompactionTool[] {
   const active = new Set(activeTools);
   return allTools
     .filter((tool) => active.has(tool.name))
@@ -149,27 +230,31 @@ function portableSummaryPrompt(
 }
 
 function portableFallbackSummary(model: OpenAICompactionModel): string {
-  let hostname = "api.openai.com";
-  try {
-    if (model.baseUrl) hostname = new URL(model.baseUrl).hostname;
-  } catch {
-    // A malformed custom base URL should not prevent portable fallback text.
-  }
+  const hostname = model.baseUrl && URL.canParse(model.baseUrl)
+    ? new URL(model.baseUrl).hostname
+    : "api.openai.com";
   return `OpenAI remote compaction applied for ${model.provider}/${model.id} via ${hostname}. Pi keeps this textual summary for portability, while compatible future OpenAI turns can use provider-native replacement history stored in compaction details.`;
 }
 
 const localSummaryDefaults: LocalSummaryImplementations = {
-  complete,
-  compact,
-  now: Date.now,
+  complete: (...args) =>
+    Effect.tryPromise({
+      try: () => complete(...args),
+      catch: (cause) => cause,
+    }),
+  compact: (...args) =>
+    Effect.tryPromise({
+      try: () => compact(...args),
+      catch: (cause) => cause,
+    }),
+  now: Clock.currentTimeMillis,
 };
 
-export async function generateBestEffortLocalSummary(
+export function generateBestEffortLocalSummary(
   request: LocalCompactionRequest,
   implementations: LocalSummaryImplementations = localSummaryDefaults,
-): Promise<CompactionResult> {
-  let portableAttemptEnded = false;
-  try {
+): Effect.Effect<CompactionResult, unknown> {
+  const portable = Effect.gen(function*() {
     const messages = request.event.branchEntries
       .filter(
         (entry): entry is SessionMessageEntry =>
@@ -177,7 +262,8 @@ export async function generateBestEffortLocalSummary(
       )
       .map((entry) => entry.message);
     const conversation = serializeConversation(convertToLlm(messages));
-    const response = await implementations.complete(
+    const timestamp = yield* implementations.now;
+    const response = yield* implementations.complete(
       request.model,
       {
         messages: [
@@ -192,7 +278,7 @@ export async function generateBestEffortLocalSummary(
                 ),
               },
             ],
-            timestamp: implementations.now(),
+            timestamp,
           },
         ],
       },
@@ -203,24 +289,31 @@ export async function generateBestEffortLocalSummary(
         signal: request.event.signal,
         env: request.auth.env,
       },
+    ).pipe(
+      Effect.mapError((cause) =>
+        LocalSummaryFailure.make({
+          cause,
+          code: "portable_request_failed",
+          streamOutcome: "upstream_error",
+        })
+      ),
     );
     const failure = safeAssistantFailure(response.stopReason);
-    if (failure) {
-      portableAttemptEnded = true;
-      request.telemetry?.currentAttempt().end({
+    if (failure !== undefined) {
+      return yield* LocalSummaryFailure.make({
+        cause: failure,
+        code: "portable_provider_failed",
         status: 200,
-        error: failure,
-        streamOutcome:
-          response.stopReason === "aborted" ? "aborted" : "upstream_error",
-        inputTokens: safeTokenCount(response.usage.input),
-        outputTokens: safeTokenCount(response.usage.output),
+        streamOutcome: response.stopReason === "aborted"
+          ? "aborted"
+          : "upstream_error",
+        ...(safeTokenCount(response.usage.input) === undefined
+          ? {}
+          : { inputTokens: safeTokenCount(response.usage.input) }),
+        ...(safeTokenCount(response.usage.output) === undefined
+          ? {}
+          : { outputTokens: safeTokenCount(response.usage.output) }),
       });
-      request.telemetry?.startFallbackAttempt();
-      throw new Error(
-        response.stopReason === "aborted"
-          ? "OpenAI portable compaction aborted"
-          : "OpenAI portable compaction failed",
-      );
     }
     const summary = response.content
       .filter(
@@ -234,38 +327,55 @@ export async function generateBestEffortLocalSummary(
       summary: summary || portableFallbackSummary(request.model),
       firstKeptEntryId: request.event.preparation.firstKeptEntryId,
       tokensBefore: request.event.preparation.tokensBefore,
-    };
-  } catch (error) {
-    if (!portableAttemptEnded) {
-      request.telemetry?.currentAttempt().end({
-        error,
-        streamOutcome: "upstream_error",
-      });
-      request.telemetry?.startFallbackAttempt();
-    }
-    return implementations.compact(
-      request.event.preparation,
-      request.model,
-      request.auth.apiKey,
-      request.auth.headers,
-      request.event.customInstructions,
-      request.event.signal,
-      request.thinkingLevel,
-      undefined,
-      request.auth.env,
-    );
-  }
+    } satisfies CompactionResult;
+  });
+
+  return portable.pipe(
+    Effect.catch((failure) =>
+      Effect.gen(function*() {
+        yield* Effect.sync(() => {
+          request.telemetry?.currentAttempt().end({
+            ...(failure.status === undefined ? {} : { status: failure.status }),
+            error: failure.cause,
+            streamOutcome: failure.streamOutcome,
+            ...(failure.inputTokens === undefined
+              ? {}
+              : { inputTokens: failure.inputTokens }),
+            ...(failure.outputTokens === undefined
+              ? {}
+              : { outputTokens: failure.outputTokens }),
+          });
+          request.telemetry?.startFallbackAttempt();
+        });
+        return yield* implementations.compact(
+          request.event.preparation,
+          request.model,
+          request.auth.apiKey,
+          request.auth.headers,
+          request.event.customInstructions,
+          request.event.signal,
+          request.thinkingLevel,
+          undefined,
+          request.auth.env,
+        );
+      })
+    ),
+  );
 }
 
-async function defaultLocalCompaction(
-  request: LocalCompactionRequest,
-): Promise<CompactionResult> {
+function defaultLocalCompaction(request: LocalCompactionRequest) {
   return generateBestEffortLocalSummary(request);
+}
+
+function defaultServerCompaction(request: ServerCompactionRequest) {
+  return requestServerCompaction(request).pipe(
+    Effect.provide(compactionPlatformLayer),
+  );
 }
 
 const defaults: OpenAIServerCompactionDependencies = {
   runLocalCompaction: defaultLocalCompaction,
-  runServerCompaction: requestServerCompaction,
+  runServerCompaction: defaultServerCompaction,
 };
 
 function mergedDetails(
@@ -282,7 +392,9 @@ function mergedDetails(
 }
 
 function finiteNumber(value: number | undefined): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, value)
+    : 0;
 }
 
 function normalizedServerUsage(
@@ -309,7 +421,10 @@ function normalizedServerUsage(
   return usage;
 }
 
-function combinedUsage(local: Usage | undefined, remote: Usage | undefined): Usage | undefined {
+function combinedUsage(
+  local: Usage | undefined,
+  remote: Usage | undefined,
+): Usage | undefined {
   if (!local) return remote;
   if (!remote) return local;
   return {
@@ -329,177 +444,227 @@ function combinedUsage(local: Usage | undefined, remote: Usage | undefined): Usa
   };
 }
 
-async function handleCompaction(
+function startTelemetryOperation(
+  model: OpenAICompactionModel,
+  telemetry: AgentOSTelemetrySource | undefined,
+) {
+  return Effect.tryPromise({
+    try: () => startAgentOSAuxiliaryOperation(model, telemetry, "resumed"),
+    catch: (cause) =>
+      OpenAIServerCompactionExtensionError.make({
+        cause,
+        code: "telemetry_unavailable",
+      }),
+  });
+}
+
+function resolveModelAuth(
+  ctx: ExtensionContext,
+  model: OpenAICompactionModel,
+) {
+  return Effect.tryPromise({
+    try: () => ctx.modelRegistry.getApiKeyAndHeaders(model),
+    catch: (cause) =>
+      OpenAIServerCompactionExtensionError.make({
+        cause,
+        code: "model_registry_unavailable",
+      }),
+  });
+}
+
+function handleCompaction(
   pi: ExtensionAPI,
   dependencies: OpenAIServerCompactionDependencies,
   requestShapes: Map<string, ProviderRequestShape>,
   event: SessionBeforeCompactEvent,
   ctx: ExtensionContext,
 ) {
-  const model = ctx.model;
-  if (!isEnabled() || !supportsServerCompaction(model)) return undefined;
+  return Effect.gen(function*() {
+    const config = yield* dependencies.config ?? openAIServerCompactionConfig;
+    const model = ctx.model;
+    if (!config.enabled || !supportsServerCompaction(model)) return undefined;
 
-  const resolved = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-  if (!resolved.ok) return undefined;
-  const workloadIdentity = await runPromiseLegacy(
-    resolvePiWorkloadIdentity(model, dependencies.workloadIdentity),
-  );
-  if (workloadIdentity.active && workloadIdentity.headers === undefined) {
-    return undefined;
-  }
-  const hasAuthorization = Object.keys(resolved.headers ?? {}).some(
-    (name) => name.toLowerCase() === "authorization",
-  );
-  if (!workloadIdentity.active && !resolved.apiKey && !hasAuthorization) {
-    return undefined;
-  }
-
-  const thinkingLevel = pi.getThinkingLevel();
-  const telemetryOperation = await startAgentOSAuxiliaryOperation(
-    model,
-    dependencies.telemetry,
-    "resumed",
-  );
-  const startPortableAttempt = () =>
-    telemetryOperation.startProviderAttempt({
-      compactionPath: "portable_summary",
-      requestKind: "compaction",
-      streamMode: "non_streaming",
-    });
-  let localAttempt = startPortableAttempt();
-  const remoteAttempt = telemetryOperation.startProviderAttempt({
-    compactionPath: "native_server",
-    requestKind: "compaction",
-    streamMode: model.provider === "openai-codex" ? "streaming" : "non_streaming",
-  });
-  const baseHeaders = mergedHeaders(model.headers, resolved.headers);
-  if (workloadIdentity.active) {
-    for (const name of Object.keys(baseHeaders)) {
-      if (isGatewaySecurityHeader(name)) delete baseHeaders[name];
-    }
-    Object.assign(baseHeaders, workloadIdentity.headers);
-  }
-  const localHeaders = { ...baseHeaders };
-  const remoteHeaders = { ...baseHeaders };
-  localAttempt.inject(localHeaders);
-  remoteAttempt.inject(remoteHeaders);
-  const localRequest = {
-    event,
-    model,
-    auth: {
-      ...resolved,
-      ...(workloadIdentity.active ? { apiKey: undefined } : {}),
-      headers: localHeaders,
-    },
-    thinkingLevel,
-    telemetry: {
-      currentAttempt: () => localAttempt,
-      startFallbackAttempt: () => {
-        localAttempt = startPortableAttempt();
-        localAttempt.inject(localHeaders);
-      },
-    },
-  };
-  const requestShape = requestShapes.get(requestShapeKey(ctx));
-  requestShapes.delete(requestShapeKey(ctx));
-  const remoteRequest: ServerCompactionRequest = {
-    model,
-    route: agentOSRouteForModel(model),
-    apiKey: workloadIdentity.active ? undefined : resolved.apiKey,
-    headers: remoteHeaders,
-    sessionId: ctx.sessionManager.getSessionId(),
-    input: normalizeResponseItemsForPrompt(
-      buildCompactionInput(
-        event.branchEntries,
-        model.provider,
-        model.api,
-        model.id,
-      ),
+    const resolved = yield* resolveModelAuth(ctx, model);
+    if (!resolved.ok) return undefined;
+    const workloadIdentity = yield* resolvePiWorkloadIdentity(
       model,
-    ),
-    instructions: ctx.getSystemPrompt(),
-    tools: toolsPayload(pi.getAllTools(), pi.getActiveTools()),
-    reasoning: requestShape?.reasoning ?? reasoningFor(thinkingLevel, model),
-    text: requestShape?.text,
-    signal: event.signal,
-    timeoutMs: configuredRemoteTimeout(),
-  };
-
-  const [local, remote] = await Promise.allSettled([
-    observeCompactionAttempt(
-      () => localAttempt,
-      () => dependencies.runLocalCompaction(localRequest),
-      (result) => ({
-        inputTokens: safeTokenCount(result.usage?.input),
-        outputTokens: safeTokenCount(result.usage?.output),
-      }),
-    ),
-    observeCompactionAttempt(
-      remoteAttempt,
-      () => dependencies.runServerCompaction(remoteRequest),
-      (result) => ({
-        inputTokens: safeTokenCount(result.usage?.input_tokens),
-        outputTokens: safeTokenCount(result.usage?.output_tokens),
-      }),
-    ),
-  ]);
-
-  if (local.status !== "fulfilled") {
-    telemetryOperation.end({ error: local.reason });
-    return undefined;
-  }
-  telemetryOperation.end({ status: 200 });
-  if (remote.status !== "fulfilled") {
-    if (!event.signal.aborted && ctx.hasUI) {
-      ctx.ui.notify("OpenAI server compaction unavailable; using Pi's portable summary.", "warning");
+      dependencies.workloadIdentity,
+    );
+    if (workloadIdentity.active && workloadIdentity.headers === undefined) {
+      return undefined;
     }
-    return { compaction: local.value };
-  }
+    const hasAuthorization = Object.keys(resolved.headers ?? {}).some(
+      (name) => name.toLowerCase() === "authorization",
+    );
+    if (!workloadIdentity.active && !resolved.apiKey && !hasAuthorization) {
+      return undefined;
+    }
 
-  const native = nativeCompactionDetails(
-    model.provider,
-    model.api,
-    model.id,
-    remote.value.output,
-    remote.value.usage,
-  );
-  return {
-    compaction: {
-      ...local.value,
-      usage: combinedUsage(local.value.usage, normalizedServerUsage(model, remote.value.usage)),
-      details: mergedDetails(local.value.details, native),
-    },
-  };
+    const thinkingLevel = pi.getThinkingLevel();
+    const telemetryOperation = yield* startTelemetryOperation(
+      model,
+      dependencies.telemetry,
+    );
+    const startPortableAttempt = () =>
+      telemetryOperation.startProviderAttempt({
+        compactionPath: "portable_summary",
+        requestKind: "compaction",
+        streamMode: "non_streaming",
+      });
+    let localAttempt = startPortableAttempt();
+    const remoteAttempt = telemetryOperation.startProviderAttempt({
+      compactionPath: "native_server",
+      requestKind: "compaction",
+      streamMode: model.provider === "openai-codex"
+        ? "streaming"
+        : "non_streaming",
+    });
+    const baseHeaders = mergedHeaders(model.headers, resolved.headers);
+    if (workloadIdentity.active) {
+      for (const name of Object.keys(baseHeaders)) {
+        if (isGatewaySecurityHeader(name)) delete baseHeaders[name];
+      }
+      Object.assign(baseHeaders, workloadIdentity.headers);
+    }
+    const localHeaders = { ...baseHeaders };
+    const remoteHeaders = { ...baseHeaders };
+    localAttempt.inject(localHeaders);
+    remoteAttempt.inject(remoteHeaders);
+    const localRequest: LocalCompactionRequest = {
+      event,
+      model,
+      auth: {
+        ...resolved,
+        ...(workloadIdentity.active ? { apiKey: undefined } : {}),
+        headers: localHeaders,
+      },
+      thinkingLevel,
+      telemetry: {
+        currentAttempt: () => localAttempt,
+        startFallbackAttempt: () => {
+          localAttempt = startPortableAttempt();
+          localAttempt.inject(localHeaders);
+        },
+      },
+    };
+    const shapeKey = requestShapeKey(ctx);
+    const requestShape = requestShapes.get(shapeKey);
+    requestShapes.delete(shapeKey);
+    const remoteRequest: ServerCompactionRequest = {
+      model,
+      route: agentOSRouteForModel(model),
+      apiKey: workloadIdentity.active ? undefined : resolved.apiKey,
+      headers: remoteHeaders,
+      sessionId: ctx.sessionManager.getSessionId(),
+      input: normalizeResponseItemsForPrompt(
+        buildCompactionInput(
+          event.branchEntries,
+          model.provider,
+          model.api,
+          model.id,
+        ),
+        model,
+      ),
+      instructions: ctx.getSystemPrompt(),
+      tools: toolsPayload(pi.getAllTools(), pi.getActiveTools()),
+      reasoning: requestShape?.reasoning ?? reasoningFor(thinkingLevel, model),
+      text: requestShape?.text,
+      signal: event.signal,
+      timeoutMs: config.remoteTimeoutMs,
+    };
+
+    const [local, remote] = yield* Effect.all([
+      Effect.result(
+        observeCompactionAttempt(
+          () => localAttempt,
+          dependencies.runLocalCompaction(localRequest),
+          (result) => ({
+            inputTokens: safeTokenCount(result.usage?.input),
+            outputTokens: safeTokenCount(result.usage?.output),
+          }),
+        ),
+      ),
+      Effect.result(
+        observeCompactionAttempt(
+          remoteAttempt,
+          dependencies.runServerCompaction(remoteRequest),
+          (result) => ({
+            inputTokens: safeTokenCount(result.usage?.input_tokens),
+            outputTokens: safeTokenCount(result.usage?.output_tokens),
+          }),
+        ),
+      ),
+    ], { concurrency: "unbounded" });
+
+    if (Result.isFailure(local)) {
+      telemetryOperation.end({ error: local.failure });
+      return undefined;
+    }
+    telemetryOperation.end({ status: 200 });
+    if (Result.isFailure(remote)) {
+      if (!event.signal.aborted && ctx.hasUI) {
+        yield* Effect.sync(() =>
+          ctx.ui.notify(
+            "OpenAI server compaction unavailable; using Pi's portable summary.",
+            "warning",
+          )
+        );
+      }
+      return { compaction: local.success };
+    }
+
+    const native = nativeCompactionDetails(
+      model.provider,
+      model.api,
+      model.id,
+      remote.success.output,
+      remote.success.usage,
+    );
+    return {
+      compaction: {
+        ...local.success,
+        usage: combinedUsage(
+          local.success.usage,
+          normalizedServerUsage(model, remote.success.usage),
+        ),
+        details: mergedDetails(local.success.details, native),
+      },
+    };
+  });
 }
 
-async function observeCompactionAttempt<T>(
+function observeCompactionAttempt<T, E>(
   attempt: AgentOSProviderAttempt | (() => AgentOSProviderAttempt),
-  run: () => Promise<T>,
+  run: Effect.Effect<T, E>,
   counts: (
     result: T,
   ) => Pick<
     AgentOSProviderAttemptOutcome,
     "inputTokens" | "outputTokens"
   >,
-): Promise<T> {
-  try {
-    const result = await run();
-    resolveAttempt(attempt).end({
-      status: 200,
-      streamOutcome: "completed",
-      ...counts(result),
-    });
-    return result;
-  } catch (error) {
-    resolveAttempt(attempt).end({
-      ...(error instanceof OpenAICompactionHttpError
-        ? { status: error.status }
-        : {}),
-      error,
-      streamOutcome: "upstream_error",
-    });
-    throw error;
-  }
+) {
+  return run.pipe(
+    Effect.tap((result) =>
+      Effect.sync(() =>
+        resolveAttempt(attempt).end({
+          status: 200,
+          streamOutcome: "completed",
+          ...counts(result),
+        })
+      )
+    ),
+    Effect.tapError((error) =>
+      Effect.sync(() =>
+        resolveAttempt(attempt).end({
+          ...(error instanceof OpenAICompactionHttpError
+            ? { status: error.status }
+            : {}),
+          error,
+          streamOutcome: "upstream_error",
+        })
+      )
+    ),
+  );
 }
 
 function resolveAttempt(
@@ -515,18 +680,17 @@ type ProviderRequestShape = {
 
 function requestShapeKey(ctx: ExtensionContext): string {
   const model = ctx.model;
-  const sessionId = (
-    ctx.sessionManager as { getSessionId?: () => string }
-  ).getSessionId?.() ?? "";
   return [
-    sessionId,
+    ctx.sessionManager.getSessionId(),
     model?.provider,
     model?.api,
     model?.id,
   ].join("\u0000");
 }
 
-function requestShapeFromPayload(payload: unknown): ProviderRequestShape | undefined {
+function requestShapeFromPayload(
+  payload: unknown,
+): ProviderRequestShape | undefined {
   const parsed = parseJsonObject(payload);
   if (!parsed) return undefined;
   const reasoning = parseJsonObject(parsed.reasoning);
@@ -538,37 +702,61 @@ function requestShapeFromPayload(payload: unknown): ProviderRequestShape | undef
   };
 }
 
+function handleProviderRequest(
+  dependencies: OpenAIServerCompactionDependencies,
+  requestShapes: Map<string, ProviderRequestShape>,
+  payload: unknown,
+  ctx: ExtensionContext,
+) {
+  return Effect.gen(function*() {
+    const config = yield* dependencies.config ?? openAIServerCompactionConfig;
+    const model = ctx.model;
+    if (!config.enabled || !supportsServerCompaction(model)) return undefined;
+    const key = requestShapeKey(ctx);
+    requestShapes.delete(key);
+    const requestShape = requestShapeFromPayload(payload);
+    if (requestShape) requestShapes.set(key, requestShape);
+    return rewriteResponsesPayload(
+      payload,
+      ctx.sessionManager.getBranch(),
+      model.provider,
+      model.api,
+      model.id,
+    );
+  });
+}
+
+function runExtensionEffect<A, E>(effect: Effect.Effect<A, E>) {
+  return runPromiseLegacy(
+    effect.pipe(Effect.provide(legacyEnvironmentConfigLayer())),
+  );
+}
+
 export function createOpenAIServerCompactionExtension(
   dependencies: OpenAIServerCompactionDependencies = defaults,
 ) {
   return (pi: ExtensionAPI) => {
     const requestShapes = new Map<string, ProviderRequestShape>();
+    const clearRequestShapes = () =>
+      runExtensionEffect(Effect.sync(() => requestShapes.clear()));
     pi.on("session_before_compact", (event, ctx) =>
-      handleCompaction(pi, dependencies, requestShapes, event, ctx),
+      runExtensionEffect(
+        handleCompaction(pi, dependencies, requestShapes, event, ctx),
+      )
     );
-    pi.on("before_provider_request", (event, ctx) => {
-      const model = ctx.model;
-      if (!isEnabled() || !supportsServerCompaction(model)) return undefined;
-      const key = requestShapeKey(ctx);
-      requestShapes.delete(key);
-      const requestShape = requestShapeFromPayload(event.payload);
-      if (requestShape) requestShapes.set(key, requestShape);
-      return rewriteResponsesPayload(
-        event.payload,
-        ctx.sessionManager.getBranch(),
-        model.provider,
-        model.api,
-        model.id,
-      );
-    });
-    pi.on("session_start", () => requestShapes.clear());
-    pi.on("session_before_switch", () => requestShapes.clear());
-    pi.on("session_before_fork", () => requestShapes.clear());
-    pi.on("session_before_tree", () => requestShapes.clear());
-    pi.on("session_tree", () => requestShapes.clear());
-    pi.on("session_compact", () => requestShapes.clear());
-    pi.on("model_select", () => requestShapes.clear());
-    pi.on("session_shutdown", () => requestShapes.clear());
+    pi.on("before_provider_request", (event, ctx) =>
+      runExtensionEffect(
+        handleProviderRequest(dependencies, requestShapes, event.payload, ctx),
+      )
+    );
+    pi.on("session_start", clearRequestShapes);
+    pi.on("session_before_switch", clearRequestShapes);
+    pi.on("session_before_fork", clearRequestShapes);
+    pi.on("session_before_tree", clearRequestShapes);
+    pi.on("session_tree", clearRequestShapes);
+    pi.on("session_compact", clearRequestShapes);
+    pi.on("model_select", clearRequestShapes);
+    pi.on("session_shutdown", clearRequestShapes);
   };
 }
 
