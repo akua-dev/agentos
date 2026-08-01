@@ -24,6 +24,10 @@ import {
 } from "effect";
 
 import {
+  AIGatewayTelemetry,
+  type AIGatewayRequestTelemetry,
+} from "./observability.ts";
+import {
   type AIProviderHttp,
   type AIProviderHttpError,
 } from "./provider-http.ts";
@@ -79,6 +83,7 @@ export interface AIForwardOptions {
     sessionKey: string | undefined,
     signal: AbortSignal,
     authorization: ProviderAuthorizationGrantV1 | undefined,
+    telemetry: AIGatewayRequestTelemetry,
   ) => Effect.Effect<AIForwardLease | undefined, AIForwardRouteError>;
   readonly provider: AIProviderHttp["Service"];
   readonly settlements: ProviderBudgetSettlementReporter["Service"];
@@ -104,10 +109,12 @@ export const makeAIForwardHandler = Effect.fn(
       code: "invalid_configuration",
     });
   }
+  const telemetry = yield* AIGatewayTelemetry;
 
   const handler: AIForwardHandler = Effect.fn(
     "agentos.aiGateway.forward",
   )(function*(request: Request) {
+    const requestTelemetry = yield* telemetry.start(request);
     const urlResult = yield* Effect.result(Effect.try({
       try: () => new URL(request.url),
       catch: () => AIForwardConfigurationError.make({
@@ -124,7 +131,18 @@ export const makeAIForwardHandler = Effect.fn(
       url,
       options.now,
     );
+    yield* diagnostic(requestTelemetry.authenticate(
+      authentication.authenticated,
+      authentication.authenticated
+        ? authentication.authorization
+        : undefined,
+      authentication.authenticated ? undefined : authentication.status,
+    ));
     if (!authentication.authenticated) {
+      yield* diagnostic(requestTelemetry.end({
+        status: authentication.status,
+        streamOutcome: "not_streamed",
+      }));
       return jsonResponse(
         authentication.status,
         authentication.status === 403 ? "forbidden" : "unauthorized",
@@ -134,40 +152,79 @@ export const makeAIForwardHandler = Effect.fn(
       request.method !== "POST" ||
       !isSupportedResponsePath(url.pathname)
     ) {
+      yield* diagnostic(requestTelemetry.end({
+        status: 404,
+        streamOutcome: "not_streamed",
+      }));
       return jsonResponse(404, "not_found");
     }
 
     const session = yield* Effect.result(extractSessionKey(request.headers));
     if (Result.isFailure(session)) {
+      yield* diagnostic(requestTelemetry.end({
+        status: 400,
+        streamOutcome: "not_streamed",
+      }));
       return jsonResponse(400, "invalid_session");
     }
     const sessionKey = attributedSessionKey(
       Option.getOrUndefined(session.success),
       authentication.authorization,
     );
+    yield* diagnostic(requestTelemetry.routeStarted);
     const acquired = yield* Effect.result(options.acquire(
       sessionKey,
       request.signal,
       authentication.authorization,
+      requestTelemetry,
     ));
     if (Result.isFailure(acquired)) {
+      yield* diagnostic(
+        requestTelemetry.routeEnded("error", acquired.failure),
+      );
+      yield* diagnostic(requestTelemetry.end({
+        status: 503,
+        error: acquired.failure,
+        streamOutcome: "not_streamed",
+      }));
       return jsonResponse(503, "route_unavailable");
     }
     const lease = acquired.success;
     if (lease === undefined) {
+      yield* diagnostic(requestTelemetry.routeEnded("unavailable"));
+      yield* diagnostic(requestTelemetry.end({
+        status: 503,
+        streamOutcome: "not_streamed",
+      }));
       return jsonResponse(503, "no_eligible_account");
     }
+    yield* diagnostic(requestTelemetry.routeEnded("acquired"));
 
     const upstreamRequest = yield* makeUpstreamRequest(request, url, lease);
     if (upstreamRequest === undefined) {
-      yield* releaseLease(lease);
+      yield* releaseLease(lease, requestTelemetry);
+      yield* diagnostic(requestTelemetry.end({
+        status: 400,
+        streamOutcome: "not_streamed",
+      }));
       return jsonResponse(400, "invalid_request");
     }
+    yield* diagnostic(
+      requestTelemetry.upstreamStarted(upstreamRequest.headers),
+    );
     const upstreamResult = yield* Effect.result(
       options.provider.execute(upstreamRequest),
     );
     if (Result.isFailure(upstreamResult)) {
-      yield* releaseLease(lease);
+      yield* diagnostic(
+        requestTelemetry.upstreamFailed(upstreamResult.failure),
+      );
+      yield* releaseLease(lease, requestTelemetry);
+      yield* diagnostic(requestTelemetry.end({
+        status: 502,
+        error: upstreamResult.failure,
+        streamOutcome: request.signal.aborted ? "aborted" : "upstream_error",
+      }));
       return jsonResponse(502, providerErrorCode(upstreamResult.failure));
     }
     const upstream = upstreamResult.success;
@@ -178,27 +235,65 @@ export const makeAIForwardHandler = Effect.fn(
       }),
     }));
     if (Result.isFailure(headersResult)) {
-      yield* releaseLease(lease);
+      yield* diagnostic(
+        requestTelemetry.upstreamFailed(headersResult.failure),
+      );
+      yield* releaseLease(lease, requestTelemetry);
+      yield* diagnostic(requestTelemetry.end({
+        status: 502,
+        error: headersResult.failure,
+        streamOutcome: "upstream_error",
+      }));
       return jsonResponse(502, "invalid_provider_response");
     }
     const upstreamHeaders = headersResult.success;
-    yield* recordResponse(lease, upstream.status, upstreamHeaders);
+    yield* diagnostic(
+      requestTelemetry.upstreamHeaders(upstream.status, upstreamHeaders),
+    );
     const responseHeaders = sanitizeResponseHeaders(upstreamHeaders);
+    const responseMetadata = yield* Effect.result(finiteResponse(
+      null,
+      upstream.status,
+      responseHeaders,
+    ));
+    if (Result.isFailure(responseMetadata)) {
+      yield* diagnostic(
+        requestTelemetry.upstreamFailed(responseMetadata.failure),
+      );
+      yield* releaseLease(lease, requestTelemetry);
+      yield* diagnostic(requestTelemetry.end({
+        status: 502,
+        error: responseMetadata.failure,
+        streamOutcome: "upstream_error",
+      }));
+      return jsonResponse(502, "invalid_provider_response");
+    }
+    yield* recordResponse(lease, upstream.status, upstreamHeaders);
     if (upstream.body === null) {
       yield* settleWithoutBody(
         options.settlements,
         authentication.authorization,
         upstream.status,
       );
-      yield* releaseLease(lease);
-      const responseResult = yield* Effect.result(finiteResponse(
-        null,
-        upstream.status,
-        responseHeaders,
-      ));
-      return Result.isSuccess(responseResult)
-        ? responseResult.success
-        : jsonResponse(502, "invalid_provider_response");
+      yield* releaseLease(lease, requestTelemetry);
+      yield* diagnostic(requestTelemetry.end({
+        status: upstream.status,
+        streamOutcome: "not_streamed",
+      }));
+      return responseMetadata.success;
+    }
+    if (!responseStatusAllowsBody(upstream.status)) {
+      const failure = AIForwardConfigurationError.make({
+        code: "invalid_configuration",
+      });
+      yield* diagnostic(requestTelemetry.upstreamFailed(failure));
+      yield* releaseLease(lease, requestTelemetry);
+      yield* diagnostic(requestTelemetry.end({
+        status: 502,
+        error: failure,
+        streamOutcome: "upstream_error",
+      }));
+      return jsonResponse(502, "invalid_provider_response");
     }
 
     const observerResult = upstream.status < 400 &&
@@ -208,13 +303,16 @@ export const makeAIForwardHandler = Effect.fn(
       }))
       : undefined;
     if (observerResult !== undefined && Result.isFailure(observerResult)) {
-      yield* releaseLease(lease);
+      yield* releaseLease(lease, requestTelemetry);
       return jsonResponse(503, "accounting_unavailable");
     }
     const observer = observerResult === undefined
       ? undefined
       : observerResult.success;
     const monitored = upstream.body.pipe(
+      Stream.tap((chunk) =>
+        diagnostic(requestTelemetry.streamChunk(chunk.byteLength))
+      ),
       observer === undefined
         ? (stream) => stream
         : Stream.tap((chunk) => observer.observe(chunk)),
@@ -226,6 +324,8 @@ export const makeAIForwardHandler = Effect.fn(
           authentication.authorization,
           upstream.status,
           observer,
+          requestTelemetry,
+          request.signal,
         )
       ),
     );
@@ -242,7 +342,7 @@ export const makeAIForwardHandler = Effect.fn(
       responseHeaders,
     ));
     if (Result.isFailure(responseResult)) {
-      yield* releaseLease(lease);
+      yield* releaseLease(lease, requestTelemetry);
       return jsonResponse(502, "invalid_provider_response");
     }
     return responseResult.success;
@@ -400,6 +500,8 @@ function finalizeStream(
   authorization: ProviderAuthorizationGrantV1 | undefined,
   status: number,
   observer: OpenAITerminalUsageObserver | undefined,
+  telemetry: AIGatewayRequestTelemetry,
+  signal: AbortSignal,
 ): Effect.Effect<void> {
   return Effect.gen(function*() {
     if (authorization !== undefined) {
@@ -420,9 +522,18 @@ function finalizeStream(
         }
       }
     }
-    yield* releaseLease(lease);
+    yield* releaseLease(lease, telemetry);
+    const outcome = telemetryStreamOutcome(exit, signal);
+    const failure = Exit.isFailure(exit)
+      ? Option.getOrUndefined(Cause.findErrorOption(exit.cause))
+      : undefined;
+    yield* diagnostic(telemetry.end({
+      status,
+      streamOutcome: outcome,
+      ...(failure === undefined ? {} : { error: failure }),
+    }));
   }).pipe(
-    Effect.catchCause(() => releaseLease(lease)),
+    Effect.catchCause(() => releaseLease(lease, telemetry)),
     Effect.catchCause(() => Effect.void),
     Effect.uninterruptible,
   );
@@ -467,11 +578,25 @@ function reportSettlement(
   );
 }
 
-function releaseLease(lease: AIForwardLease) {
-  return lease.release.pipe(
-    Effect.catchCause(() => Effect.void),
+function releaseLease(
+  lease: AIForwardLease,
+  telemetry: AIGatewayRequestTelemetry,
+) {
+  return Effect.gen(function*() {
+    yield* diagnostic(telemetry.routeReleaseStarted);
+    const release = yield* Effect.exit(lease.release);
+    yield* diagnostic(
+      Exit.isSuccess(release)
+        ? telemetry.routeReleased
+        : telemetry.routeReleaseFailed,
+    );
+  }).pipe(
     Effect.uninterruptible,
   );
+}
+
+function diagnostic(effect: Effect.Effect<void>): Effect.Effect<void> {
+  return effect.pipe(Effect.catchCause(() => Effect.void));
 }
 
 function recordResponse(
@@ -493,9 +618,24 @@ function streamOutcome(
     : "transport_failed";
 }
 
+function telemetryStreamOutcome(
+  exit: Exit.Exit<unknown, AIProviderHttpError>,
+  signal: AbortSignal,
+): "completed" | "client_disconnect" | "aborted" | "upstream_error" {
+  if (Exit.isSuccess(exit)) return "completed";
+  if (signal.aborted) return "aborted";
+  return Cause.interruptors(exit.cause).size > 0
+    ? "client_disconnect"
+    : "upstream_error";
+}
+
 function isEventStream(headers: Headers): boolean {
   return headers.get("content-type")?.toLowerCase()
     .split(";", 1)[0]?.trim() === "text/event-stream";
+}
+
+function responseStatusAllowsBody(status: number): boolean {
+  return status !== 204 && status !== 205 && status !== 304;
 }
 
 function providerErrorCode(error: AIProviderHttpError): string {

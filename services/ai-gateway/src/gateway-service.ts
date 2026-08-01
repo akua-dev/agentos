@@ -1,6 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import {
+  AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
   ProviderBudgetSettlementReporter,
+  type ProviderAuthorizationGrantV1,
 } from "@akua-dev/agentos";
 import {
   Clock,
@@ -17,6 +19,7 @@ import {
   type AIForwardLease,
 } from "./forward.ts";
 import { AIProviderHttp } from "./provider-http.ts";
+import type { AIGatewayRequestTelemetry } from "./observability.ts";
 import { CodexQuota } from "./quota.ts";
 import {
   AIRoutingState,
@@ -116,9 +119,25 @@ export const makeAIGatewayApplication = Effect.fn(
     function*(
       sessionKey: string | undefined,
       _signal: AbortSignal,
+      _authorization: ProviderAuthorizationGrantV1 | undefined,
+      telemetry: AIGatewayRequestTelemetry,
     ): Effect.fn.Return<AIForwardLease | undefined, AIForwardRouteError> {
       const set = yield* candidateSet();
       const currentTime = yield* Clock.currentTimeMillis;
+      yield* Effect.forEach(
+        set.candidates,
+        (candidate) =>
+          candidate.usage === undefined
+            ? Effect.void
+            : telemetry.quotaObservation(
+              quotaObservationAgeSeconds(
+                currentTime,
+                candidate.usage.observedAt,
+              ),
+              candidate.usage.stale,
+            ).pipe(Effect.catchCause(() => Effect.void)),
+        { discard: true },
+      );
       const reservation = yield* routing.acquire({
         candidates: set.candidates,
         now: currentTime,
@@ -178,7 +197,8 @@ export const makeAIGatewayApplication = Effect.fn(
 
   const forward = yield* makeAIForwardHandler({
     authentication: options.authentication,
-    acquire: (sessionKey, signal) => acquire(sessionKey, signal),
+    acquire: (sessionKey, signal, authorization, telemetry) =>
+      acquire(sessionKey, signal, authorization, telemetry),
     provider,
     settlements,
     now: Clock.currentTimeMillis,
@@ -347,6 +367,14 @@ function staleOrUnknownCandidate(
     needsReauth,
     ...(cached === undefined ? {} : { usage: { ...cached, stale: true } }),
   };
+}
+
+function quotaObservationAgeSeconds(now: number, observedAt: number): number {
+  if (!Number.isFinite(now) || !Number.isFinite(observedAt)) return 0;
+  return Math.min(
+    AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
+    Math.max(0, now - observedAt) / 1_000,
+  );
 }
 
 function fallbackLease(accessToken: string): AIForwardLease {
