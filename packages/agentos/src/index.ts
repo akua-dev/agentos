@@ -189,3 +189,20 @@ export {
   type AgentOSDiagnosticAttributeValue,
   type AgentOSDiagnosticInput,
 } from "./shared/services.ts";
+export {
+  AgentWorkloadProfileNameSchema,
+  AgentWorkloadSpecError,
+  AgentWorkloadSpecV1Schema,
+  decodeAgentWorkloadSpec,
+  workloadSpecError,
+  type AgentWorkloadProfileName,
+  type AgentWorkloadSpecV1,
+} from "./workloads/spec.ts";
+export {
+  AgentWorkloadOverlayFileV1Schema,
+  AgentWorkloadPlanSummaryV1Schema,
+  AgentWorkloadPlanV1Schema,
+  compileAgentWorkloadSpec,
+  type AgentWorkloadPlanSummaryV1,
+  type AgentWorkloadPlanV1,
+} from "./workloads/compiler.ts";

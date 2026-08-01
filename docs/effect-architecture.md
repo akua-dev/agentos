@@ -105,6 +105,14 @@ Compile-checked implementations live under
 These are boundary shapes, not parallel product abstractions. A migration
 should reuse the smallest relevant pattern and keep its own domain names.
 
+The typed Agent workload boundary follows the same split. The released
+`AgentWorkloadSpecV1Schema` decodes a closed, credential-reference-only input,
+and `compileAgentWorkloadSpec` is a pure Effect program that validates and
+normalizes that input into deterministic Kustomize files, digests and a safe
+review summary. Filesystem path canonicalization, file writes and native
+Kubernetes commands stay in the runtime operation layer; the compiler cannot
+apply or observe cluster state.
+
 ## Inventory and progressive enforcement
 
 [`inventory.json`](../tooling/effect-migration/inventory.json) assigns every

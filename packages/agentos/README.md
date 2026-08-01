@@ -19,6 +19,16 @@ adapters, so ecosystem packages can migrate incrementally. Every registration
 accepts Pi's `ExtensionAPI` explicitly, and packages remain free to use any
 ordinary Pi API beside these helpers.
 
+The root also exports `AgentWorkloadSpecV1Schema` and the pure
+`compileAgentWorkloadSpec` Effect. A caller supplies canonical distribution and
+overlay roots plus reviewed Agent, ownership, lifecycle, resource, Secret
+reference and provider-profile inputs. The compiler rejects mutable images,
+literal credentials, unknown fields and inconsistent identity relationships,
+then returns deterministic ordinary Kustomize files, spec/overlay digests and a
+credential-free review summary. It performs no filesystem, Kubernetes or
+database operation; the runtime operation boundary owns canonical path
+resolution, exact file writes and native `kubectl` dry-run/diff/apply/verify.
+
 Operational instructions, role-specific Skills, Mise files, Kubernetes
 overlays and Crewmate assets are normal package resources. Loading the package
 into Pi activates only Pi behavior and resources; it does not apply native
