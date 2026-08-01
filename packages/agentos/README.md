@@ -11,11 +11,13 @@ Role-only Skills are added through Pi resource discovery afterward, so the
 bounded startup turn may require only a Skill that Pi already exposes in its
 effective pre-session catalog.
 
-The public root exports plain registration contracts, preflight helpers,
-instruction and resource helpers, bounded startup behavior, and factories for
-released Pi behavior. Every registration accepts Pi's `ExtensionAPI`
-explicitly. Ecosystem packages remain free to use any ordinary Pi API beside
-these helpers.
+The public root exports versioned Effect Schemas, tagged failures, deterministic
+service Layers, composable `*Effect` programs, and compatibility helpers for
+registration preflight, instructions, resources, bounded startup, role loading,
+and semantic readiness. Existing plain and Promise-returning APIs remain narrow
+adapters, so ecosystem packages can migrate incrementally. Every registration
+accepts Pi's `ExtensionAPI` explicitly, and packages remain free to use any
+ordinary Pi API beside these helpers.
 
 Operational instructions, role-specific Skills, Mise files, Kubernetes
 overlays and Crewmate assets are normal package resources. Loading the package

@@ -1,15 +1,9 @@
-import { createHash, randomUUID } from "node:crypto";
-import {
-  chmod,
-  mkdir,
-  readFile,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { Effect, Option, Schema } from "effect";
+import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
+import * as BunPath from "@effect/platform-bun/BunPath";
+import { createHash } from "node:crypto";
+import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
+
+import { AgentOSIdentifier } from "./shared/services.ts";
 
 const FileHashes = Schema.Struct({
   markerSha256: Schema.NullOr(Schema.String),
@@ -47,6 +41,26 @@ type Environment = Readonly<Record<string, string | undefined>>;
 type CoordinationReadinessState = typeof CoordinationReadinessState.Type;
 type CrewmateReadinessState = typeof CrewmateReadinessState.Type;
 
+interface PiProviderReadinessOptions {
+  readonly environment: Environment;
+  readonly piAgentDirectory: string;
+  readonly stateDirectory: string;
+}
+
+interface CoordinationReadinessOptions {
+  readonly agentName: string;
+  readonly herdrSession: string;
+  readonly listenerProcessId: number;
+  readonly listenerTaskId: string;
+  readonly ownerProcessId: number;
+  readonly phase: CoordinationReadinessState["phase"];
+  readonly stateDirectory: string;
+}
+
+type CrewmateReadinessOptions = Omit<CrewmateReadinessState, "version"> & {
+  readonly stateDirectory: string;
+};
+
 export class ReadinessStateError extends Schema.TaggedErrorClass<ReadinessStateError>()(
   "ReadinessStateError",
   {
@@ -57,6 +71,15 @@ export class ReadinessStateError extends Schema.TaggedErrorClass<ReadinessStateE
 ) {}
 
 const maximumConfigurationBytes = 1024 * 1024;
+const maximumReadinessBytes = 64 * 1024;
+const privateDirectoryMode = 0o700;
+const privateFileMode = 0o600;
+
+const ReadinessStateLive = Layer.mergeAll(
+  BunFileSystem.layer,
+  BunPath.layer,
+  AgentOSIdentifier.layer,
+);
 
 function stateError(operation: string, path: string) {
   return ReadinessStateError.make({
@@ -66,10 +89,6 @@ function stateError(operation: string, path: string) {
   });
 }
 
-function isMissingFile(cause: unknown): boolean {
-  return cause instanceof Error && "code" in cause && cause.code === "ENOENT";
-}
-
 function optionalEnvironment(environment: Environment, name: string) {
   const value = environment[name]?.trim();
   return value ? value : undefined;
@@ -77,21 +96,23 @@ function optionalEnvironment(environment: Environment, name: string) {
 
 const readOptionalText = Effect.fn("agentos.readinessState.readOptionalText")(
   function*(path: string, maximumBytes: number) {
-    return yield* Effect.tryPromise({
-      try: async () => {
-        try {
-          const metadata = await stat(path);
-          if (!metadata.isFile() || metadata.size > maximumBytes) {
-            throw new Error("file is not a bounded regular file");
-          }
-          return await readFile(path, "utf8");
-        } catch (cause) {
-          if (isMissingFile(cause)) return undefined;
-          throw cause;
-        }
-      },
-      catch: () => stateError("read", path),
-    });
+    const fileSystem = yield* FileSystem.FileSystem;
+    const exists = yield* fileSystem.exists(path).pipe(
+      Effect.mapError(() => stateError("read", path)),
+    );
+    if (!exists) return undefined;
+    const metadata = yield* fileSystem.stat(path).pipe(
+      Effect.mapError(() => stateError("read", path)),
+    );
+    if (
+      metadata.type !== "File" ||
+      metadata.size > FileSystem.Size(maximumBytes)
+    ) {
+      return yield* stateError("read", path);
+    }
+    return yield* fileSystem.readFileString(path).pipe(
+      Effect.mapError(() => stateError("read", path)),
+    );
   },
 );
 
@@ -104,48 +125,64 @@ const hashOptionalFile = Effect.fn("agentos.readinessState.hashOptionalFile")(
   },
 );
 
-const writePrivateState = Effect.fn("agentos.readinessState.writePrivate")(
-  function*(path: string, value: unknown) {
-    const temporary = `${path}.${process.pid}.${randomUUID()}.agentos-next`;
-    yield* Effect.tryPromise({
-      try: async () => {
-        await mkdir(dirname(path), { mode: 0o700, recursive: true });
-        try {
-          await writeFile(temporary, `${JSON.stringify(value)}\n`, {
-            flag: "wx",
-            mode: 0o600,
-          });
-          await chmod(temporary, 0o600);
-          await rename(temporary, path);
-        } finally {
-          await rm(temporary, { force: true });
-        }
-      },
-      catch: () => stateError("write", path),
-    });
-  },
-);
+function writePrivateState<S extends Schema.Constraint>(
+  path: string,
+  schema: S,
+  value: S["Type"],
+) {
+  return Effect.gen(function*() {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const paths = yield* Path.Path;
+    const identifiers = yield* AgentOSIdentifier;
+    const temporaryIdentifier = yield* identifiers.next.pipe(
+      Effect.mapError(() => stateError("write", path)),
+    );
+    const temporary = `${path}.${temporaryIdentifier}.agentos-next`;
+    const source = yield* Schema.encodeEffect(Schema.fromJsonString(schema))(
+      value,
+    ).pipe(Effect.mapError(() => stateError("write", path)));
+
+    yield* fileSystem
+      .makeDirectory(paths.dirname(path), {
+        mode: privateDirectoryMode,
+        recursive: true,
+      })
+      .pipe(Effect.mapError(() => stateError("write", path)));
+
+    yield* Effect.gen(function*() {
+      yield* fileSystem.writeFileString(temporary, `${source}\n`, {
+        flag: "wx",
+        mode: privateFileMode,
+      });
+      yield* fileSystem.chmod(temporary, privateFileMode);
+      yield* fileSystem.rename(temporary, path);
+    }).pipe(
+      Effect.mapError(() => stateError("write", path)),
+      Effect.ensuring(
+        fileSystem.remove(temporary, { force: true }).pipe(Effect.ignore),
+      ),
+    );
+  });
+}
 
 function decodeState<S extends Schema.ConstraintDecoder<unknown>>(
   schema: S,
   source: string,
-): S["Type"] | undefined {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(source);
-  } catch {
-    return undefined;
-  }
-  return Option.getOrUndefined(Schema.decodeUnknownOption(schema)(parsed));
+) {
+  return Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(source).pipe(
+    Effect.option,
+    Effect.map(Option.getOrUndefined),
+  );
 }
 
-export const attestPiProviderReadiness = Effect.fn(
-  "agentos.readinessState.attestPiProvider",
-)(function*(options: {
-  readonly environment: Environment;
-  readonly piAgentDirectory: string;
-  readonly stateDirectory: string;
-}) {
+export const attestPiProviderReadinessEffect = Effect.fn(
+  "agentos.readinessState.attestPiProvider.effect",
+)(function*(options: PiProviderReadinessOptions) {
+  const paths = yield* Path.Path;
+  const readinessPath = paths.join(
+    options.stateDirectory,
+    "pi-provider-readiness.json",
+  );
   const configuredModeRaw =
     optionalEnvironment(options.environment, "AGENTOS_PI_PROVIDER_MODE") ??
     "direct";
@@ -154,23 +191,18 @@ export const attestPiProviderReadiness = Effect.fn(
   const mode = yield* Schema.decodeUnknownEffect(
     Schema.Literals(["ai_gateway", "direct"]),
   )(configuredMode).pipe(
-    Effect.mapError(() =>
-      stateError(
-        "validate",
-        join(options.stateDirectory, "pi-provider-readiness.json"),
-      ),
-    ),
+    Effect.mapError(() => stateError("validate", readinessPath)),
   );
   const state = {
     files: {
       markerSha256: yield* hashOptionalFile(
-        join(options.stateDirectory, "pi-provider.json"),
+        paths.join(options.stateDirectory, "pi-provider.json"),
       ),
       modelsSha256: yield* hashOptionalFile(
-        join(options.piAgentDirectory, "models.json"),
+        paths.join(options.piAgentDirectory, "models.json"),
       ),
       settingsSha256: yield* hashOptionalFile(
-        join(options.piAgentDirectory, "settings.json"),
+        paths.join(options.piAgentDirectory, "settings.json"),
       ),
     },
     mode,
@@ -180,24 +212,19 @@ export const attestPiProviderReadiness = Effect.fn(
       optionalEnvironment(options.environment, "AGENTOS_THINKING") ?? null,
     version: 1,
   } satisfies typeof PiProviderReadinessState.Type;
-  yield* writePrivateState(
-    join(options.stateDirectory, "pi-provider-readiness.json"),
-    state,
-  );
+  yield* writePrivateState(readinessPath, PiProviderReadinessState, state);
   return state;
 });
 
-export const writeCoordinationReadiness = Effect.fn(
-  "agentos.readinessState.writeCoordination",
-)(function*(options: {
-  readonly agentName: string;
-  readonly herdrSession: string;
-  readonly listenerProcessId: number;
-  readonly listenerTaskId: string;
-  readonly ownerProcessId: number;
-  readonly phase: CoordinationReadinessState["phase"];
-  readonly stateDirectory: string;
-}) {
+export const writeCoordinationReadinessEffect = Effect.fn(
+  "agentos.readinessState.writeCoordination.effect",
+)(function*(options: CoordinationReadinessOptions) {
+  const paths = yield* Path.Path;
+  const readinessPath = paths.join(
+    options.stateDirectory,
+    "readiness",
+    "coordination.json",
+  );
   const state = yield* Schema.decodeUnknownEffect(CoordinationReadinessState)({
     agentName: options.agentName,
     herdrSession: options.herdrSession,
@@ -207,39 +234,40 @@ export const writeCoordinationReadiness = Effect.fn(
     phase: options.phase,
     version: 1,
   }).pipe(
-    Effect.mapError(() =>
-      stateError(
-        "validate",
-        join(options.stateDirectory, "readiness", "coordination.json"),
-      ),
-    ),
+    Effect.mapError(() => stateError("validate", readinessPath)),
   );
-  yield* writePrivateState(
-    join(options.stateDirectory, "readiness", "coordination.json"),
-    state,
-  );
+  yield* writePrivateState(readinessPath, CoordinationReadinessState, state);
   return state;
 });
 
-export const invalidateCoordinationReadiness = Effect.fn(
-  "agentos.readinessState.invalidateCoordination",
+export const invalidateCoordinationReadinessEffect = Effect.fn(
+  "agentos.readinessState.invalidateCoordination.effect",
 )(function*(stateDirectory: string, listenerTaskId: string) {
-  const path = join(stateDirectory, "readiness", "coordination.json");
-  const source = yield* readOptionalText(path, 64 * 1024);
+  const fileSystem = yield* FileSystem.FileSystem;
+  const paths = yield* Path.Path;
+  const readinessPath = paths.join(
+    stateDirectory,
+    "readiness",
+    "coordination.json",
+  );
+  const source = yield* readOptionalText(readinessPath, maximumReadinessBytes);
   if (source === undefined) return;
-  const current = decodeState(CoordinationReadinessState, source);
+  const current = yield* decodeState(CoordinationReadinessState, source);
   if (current !== undefined && current.listenerTaskId !== listenerTaskId) return;
-  yield* Effect.tryPromise({
-    try: () => rm(path, { force: true }),
-    catch: () => stateError("remove", path),
-  });
+  yield* fileSystem.remove(readinessPath, { force: true }).pipe(
+    Effect.mapError(() => stateError("remove", readinessPath)),
+  );
 });
 
-export const writeCrewmateReadiness = Effect.fn(
-  "agentos.readinessState.writeCrewmate",
-)(function*(options: Omit<CrewmateReadinessState, "version"> & {
-  readonly stateDirectory: string;
-}) {
+export const writeCrewmateReadinessEffect = Effect.fn(
+  "agentos.readinessState.writeCrewmate.effect",
+)(function*(options: CrewmateReadinessOptions) {
+  const paths = yield* Path.Path;
+  const readinessPath = paths.join(
+    options.stateDirectory,
+    "readiness",
+    "crewmate.json",
+  );
   const state = yield* Schema.decodeUnknownEffect(CrewmateReadinessState)({
     agentId: options.agentId,
     assignmentId: options.assignmentId,
@@ -250,16 +278,38 @@ export const writeCrewmateReadiness = Effect.fn(
     taskId: options.taskId,
     version: 1,
   }).pipe(
-    Effect.mapError(() =>
-      stateError(
-        "validate",
-        join(options.stateDirectory, "readiness", "crewmate.json"),
-      ),
-    ),
+    Effect.mapError(() => stateError("validate", readinessPath)),
   );
-  yield* writePrivateState(
-    join(options.stateDirectory, "readiness", "crewmate.json"),
-    state,
-  );
+  yield* writePrivateState(readinessPath, CrewmateReadinessState, state);
   return state;
 });
+
+export function attestPiProviderReadiness(options: PiProviderReadinessOptions) {
+  return attestPiProviderReadinessEffect(options).pipe(
+    Effect.provide(ReadinessStateLive),
+  );
+}
+
+export function writeCoordinationReadiness(
+  options: CoordinationReadinessOptions,
+) {
+  return writeCoordinationReadinessEffect(options).pipe(
+    Effect.provide(ReadinessStateLive),
+  );
+}
+
+export function invalidateCoordinationReadiness(
+  stateDirectory: string,
+  listenerTaskId: string,
+) {
+  return invalidateCoordinationReadinessEffect(
+    stateDirectory,
+    listenerTaskId,
+  ).pipe(Effect.provide(ReadinessStateLive));
+}
+
+export function writeCrewmateReadiness(options: CrewmateReadinessOptions) {
+  return writeCrewmateReadinessEffect(options).pipe(
+    Effect.provide(ReadinessStateLive),
+  );
+}
