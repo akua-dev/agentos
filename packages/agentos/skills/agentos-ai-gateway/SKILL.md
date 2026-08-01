@@ -101,15 +101,18 @@ the reviewed render:
 ```console
 kubectl --context <context> kustomize services/ai-gateway/kubernetes
 kubectl --context <context> --namespace agentos apply --filename <reviewed-render>
-kubectl --context <context> --namespace agentos rollout status statefulset/ai-gateway
 ```
+
+The empty gateway is live but intentionally not ready, so wait for its named
+Pod and container to start here rather than weakening readiness or waiting for
+the StatefulSet rollout to complete. Add an approved credential below, verify
+readiness, and only then run `kubectl rollout status`.
 
 Delete the private token file only after the live Secret metadata and service
 takeover are verified. Never put the token value in argv, chat, an Assignment,
 a manifest or a log.
 
-The empty gateway is live but intentionally not ready. Add each subscription with
-a fresh device login owned by the gateway Pod:
+Add each subscription with a fresh device login owned by the gateway Pod:
 
 ```console
 # Repeat this login once for every approved subscription in the pool.
@@ -276,11 +279,18 @@ so select and verify the exact model before dispatch.
 
 ## Verify, recover and retire
 
-Verify `/readyz`, `ai-gateway status`, the selected Agent environment and one
-short fixed no-tool response. Record only effective provider/model, the opaque
-managed account label/ID and success. `quota-axi` may provide additional
-read-only provider observations; it never selects accounts or mutates the
-gateway.
+Verify public `/readyz`, authenticated `/readyz/client`, `ai-gateway status`,
+the selected Agent environment and one separately authorized short fixed
+no-tool response. Both readiness endpoints are local, read-only eligibility
+diagnostics and never refresh a credential, probe quota, send a prompt or
+reserve an account. `ready` means a locally eligible route or explicit API-key
+fallback exists; `degraded` keeps the Pod ready when valid credentials exist
+but cached capacity is unknown or temporarily blocked; `not_ready` means the
+client identity or provider credential boundary is unavailable. The client
+endpoint must receive the Secret-backed token through a header without printing
+it. Record only effective provider/model, the opaque managed account label/ID
+and success. `quota-axi` may provide additional read-only provider observations;
+it never selects accounts or mutates the gateway.
 
 ### Gateway-only First Mate recovery
 

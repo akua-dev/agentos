@@ -107,12 +107,17 @@ canonical definition of work nor logic inside the Pi guard.
      wait defaults to 30 seconds; override `ready_timeout` only when the
      selected native command has a reviewed different startup bound. The tool
      returns only after PostgreSQL has registered `LISTEN`; immediately after
-     that result, call `agentos.current_mate_bearings()` and drain the durable
-     rows it references with `psql`. This ready-then-catch-up order closes the
-     notification gap without putting Fleet policy in `pg-listen`. The CLI never
-     reconciles Inbox itself. If the one-shot listener completes during catch-up,
-     reconcile the durable rows, directly re-arm it with the same readiness
-     gate and catch up again before yielding. Its small table-and-operation hint
+     that result, call `attest_coordination_listener` with its returned task ID.
+     Then call `agentos.current_mate_bearings()` and drain the durable rows it
+     references with `psql`. After that catch-up succeeds and only while the
+     exact listener is still running, call `confirm_coordination_catchup` with
+     the same task ID. This ready-then-catch-up order closes the notification
+     gap and is the Mate Pod's semantic readiness proof without putting Fleet
+     policy in `pg-listen`. The CLI never reconciles Inbox itself. If the
+     one-shot listener completes during catch-up, reconcile the durable rows,
+     directly re-arm it with the same readiness gate, attest the replacement
+     and catch up again before confirming or yielding. A terminal listener
+     invalidates its readiness marker. Its small table-and-operation hint
      routes reconciliation but does not identify which current business
      priority changed or grant authority.
    - Use `herdr agent wait <handle> --status <idle|working|blocked|unknown>
@@ -160,9 +165,10 @@ canonical definition of work nor logic inside the Pi guard.
    has `[agentos-supervision]` in its useful description. The Pi backstop tracks
    tagged task starts and terminal events. A successful
    `run_background_command` result and its returned task ID are sufficient
-   evidence that the wait started; for `pg-listen`, the required
-   `ready_output` also proves that `LISTEN` was registered before catch-up. Do
-   not immediately call
+   evidence that an ordinary wait started. For the continuity `pg-listen`, the
+   required `ready_output` proves that `LISTEN` registered, while the matching
+   listener and catch-up attestations establish semantic Pod readiness. Do not
+   immediately call
    `list_background_commands` to re-prove it. Use the list only after missing,
    ambiguous or contradictory lifecycle evidence. While any direct report
    remains active, also ensure that every

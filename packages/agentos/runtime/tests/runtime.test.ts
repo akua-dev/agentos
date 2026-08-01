@@ -64,6 +64,58 @@ async function createHarness(
     mkdir(fakeBin, { recursive: true }),
     mkdir(state, { recursive: true }),
   ]);
+  const agentCwd = overrides.AGENTOS_AGENT_CWD ?? defaultFirstMateCwd;
+  const piAgentDirectory = join(state, "pi-agent");
+  const piSession = join(state, "pi-session.jsonl");
+  const providerState = join(state, "home", ".local", "state", "agentos");
+  const readinessState = join(providerState, "readiness");
+  await Promise.all([
+    mkdir(piAgentDirectory, { recursive: true }),
+    mkdir(providerState, { recursive: true }),
+    mkdir(readinessState, { recursive: true }),
+  ]);
+  await Promise.all([
+    writeFile(
+      piSession,
+      `${JSON.stringify({ cwd: agentCwd, id: "runtime-test", type: "session", version: 3 })}\n`,
+      { mode: 0o600 },
+    ),
+    writeFile(join(piAgentDirectory, "auth.json"), "not-read-by-readiness", {
+      mode: 0o600,
+    }),
+    writeFile(join(state, "home", ".pgpass"), "not-read-by-readiness", {
+      mode: 0o600,
+    }),
+    writeFile(
+      join(providerState, "pi-provider-readiness.json"),
+      `${JSON.stringify({
+        files: {
+          markerSha256: null,
+          modelsSha256: null,
+          settingsSha256: null,
+        },
+        mode: "direct",
+        selectedModel: null,
+        selectedThinking: null,
+        version: 1,
+      })}\n`,
+      { mode: 0o600 },
+    ),
+    writeFile(
+      join(readinessState, "coordination.json"),
+      `${JSON.stringify({
+        agentName: overrides.AGENTOS_AGENT_NAME ?? "firstmate",
+        herdrSession:
+          overrides.HERDR_SESSION ?? "agentos-firstmate-test",
+        listenerProcessId: process.pid,
+        listenerTaskId: "bg-listener",
+        ownerProcessId: 4242,
+        phase: "caught_up",
+        version: 1,
+      })}\n`,
+      { mode: 0o600 },
+    ),
+  ]);
   await writeFile(join(state, "agents.json"), JSON.stringify(agents), "utf8");
   const fakeHerdr = join(fakeBin, "herdr");
   await writeFile(
@@ -91,7 +143,10 @@ if (args[0] === "server") {
   const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
   const cwdIndex = args.indexOf("--cwd");
   agents.push({
+    agent_session: { kind: "path", value: process.env.FAKE_PI_SESSION },
+    agent_status: "idle",
     cwd: args[cwdIndex + 1],
+    foreground_cwd: args[cwdIndex + 1],
     live: true,
     name: args[2],
     pane_id: "w-started:p1",
@@ -118,6 +173,11 @@ if (args[0] === "server") {
   const agent = agents.find((candidate: { name: string }) => candidate.name === args[2]);
   if (!agent) process.exit(1);
   console.log(JSON.stringify({ result: { type: "agent_info", agent } }));
+} else if (command === "agent explain") {
+  console.log(JSON.stringify({
+    agent: process.env.FAKE_HERDR_AGENT_KIND ?? "pi",
+    state: process.env.FAKE_HERDR_AGENT_STATUS ?? "idle",
+  }));
 } else if (command === "pane process-info") {
   const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
   const paneIndex = args.indexOf("--pane");
@@ -125,7 +185,20 @@ if (args[0] === "server") {
     candidate.pane_id === args[paneIndex + 1] && candidate.live,
   );
   if (!agent) process.exit(1);
-  console.log(JSON.stringify({ result: { type: "pane_process_info" } }));
+  console.log(JSON.stringify({
+    result: {
+      process_info: {
+        foreground_process_group_id: 4242,
+        foreground_processes: [{
+          argv0: process.env.FAKE_HERDR_AGENT_KIND ?? "pi",
+          cwd: agent.foreground_cwd ?? agent.cwd,
+          pid: 4242,
+        }],
+        pane_id: agent.pane_id,
+      },
+      type: "pane_process_info",
+    },
+  }));
 } else if (command === "pane close") {
   const agents = JSON.parse(await readFile(join(state, "agents.json"), "utf8"));
   await writeFile(
@@ -147,15 +220,26 @@ if (args[0] === "server") {
     AGENTOS_AGENT_CWD: defaultFirstMateCwd,
     AGENTOS_AGENT_NAME: "firstmate",
     AGENTOS_AGENT_ROLE: "first_mate",
+    AGENTOS_DATABASE_IDENTITY:
+      overrides.AGENTOS_AGENT_ROLE === "second_mate"
+        ? "runtime_secondmate"
+        : "runtime_firstmate",
+    AGENTOS_DATABASE_URL:
+      overrides.AGENTOS_AGENT_ROLE === "second_mate"
+        ? "postgresql://runtime_secondmate@postgres:5432/agentos?sslmode=require"
+        : "postgresql://runtime_firstmate@postgres:5432/agentos?sslmode=require",
     AGENTOS_DISTRIBUTION_ROOT: defaultDistributionRoot,
     FAKE_HERDR_STATE: state,
+    FAKE_PI_SESSION: piSession,
     HERDR_SESSION: "agentos-firstmate-test",
-    PI_CODING_AGENT_DIR: join(state, "pi-agent"),
+    HOME: join(state, "home"),
+    PI_CODING_AGENT_DIR: piAgentDirectory,
+    PGPASSFILE: join(state, "home", ".pgpass"),
     PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
     ...overrides,
   };
 
-  return { env, state };
+  return { env, piSession, state };
 }
 
 async function readCalls(state: string): Promise<string[][]> {
@@ -1029,24 +1113,58 @@ describe("Mate runtime", () => {
   });
 
   test("separates server liveness from required-agent readiness", async () => {
-    const { env, state } = await createHarness([]);
+    const { env, piSession, state } = await createHarness([]);
 
-    expect((await runHealth(env, "live")).exitCode).toBe(0);
+    const live = await runHealth(env, "live");
+    expect(live).toEqual({
+      exitCode: 0,
+      stderr: "",
+      stdout:
+        '{"checks":[{"component":"herdr","status":"pass"}],"mode":"live","reasons":[],"role":"first_mate","status":"live","version":1}\n',
+    });
     expect((await runHealth(env, "ready")).exitCode).toBe(1);
 
     await writeFile(
       join(state, "agents.json"),
-      JSON.stringify([{ live: false, name: "firstmate", pane_id: "w1:p1" }]),
+      JSON.stringify([
+        {
+          agent_session: { kind: "path", value: piSession },
+          agent_status: "idle",
+          cwd: defaultFirstMateCwd,
+          foreground_cwd: defaultFirstMateCwd,
+          live: false,
+          name: "firstmate",
+          pane_id: "w1:p1",
+        },
+      ]),
       "utf8",
     );
     expect((await runHealth(env, "ready")).exitCode).toBe(1);
 
     await writeFile(
       join(state, "agents.json"),
-      JSON.stringify([{ live: true, name: "firstmate", pane_id: "w1:p1" }]),
+      JSON.stringify([
+        {
+          agent_session: { kind: "path", value: piSession },
+          agent_status: "idle",
+          cwd: defaultFirstMateCwd,
+          foreground_cwd: defaultFirstMateCwd,
+          live: true,
+          name: "firstmate",
+          pane_id: "w1:p1",
+        },
+      ]),
       "utf8",
     );
-    expect((await runHealth(env, "ready")).exitCode).toBe(0);
+    const ready = await runHealth(env, "ready");
+    expect(ready.exitCode).toBe(0);
+    expect(JSON.parse(ready.stdout)).toMatchObject({
+      mode: "ready",
+      reasons: [],
+      role: "first_mate",
+      status: "ready",
+      version: 1,
+    });
   });
 
   test("runs and checks the configured Second Mate identity", async () => {

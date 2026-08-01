@@ -174,9 +174,13 @@ describe("Crewmate Kubernetes base", () => {
       AGENTOS_AGENT_ROLE: "crewmate",
       AGENTOS_ASSIGNMENT_ID: "00000000-0000-4000-8000-000000000005",
       AGENTOS_BRIEF_PATH: "/home/agent/brief.md",
+      AGENTOS_BRIEF_SHA256: "0".repeat(64),
+      AGENTOS_DATABASE_IDENTITY: "runtime_crewmate",
       AGENTOS_DATABASE_URL:
         "postgresql://runtime_crewmate@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos?sslmode=require",
+      AGENTOS_HARNESS: "codex",
       AGENTOS_PGPASS_SOURCE: "/var/run/secrets/agentos/pgpass",
+      AGENTOS_PROVIDER_CREDENTIAL_KIND: "codex_auth",
       AGENTOS_TASK_ID: "00000000-0000-4000-8000-000000000004",
       HERDR_SESSION: "agentos-crewmate",
       PGPASSFILE: "/home/agent/.pgpass",
@@ -190,15 +194,21 @@ describe("Crewmate Kubernetes base", () => {
     expect(container.command).toEqual(["herdr"]);
     expect(container.args).toEqual(["server", "--session", "agentos-crewmate"]);
     expect(container.livenessProbe.exec.command).toEqual([
-      "herdr",
-      "status",
-      "--json",
-      "--session",
-      "agentos-crewmate",
+      "mise",
+      "run",
+      "--skip-tools",
+      "crewmate:health",
+      "--",
+      "live",
     ]);
-    expect(container.readinessProbe.exec.command).toEqual(
-      container.livenessProbe.exec.command,
-    );
+    expect(container.readinessProbe.exec.command).toEqual([
+      "mise",
+      "run",
+      "--skip-tools",
+      "crewmate:health",
+      "--",
+      "ready",
+    ]);
     expect(container.securityContext).toEqual({
       allowPrivilegeEscalation: false,
       capabilities: { drop: ["ALL"] },
@@ -253,6 +263,7 @@ describe("Crewmate Kubernetes base", () => {
     expect(environment.AI_GATEWAY_TOKEN).toEqual({
       secretKeyRef: { key: "token", name: "ai-gateway-client" },
     });
+    expect(environment.AGENTOS_PROVIDER_CREDENTIAL_KIND).toBe("ai_gateway");
     expect(pod.serviceAccountName).toBe("agentos-crewmate");
     expect(spec.volumeClaimTemplates[0].metadata.name).toBe("home");
   });

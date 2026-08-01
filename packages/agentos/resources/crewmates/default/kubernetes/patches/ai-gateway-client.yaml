@@ -11,6 +11,8 @@ spec:
       containers:
         - name: crewmate
           env:
+            - name: AGENTOS_PROVIDER_CREDENTIAL_KIND
+              value: ai_gateway
             - name: AI_GATEWAY_URL
               value: http://ai-gateway.agentos.svc.cluster.local:8787
             - name: AI_GATEWAY_TOKEN

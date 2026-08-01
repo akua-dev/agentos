@@ -211,6 +211,7 @@ describe("First Mate Kubernetes resources", () => {
     );
     expect(environment.AGENTOS_AGENT_NAME).toBe("firstmate");
     expect(environment.AGENTOS_AGENT_ROLE).toBe("first_mate");
+    expect(environment.AGENTOS_PROVIDER_CREDENTIAL_KIND).toBe("pi_auth");
     expect(environment.NODE_PATH).toBe("/opt/agentos/node_modules");
     expect(environment.AGENTOS_MODEL).toBeUndefined();
     expect(environment.AGENTOS_THINKING).toBeUndefined();
@@ -346,6 +347,7 @@ describe("First Mate Kubernetes resources", () => {
       ]),
     );
     expect(environment).toMatchObject({
+      AGENTOS_DATABASE_IDENTITY: "agentos",
       DATABASE_URL:
         "postgresql://agentos@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos?sslmode=verify-full",
       EXISTING_RUNTIME_SETTING: "preserve-me",
@@ -506,6 +508,7 @@ describe("First Mate Kubernetes resources", () => {
       secretKeyRef: { key: "token", name: "ai-gateway-client" },
     });
     expect(environment.AGENTOS_PI_PROVIDER_MODE).toBe("ai-gateway");
+    expect(environment.AGENTOS_PROVIDER_CREDENTIAL_KIND).toBe("ai_gateway");
     expect(prepareEnvironment).toMatchObject({
       AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
       AI_GATEWAY_TOKEN: {

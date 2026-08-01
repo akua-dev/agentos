@@ -139,6 +139,7 @@ export const startBackgroundCommand: StartBackgroundCommand = async (
 
   return {
     completion,
+    processId: child.pid,
     stop: () => stop("cancelled"),
   };
 };

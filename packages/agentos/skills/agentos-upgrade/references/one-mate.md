@@ -153,7 +153,12 @@ annotations. Any other diff requires separate authority or a smaller patch.
 1. Switch the clean persistent checkout to the verified release tag without
    deleting the previous branch.
 2. Apply the reviewed rendered source or live patch once to the named Mate.
-3. Wait for that StatefulSet rollout within a bounded deadline.
+3. Wait for that StatefulSet rollout within a bounded deadline. The replacement
+   runtime invalidates its process-bound coordination marker by design; its
+   startup recovery turn must re-arm and attest the targeted listener, catch up
+   from current bearings, and confirm catch-up before the Pod becomes Ready.
+   A live Pod reporting only those readiness reasons is recovering, not evidence
+   for another restart.
 
 The expected single Pod replacement belongs to the StatefulSet's
 `RollingUpdate`. Do not manually delete the Pod, invoke another restart, update

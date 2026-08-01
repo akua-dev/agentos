@@ -26,6 +26,20 @@ export {
   type AgentOSBackgroundTasksOptions,
 } from "./background-tasks/extension.ts";
 export {
+  registerCoordinationReadiness,
+  type CoordinationReadinessOptions,
+} from "./coordination-readiness/extension.ts";
+export {
+  attestPiProviderReadiness,
+  CoordinationReadinessState,
+  CrewmateReadinessState,
+  invalidateCoordinationReadiness,
+  PiProviderReadinessState,
+  ReadinessStateError,
+  writeCoordinationReadiness,
+  writeCrewmateReadiness,
+} from "./readiness-state.ts";
+export {
   buildAgentOSInstructions,
   registerAgentOSInstructions,
   type AgentOSInstructionSourceV1,
