@@ -430,7 +430,13 @@ telemetry availability.
 
 ### Target boundary
 
-Every AgentOS-owned fallible, asynchronous, concurrent, resource-managed, or I/O TypeScript path will use Effect. Pure calculations and presentational React/TSX stay pure; they are not wrapped in Effect merely to satisfy a count. Runtime escape from Effect is allowed only at unavoidable program, HTTP framework, browser, extension, or tool boundaries.
+All AgentOS-owned TypeScript and TSX uses an Effect-native architecture. There
+are no package, service, CLI, script, test, website, browser, extension, or
+framework carve-outs for effectful behavior or asynchronous control flow. Pure
+calculations and render functions remain ordinary pure functions inside those
+Effect-native modules, but they may not perform or conceal effects. Runtime
+invocation is allowed only in named, tested, one-way outer host adapters that
+immediately enter a managed Effect runtime and contain no domain logic.
 
 The repository pins one exact compatible Effect beta family across workspaces. New code follows the existing Effect skill and repository standards:
 
@@ -444,6 +450,15 @@ The repository pins one exact compatible Effect beta family across workspaces. N
 - `@effect/vitest` for service and failure-path tests; and
 - OpenTelemetry spans and metrics at service boundaries.
 
+AgentOS-owned Promise/`async` orchestration, raw fetch/filesystem/process/
+database/network/timer I/O, ambient configuration reads, thrown domain errors,
+and ad hoc boundary parsers are forbidden outside those reviewed outer host
+adapters. Library and domain code returns `Effect` values and never starts its
+own global runtime. A machine-readable allowlist names every temporary or
+unavoidable adapter with its owner, reason, tests, and removal condition; CI
+rejects all other escapes across the repository from the start of the
+migration.
+
 ### Migration sequence
 
 The migration is incremental and behavior-preserving, never a flag day:
@@ -454,8 +469,8 @@ The migration is incremental and behavior-preserving, never a flag day:
 4. migrate AgentOS runtime composition, lifecycle, supervision, and reconciliation;
 5. migrate Pi extensions, memory, compaction, and native-session integration;
 6. migrate database tooling, CLIs, and release programs;
-7. migrate website server, data, worker, and API paths while leaving pure UI functions pure;
-8. convert tests and add cross-implementation behavior/conformance gates; and
+7. migrate website, browser, server, data, worker, build, and API paths;
+8. convert all effectful test orchestration and add cross-implementation behavior/conformance gates; and
 9. remove temporary Promise/schema/error adapters and enforce the final boundaries.
 
 Each slice starts with characterization tests, keeps a narrow adapter around not-yet-migrated code, and removes that adapter when the downstream slice lands. No issue may combine migration with unrelated product behavior unless the behavior is needed to preserve semantics.
@@ -581,8 +596,10 @@ The gateway, authorizer, and OpenFGA require readiness checks that prove useful 
 - Each migration slice has characterization, service, and failure tests before the legacy path is removed.
 - Repository-owned boundary data is decoded with Effect Schema and failures remain typed end to end.
 - Long-running services use scoped resources and structured concurrency; interruption releases listeners, processes, database connections, and streams.
-- CI rejects newly introduced unapproved effectful Promise/throw/schema patterns after the relevant directory is migrated.
-- Final enforcement finds no AgentOS-owned effectful TypeScript outside approved runtime adapters.
+- CI rejects newly introduced unapproved Promise/`async`, raw-I/O, runtime,
+  throw, ambient-config, and schema escapes across all TypeScript directories.
+- Final enforcement finds no AgentOS-owned effectful TypeScript outside Effect
+  and no unreviewed runtime adapter.
 
 ## Alternatives considered
 

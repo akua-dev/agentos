@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 326,
+      "digest": "54329b33723cbd3f4261fb41ef986fb9420c0358881b0e8ae12778829587fd42",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every finding owned by issue #104; touched debt must migrate instead of refreshing the digest."
+    },
+    {
+      "slice": "benchmarks",
+      "issue": 97,
+      "violationCount": 119,
+      "digest": "2665450747e2df58ce3ef762477bb245d45a1fa2f51952d853f8ae02575dbafb",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every finding owned by issue #97; touched debt must migrate instead of refreshing the digest."
+    },
+    {
+      "slice": "database-and-clis",
+      "issue": 97,
+      "violationCount": 86,
+      "digest": "ed90d419bc28525e4da99b233d26070e616e0c779002fbbc1a19ec02b31ac702",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every finding owned by issue #97; touched debt must migrate instead of refreshing the digest."
+    },
+    {
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1823,
+      "digest": "3507bebbe054e73ec8b37050bc65d992cf72598e9890af11748ec55d6abbf513",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every finding owned by issue #102; touched debt must migrate instead of refreshing the digest."
+    },
+    {
+      "slice": "openfga-generated-tooling",
+      "issue": 97,
+      "violationCount": 2,
+      "digest": "9b4bbafa971dcabe78316840f59dc8784d7e35ecd9ec5cd06f80502b79922ec7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every finding owned by issue #97; touched debt must migrate instead of refreshing the digest."
+    },
+    {
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 301,
+      "digest": "8208f7f101eaa6e7660ecabc41bbdb2fd01343f33a386232c20d249c1af1839b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every finding owned by issue #98; touched debt must migrate instead of refreshing the digest."
+    },
+    {
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 118,
+      "digest": "94e331cb5e5e6f3814b284722b3dcd942b7574839583616d3fe8aefc845a02dd",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every finding owned by issue #105; touched debt must migrate instead of refreshing the digest."
+    },
+    {
+      "slice": "shared-contracts-and-telemetry",
+      "issue": 104,
+      "violationCount": 30,
+      "digest": "48d621144319a332358146c7e506bcc2a3466b1cbea4779ffaab1435f1ddb7d8",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every finding owned by issue #104; touched debt must migrate instead of refreshing the digest."
+    },
+    {
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 151,
+      "digest": "237a89b97d0bed70cefad1da6c9030e200b9c35237aab7e0e79b549afa8f4b32",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every finding owned by issue #99; touched debt must migrate instead of refreshing the digest."
+    }
+  ]
+}
