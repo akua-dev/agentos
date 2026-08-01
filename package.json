@@ -13,9 +13,11 @@
   ],
   "scripts": {
     "build": "bun run --filter @akua-dev/agentos build",
-    "test": "bun run build && bun test . ./packages/agentos/src/background-tasks ./packages/agentos/src/supervision-guard ./packages/agentos/src/openai-server-compaction ./packages/agentos/src/mate-memory --path-ignore-patterns='website/apps/docs/**' && bun run site:test",
+    "test": "bun run build && bun test . ./packages/agentos/src/background-tasks ./packages/agentos/src/supervision-guard ./packages/agentos/src/openai-server-compaction ./packages/agentos/src/mate-memory --path-ignore-patterns='website/apps/docs/**' --path-ignore-patterns='tooling/effect-migration/**' && bun run effect:test && bun run site:test",
     "typecheck": "tsc --project tsconfig.json",
-    "check": "bun run test && bun run typecheck && bun run site:lint && bun run site:typecheck",
+    "effect:check": "bun tooling/effect-migration/check.ts",
+    "effect:test": "vitest run tooling/effect-migration",
+    "check": "bun run effect:check && bun run test && bun run typecheck && bun run site:lint && bun run site:typecheck",
     "site:dev": "bun run --cwd website/apps/docs dev",
     "site:test": "bun run --cwd website/apps/docs test",
     "site:lint": "bun run --cwd website/apps/docs lint",
@@ -28,10 +30,16 @@
     "site:upload:worker": "bun run --cwd website/apps/docs upload:worker"
   },
   "devDependencies": {
+    "@effect/opentelemetry": "4.0.0-beta.102",
+    "@effect/platform-browser": "4.0.0-beta.102",
+    "@effect/platform-bun": "4.0.0-beta.102",
+    "@effect/sql-pg": "4.0.0-beta.102",
     "@effect/vitest": "4.0.0-beta.102",
     "@types/bun": "1.3.14",
     "typescript": "7.0.2",
     "vite": "8.1.5",
+    "effect": "4.0.0-beta.102",
+    "oxc-parser": "0.128.0",
     "vitest": "4.1.10"
   },
   "dependencies": {

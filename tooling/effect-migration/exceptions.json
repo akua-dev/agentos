@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "exceptions": [
+    {
+      "path": "tooling/effect-migration/check.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The executable policy checker needs one reviewed Bun process entry boundary."
+    }
+  ]
+}
