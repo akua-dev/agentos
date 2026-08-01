@@ -590,8 +590,8 @@ function boundedHeader<T extends string>(
   values: readonly T[],
   fallback: T,
 ): T {
-  const value = headers.get(name)?.trim() as T | undefined;
-  return value && values.includes(value) ? value : fallback;
+  const value = headers.get(name)?.trim();
+  return values.find((candidate) => candidate === value) ?? fallback;
 }
 
 function inferRuntime(headers: Headers): AgentOSAIRuntime {
@@ -629,10 +629,11 @@ function extractParent(
   propagator: TextMapPropagator,
 ): Context {
   const carrier: Record<string, string> = {};
-  for (const [name, maximum] of [
+  const propagationHeaders: ReadonlyArray<readonly [string, number]> = [
     ["traceparent", 55],
     ["tracestate", 512],
-  ] as const) {
+  ];
+  for (const [name, maximum] of propagationHeaders) {
     const value = headers.get(name);
     if (value && value.length <= maximum) carrier[name] = value;
   }
