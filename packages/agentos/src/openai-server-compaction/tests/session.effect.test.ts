@@ -1,12 +1,17 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, it } from "@effect/vitest";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+import { Effect } from "effect";
 import {
   buildCompactionInput,
   nativeCompactionDetails,
   NATIVE_DETAILS_KEY,
   rewriteResponsesPayload,
 } from "../session.ts";
-import { parseResponseItems } from "../schemas.ts";
+import {
+  parseResponseItems,
+  type CompactionArtifact,
+  type ResponseItem,
+} from "../schemas.ts";
 
 const usage = {
   input: 1,
@@ -22,6 +27,16 @@ const usage = {
     total: 0,
   },
 };
+
+function responseItems(value: unknown): ResponseItem[] {
+  const parsed = parseResponseItems(value);
+  expect(parsed).toBeDefined();
+  return parsed ?? [];
+}
+
+function test(name: string, assertion: () => void) {
+  it.effect(name, () => Effect.sync(assertion));
+}
 
 function message(id: string, parentId: string | null, text: string): SessionEntry {
   return {
@@ -132,27 +147,26 @@ describe("native compaction session replay", () => {
   });
 
   test("continues from the latest matching opaque artifact", () => {
-    const output = parseResponseItems([
+    const output = responseItems([
       {
-        type: "message" as const,
-        role: "user" as const,
+        type: "message",
+        role: "user",
         content: [
-          { type: "input_text" as const, text: "retained" },
+          { type: "input_text", text: "retained" },
           { type: "opaque_content", opaque: { provider_key: "preserve-me" } },
         ],
         provider_metadata: { trace_id: "trace-1" },
       },
       {
-        type: "function_call" as const,
+        type: "function_call",
         call_id: "call_1",
         name: "read",
         arguments: "{}",
         provider_metadata: { region: "test" },
       },
       { type: "opaque_item", opaque: { provider_key: "preserve-me" } },
-      { type: "compaction" as const, encrypted_content: "opaque" },
+      { type: "compaction", encrypted_content: "opaque" },
     ]);
-    if (!output) throw new Error("Invalid response item fixture.");
     const details = nativeCompactionDetails(
       "openai",
       "openai-responses",
@@ -198,7 +212,10 @@ describe("native compaction session replay", () => {
   });
 
   test("clears pending messages at an empty assistant turn boundary", () => {
-    const artifact = { type: "compaction" as const, encrypted_content: "opaque" };
+    const artifact: CompactionArtifact = {
+      type: "compaction",
+      encrypted_content: "opaque",
+    };
     const native = nativeCompactionDetails(
       "openai",
       "openai-responses",
@@ -237,7 +254,10 @@ describe("native compaction session replay", () => {
   });
 
   test("never reuses an older artifact across a newer local compaction or model mismatch", () => {
-    const artifact = { type: "compaction" as const, encrypted_content: "opaque" };
+    const artifact: CompactionArtifact = {
+      type: "compaction",
+      encrypted_content: "opaque",
+    };
     const native = nativeCompactionDetails(
       "openai-codex",
       "openai-codex-responses",
@@ -339,7 +359,10 @@ describe("native compaction session replay", () => {
   });
 
   test("does not replay native output for a different payload model", () => {
-    const artifact = { type: "compaction" as const, encrypted_content: "opaque" };
+    const artifact: CompactionArtifact = {
+      type: "compaction",
+      encrypted_content: "opaque",
+    };
     const entries = [
       message("old", null, "discarded"),
       compaction(
@@ -367,8 +390,8 @@ describe("native compaction session replay", () => {
   });
 
   test("rejects version-1 replay state and version-2 API mismatches", () => {
-    const artifact = {
-      type: "compaction" as const,
+    const artifact: CompactionArtifact = {
+      type: "compaction",
       encrypted_content: "opaque-legacy",
     };
     const legacy = [
@@ -419,8 +442,8 @@ describe("native compaction session replay", () => {
   });
 
   test("replays only matching completed turns plus the pending tail", () => {
-    const artifact = {
-      type: "compaction" as const,
+    const artifact: CompactionArtifact = {
+      type: "compaction",
       encrypted_content: "opaque-turns",
     };
     const entries = [
