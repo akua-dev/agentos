@@ -161,6 +161,17 @@ export {
   type KubernetesWorkloadIdentityLiveOptions,
 } from "./access/kubernetes-identity-http.ts";
 export {
+  AgentOSWorkloadIdentityStorePostgresLayer,
+  ProviderAccessDatabase,
+  ProviderAccessDatabaseSqlLayer,
+  ProviderAccessDatabaseUnavailable,
+  ProviderPolicySnapshotStore,
+  ProviderPolicySnapshotStorePostgresLayer,
+  ProviderPolicySnapshotUnavailable,
+  ProviderPolicySnapshotV1Schema,
+  type ProviderPolicySnapshotV1,
+} from "./access/postgres-identity.ts";
+export {
   PROVIDER_AUTHORIZATION_GRANT_HEADERS,
   PROVIDER_AUTHORIZATION_GRANT_MAX_TTL_MILLIS,
   ProviderAuthorizationError,
