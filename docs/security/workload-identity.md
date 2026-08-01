@@ -26,6 +26,21 @@ This online check is deliberate. Kubernetes states that offline JWT validation d
 
 The Agent row must have `lifecycle_status = 'active'` and no `retired_at`. When the requested provider operation requires Assignment scope, the identity store—not the caller—must derive exactly one Assignment for that Agent with `status = 'active'` and no `ended_at`. The normalized output is the only identity accepted by later capability/OpenFGA evaluation; Agent IDs, Assignment IDs, ServiceAccount names, Pod names, labels, and HTTP headers supplied by a caller are never authentication on their own.
 
+The released PostgreSQL adapter uses the dedicated `agentos_egress_authz`
+service login and only the three `0019_egress_authorizer_reads.sql` Functions.
+It has no direct table access and is not a registered Agent principal. An Agent
+locator becomes provider identity only when an exact current access binding
+also supplies one unambiguous Fleet/domain scope. This deliberately fails
+closed when the same workload could resolve through inconsistent scopes; it
+does not infer authority from namespace naming.
+
+Policy lookup is one statement-consistent binding/profile/head/ceiling
+snapshot. Closed Effect Schemas decode the result, and the adapter rejects a
+missing or duplicate binding, pending/expired binding, stale profile head,
+mismatched ceiling reference, pending ceiling reconciliation, inactive or
+future ceiling, or in-progress access-control operation. Therefore a rollout
+is never acknowledged from a mixture of database versions.
+
 ## Cache and revocation
 
 Only successful normalized identities are cached. The key is a SHA-256 digest of the bearer token plus whether active Assignment identity was required. Neither raw token nor JWT payload is retained. A cache entry expires at the earlier of:
@@ -44,7 +59,7 @@ The access boundary uses separate closed tagged errors:
 - `WorkloadAuthenticationError`: malformed/expired/rejected token, audience or bound-object failure, deleted/missing Kubernetes identity, UID/ownership mismatch, or non-running Pod;
 - `WorkloadIdentityResolutionError`: missing, ambiguous, inactive, or locator-mismatched Agent/Assignment;
 - `WorkloadAuthorizationError`: an authenticated identity cannot own the derived authorization subject;
-- `WorkloadIdentityDependencyUnavailable`: TokenReview, Kubernetes lookup, or AgentOS identity-store availability failure; and
+- `WorkloadIdentityDependencyUnavailable`: TokenReview, Kubernetes lookup, or AgentOS identity-store availability/response failure; and
 - `WorkloadPolicyDenied`: a later current-policy decision denied an otherwise authenticated identity.
 
 Every category fails closed before provider credentials are available. Dependency error fields contain only a finite dependency and operation code—never upstream error text. The authenticator emits no log records or metrics. Its span contains only the fixed audience, cache-hit state, Assignment-required state, Agent ID, and namespace; bearer tokens, JWT payloads, request/response bodies, prompts, credentials, and provider payloads are excluded.

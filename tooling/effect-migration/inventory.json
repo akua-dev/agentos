@@ -95,6 +95,26 @@
       "status": "migrated"
     },
     {
+      "id": "provider-postgresql-identity-effect-tests",
+      "issue": 96,
+      "pattern": "^packages/agentos/src/access/tests/postgres-identity\\.effect\\.test\\.ts$",
+      "runtime": "bun-postgresql",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "clock", "database"],
+      "migrationDependencies": [100, 101, 87, 88, 89],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-postgresql-authorizer-effect-tests",
+      "issue": 96,
+      "pattern": "^database/tests/egress-authorizer-reads\\.effect\\.test\\.ts$",
+      "runtime": "bun-postgresql",
+      "package": "@agentos/database",
+      "io": ["test", "filesystem", "database"],
+      "migrationDependencies": [100, 101, 87, 88, 89],
+      "status": "migrated"
+    },
+    {
       "id": "provider-kubernetes-identity",
       "issue": 96,
       "pattern": "^packages/agentos/src/access/kubernetes-identity-http\\.ts$",
@@ -102,6 +122,16 @@
       "package": "@akua-dev/agentos",
       "io": ["filesystem", "http", "kubernetes", "stream"],
       "migrationDependencies": [100, 101, 87, 88],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-postgresql-identity",
+      "issue": 96,
+      "pattern": "^packages/agentos/src/access/postgres-identity\\.ts$",
+      "runtime": "shared-bun-postgresql",
+      "package": "@akua-dev/agentos",
+      "io": ["clock", "database", "schema"],
+      "migrationDependencies": [100, 101, 87, 88, 89],
       "status": "migrated"
     },
     {

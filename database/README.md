@@ -269,3 +269,49 @@ can inspect the Fleet-wide rows, but only First Mate receives the mutation
 Functions. `tests/access-control-plane.test.ts` exercises bounds, concurrency,
 retry, grants, staged ceiling shrink, Assignment binding, Grants/RLS, privacy and
 immutability against the full migration chain.
+
+`0019_egress_authorizer_reads.sql` creates the narrow PostgreSQL boundary used
+by `agentos-egress-authz`. It does not create a login or credential. The
+database operator must create a dedicated non-privileged login through the
+approved secret workflow, then the AgentOS schema owner applies the reviewed
+grant configurator:
+
+```sql
+SELECT agentos.configure_egress_authorizer_privileges(
+  'agentos_egress_authz'::name
+);
+```
+
+The configurator rejects a superuser, database/role creator, replication or
+`BYPASSRLS` role and rejects inherited role memberships. It removes direct
+schema, table, sequence and Function grants before granting only these readers:
+
+- `read_egress_workload_agents(text, text)`;
+- `read_egress_assignments(uuid)`; and
+- `read_egress_policy_snapshots(jsonb)`.
+
+Run the configurator during install and after an upgrade before making the
+authorizer ready. Do not register this login as an Agent principal: it is a
+service identity with narrower access than the Fleet-wide Agent read view.
+Supply its password and verified TLS connection configuration only to the
+authorizer through the deployment's approved Kubernetes secret source. Never
+place them in a migration, manifest value, command argument, log or error.
+
+The workload reader resolves an exact namespace/Pod locator. Fleet and domain
+come only from a current active mate or Assignment access binding; it never
+parses a namespace name or trusts a caller label. Multiple scopes remain
+multiple rows so the Effect identity store rejects the lookup as ambiguous.
+The Assignment reader returns only non-ended candidates for the selected
+Agent.
+
+The policy reader returns binding, immutable profile version and head,
+binding/profile ceiling references, the exact ceiling, pending-ceiling state
+and in-progress rollout state in one PostgreSQL statement snapshot. The Effect
+store applies closed Schema decoding and rejects missing or duplicate rows,
+pending/expired bindings, subject/reference mismatch, stale profile heads,
+pending or inactive ceilings, future effective times and unfinished rollout.
+Database and decoding failures are finite content-free tagged errors; raw SQL,
+parameters, PostgreSQL errors and credentials never enter the domain failure.
+`tests/egress-authorizer-reads.effect.test.ts` proves the real role boundary,
+including removal of deliberately broad grants, exact reads and denial to an
+unrelated login.
