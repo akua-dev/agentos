@@ -472,6 +472,9 @@ describe("First Mate Kubernetes resources", () => {
     const firstmate = pod.containers.find(
       ({ name }: { name: string }) => name === "agentos",
     );
+    const prepare = pod.initContainers.find(
+      ({ name }: { name: string }) => name === "prepare-home",
+    );
     const environment = Object.fromEntries(
       firstmate.env.map(
         ({ name, value, valueFrom }: Record<string, unknown>) => [
@@ -480,6 +483,18 @@ describe("First Mate Kubernetes resources", () => {
         ],
       ),
     );
+    const prepareEnvironment = Object.fromEntries(
+      prepare.env.map(
+        ({ name, value, valueFrom }: Record<string, unknown>) => [
+          name,
+          value ?? valueFrom,
+        ],
+      ),
+    );
+
+    expect(
+      pod.initContainers.map(({ name }: { name: string }) => name),
+    ).toEqual(["install-tools", "prepare-home"]);
 
     expect(spec.template.metadata.labels).toMatchObject({
       "agentos.akua.dev/ai-gateway-client": "true",
@@ -490,7 +505,60 @@ describe("First Mate Kubernetes resources", () => {
     expect(environment.AI_GATEWAY_TOKEN).toEqual({
       secretKeyRef: { key: "token", name: "ai-gateway-client" },
     });
+    expect(environment.AGENTOS_PI_PROVIDER_MODE).toBe("ai-gateway");
+    expect(prepareEnvironment).toMatchObject({
+      AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
+      AI_GATEWAY_TOKEN: {
+        secretKeyRef: { key: "token", name: "ai-gateway-client" },
+      },
+      AI_GATEWAY_URL:
+        "http://ai-gateway.agentos.svc.cluster.local:8787",
+    });
+    expect(environment.AGENTOS_MODEL).toBeUndefined();
+    expect(environment.AGENTOS_THINKING).toBeUndefined();
+    expect(prepareEnvironment.AGENTOS_MODEL).toBeUndefined();
+    expect(prepareEnvironment.AGENTOS_THINKING).toBeUndefined();
     expect(pod.serviceAccountName).toBe("agentos-firstmate");
     expect(spec.volumeClaimTemplates[0].metadata.name).toBe("home");
+  });
+
+  test("renders an explicit one-rollout return to direct Pi auth", async () => {
+    const resources = await render(
+      join(runtime, "tests", "fixtures", "ai-gateway-direct-auth"),
+    );
+    const statefulSet = resource(resources, "StatefulSet", "agentos-firstmate");
+    const pod = statefulSet.spec!.template.spec;
+    const prepare = pod.initContainers.find(
+      ({ name }: { name: string }) => name === "prepare-home",
+    );
+    const runtimeContainer = pod.containers.find(
+      ({ name }: { name: string }) => name === "agentos",
+    );
+    const prepareEnvironment = Object.fromEntries(
+      prepare.env.map(({ name, value }: { name: string; value: string }) => [
+        name,
+        value,
+      ]),
+    );
+    const runtimeEnvironment = Object.fromEntries(
+      runtimeContainer.env.map(
+        ({ name, value }: { name: string; value: string }) => [name, value],
+      ),
+    );
+
+    expect(
+      pod.initContainers.map(({ name }: { name: string }) => name),
+    ).toEqual(["install-tools", "prepare-home"]);
+
+    expect(prepareEnvironment.AGENTOS_PI_PROVIDER_MODE).toBe("direct");
+    expect(prepareEnvironment.AI_GATEWAY_URL).toBeUndefined();
+    expect(prepareEnvironment.AI_GATEWAY_TOKEN).toBeUndefined();
+    expect(prepareEnvironment.AGENTOS_MODEL).toBeUndefined();
+    expect(runtimeEnvironment.AGENTOS_PI_PROVIDER_MODE).toBeUndefined();
+    expect(runtimeEnvironment.AI_GATEWAY_URL).toBeUndefined();
+    expect(runtimeEnvironment.AI_GATEWAY_TOKEN).toBeUndefined();
+    expect(statefulSet.spec!.template.metadata.labels).not.toHaveProperty(
+      "agentos.akua.dev/ai-gateway-client",
+    );
   });
 });
