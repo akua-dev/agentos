@@ -10,9 +10,15 @@ strategy:
     maxUnavailable: 0
 commonLabels:
   app.kubernetes.io/part-of: agentos
-  agentos.akua.dev/credential-domain: fleet-ai-gateway
+  agentos.akua.dev/credential-domain: openai
 podAnnotations:
   agentos.akua.dev/config-source: readonly
+serviceAccount:
+  create: true
+  name: agentgateway-openai
+podSecurityContext:
+  fsGroup: 2000
+  fsGroupChangePolicy: OnRootMismatch
 gateway:
   service:
     enabled: true
@@ -31,12 +37,18 @@ resources:
   limits:
     cpu: "1"
     memory: 512Mi
-extraEnv:
-  - name: AGENTOS_AI_GATEWAY_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: agentgateway-ai-gateway-client
-        key: token
+extraVolumes:
+  - name: provider-credential-openai
+    secret:
+      secretName: agentgateway-ai-gateway-client
+      defaultMode: 288
+      items:
+        - key: token
+          path: credential
+extraVolumeMounts:
+  - name: provider-credential-openai
+    mountPath: /var/run/secrets/agentos-provider/openai
+    readOnly: true
 config:
   config:
     adminAddr: 127.0.0.1:15000
@@ -67,4 +79,6 @@ config:
         - host: ai-gateway.agentos.svc.cluster.local:8787
           policies:
             backendAuth:
-              key: $AGENTOS_AI_GATEWAY_TOKEN
+              key:
+                value:
+                  file: /var/run/secrets/agentos-provider/openai/credential

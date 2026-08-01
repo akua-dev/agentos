@@ -57,6 +57,21 @@ const ValuesSchema = Schema.Struct({
       maxUnavailable: Schema.Literal(0),
     }),
   }),
+  commonLabels: Schema.Struct({
+    "app.kubernetes.io/part-of": Schema.Literal("agentos"),
+    "agentos.akua.dev/credential-domain": Schema.Literal("openai"),
+  }),
+  podAnnotations: Schema.Struct({
+    "agentos.akua.dev/config-source": Schema.Literal("readonly"),
+  }),
+  serviceAccount: Schema.Struct({
+    create: Schema.Literal(true),
+    name: Schema.Literal("agentgateway-openai"),
+  }),
+  podSecurityContext: Schema.Struct({
+    fsGroup: Schema.Literal(2000),
+    fsGroupChangePolicy: Schema.Literal("OnRootMismatch"),
+  }),
   gateway: Schema.Struct({
     service: Schema.Struct({
       enabled: Schema.Literal(true),
@@ -76,15 +91,28 @@ const ValuesSchema = Schema.Struct({
     requests: Schema.Struct({ cpu: Schema.String, memory: Schema.String }),
     limits: Schema.Struct({ cpu: Schema.String, memory: Schema.String }),
   }),
-  extraEnv: Schema.Array(
+  extraVolumes: Schema.Array(
     Schema.Struct({
-      name: Schema.Literal("AGENTOS_AI_GATEWAY_TOKEN"),
-      valueFrom: Schema.Struct({
-        secretKeyRef: Schema.Struct({
-          name: Schema.Literal("agentgateway-ai-gateway-client"),
-          key: Schema.Literal("token"),
-        }),
+      name: Schema.Literal("provider-credential-openai"),
+      secret: Schema.Struct({
+        secretName: Schema.Literal("agentgateway-ai-gateway-client"),
+        defaultMode: Schema.Literal(288),
+        items: Schema.Array(
+          Schema.Struct({
+            key: Schema.Literal("token"),
+            path: Schema.Literal("credential"),
+          }),
+        ),
       }),
+    }),
+  ),
+  extraVolumeMounts: Schema.Array(
+    Schema.Struct({
+      name: Schema.Literal("provider-credential-openai"),
+      mountPath: Schema.Literal(
+        "/var/run/secrets/agentos-provider/openai",
+      ),
+      readOnly: Schema.Literal(true),
     }),
   ),
   config: Schema.Struct({
@@ -107,6 +135,16 @@ const ValuesSchema = Schema.Struct({
           extAuthz: Schema.Struct({
             host: Schema.String,
             failureMode: Schema.Literal("deny"),
+            protocol: Schema.Struct({ grpc: Schema.Struct({}) }),
+            includeRequestHeaders: Schema.Array(
+              Schema.Literals([
+                "authorization",
+                "x-agentos-profile",
+                "x-agentos-assignment-id",
+                ":method",
+                ":path",
+              ]),
+            ),
           }),
         }),
         backends: Schema.Array(
@@ -114,7 +152,13 @@ const ValuesSchema = Schema.Struct({
             host: Schema.String,
             policies: Schema.Struct({
               backendAuth: Schema.Struct({
-                key: Schema.Literal("$AGENTOS_AI_GATEWAY_TOKEN"),
+                key: Schema.Struct({
+                  value: Schema.Struct({
+                    file: Schema.Literal(
+                      "/var/run/secrets/agentos-provider/openai/credential",
+                    ),
+                  }),
+                }),
               }),
             }),
           }),
@@ -166,10 +210,18 @@ layer(Layer.merge(BunFileSystem.layer, BunPath.layer))(
         const path = yield* Path.Path;
         const values = yield* readYaml(
           path.join(testDirectory, "../kubernetes/values.yaml"),
-        ).pipe(Effect.flatMap(Schema.decodeUnknownEffect(ValuesSchema)));
+        ).pipe(
+          Effect.flatMap(
+            Schema.decodeUnknownEffect(ValuesSchema, {
+              onExcessProperty: "error",
+            }),
+          ),
+        );
         assert.strictEqual(values.gateway.service.type, "ClusterIP");
         assert.strictEqual(values.mode, "readonly");
         assert.strictEqual(values.replicaCount, 2);
+        assert.strictEqual(values.extraVolumes.length, 1);
+        assert.strictEqual(values.extraVolumeMounts.length, 1);
         assert.strictEqual(
           values.config.routes[0]?.policies.extAuthz.failureMode,
           "deny",

@@ -6,6 +6,8 @@ Status: released v1 contract for AgentOS issue #88.
 
 Captain/platform owns the finite capability registry and publishes immutable, contiguous ceiling revisions for one exact Fleet or Second-Mate domain. First Mate publishes immutable profile versions and binds one exact version to one Mate or Assignment through the [released control plane](./first-mate-access-control.md). First Mate cannot add a capability, reinterpret an action, change a resource kind, or widen the supplied Captain ceiling.
 
+An allowed decision never carries a credential. The [provider-isolated credential-delivery contract](./provider-credential-delivery.md) consumes the bounded decision reference inside one provider adapter and keeps provider roots outside every Mate namespace.
+
 Every request-time decision uses the current Captain ceiling. The ceiling revision recorded on a binding is provenance, not continuing authority. If revision 2 removes or tightens a permission issued under revision 1, the old profile and binding immediately evaluate as denied. Expiry and rate-class limits also compose by taking the stricter current value.
 
 The v1 contract deliberately is not a policy language. One permission contains only:
