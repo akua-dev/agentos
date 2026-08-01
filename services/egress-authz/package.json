@@ -1,0 +1,23 @@
+{
+  "name": "@agentos/egress-authz",
+  "version": "0.0.0",
+  "description": "Effect-native workload identity and provider policy authorizer for AgentGateway",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agentos-egress-authz": "./src/main.ts"
+  },
+  "scripts": {
+    "test": "vitest run tests",
+    "typecheck": "tsc --project ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.0-beta.102",
+    "@effect/sql-pg": "4.0.0-beta.102",
+    "@akua-dev/agentos": "workspace:*",
+    "effect": "4.0.0-beta.102"
+  },
+  "devDependencies": {
+    "yaml": "2.9.0"
+  }
+}

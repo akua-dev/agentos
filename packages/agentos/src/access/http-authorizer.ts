@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { Clock, Effect, Schema } from "effect";
+import { Clock, Effect, Encoding, Option, Result, Schema } from "effect";
 
 import {
   AccessCapabilityIdSchema,
@@ -12,6 +11,7 @@ import {
   type AuthorizationSubjectV1,
 } from "./contracts.ts";
 import {
+  ProviderPolicyDecisionError,
   ProviderPolicyDecisionPoint,
 } from "./credential-delivery.ts";
 import {
@@ -134,7 +134,7 @@ export const PROVIDER_AUTHORIZATION_GRANT_HEADERS = Object.freeze([
   "x-agentos-authz-ceiling-id",
   "x-agentos-authz-ceiling-revision",
   "x-agentos-authz-rate-class",
-] as const);
+]);
 
 export function resolveProviderAuthorizationRoute(
   method: string,
@@ -324,16 +324,23 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
   "agentos.providerAuthorization.createHttpHandler",
 )(function*(options: {
   readonly clock?: Effect.Effect<number>;
-  readonly id?: Effect.Effect<string>;
+  readonly id: Effect.Effect<string, ProviderPolicyDecisionError>;
 }) {
   const authenticator = yield* WorkloadIdentityAuthenticator;
   const decisionPoint = yield* ProviderPolicyDecisionPoint;
   const clock = options.clock ?? Clock.currentTimeMillis;
-  const id = options.id ?? Effect.sync(() => randomUUID().replaceAll("-", ""));
+  const id = options.id;
 
   const authorize = Effect.fn("agentos.providerAuthorization.authorizeHttp")(
     function*(request: Request) {
       if (request.method !== "POST" || new URL(request.url).pathname !== "/authorize") {
+        return forbiddenResponse();
+      }
+      if (
+        PROVIDER_AUTHORIZATION_GRANT_HEADERS.some((header) =>
+          request.headers.has(header)
+        )
+      ) {
         return forbiddenResponse();
       }
       const bearerToken = bearerTokenFrom(request.headers);
@@ -443,11 +450,8 @@ const GitHubRepositoryPattern = /^[a-z0-9._-]+$/;
 
 function parseRequestPath(path: string): URL | null {
   if (!path.startsWith("/") || path.length > 4_096) return null;
-  try {
-    return new URL(path, "http://agentos.invalid");
-  } catch {
-    return null;
-  }
+  const base = "http://agentos.invalid";
+  return URL.canParse(path, base) ? new URL(path, base) : null;
 }
 
 function resolveGitHubAuthorizationRoute(
@@ -566,84 +570,92 @@ function resolveGitHubGraphqlRoute(
   source: string,
   hinted: GitHubRepositoryResource | null,
 ): Effect.Effect<ProviderAuthorizationRouteV1, ProviderAuthorizationError> {
-  if (new TextEncoder().encode(source).byteLength > GITHUB_AUTHORIZATION_BODY_MAX_BYTES) {
-    return Effect.fail(authorizerError("invalid_request"));
-  }
-  let body: unknown;
-  try {
-    body = JSON.parse(source);
-  } catch {
-    return Effect.fail(authorizerError("invalid_request"));
-  }
-  if (!isRecord(body) || typeof body.query !== "string") {
-    return Effect.fail(authorizerError("invalid_request"));
-  }
-  const variables = isRecord(body.variables) ? body.variables : {};
-  const embedded = githubRepositoryFromGraphql(body.query, variables);
-  if (embedded !== null && hinted !== null && !sameGitHubRepository(embedded, hinted)) {
-    return Effect.fail(authorizerError("resource_mismatch"));
-  }
-  if (embedded === null) {
-    return Effect.fail(authorizerError("unsupported_route"));
-  }
-  const resource = embedded;
-  const query = stripGraphqlComments(body.query);
-  if (/\bsubscription\b/.test(query)) {
-    return Effect.fail(authorizerError("unsupported_route"));
-  }
-  const mutation = /\bmutation\b/.test(query);
-  const pullRequestSignal = mutation
-    ? hasAnyGraphqlField(query, [
-      "addPullRequestReview",
-      "addPullRequestReviewThread",
-      "addPullRequestReviewThreadReply",
-      "closePullRequest",
-      "convertPullRequestToDraft",
-      "createPullRequest",
-      "deletePullRequestReview",
-      "deletePullRequestReviewComment",
-      "disablePullRequestAutoMerge",
-      "dismissPullRequestReview",
-      "enablePullRequestAutoMerge",
-      "enqueuePullRequest",
-      "markFileAsViewed",
-      "markPullRequestReadyForReview",
-      "mergePullRequest",
-      "reopenPullRequest",
-      "requestReviews",
-      "resolveReviewThread",
-      "revertPullRequest",
-      "submitPullRequestReview",
-      "unmarkFileAsViewed",
-    ])
-    : /\b(?:pullRequest|pullRequests)\s*\(/.test(query);
-  const issueSignal = mutation
-    ? hasAnyGraphqlField(query, [
-      "addComment",
-      "closeIssue",
-      "createIssue",
-      "deleteIssueComment",
-      "reopenIssue",
-      "updateIssue",
-      "updateIssueComment",
-    ])
-    : /\b(?:issue|issues)\s*\(/.test(query);
-  if (pullRequestSignal && issueSignal) {
-    return Effect.fail(authorizerError("unsupported_route"));
-  }
-  if (mutation && !pullRequestSignal && !issueSignal) {
-    return Effect.fail(authorizerError("unsupported_route"));
-  }
-  const capability = pullRequestSignal
-    ? mutation
-      ? "github.pull_request.write" as const
-      : "github.pull_request.read" as const
-    : issueSignal
-    ? mutation
-      ? "github.issue.write" as const
-      : "github.issue.read" as const
-    : "github.repository.read" as const;
-  return Effect.succeed(githubRoute(capability, resource));
+  return Effect.gen(function*() {
+    if (
+      new TextEncoder().encode(source).byteLength >
+        GITHUB_AUTHORIZATION_BODY_MAX_BYTES
+    ) {
+      return yield* authorizerError("invalid_request");
+    }
+    const body = yield* Schema.decodeUnknownEffect(
+      Schema.fromJsonString(Schema.Unknown),
+    )(source).pipe(
+      Effect.mapError(() => authorizerError("invalid_request")),
+    );
+    if (!isRecord(body) || typeof body.query !== "string") {
+      return yield* authorizerError("invalid_request");
+    }
+    const variables = isRecord(body.variables) ? body.variables : {};
+    const embedded = githubRepositoryFromGraphql(body.query, variables);
+    if (
+      embedded !== null && hinted !== null &&
+      !sameGitHubRepository(embedded, hinted)
+    ) {
+      return yield* authorizerError("resource_mismatch");
+    }
+    if (embedded === null) {
+      return yield* authorizerError("unsupported_route");
+    }
+    const query = stripGraphqlComments(body.query);
+    if (/\bsubscription\b/.test(query)) {
+      return yield* authorizerError("unsupported_route");
+    }
+    const mutation = /\bmutation\b/.test(query);
+    const pullRequestSignal = mutation
+      ? hasAnyGraphqlField(query, [
+        "addPullRequestReview",
+        "addPullRequestReviewThread",
+        "addPullRequestReviewThreadReply",
+        "closePullRequest",
+        "convertPullRequestToDraft",
+        "createPullRequest",
+        "deletePullRequestReview",
+        "deletePullRequestReviewComment",
+        "disablePullRequestAutoMerge",
+        "dismissPullRequestReview",
+        "enablePullRequestAutoMerge",
+        "enqueuePullRequest",
+        "markFileAsViewed",
+        "markPullRequestReadyForReview",
+        "mergePullRequest",
+        "reopenPullRequest",
+        "requestReviews",
+        "resolveReviewThread",
+        "revertPullRequest",
+        "submitPullRequestReview",
+        "unmarkFileAsViewed",
+      ])
+      : /\b(?:pullRequest|pullRequests)\s*\(/.test(query);
+    const issueSignal = mutation
+      ? hasAnyGraphqlField(query, [
+        "addComment",
+        "closeIssue",
+        "createIssue",
+        "deleteIssueComment",
+        "reopenIssue",
+        "updateIssue",
+        "updateIssueComment",
+      ])
+      : /\b(?:issue|issues)\s*\(/.test(query);
+    if (pullRequestSignal && issueSignal) {
+      return yield* authorizerError("unsupported_route");
+    }
+    if (mutation && !pullRequestSignal && !issueSignal) {
+      return yield* authorizerError("unsupported_route");
+    }
+    let capability: Extract<
+      ProviderAuthorizationRouteV1,
+      { readonly provider: "github" }
+    >["capability"] = "github.repository.read";
+    if (pullRequestSignal) {
+      capability = mutation
+        ? "github.pull_request.write"
+        : "github.pull_request.read";
+    } else if (issueSignal) {
+      capability = mutation ? "github.issue.write" : "github.issue.read";
+    }
+    return githubRoute(capability, embedded);
+  });
 }
 
 type GitHubRepositoryResource = Extract<
@@ -681,14 +693,15 @@ function githubRepositoryFromSegments(
   repository: string | undefined,
 ): GitHubRepositoryResource | null {
   if (owner === undefined || repository === undefined) return null;
-  try {
-    return githubRepositoryFromUnknown(
-      decodeURIComponent(owner),
-      decodeURIComponent(repository),
-    );
-  } catch {
-    return null;
-  }
+  const decodedOwner = Schema.decodeUnknownOption(
+    Schema.StringFromUriComponent,
+  )(owner);
+  const decodedRepository = Schema.decodeUnknownOption(
+    Schema.StringFromUriComponent,
+  )(repository);
+  return Option.isSome(decodedOwner) && Option.isSome(decodedRepository)
+    ? githubRepositoryFromUnknown(decodedOwner.value, decodedRepository.value)
+    : null;
 }
 
 function githubRepositoryFromUnknown(
@@ -887,16 +900,13 @@ function bearerTokenFrom(headers: Headers): string | null {
   const basic = /^Basic\s+(\S+)$/i.exec(authorization)?.[1];
   let token = bearer;
   if (token === undefined && basic !== undefined) {
-    try {
-      const decoded = Buffer.from(basic, "base64").toString("utf8");
-      const separator = decoded.indexOf(":");
-      if (separator < 1) return null;
-      const username = decoded.slice(0, separator);
-      if (username !== "x-access-token" && username !== "agentos") return null;
-      token = decoded.slice(separator + 1);
-    } catch {
-      return null;
-    }
+    const decoded = Result.getOrUndefined(Encoding.decodeBase64String(basic));
+    if (decoded === undefined) return null;
+    const separator = decoded.indexOf(":");
+    if (separator < 1) return null;
+    const username = decoded.slice(0, separator);
+    if (username !== "x-access-token" && username !== "agentos") return null;
+    token = decoded.slice(separator + 1);
   }
   if (!token || /\s/.test(token)) return null;
   return token.length <= 16 * 1_024 ? token : null;
@@ -922,27 +932,30 @@ function authorizerError(code: ProviderAuthorizationError["code"]) {
 }
 
 function responseForAuthorizationFailure(error: unknown): Response {
-  if (
-    typeof error === "object" && error !== null && "outcome" in error &&
-    typeof error.outcome === "string" &&
-    [
-      "credential_unavailable",
-      "credential_rejected",
-      "credential_rotating",
-      "credential_exchange_failed",
-    ].includes(error.outcome)
-  ) {
-    return Response.json({ error: "authorization_unavailable" }, {
-      status: 503,
-    });
+  if (error instanceof ProviderPolicyDecisionError) {
+    switch (error.outcome) {
+      case "database_unavailable":
+      case "policy_stale":
+      case "openfga_unavailable":
+      case "decision_reference_unavailable":
+        return unavailableResponse();
+      case "invalid_route":
+      case "identity_rejected":
+      case "profile_denied":
+      case "ceiling_denied":
+      case "effective_policy_denied":
+      case "rate_class_disabled":
+      case "rate_class_exceeded":
+      case "rate_limited":
+      case "budget_exhausted":
+        return forbiddenResponse();
+    }
   }
   if (
     typeof error === "object" && error !== null && "_tag" in error &&
     error._tag === "WorkloadIdentityDependencyUnavailable"
   ) {
-    return Response.json({ error: "authorization_unavailable" }, {
-      status: 503,
-    });
+    return unavailableResponse();
   }
   if (
     typeof error === "object" && error !== null && "_tag" in error &&
@@ -952,6 +965,12 @@ function responseForAuthorizationFailure(error: unknown): Response {
     return unauthorizedResponse();
   }
   return forbiddenResponse();
+}
+
+function unavailableResponse(): Response {
+  return Response.json({ error: "authorization_unavailable" }, {
+    status: 503,
+  });
 }
 
 function unauthorizedResponse(): Response {

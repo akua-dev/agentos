@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agentos-egress-authz
+  labels:
+    app.kubernetes.io/name: agentos-egress-authz
+    app.kubernetes.io/component: authorization
+    app.kubernetes.io/part-of: agentos
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-egress-authz
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agentos-egress-authz
+        app.kubernetes.io/component: authorization
+        app.kubernetes.io/part-of: agentos
+        agentos.akua.dev/openfga-client: "true"
+    spec:
+      automountServiceAccountToken: true
+      serviceAccountName: agentos-egress-authz
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: agentos-egress-authz
+      containers:
+        - name: egress-authz
+          image: agentos:dev
+          imagePullPolicy: Never
+          command:
+            - agentos-egress-authz
+          env:
+            - name: AGENTOS_ENVIRONMENT
+              value: production
+            - name: EGRESS_AUTHZ_LISTEN_HOST
+              value: 0.0.0.0
+            - name: EGRESS_AUTHZ_LISTEN_PORT
+              value: "8787"
+            - name: AGENTOS_DATABASE_URL_FILE
+              value: /var/run/secrets/agentos-database/database-url
+            - name: OPENFGA_BASE_URL
+              value: http://openfga.agentos.svc.cluster.local:8080
+            - name: OPENFGA_PRESHARED_KEY_FILE
+              value: /var/run/secrets/agentos-openfga/preshared-key
+            - name: OPENFGA_DEPLOYMENT_DIRECTORY
+              value: /var/run/agentos/openfga-deployment
+          ports:
+            - name: http
+              containerPort: 8787
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: database
+              mountPath: /var/run/secrets/agentos-database
+              readOnly: true
+            - name: openfga-admin
+              mountPath: /var/run/secrets/agentos-openfga
+              readOnly: true
+            - name: openfga-deployment
+              mountPath: /var/run/agentos/openfga-deployment
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: database
+          secret:
+            secretName: agentos-postgres-app
+            defaultMode: 0440
+            items:
+              - key: uri
+                path: database-url
+        - name: openfga-admin
+          secret:
+            secretName: openfga-admin
+            defaultMode: 0440
+            items:
+              - key: preshared-key
+                path: preshared-key
+        - name: openfga-deployment
+          configMap:
+            name: openfga-deployment
+            defaultMode: 0444
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

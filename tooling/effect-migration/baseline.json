@@ -632,15 +632,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/prepare-home.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/tests/production-dependencies.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 17,
-      "digest": "ff98cb8ce4597e4106ea1a0fd06394b7015f70aea40e5ba2de51a0b6d7f65362",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/production-dependencies.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/tests/readiness-state.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -668,15 +659,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/runtime.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/src/access/http-authorizer.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 7,
-      "digest": "abab3bad5f1525d56a11bb22819654250a34f6f73829bf5b9ca3a0b4768502a2",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/access/http-authorizer.ts under issue #104; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/src/access/pi-workload-identity.ts",
       "slice": "agentos-runtime",
       "issue": 104,
@@ -693,15 +675,6 @@
       "digest": "08b1a84caa20968cde9e3efc966dbc55e3a6fc4df1bffb4bddf9cfde9b443d45",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/access/tests/github-routes.effect.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/access/tests/http-authorizer.effect.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 2,
-      "digest": "2930f1992907e8f681ca0f8f53c3ba456fc5363d8f89306f062a97d715c6748f",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/access/tests/http-authorizer.effect.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/src/background-tasks/broker.ts",
