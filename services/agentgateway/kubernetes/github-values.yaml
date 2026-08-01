@@ -1,0 +1,132 @@
+fullnameOverride: agentgateway-github
+namespaceOverride: agentos
+replicaCount: 2
+mode: readonly
+image: cr.agentgateway.dev/agentgateway@sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+commonLabels:
+  app.kubernetes.io/part-of: agentos
+  agentos.akua.dev/credential-domain: github
+  agentos.akua.dev/github-broker-upstream: "true"
+podAnnotations:
+  agentos.akua.dev/config-source: readonly
+serviceAccount:
+  create: true
+  name: agentgateway-github
+podSecurityContext:
+  fsGroup: 2000
+  fsGroupChangePolicy: OnRootMismatch
+gateway:
+  service:
+    enabled: true
+    type: ClusterIP
+    ports:
+      - name: github
+        port: 443
+        targetPort: 4443
+        protocol: TCP
+monitoring:
+  enabled: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+extraVolumes:
+  - name: github-tls
+    secret:
+      secretName: agentos-github-tls
+      defaultMode: 0440
+extraVolumeMounts:
+  - name: github-tls
+    mountPath: /var/run/secrets/agentos-github-tls
+    readOnly: true
+config:
+  config:
+    adminAddr: 127.0.0.1:15000
+    statsAddr: 0.0.0.0:15020
+    readinessAddr: 0.0.0.0:15021
+    tracing:
+      otlpEndpoint: http://otel-collector.agentos.svc.cluster.local:4317
+      otlpProtocol: grpc
+  gateways:
+    github:
+      port: 4443
+      protocol: HTTPS
+      tls:
+        cert: /var/run/secrets/agentos-github-tls/tls.crt
+        key: /var/run/secrets/agentos-github-tls/tls.key
+  routes:
+    - name: github-graphql
+      gateways:
+        - github
+      matches:
+        - path:
+            exact: /api/graphql
+      policies:
+        extAuthz:
+          host: agentos-egress-authz.agentos.svc.cluster.local:9001
+          failureMode: deny
+          includeRequestHeaders:
+            - authorization
+            - x-agentos-assignment-id
+          includeRequestBody:
+            maxRequestBytes: 262144
+            allowPartialMessage: false
+          protocol:
+            http:
+              path: '"/authorize"'
+              addRequestHeaders:
+                x-agentos-original-method: request.method
+                x-agentos-original-path: request.path
+              includeResponseHeaders: &github-grant-headers
+                - x-agentos-authz-schema-version
+                - x-agentos-authz-correlation-id
+                - x-agentos-authz-decision-ref
+                - x-agentos-authz-expires-at-millis
+                - x-agentos-authz-credential-domain
+                - x-agentos-authz-agent-id
+                - x-agentos-authz-role
+                - x-agentos-authz-fleet
+                - x-agentos-authz-domain
+                - x-agentos-authz-assignment-id
+                - x-agentos-authz-capability
+                - x-agentos-authz-resource-kind
+                - x-agentos-authz-provider
+                - x-agentos-authz-service
+                - x-agentos-authz-resource-owner
+                - x-agentos-authz-resource-repository
+                - x-agentos-authz-resource-organization
+                - x-agentos-authz-resource-project-number
+                - x-agentos-authz-profile-id
+                - x-agentos-authz-profile-version
+                - x-agentos-authz-ceiling-id
+                - x-agentos-authz-ceiling-revision
+                - x-agentos-authz-rate-class
+      backends:
+        - host: github-broker.agentos.svc.cluster.local:8789
+    - name: github-native-rest-and-git
+      gateways:
+        - github
+      policies:
+        extAuthz:
+          host: agentos-egress-authz.agentos.svc.cluster.local:9001
+          failureMode: deny
+          includeRequestHeaders:
+            - authorization
+            - x-agentos-assignment-id
+          protocol:
+            http:
+              path: '"/authorize"'
+              addRequestHeaders:
+                x-agentos-original-method: request.method
+                x-agentos-original-path: request.path
+              includeResponseHeaders: *github-grant-headers
+      backends:
+        - host: github-broker.agentos.svc.cluster.local:8789

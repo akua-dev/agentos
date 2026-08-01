@@ -111,8 +111,16 @@ describe("Second Mate Kubernetes base", () => {
           }],
         },
       },
+      {
+        name: "agentos-github-ca",
+        configMap: {
+          defaultMode: 292,
+          items: [{ key: "ca.pem", path: "ca.pem" }],
+          name: "agentos-github-ca",
+        },
+      },
     ]);
-    expect(pod.initContainers).toHaveLength(2);
+    expect(pod.initContainers).toHaveLength(3);
     expect(pod.containers).toHaveLength(1);
     const container = pod.containers[0];
     const allContainers = [...pod.initContainers, container];
@@ -120,12 +128,16 @@ describe("Second Mate Kubernetes base", () => {
       "agentos:dev",
       "agentos:dev",
       "agentos:dev",
+      "agentos:dev",
     ]);
     expect(
-      allContainers.map(({ workingDir }: { workingDir: string }) => workingDir),
+      allContainers.map(
+        ({ workingDir }: { workingDir?: string }) => workingDir,
+      ),
     ).toEqual([
       "/opt/agentos/packages/agentos/resources/roles/secondmate",
       "/opt/agentos/packages/agentos/resources/roles/secondmate",
+      undefined,
       "/opt/agentos/packages/agentos/resources/roles/secondmate",
     ]);
     const environment = Object.fromEntries(
@@ -198,7 +210,11 @@ describe("Second Mate Kubernetes base", () => {
 
     expect(
       pod.initContainers.map(({ name }: { name: string }) => name),
-    ).toEqual(["install-tools", "prepare-home"]);
+    ).toEqual([
+      "install-tools",
+      "prepare-home",
+      "prepare-github-provider",
+    ]);
 
     expect(spec.template.metadata.labels).toMatchObject({
       "agentos.akua.dev/agentgateway-client": "true",
@@ -252,7 +268,11 @@ describe("Second Mate Kubernetes base", () => {
 
     expect(
       pod.initContainers.map(({ name }: { name: string }) => name),
-    ).toEqual(["install-tools", "prepare-home"]);
+    ).toEqual([
+      "install-tools",
+      "prepare-home",
+      "prepare-github-provider",
+    ]);
 
     expect(prepareEnvironment.AGENTOS_PI_PROVIDER_MODE).toBe("direct");
     expect(prepareEnvironment.AI_GATEWAY_URL).toBeUndefined();

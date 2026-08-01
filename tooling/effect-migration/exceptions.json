@@ -35,6 +35,27 @@
       "match": "BunRuntime.runMain",
       "maximumOccurrences": 1,
       "reason": "The OpenFGA readiness executable needs one reviewed Bun process entry boundary around its scoped Effect server lifecycle."
+    },
+    {
+      "path": "packages/agentos/runtime/github-workload-auth-main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The GitHub workload helper executable needs one reviewed Bun process entry boundary around its fully typed Effect program."
+    },
+    {
+      "path": "packages/agentos/runtime/github-provider-main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The GitHub provider reconciler executable needs one reviewed Bun process entry boundary around its fully typed Effect program."
+    },
+    {
+      "path": "services/github-broker/src/main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The GitHub broker executable needs one reviewed Bun process entry boundary around its scoped Effect server program."
     }
   ]
 }

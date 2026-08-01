@@ -58,6 +58,7 @@ async function copyProductionInstallInputs(destination: string) {
     "packages/agentos/package.json",
     "services/agentgateway/package.json",
     "services/ai-gateway/package.json",
+    "services/github-broker/package.json",
     "services/openfga/package.json",
     "services/otel-collector/package.json",
     ...(rootPackage.workspaces.includes("website/apps/docs")
@@ -146,6 +147,8 @@ test("the production image can prepare a persistent Mate home", async () => {
       "@agentos/pg-listen",
       "--filter",
       "@agentos/ai-gateway",
+      "--filter",
+      "@agentos/github-broker",
       "--filter",
       "@agentos/openfga",
     ],

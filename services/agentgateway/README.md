@@ -46,7 +46,7 @@ The selected placement is **alongside and immediately in front of explicit gover
 
 A global `HTTP_PROXY` or `HTTPS_PROXY` would make normal Internet availability depend on agentgateway. HTTPS `CONNECT` also hides the request path and body from a forward proxy and prevents just-in-time credential injection unless AgentOS intercepts TLS. AgentOS rejects that topology.
 
-Clients with a provider base-URL setting point it at an explicit AgentOS gateway Service. Tools that cannot select an API base URL need a reviewed adapter or broker. In particular, [#94](https://github.com/akua-dev/agentos/issues/94) must prove the exact `gh` REST/GraphQL host and path-rewrite behavior; Git transport and ordinary GitHub browsing remain direct. A short-lived token fallback is not considered equivalent to proxy-mode credential isolation.
+Clients with a provider base-URL setting point it at an explicit AgentOS gateway Service. Tools that cannot select an API base URL need a reviewed adapter or broker. [#94](https://github.com/akua-dev/agentos/issues/94) now provides that boundary for native `git`, `gh`, and `gh-axi`: an owned host and Git rewrite target `agentgateway-github`, a per-call projected-token helper, fail-closed REST/Git/GraphQL classification, and a GitHub-only broker. Ordinary Internet traffic remains direct. No universal `HTTP_PROXY`, TLS interception, App-key mount, per-Agent GitHub token Secret, or token-returning API is used.
 
 ## PEP, PDP and credential boundaries
 

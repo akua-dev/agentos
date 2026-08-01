@@ -113,6 +113,21 @@
         "@types/proper-lockfile": "4.1.4",
       },
     },
+    "services/github-broker": {
+      "name": "@agentos/github-broker",
+      "version": "0.0.0",
+      "bin": {
+        "agentos-github-broker": "./src/main.ts",
+      },
+      "dependencies": {
+        "@akua-dev/agentos": "workspace:*",
+        "@effect/platform-bun": "4.0.0-beta.102",
+        "effect": "4.0.0-beta.102",
+      },
+      "devDependencies": {
+        "yaml": "2.9.0",
+      },
+    },
     "services/openfga": {
       "name": "@agentos/openfga",
       "version": "0.0.0",
@@ -194,6 +209,8 @@
     "@agentos/database": ["@agentos/database@workspace:database"],
 
     "@agentos/github-app-token": ["@agentos/github-app-token@workspace:clis/github-app-token"],
+
+    "@agentos/github-broker": ["@agentos/github-broker@workspace:services/github-broker"],
 
     "@agentos/openfga": ["@agentos/openfga@workspace:services/openfga"],
 

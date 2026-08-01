@@ -1,0 +1,22 @@
+{
+  "name": "@agentos/github-broker",
+  "version": "0.0.0",
+  "description": "Workload-authorized GitHub App adapter for native AgentOS clients",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agentos-github-broker": "./src/main.ts"
+  },
+  "scripts": {
+    "test": "vitest run tests",
+    "typecheck": "tsc --project ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.0-beta.102",
+    "@akua-dev/agentos": "workspace:*",
+    "effect": "4.0.0-beta.102"
+  },
+  "devDependencies": {
+    "yaml": "2.9.0"
+  }
+}

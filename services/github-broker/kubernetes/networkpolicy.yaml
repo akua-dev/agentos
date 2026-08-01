@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: github-broker
+  labels:
+    app.kubernetes.io/name: github-broker
+    app.kubernetes.io/part-of: agentos
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: github-broker
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              agentos.akua.dev/github-broker-upstream: "true"
+      ports:
+        - protocol: TCP
+          port: 8789

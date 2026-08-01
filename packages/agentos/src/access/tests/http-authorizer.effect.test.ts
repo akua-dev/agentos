@@ -88,10 +88,10 @@ describe("AgentGateway HTTP authorization contract", () => {
     const decisions: ProviderPolicyDecisionRequestV1[] = [];
     return Effect.gen(function*() {
       const handler = yield* createProviderAuthorizationHttpHandler({
-        clock: () => now,
-        id: () => "44444444444444444444444444444444",
+        clock: Effect.succeed(now),
+        id: Effect.succeed("44444444444444444444444444444444"),
       });
-      const response = yield* Effect.promise(() => handler(request()));
+      const response = yield* handler(request());
       assert.strictEqual(response.status, 200);
 
       const grant = yield* decodeProviderAuthorizationGrantHeaders(
@@ -168,12 +168,10 @@ describe("AgentGateway HTTP authorization contract", () => {
     let observed: ProviderPolicyDecisionRequestV1 | undefined;
     return Effect.gen(function*() {
       const handler = yield* createProviderAuthorizationHttpHandler({
-        clock: () => now,
-        id: () => "44444444444444444444444444444444",
+        clock: Effect.succeed(now),
+        id: Effect.succeed("44444444444444444444444444444444"),
       });
-      const response = yield* Effect.promise(() =>
-        handler(request("/v1/responses/compact"))
-      );
+      const response = yield* handler(request("/v1/responses/compact"));
       assert.strictEqual(response.status, 200);
       assert.strictEqual(observed?.capability, "openai.responses.compact");
       const grant = yield* decodeProviderAuthorizationGrantHeaders(
@@ -198,10 +196,10 @@ describe("AgentGateway HTTP authorization contract", () => {
   it.effect("caps downstream grants independently of a longer policy decision", () =>
     Effect.gen(function*() {
       const handler = yield* createProviderAuthorizationHttpHandler({
-        clock: () => now,
-        id: () => "44444444444444444444444444444444",
+        clock: Effect.succeed(now),
+        id: Effect.succeed("44444444444444444444444444444444"),
       });
-      const response = yield* Effect.promise(() => handler(request()));
+      const response = yield* handler(request());
       const grant = yield* decodeProviderAuthorizationGrantHeaders(
         response.headers,
         { method: "POST", path: "/v1/responses", nowMillis: now },
@@ -216,13 +214,13 @@ describe("AgentGateway HTTP authorization contract", () => {
   it.effect("rejects missing identity, Assignment mismatch, unsupported routes, and stale grants", () =>
     Effect.gen(function*() {
       const handler = yield* createProviderAuthorizationHttpHandler({
-        clock: () => now,
-        id: () => "44444444444444444444444444444444",
+        clock: Effect.succeed(now),
+        id: Effect.succeed("44444444444444444444444444444444"),
       });
       const missingBearer = request();
       missingBearer.headers.delete("authorization");
       assert.strictEqual(
-        (yield* Effect.promise(() => handler(missingBearer))).status,
+        (yield* handler(missingBearer)).status,
         401,
       );
 
@@ -232,15 +230,15 @@ describe("AgentGateway HTTP authorization contract", () => {
         "20000000-0000-4000-8000-000000000002",
       );
       assert.strictEqual(
-        (yield* Effect.promise(() => handler(mismatch))).status,
+        (yield* handler(mismatch)).status,
         403,
       );
       assert.strictEqual(
-        (yield* Effect.promise(() => handler(request("/unknown")))).status,
+        (yield* handler(request("/unknown"))).status,
         403,
       );
 
-      const response = yield* Effect.promise(() => handler(request()));
+      const response = yield* handler(request());
       const failure = yield* decodeProviderAuthorizationGrantHeaders(
         response.headers,
         { method: "POST", path: "/v1/responses", nowMillis: now + 15_000 },
@@ -251,10 +249,10 @@ describe("AgentGateway HTTP authorization contract", () => {
   it.effect("reports policy-decision dependency failures as unavailable", () =>
     Effect.gen(function*() {
       const handler = yield* createProviderAuthorizationHttpHandler({
-        clock: () => now,
-        id: () => "44444444444444444444444444444444",
+        clock: Effect.succeed(now),
+        id: Effect.succeed("44444444444444444444444444444444"),
       });
-      const response = yield* Effect.promise(() => handler(request()));
+      const response = yield* handler(request());
       assert.strictEqual(response.status, 503);
       assert.deepStrictEqual(yield* Effect.promise(() => response.json()), {
         error: "authorization_unavailable",
