@@ -141,6 +141,13 @@
       "when": 1785598772613,
       "tag": "0019_egress_authorizer_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785606305000,
+      "tag": "0020_provider_budget_enforcement",
+      "breakpoints": true
     }
   ]
 }

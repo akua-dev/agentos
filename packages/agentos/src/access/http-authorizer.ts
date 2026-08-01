@@ -946,9 +946,10 @@ function responseForAuthorizationFailure(error: unknown): Response {
       case "effective_policy_denied":
       case "rate_class_disabled":
       case "rate_class_exceeded":
+        return forbiddenResponse();
       case "rate_limited":
       case "budget_exhausted":
-        return forbiddenResponse();
+        return quotaDeniedResponse(error.outcome);
     }
   }
   if (
@@ -979,4 +980,13 @@ function unauthorizedResponse(): Response {
 
 function forbiddenResponse(): Response {
   return Response.json({ error: "forbidden" }, { status: 403 });
+}
+
+function quotaDeniedResponse(
+  outcome: "rate_limited" | "budget_exhausted",
+): Response {
+  return Response.json({ error: outcome }, {
+    status: 429,
+    headers: { "x-agentos-denial-reason": outcome },
+  });
 }

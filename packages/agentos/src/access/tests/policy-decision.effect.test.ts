@@ -37,6 +37,12 @@ import {
   type ProviderPolicySnapshotV1,
 } from "../postgres-identity.ts";
 import {
+  ProviderBudgetEnforcementError,
+  ProviderBudgetEnforcer,
+  type ProviderBudgetReservationInputV1,
+  type ProviderBudgetReservationV1,
+} from "../provider-budget.ts";
+import {
   ProviderDecisionReferenceGenerator,
   ProviderDecisionReferenceGeneratorLiveLayer,
   makeProviderPolicyDecisionPointLayer,
@@ -119,6 +125,7 @@ function decisionLayer(input?: {
     request: OpenFgaApiCheckRequest,
   ) => Effect.Effect<boolean, OpenFgaDependencyUnavailable>;
   readonly environment?: string | null;
+  readonly reserve?: ProviderBudgetEnforcer["Service"]["reserve"];
 }) {
   const stores = Layer.mergeAll(
     Layer.succeed(ProviderPolicySnapshotStore, {
@@ -130,6 +137,20 @@ function decisionLayer(input?: {
     }),
     Layer.succeed(ProviderDecisionReferenceGenerator, {
       next: Effect.succeed("44444444444444444444444444444444"),
+    }),
+    Layer.succeed(ProviderBudgetEnforcer, {
+      reserve: input?.reserve ?? ((reservation) => Effect.succeed({
+        schemaVersion: 1,
+        decisionRef: reservation.decisionRef,
+        budgetKey: `budget_${"5".repeat(64)}`,
+        outcome: "reserved",
+        effectiveRateClass: reservation.rateClass,
+        requestWindowEndsAtMillis: reservation.nowMillis + 60_000,
+        tokenWindowEndsAtMillis: reservation.nowMillis + 60_000,
+        spendWindowEndsAtMillis: reservation.nowMillis + 3_600_000,
+        leaseExpiresAtMillis: reservation.nowMillis + 900_000,
+      })),
+      settle: () => Effect.die("settlement not expected in PDP"),
     }),
   );
   return makeProviderPolicyDecisionPointLayer({
@@ -346,6 +367,77 @@ describe("provider policy decision point", () => {
         "rate_class_exceeded",
         "ceiling_denied",
       ]);
+    }));
+
+  it.effect("reserves durable budget capacity only after strong authorization", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(Now);
+      const reservations = yield* Ref.make<
+        ReadonlyArray<ProviderBudgetReservationInputV1>
+      >([]);
+      const result = yield* decide.pipe(Effect.provide(decisionLayer({
+        reserve: (input) => {
+          const reservation: ProviderBudgetReservationV1 = {
+              schemaVersion: 1,
+              decisionRef: input.decisionRef,
+              budgetKey: `budget_${"5".repeat(64)}`,
+              outcome: "reserved",
+              effectiveRateClass: input.rateClass,
+              requestWindowEndsAtMillis: Now + 60_000,
+              tokenWindowEndsAtMillis: Now + 60_000,
+              spendWindowEndsAtMillis: Now + 3_600_000,
+              leaseExpiresAtMillis: Now + 900_000,
+          };
+          return Ref.update(reservations, (current) => [
+            ...current,
+            input,
+          ]).pipe(Effect.as(reservation));
+        },
+      })));
+      assert.strictEqual(result.decision, "allow");
+      assert.deepStrictEqual(yield* Ref.get(reservations), [{
+        schemaVersion: 1,
+        decisionRef: result.decisionRef,
+        correlationId: Request.correlationId,
+        bindingId: Snapshot.binding.bindingId,
+        subject: Subject,
+        provider: Request.provider,
+        credentialDomain: Request.credentialDomain,
+        capability: Request.capability,
+        resource: Resource,
+        environment: "production",
+        rateClass: "standard",
+        nowMillis: Now,
+      }]);
+    }));
+
+  it.effect("keeps budget exhaustion distinct from provider and policy failures", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(Now);
+      const outcomes: ReadonlyArray<"rate_limited" | "budget_exhausted"> = [
+        "rate_limited",
+        "budget_exhausted",
+      ];
+      for (const outcome of outcomes) {
+        const failure = yield* policyError(decide.pipe(Effect.provide(
+          decisionLayer({
+            reserve: () => Effect.fail(ProviderBudgetEnforcementError.make({
+              outcome,
+              retryable: true,
+              retryAtMillis: Now + 60_000,
+            })),
+          }),
+        )));
+        assert.deepStrictEqual(
+          [failure.outcome, failure.retryable],
+          [outcome, true],
+        );
+        assert.deepStrictEqual(Object.keys(failure).sort(), [
+          "_tag",
+          "outcome",
+          "retryable",
+        ]);
+      }
     }));
 
   it.effect("revalidates snapshot freshness, uniqueness, scope, and bounded expiry", () =>

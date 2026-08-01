@@ -95,6 +95,36 @@
       "status": "migrated"
     },
     {
+      "id": "provider-budget-effect-tests",
+      "issue": 107,
+      "pattern": "^packages/agentos/src/access/tests/provider-budget(?:-postgres)?\\.effect\\.test\\.ts$",
+      "runtime": "bun-postgresql",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "crypto", "database", "schema"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90, 96],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-budget-runtime",
+      "issue": 107,
+      "pattern": "^packages/agentos/src/access/provider-budget(?:-postgres)?\\.ts$",
+      "runtime": "shared-bun-postgresql",
+      "package": "@akua-dev/agentos",
+      "io": ["crypto", "database", "schema"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90, 96],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-budget-database-effect-tests",
+      "issue": 107,
+      "pattern": "^database/tests/provider-budget-enforcement\\.effect\\.test\\.ts$",
+      "runtime": "bun-postgresql",
+      "package": "@agentos/database",
+      "io": ["test", "filesystem", "database"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90, 96],
+      "status": "migrated"
+    },
+    {
       "id": "provider-postgresql-identity-effect-tests",
       "issue": 96,
       "pattern": "^packages/agentos/src/access/tests/postgres-identity\\.effect\\.test\\.ts$",

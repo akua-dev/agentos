@@ -119,6 +119,28 @@ export {
   type ProviderPolicyDecisionPointOptions,
 } from "./access/policy-decision.ts";
 export {
+  ProviderBudgetEnforcementError,
+  ProviderBudgetEnforcer,
+  ProviderBudgetRateClassV1Schema,
+  ProviderBudgetReservationInputV1Schema,
+  ProviderBudgetReservationV1Schema,
+  ProviderBudgetSettlementInputV1Schema,
+  ProviderBudgetSettlementV1Schema,
+  makeProviderBudgetEnforcerLayer,
+  providerBudgetKey,
+  providerBudgetRateClassesV1,
+  type ProviderBudgetRateClassV1,
+  type ProviderBudgetReservationInputV1,
+  type ProviderBudgetReservationV1,
+  type ProviderBudgetSettlementInputV1,
+  type ProviderBudgetSettlementV1,
+  type ProviderBudgetStore,
+  type ProviderBudgetStoreReservationResult,
+} from "./access/provider-budget.ts";
+export {
+  ProviderBudgetEnforcerPostgresLayer,
+} from "./access/provider-budget-postgres.ts";
+export {
   AGENTOS_EGRESS_TOKEN_AUDIENCE,
   AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
   AGENTOS_EGRESS_TOKEN_MOUNT_PATH,

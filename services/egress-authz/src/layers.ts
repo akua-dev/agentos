@@ -7,6 +7,7 @@ import {
   OpenFgaAuthorizationApi,
   OpenFgaAuthorizationApiHttpLayer,
   ProviderAccessDatabaseSqlLayer,
+  ProviderBudgetEnforcerPostgresLayer,
   ProviderDecisionReferenceGeneratorLiveLayer,
   ProviderPolicySnapshotStorePostgresLayer,
   WorkloadIdentityAuthenticator,
@@ -58,6 +59,9 @@ export function makeEgressAuthorizerLiveLayer(
   const policySnapshots = ProviderPolicySnapshotStorePostgresLayer.pipe(
     Layer.provide(accessDatabase),
   );
+  const providerBudgets = ProviderBudgetEnforcerPostgresLayer.pipe(
+    Layer.provide(postgres),
+  );
   const kubernetesIdentity = makeKubernetesWorkloadIdentityLiveLayer({
     baseUrl: config.kubernetesBaseUrl,
     serviceAccountTokenPath: config.kubernetesServiceAccountTokenPath,
@@ -84,6 +88,7 @@ export function makeEgressAuthorizerLiveLayer(
   }).pipe(
     Layer.provide(Layer.mergeAll(
       policySnapshots,
+      providerBudgets,
       openFgaAuthorization,
       ProviderDecisionReferenceGeneratorLiveLayer,
     )),
