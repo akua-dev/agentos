@@ -28,5 +28,16 @@ spec:
           volumeMounts:
             - name: home
               mountPath: /home/agent
+            - name: agentos-egress-identity
+              mountPath: /var/run/secrets/agentos-egress
+              readOnly: true
       volumes:
         - $patch: replace
+        - name: agentos-egress-identity
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  audience: agentos-egress-authz
+                  expirationSeconds: 600
+                  path: token

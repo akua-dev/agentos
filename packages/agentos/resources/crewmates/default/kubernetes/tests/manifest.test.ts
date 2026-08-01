@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
+import {
+  AGENTOS_EGRESS_TOKEN_AUDIENCE,
+  AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+} from "../../../../../src/access/identity.ts";
+
 type Resource = {
   automountServiceAccountToken?: boolean;
   kind: string;
@@ -215,6 +220,11 @@ describe("Crewmate Kubernetes base", () => {
     });
     expect(container.volumeMounts).toEqual([
       { mountPath: "/home/agent", name: "home" },
+      {
+        mountPath: "/var/run/secrets/agentos-egress",
+        name: "agentos-egress-identity",
+        readOnly: true,
+      },
     ]);
     expect(prepare.volumeMounts).toEqual([
       { mountPath: "/home/agent", name: "home" },
@@ -230,6 +240,19 @@ describe("Crewmate Kubernetes base", () => {
         secret: {
           defaultMode: 288,
           secretName: "agentos-crewmate-postgres",
+        },
+      },
+      {
+        name: "agentos-egress-identity",
+        projected: {
+          defaultMode: 288,
+          sources: [{
+            serviceAccountToken: {
+              audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
+              expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+              path: "token",
+            },
+          }],
         },
       },
     ]);

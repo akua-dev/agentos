@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 
+import {
+  AGENTOS_EGRESS_TOKEN_AUDIENCE,
+  AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+} from "../../../../../src/access/identity.ts";
+
 const context = process.env.AGENTOS_KUBERNETES_TEST_CONTEXT;
 const lifecycleTest = context ? test : test.skip;
 const kubernetes = new URL("..", import.meta.url).pathname;
@@ -124,6 +129,34 @@ function workloadParts(workload: unknown) {
       "workload.spec.template.metadata.labels",
     ),
   };
+}
+
+function egressTokenProjection(workload: unknown) {
+  const pod = workloadParts(workload).pod;
+  const volumes = requireArray(
+    pod.volumes,
+    "workload.spec.template.spec.volumes",
+  );
+  const identityVolume = volumes.map((volume, index) =>
+    requireRecord(volume, `workload.spec.template.spec.volumes[${index}]`)
+  ).find((volume) => volume.name === "agentos-egress-identity");
+  if (identityVolume === undefined) {
+    throw new Error("Workload is missing agentos-egress-identity volume");
+  }
+  const projected = requireRecord(
+    identityVolume.projected,
+    "agentos-egress-identity.projected",
+  );
+  const sources = requireArray(
+    projected.sources,
+    "agentos-egress-identity.projected.sources",
+  );
+  expect(sources).toHaveLength(1);
+  return requireRecord(
+    requireRecord(sources[0], "agentos-egress-identity source")
+      .serviceAccountToken,
+    "agentos-egress-identity serviceAccountToken",
+  );
 }
 
 function hasNoTypeCheckingWarnings(status: unknown): boolean {
@@ -343,6 +376,53 @@ lifecycleTest(
         "disabled token automount",
       );
 
+      const widenedAudience = structuredClone(validChild);
+      egressTokenProjection(widenedAudience).audience = "kubernetes";
+      await requireAdmissionDenial(
+        alpha,
+        secondmateIdentity,
+        widenedAudience,
+        "only the dedicated egress identity token projection",
+      );
+
+      const widenedLifetime = structuredClone(validChild);
+      egressTokenProjection(widenedLifetime).expirationSeconds =
+        AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS + 600;
+      await requireAdmissionDenial(
+        alpha,
+        secondmateIdentity,
+        widenedLifetime,
+        "only the dedicated egress identity token projection",
+      );
+
+      const wrongTokenPath = structuredClone(validChild);
+      egressTokenProjection(wrongTokenPath).path = "kubernetes-api-token";
+      await requireAdmissionDenial(
+        alpha,
+        secondmateIdentity,
+        wrongTokenPath,
+        "only the dedicated egress identity token projection",
+      );
+
+      expect(egressTokenProjection(validChild)).toEqual({
+        audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
+        expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+        path: "token",
+      });
+
+      const initContainerToken = structuredClone(validChild);
+      const initContainerTokenParts = workloadParts(initContainerToken);
+      initContainerTokenParts.pod.initContainers = [{
+        ...structuredClone(initContainerTokenParts.container),
+        name: "identity-reading-init",
+      }];
+      await requireAdmissionDenial(
+        alpha,
+        secondmateIdentity,
+        initContainerToken,
+        "only the dedicated egress identity token projection",
+      );
+
       const hostAccess = structuredClone(validChild);
       workloadParts(hostAccess).pod.hostNetwork = true;
       await requireAdmissionDenial(
@@ -368,9 +448,17 @@ lifecycleTest(
       );
 
       const providerRootCredential = structuredClone(validChild);
-      workloadParts(providerRootCredential).container.env = [
-        { name: "OPENAI_API_KEY", value: "not-a-real-secret" },
-      ];
+      const providerRootCredentialContainer = workloadParts(
+        providerRootCredential,
+      ).container;
+      const providerRootCredentialEnv =
+        providerRootCredentialContainer.env === undefined
+          ? (providerRootCredentialContainer.env = [])
+          : requireArray(providerRootCredentialContainer.env, "container.env");
+      providerRootCredentialEnv.push({
+        name: "OPENAI_API_KEY",
+        value: "not-a-real-secret",
+      });
       await requireAdmissionDenial(
         alpha,
         secondmateIdentity,

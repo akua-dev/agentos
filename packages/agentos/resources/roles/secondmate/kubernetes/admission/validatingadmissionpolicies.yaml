@@ -35,6 +35,12 @@ spec:
     - name: identityKeys
       expression: >-
         ['agentos.akua.dev/agent-id', 'agentos.akua.dev/owner-agent-id', 'agentos.akua.dev/task-id', 'agentos.akua.dev/assignment-id']
+    - name: egressIdentityVolumes
+      expression: >-
+        has(variables.podSpec.volumes) ? variables.podSpec.volumes.filter(volume, has(volume.projected) && has(volume.projected.sources) && volume.projected.sources.exists(source, has(source.serviceAccountToken))) : []
+    - name: egressIdentityValid
+      expression: >-
+        size(variables.egressIdentityVolumes) == 1 && variables.egressIdentityVolumes[0].name == 'agentos-egress-identity' && has(variables.egressIdentityVolumes[0].projected.defaultMode) && variables.egressIdentityVolumes[0].projected.defaultMode == 288 && size(variables.egressIdentityVolumes[0].projected.sources) == 1 && has(variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken) && variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken.audience == 'agentos-egress-authz' && variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken.expirationSeconds == 600 && variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken.path == 'token' && variables.podSpec.containers.all(container, has(container.volumeMounts) && container.volumeMounts.exists(mount, mount.name == 'agentos-egress-identity' && mount.mountPath == '/var/run/secrets/agentos-egress' && has(mount.readOnly) && mount.readOnly == true)) && (!has(variables.podSpec.initContainers) || variables.podSpec.initContainers.all(container, !has(container.volumeMounts) || container.volumeMounts.all(mount, mount.name != 'agentos-egress-identity')))
   validations:
     - expression: >-
         !variables.persistentMate || request.userInfo.username != 'system:serviceaccount:' + request.namespace + ':agentos-secondmate'
@@ -65,8 +71,12 @@ spec:
       message: Every Crewmate container requires CPU and memory requests and limits within the domain ceiling.
       reason: Invalid
     - expression: >-
-        request.operation == 'DELETE' || variables.persistentMate || ((has(variables.podSpec.hostNetwork) ? variables.podSpec.hostNetwork == false : true) && (has(variables.podSpec.hostPID) ? variables.podSpec.hostPID == false : true) && (has(variables.podSpec.hostIPC) ? variables.podSpec.hostIPC == false : true) && (!has(variables.podSpec.volumes) || variables.podSpec.volumes.all(volume, !has(volume.hostPath) && (!has(volume.projected) || !has(volume.projected.sources) || volume.projected.sources.all(source, !has(source.serviceAccountToken))))))
-      message: Crewmates cannot use host namespaces, hostPath, or projected ServiceAccount tokens.
+        request.operation == 'DELETE' || variables.persistentMate || variables.egressIdentityValid
+      message: Crewmates may use only the dedicated egress identity token projection.
+      reason: Forbidden
+    - expression: >-
+        request.operation == 'DELETE' || variables.persistentMate || ((has(variables.podSpec.hostNetwork) ? variables.podSpec.hostNetwork == false : true) && (has(variables.podSpec.hostPID) ? variables.podSpec.hostPID == false : true) && (has(variables.podSpec.hostIPC) ? variables.podSpec.hostIPC == false : true) && (!has(variables.podSpec.volumes) || variables.podSpec.volumes.all(volume, !has(volume.hostPath))))
+      message: Crewmates cannot use host namespaces or hostPath volumes.
       reason: Forbidden
     - expression: >-
         request.operation == 'DELETE' || variables.persistentMate || (has(variables.podSpec.securityContext) && variables.podSpec.securityContext.runAsNonRoot == true && has(variables.podSpec.securityContext.seccompProfile) && variables.podSpec.securityContext.seccompProfile.type in ['RuntimeDefault', 'Localhost'] && variables.containers.all(container, has(container.securityContext) && (!has(container.securityContext.privileged) || container.securityContext.privileged == false) && container.securityContext.allowPrivilegeEscalation == false && has(container.securityContext.capabilities) && 'ALL' in container.securityContext.capabilities.drop && (!has(container.ports) || container.ports.all(port, !has(port.hostPort) || port.hostPort == 0))))
@@ -118,6 +128,12 @@ spec:
     - name: identityKeys
       expression: >-
         ['agentos.akua.dev/agent-id', 'agentos.akua.dev/owner-agent-id', 'agentos.akua.dev/task-id', 'agentos.akua.dev/assignment-id']
+    - name: egressIdentityVolumes
+      expression: >-
+        has(object.spec.volumes) ? object.spec.volumes.filter(volume, has(volume.projected) && has(volume.projected.sources) && volume.projected.sources.exists(source, has(source.serviceAccountToken))) : []
+    - name: egressIdentityValid
+      expression: >-
+        size(variables.egressIdentityVolumes) == 1 && variables.egressIdentityVolumes[0].name == 'agentos-egress-identity' && has(variables.egressIdentityVolumes[0].projected.defaultMode) && variables.egressIdentityVolumes[0].projected.defaultMode == 288 && size(variables.egressIdentityVolumes[0].projected.sources) == 1 && has(variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken) && variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken.audience == 'agentos-egress-authz' && variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken.expirationSeconds == 600 && variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken.path == 'token' && object.spec.containers.all(container, has(container.volumeMounts) && container.volumeMounts.exists(mount, mount.name == 'agentos-egress-identity' && mount.mountPath == '/var/run/secrets/agentos-egress' && has(mount.readOnly) && mount.readOnly == true)) && (!has(object.spec.initContainers) || object.spec.initContainers.all(container, !has(container.volumeMounts) || container.volumeMounts.all(mount, mount.name != 'agentos-egress-identity')))
   validations:
     - expression: '!variables.crewmate || (variables.identityKeys.all(key, key in object.metadata.labels && object.metadata.labels[key].matches(''^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'')))'
       message: Crewmate Pods require UUID Agent, owner, Task, and Assignment labels.
@@ -131,8 +147,11 @@ spec:
     - expression: '!variables.crewmate || variables.containers.all(container, has(container.resources) && has(container.resources.requests) && has(container.resources.limits) && has(container.resources.requests.cpu) && has(container.resources.requests.memory) && has(container.resources.limits.cpu) && has(container.resources.limits.memory) && isQuantity(container.resources.requests.cpu) && isQuantity(container.resources.requests.memory) && isQuantity(container.resources.limits.cpu) && isQuantity(container.resources.limits.memory) && !quantity(container.resources.requests.cpu).isGreaterThan(quantity(''4'')) && !quantity(container.resources.limits.cpu).isGreaterThan(quantity(''4'')) && !quantity(container.resources.requests.memory).isGreaterThan(quantity(''8Gi'')) && !quantity(container.resources.limits.memory).isGreaterThan(quantity(''8Gi'')))'
       message: Every Crewmate Pod container requires CPU and memory requests and limits within the domain ceiling.
       reason: Invalid
-    - expression: '!variables.crewmate || ((has(object.spec.hostNetwork) ? object.spec.hostNetwork == false : true) && (has(object.spec.hostPID) ? object.spec.hostPID == false : true) && (has(object.spec.hostIPC) ? object.spec.hostIPC == false : true) && (!has(object.spec.volumes) || object.spec.volumes.all(volume, !has(volume.hostPath) && (!has(volume.projected) || !has(volume.projected.sources) || volume.projected.sources.all(source, !has(source.serviceAccountToken))))))'
-      message: Crewmate Pods cannot use host namespaces, hostPath, or projected ServiceAccount tokens.
+    - expression: '!variables.crewmate || variables.egressIdentityValid'
+      message: Crewmate Pods may use only the dedicated egress identity token projection.
+      reason: Forbidden
+    - expression: '!variables.crewmate || ((has(object.spec.hostNetwork) ? object.spec.hostNetwork == false : true) && (has(object.spec.hostPID) ? object.spec.hostPID == false : true) && (has(object.spec.hostIPC) ? object.spec.hostIPC == false : true) && (!has(object.spec.volumes) || object.spec.volumes.all(volume, !has(volume.hostPath))))'
+      message: Crewmate Pods cannot use host namespaces or hostPath volumes.
       reason: Forbidden
     - expression: '!variables.crewmate || (has(object.spec.securityContext) && object.spec.securityContext.runAsNonRoot == true && has(object.spec.securityContext.seccompProfile) && object.spec.securityContext.seccompProfile.type in [''RuntimeDefault'', ''Localhost''] && variables.containers.all(container, has(container.securityContext) && (!has(container.securityContext.privileged) || container.securityContext.privileged == false) && container.securityContext.allowPrivilegeEscalation == false && has(container.securityContext.capabilities) && ''ALL'' in container.securityContext.capabilities.drop && (!has(container.ports) || container.ports.all(port, !has(port.hostPort) || port.hostPort == 0))))'
       message: Crewmate Pods require restricted Pod and container security without host ports.
