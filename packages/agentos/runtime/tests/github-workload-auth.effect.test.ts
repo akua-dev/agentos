@@ -15,6 +15,7 @@ const cli = fileURLToPath(
   new URL("../github-workload-auth-main.ts", import.meta.url),
 );
 const projectedToken = "header.payload.signature";
+const rotatedProjectedToken = "rotated.payload.signature";
 const platform = Layer.mergeAll(
   BunFileSystem.layer,
   BunPath.layer,
@@ -102,6 +103,28 @@ describe("GitHub workload client helper", () => {
         `username=x-access-token\npassword=${projectedToken}\n\n`,
       );
       assert.notInclude(stdout, tokenFile);
+
+      yield* fileSystem.remove(tokenFile);
+      yield* fileSystem.writeFileString(
+        tokenFile,
+        `${rotatedProjectedToken}\n`,
+        { mode: 0o440 },
+      );
+      assert.strictEqual(
+        yield* runGitHubWorkloadClient(
+          ["credential", "get"],
+          {
+            caFile: "/var/run/config/agentos-github/ca.pem",
+            home: directory,
+            host: "github.agentos.test",
+            tokenFile,
+          },
+        ).pipe(
+          Effect.provideService(GitHubWorkloadClientIo, io),
+          Effect.andThen(Ref.get(output)),
+        ),
+        `username=x-access-token\npassword=${rotatedProjectedToken}\n\n`,
+      );
     }).pipe(Effect.provide(platform))));
 
   it.effect("passes a fresh workload identity only in the native client environment", () =>
