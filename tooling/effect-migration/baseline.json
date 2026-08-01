@@ -1316,15 +1316,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/attribution.ts under issue #105; never refresh touched debt."
     },
     {
-      "path": "services/ai-gateway/src/codex-oauth.ts",
-      "slice": "provider-services",
-      "issue": 105,
-      "violationCount": 5,
-      "digest": "ed4b288765df6af9554516c13c7a4d7b77c5ad60cb0cf06489c9721f8a01aa2b",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/codex-oauth.ts under issue #105; never refresh touched debt."
-    },
-    {
       "path": "services/ai-gateway/src/proxy.ts",
       "slice": "provider-services",
       "issue": 105,
@@ -1370,15 +1361,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/storage.ts under issue #105; never refresh touched debt."
     },
     {
-      "path": "services/ai-gateway/src/telemetry.ts",
-      "slice": "provider-services",
-      "issue": 105,
-      "violationCount": 2,
-      "digest": "ed1713f434ee1d2a3949d415818f5f5fb2a64fd341ed4fdcdf7fb60d5a252296",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/telemetry.ts under issue #105; never refresh touched debt."
-    },
-    {
       "path": "services/ai-gateway/src/usage.ts",
       "slice": "provider-services",
       "issue": 105,
@@ -1397,15 +1379,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/accounts.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "services/ai-gateway/tests/codex-oauth.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 7,
-      "digest": "b6d7b1a4069c46b2d51b82c9ca6392f6244bbda67059948142eec7f430d23e98",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/codex-oauth.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/ai-gateway/tests/proxy.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -1413,15 +1386,6 @@
       "digest": "d982c4034235559f6660e5bcbdf22bd7a79938a24edf6e09f8fe4eb1052b5cba",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/proxy.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "services/ai-gateway/tests/router-package.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 1,
-      "digest": "f83ea44ca404cba64f5d306baecd174d880c29a9950add4bf3e64b379efda279",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/router-package.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "services/ai-gateway/tests/routing-state.test.ts",
@@ -1449,15 +1413,6 @@
       "digest": "5391a412692c24f4c0974c4a016c3063f36a96bfc57c3c791524d2a13e29df12",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/storage.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "services/ai-gateway/tests/telemetry.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 5,
-      "digest": "150bc05d236e6c939ff931ee522fad1d6f1c6650e5dbc4b0892799b3d33c42bc",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/telemetry.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "services/ai-gateway/tests/usage.test.ts",
