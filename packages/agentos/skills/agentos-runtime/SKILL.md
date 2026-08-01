@@ -127,9 +127,20 @@ delegation or database intake from this Skill.
    `roles/secondmate/kubernetes/admission` bundle once and verify both policies
    report no CEL type-check warnings. A Second Mate never applies that
    cluster-scoped bundle.
-3. Canonicalize `$HOME/.local/state/agentos/workloads/<handle>` and the released
-   distribution root, then construct the released `AgentWorkloadSpec` version
-   `1` from the reviewed inputs. Use `interactive-crewmate@v1` for a Crewmate
+3. Resolve the Assignment's explicit workload-profile selection with the
+   released pure `resolveAgentWorkloadProfile` Effect. Supply the exact
+   versioned profile ID, already-resolved persistence, native-attach, resume,
+   follow-up, retained-worktree, retained-delivery-state and long-lived-Service
+   requirements, plus any reviewed domain defaults. Profile choice remains
+   Assignment dispatch judgment; the resolver only proves mechanical
+   compatibility and that domain defaults narrow the immutable profile inside
+   the released admission bounds. Record its `assignment-dispatch` selection
+   authority, profile-definition digest and satisfied requirements. Stop if
+   compiler availability is not `released`; `stateless-job@v1` is eligibility-
+   visible but has no released launcher. Canonicalize
+   `$HOME/.local/state/agentos/workloads/<handle>` and the released distribution
+   root, then construct `AgentWorkloadSpec` version `1` using the resolved
+   defaults and reviewed inputs. Use `interactive-crewmate@v1` for a Crewmate
    or `persistent-mate@v1` for a Second Mate and call the released pure
    `compileAgentWorkloadSpec` Effect. Do not hand-author patches or permit an
    arbitrary Kubernetes object in the spec. Inspect its credential-free

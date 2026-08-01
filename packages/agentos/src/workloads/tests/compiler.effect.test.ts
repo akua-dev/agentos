@@ -168,6 +168,7 @@ const WorkloadPatchSchema = Schema.Struct({
     serviceName: Schema.String,
     template: Schema.Struct({
       metadata: Schema.Struct({
+        annotations: Schema.Record(Schema.String, Schema.String),
         labels: Schema.Record(Schema.String, Schema.String),
       }),
       spec: Schema.Struct({
@@ -251,6 +252,8 @@ describe("AgentWorkloadSpec compiler", () => {
       assert.deepStrictEqual(first.files, second.files);
       assert.match(first.specDigest, /^[0-9a-f]{64}$/);
       assert.match(first.overlayDigest, /^[0-9a-f]{64}$/);
+      assert.strictEqual(first.summary.profileId, "interactive-crewmate@v1");
+      assert.match(first.summary.profileDefinitionDigest, /^[0-9a-f]{64}$/);
       const safeSummary = JSON.stringify(first.summary);
       assert.notInclude(safeSummary, first.spec.distributionRoot);
       assert.notInclude(safeSummary, first.spec.overlayRoot);
@@ -284,6 +287,12 @@ describe("AgentWorkloadSpec compiler", () => {
       assert.strictEqual(
         workload.spec.template.spec.serviceAccountName,
         "agentos-crewmate-api",
+      );
+      assert.strictEqual(
+        workload.spec.template.metadata.annotations[
+          "agentos.akua.dev/workload-profile-definition"
+        ],
+        first.summary.profileDefinitionDigest,
       );
       assert.deepStrictEqual(first.summary.resourceKinds, [
         "PersistentVolumeClaim",
@@ -322,6 +331,8 @@ describe("AgentWorkloadSpec compiler", () => {
       );
       assert.strictEqual(plan.summary.assignmentId, null);
       assert.strictEqual(plan.summary.profile.name, "persistent-mate");
+      assert.strictEqual(plan.summary.profileId, "persistent-mate@v1");
+      assert.match(plan.summary.profileDefinitionDigest, /^[0-9a-f]{64}$/);
     }));
 
   it.effect("rejects unknown literal Secret fields with an exact safe path", () =>

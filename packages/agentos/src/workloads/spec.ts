@@ -59,6 +59,7 @@ const NonBlankString = Schema.String.pipe(
 export const AgentWorkloadProfileNameSchema = Schema.Literals([
   "persistent-mate",
   "interactive-crewmate",
+  "stateless-job",
 ]);
 
 const ResourceQuantityPair = Schema.Struct({
