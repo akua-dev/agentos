@@ -104,6 +104,10 @@ describe("OpenFGA Kubernetes topology", () => {
       });
       const pod = (deployment.spec as any).template.spec;
       assert.isFalse(pod.automountServiceAccountToken);
+      assert.deepNestedInclude(pod.securityContext, {
+        fsGroup: 1000,
+        fsGroupChangePolicy: "OnRootMismatch",
+      });
       assert.lengthOf(pod.containers, 2);
       const runtime = pod.containers.find(({ name }: { name: string }) =>
         name === "openfga"
@@ -129,7 +133,7 @@ describe("OpenFGA Kubernetes topology", () => {
       );
       assert.deepStrictEqual(runtime.readinessProbe.httpGet, {
         path: "/readyz",
-        port: "semantic",
+        port: 8090,
       });
       assert.deepStrictEqual(readiness.command, ["agentos-openfga-readiness"]);
       assert.deepStrictEqual(readiness.volumeMounts, [
@@ -139,6 +143,10 @@ describe("OpenFGA Kubernetes topology", () => {
       const deploymentVolume = pod.volumes.find(({ name }: { name: string }) =>
         name === "deployment"
       );
+      const adminVolume = pod.volumes.find(({ name }: { name: string }) =>
+        name === "admin"
+      );
+      assert.strictEqual(adminVolume.secret.defaultMode, 0o440);
       assert.strictEqual(deploymentVolume.configMap.name, "openfga-deployment");
       assert.isTrue(deploymentVolume.configMap.optional);
 
@@ -157,6 +165,11 @@ describe("OpenFGA Kubernetes topology", () => {
       );
       const bootstrapPod = (bootstrap.spec as any).template.spec;
       assert.strictEqual(bootstrapPod.serviceAccountName, "openfga-bootstrap");
+      assert.deepNestedInclude(bootstrapPod.securityContext, {
+        fsGroup: 1000,
+        fsGroupChangePolicy: "OnRootMismatch",
+      });
+      assert.strictEqual(bootstrapPod.volumes[0].secret.defaultMode, 0o440);
       assert.deepStrictEqual(bootstrapPod.containers[0].command, [
         "agentos-openfga-bootstrap",
       ]);

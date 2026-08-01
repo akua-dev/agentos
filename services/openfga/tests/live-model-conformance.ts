@@ -54,7 +54,12 @@ const readIssue: AccessPermissionV1 = {
   capability: "github.issue.read",
 };
 
-function profile(): AccessProfileVersionV1 {
+function profile(
+  permissions: readonly [AccessPermissionV1, ...Array<AccessPermissionV1>] = [
+    writeIssue,
+    readIssue,
+  ],
+): AccessProfileVersionV1 {
   return {
     schemaVersion: 1,
     compatibility: "agentos-access-v1",
@@ -62,7 +67,7 @@ function profile(): AccessProfileVersionV1 {
     profileVersion: 1,
     previousProfileVersion: null,
     publishedBy: "first-mate-control-plane",
-    permissions: [writeIssue, readIssue],
+    permissions,
   };
 }
 
@@ -198,6 +203,19 @@ const program = Effect.gen(function*() {
     yield* check(readIssue, Fleet, "2026-08-01T12:00:00.000Z"),
     false,
     "a revoked profile binding should deny",
+  );
+  assertions += 1;
+
+  const overCeiling = yield* compileOpenFgaAuthorizationState({
+    ceiling: ceiling(1, [{ ...writeIssue, rateClass: "standard" }]),
+    profile: profile([{ ...writeIssue, rateClass: "high" }]),
+    binding: binding(),
+  });
+  assert.equal(
+    overCeiling.tuples.some(({ relation }) =>
+      relation === openFgaCapabilityRelation(writeIssue.capability).allow),
+    false,
+    "a profile rate above the Captain ceiling must not materialize a grant",
   );
   assertions += 1;
   return { ...deployment, assertions };

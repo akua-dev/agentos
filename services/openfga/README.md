@@ -16,7 +16,16 @@ The owned [Kustomize topology](./kubernetes/) contains:
 - ingress selection for explicitly labelled core clients, with no public Ingress and no egress policy; and
 - a volume-snapshot backup configuration that prefers a standby. The target cluster must provide CSI `VolumeSnapshot` support and a default or explicitly patched snapshot class before backups are scheduled.
 
-The OpenFGA preshared key is an administrative credential. The manifests reference `Secret/openfga-admin` but deliberately do not create it. Only the OpenFGA runtime, semantic-readiness sidecar, bootstrap Job, and later core authorizer may receive it. First Mate, Second Mates, Crewmates, and their namespaces must not mount it. Provision the Secret through the approved secret-manager workflow; for a disposable development cluster, create it from a protected file rather than a command-line literal.
+The OpenFGA preshared key is an administrative credential. The manifests reference `Secret/openfga-admin` but deliberately do not create it. Only the OpenFGA runtime, semantic-readiness sidecar, bootstrap Job, and later core authorizer may receive it. First Mate, Second Mates, Crewmates, and their namespaces must not mount it. Provision the Secret through the approved secret-manager workflow. Its `preshared-key` bytes must contain no leading or trailing whitespace: OpenFGA reads the value from an environment variable while AgentOS reads the same exact bytes from a mounted file and rejects whitespace-altered input.
+
+For a disposable development cluster, generate a newline-free protected file and create the Secret from that file rather than a command-line literal:
+
+```bash
+umask 077
+openssl rand -hex 32 | tr -d '\n' > /tmp/openfga-preshared-key
+kubectl create secret generic openfga-admin -n agentos \
+  --from-file=preshared-key=/tmp/openfga-preshared-key
+```
 
 ## First install
 
@@ -62,7 +71,7 @@ All tuple commands and checks pin both store ID and immutable authorization-mode
 
 Ordinary reads may later use latency-oriented consistency where their SLO permits it. Security-sensitive acknowledgements, bootstrap, readiness, ceiling shrink, binding revocation, and profile mutation use `HIGHER_CONSISTENCY`. OpenFGA query caches remain disabled in this release. A mutation is not reported complete until its expected decision has been observed strongly.
 
-The model uses an intersection for each finite capability: target Fleet membership, active profile membership, and the current Captain ceiling must all resolve the same immutable Mate or Assignment subject. Active-window conditions use a caller-supplied `current_time`; profile and ceiling expiry are exclusive. Targets include one exact Fleet, canonical provider resource, and environment, so a relation from another Fleet cannot match.
+AgentOS' closed, typed compiler calculates the finite Fleet/profile/Captain-ceiling intersection before tuple mutation. It emits a direct `allow_<capability>` relation only for the same immutable Mate or Assignment, exact Fleet, canonical provider resource, and environment when the binding is active, the profile rate is enabled and within the ceiling rate, and every scope matches. The final grant's active window starts at the later of binding creation and ceiling activation and ends at the earliest binding, profile, or ceiling expiry. Profile, ceiling, and Fleet tuples remain alongside that decision tuple for audit and version history. OpenFGA stores the immutable result and is the strongly checked decision point; this design does not depend on a recursive runtime intersection to make a security decision.
 
 ## Upgrade and rollback
 

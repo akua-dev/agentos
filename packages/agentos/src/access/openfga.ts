@@ -13,6 +13,7 @@ import {
   type AccessCeilingV1,
   type AccessPermissionV1,
   type AccessProfileVersionV1,
+  type AccessRateClassId,
 } from "./contracts.ts";
 
 export const AGENTOS_OPENFGA_MODEL_VERSION = "agentos-access-v1";
@@ -241,12 +242,17 @@ const from = (tupleset: string, relation: string): OpenFgaUserset => ({
 const union = (...child: ReadonlyArray<OpenFgaUserset>): OpenFgaUserset => ({
   union: { child },
 });
-const intersection = (
-  ...child: ReadonlyArray<OpenFgaUserset>
-): OpenFgaUserset => ({ intersection: { child } });
 const related = (
   ...types: ReadonlyArray<{ readonly type: string; readonly condition?: string }>
 ) => ({ directly_related_user_types: types });
+
+const OpenFgaRateClassRank: Readonly<Record<AccessRateClassId, number>> =
+  Object.freeze({
+    disabled: 0,
+    low: 1,
+    standard: 2,
+    high: 3,
+  });
 
 const capabilityTargetRelations: Record<string, OpenFgaUserset> = {};
 const capabilityTargetMetadata: Record<
@@ -257,11 +263,7 @@ for (const { id } of accessCapabilitiesV1) {
   const relation = openFgaCapabilityRelation(id);
   capabilityTargetRelations[relation.profile] = direct();
   capabilityTargetRelations[relation.ceiling] = direct();
-  capabilityTargetRelations[relation.allow] = intersection(
-    from("fleet", "member"),
-    from(relation.profile, "subject"),
-    from(relation.ceiling, "subject"),
-  );
+  capabilityTargetRelations[relation.allow] = direct();
   capabilityTargetMetadata[relation.profile] = related({
     type: "access_profile",
     condition: "active_window",
@@ -270,6 +272,10 @@ for (const { id } of accessCapabilitiesV1) {
     type: "access_ceiling",
     condition: "active_window",
   });
+  capabilityTargetMetadata[relation.allow] = related(
+    { type: "mate", condition: "active_window" },
+    { type: "assignment", condition: "active_window" },
+  );
 }
 
 export const AgentOSOpenFgaAuthorizationModelV1 = deepFreeze<OpenFgaAuthorizationModelV1>({
@@ -320,18 +326,13 @@ export const AgentOSOpenFgaAuthorizationModelV1 = deepFreeze<OpenFgaAuthorizatio
     },
     {
       type: "access_ceiling",
-      relations: {
-        fleet_scope: direct(),
-        domain_scope: direct(),
-        subject: union(
-          from("fleet_scope", "member"),
-          from("domain_scope", "member"),
-        ),
-      },
+      relations: { subject: direct() },
       metadata: {
         relations: {
-          fleet_scope: related({ type: "fleet" }),
-          domain_scope: related({ type: "domain" }),
+          subject: related(
+            { type: "mate", condition: "active_window" },
+            { type: "assignment", condition: "active_window" },
+          ),
         },
       },
     },
@@ -444,11 +445,6 @@ export const compileOpenFgaAuthorizationState = Effect.fn(
     tuple(subject, "member", domain),
   ];
 
-  if (ceiling.scope.kind === "fleet") {
-    tuples.push(tuple(fleet, "fleet_scope", ceilingObject));
-  } else {
-    tuples.push(tuple(domain, "domain_scope", ceilingObject));
-  }
   if (binding.state === "active") {
     tuples.push(tuple(
       subject,
@@ -458,6 +454,16 @@ export const compileOpenFgaAuthorizationState = Effect.fn(
         binding.createdAtMillis,
         binding.expiresAtMillis,
         "binding",
+      ),
+    ));
+    tuples.push(tuple(
+      subject,
+      "subject",
+      ceilingObject,
+      yield* activeWindow(
+        Math.max(binding.createdAtMillis, ceiling.effectiveAtMillis),
+        binding.expiresAtMillis,
+        "ceiling_subject",
       ),
     ));
   }
@@ -489,6 +495,39 @@ export const compileOpenFgaAuthorizationState = Effect.fn(
         "ceiling_permission",
       ),
     ));
+  }
+
+  if (binding.state === "active") {
+    for (const profilePermission of profile.permissions) {
+      const ceilingPermission = ceiling.permissions.find((candidate) =>
+        permissionKey(candidate) === permissionKey(profilePermission)
+      );
+      if (
+        ceilingPermission === undefined ||
+        profilePermission.rateClass === "disabled" ||
+        ceilingPermission.rateClass === "disabled" ||
+        OpenFgaRateClassRank[profilePermission.rateClass] >
+          OpenFgaRateClassRank[ceilingPermission.rateClass]
+      ) {
+        continue;
+      }
+      const target = openFgaTarget(fleetName, profilePermission);
+      const relation = openFgaCapabilityRelation(profilePermission.capability);
+      tuples.push(tuple(
+        subject,
+        relation.allow,
+        target,
+        yield* activeWindow(
+          Math.max(binding.createdAtMillis, ceiling.effectiveAtMillis),
+          minimumExpiry(
+            binding.expiresAtMillis,
+            profilePermission.expiresAtMillis,
+            ceilingPermission.expiresAtMillis,
+          ),
+          "effective_grant",
+        ),
+      ));
+    }
   }
 
   return {
@@ -590,6 +629,19 @@ function ceilingContainsSubject(
   return ceiling.scope.fleet === subject.fleet &&
     (ceiling.scope.kind === "fleet" ||
       ceiling.scope.domain === subject.domain);
+}
+
+function permissionKey(permission: AccessPermissionV1) {
+  return [
+    permission.capability,
+    authorizationResourceName(permission.resource),
+    permission.environment ?? "-",
+  ].join("\u0000");
+}
+
+function minimumExpiry(...values: ReadonlyArray<number | null>) {
+  const finite = values.filter((value): value is number => value !== null);
+  return finite.length === 0 ? null : Math.min(...finite);
 }
 
 function compileError(

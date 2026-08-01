@@ -123,10 +123,24 @@ describe("AgentOS OpenFGA authorization", () => {
       const target = AgentOSOpenFgaAuthorizationModelV1.type_definitions.find(
         ({ type }) => type === "authorization_target",
       );
+      const ceiling = AgentOSOpenFgaAuthorizationModelV1.type_definitions.find(
+        ({ type }) => type === "access_ceiling",
+      );
       assert.isDefined(target);
+      assert.deepStrictEqual(ceiling?.relations?.subject, { this: {} });
+      assert.deepStrictEqual(
+        ceiling?.metadata?.relations.subject?.directly_related_user_types,
+        [
+          { type: "mate", condition: "active_window" },
+          { type: "assignment", condition: "active_window" },
+        ],
+      );
       for (const capability of accessCapabilitiesV1) {
         const relation = openFgaCapabilityRelation(capability.id);
         assert.property(target!.relations, relation.allow);
+        assert.deepStrictEqual(target!.relations?.[relation.allow], {
+          this: {},
+        });
         assert.property(target!.relations, relation.profile);
         assert.property(target!.relations, relation.ceiling);
       }
@@ -187,6 +201,19 @@ describe("AgentOS OpenFGA authorization", () => {
           },
         },
         {
+          user: subject,
+          relation: "subject",
+          object:
+            "access_ceiling:fleet%3Aagentos%2Fceiling%3Aceiling_0123456789abcdef0123456789abcdef%40r1",
+          condition: {
+            name: "active_window",
+            context: {
+              effective_at: "2026-08-01T00:00:00.000Z",
+              expires_at: "2026-08-02T00:00:00.000Z",
+            },
+          },
+        },
+        {
           user: "fleet:fleet%3Aagentos",
           relation: "fleet",
           object: target,
@@ -218,11 +245,38 @@ describe("AgentOS OpenFGA authorization", () => {
             },
           },
         },
+        {
+          user: subject,
+          relation: relation.allow,
+          object: target,
+          condition: {
+            name: "active_window",
+            context: {
+              effective_at: "2026-08-01T00:00:00.000Z",
+              expires_at: "2026-08-02T00:00:00.000Z",
+            },
+          },
+        },
       ]);
       assert.isTrue(
         plan.tuples.every(({ object, relation, user }) =>
           !object.includes("*") && !relation.includes("*") && !user.includes("*")),
       );
+      assert.isFalse(
+        plan.tuples.some(({ relation }) =>
+          relation === "fleet_scope" || relation === "domain_scope"),
+      );
+    }));
+
+  it.effect("does not materialize a grant above the Captain rate ceiling", () =>
+    Effect.gen(function*() {
+      const plan = yield* compileOpenFgaAuthorizationState({
+        ceiling: ceiling([{ ...writeIssue, rateClass: "standard" }]),
+        profile: profile([{ ...writeIssue, rateClass: "high" }]),
+        binding: binding(),
+      });
+      const allow = openFgaCapabilityRelation(writeIssue.capability).allow;
+      assert.isFalse(plan.tuples.some(({ relation }) => relation === allow));
     }));
 
   it.effect("uses separate targets and membership paths across Fleets", () =>

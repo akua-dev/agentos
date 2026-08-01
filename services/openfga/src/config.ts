@@ -51,14 +51,16 @@ export const readRedactedFile = Effect.fn("agentos.openfga.readSecret")(
         field: "secret_file",
       })),
     );
-    const value = source.trim();
-    if (value === "" || value.length > 16 * 1_024) {
+    if (
+      source === "" || source !== source.trim() ||
+      source.length > 16 * 1_024
+    ) {
       return yield* OpenFgaEntrypointError.make({
         code: "secret_unavailable",
         field: "secret_file",
       });
     }
-    return Redacted.make(value);
+    return Redacted.make(source);
   },
 );
 

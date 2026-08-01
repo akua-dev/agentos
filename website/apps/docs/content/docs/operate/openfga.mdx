@@ -3,7 +3,7 @@ title: OpenFGA authorization
 description: Install, verify, upgrade, and recover AgentOS' private authorization decision point.
 ---
 
-AgentOS uses a private OpenFGA deployment for provider/API authorization. It does not proxy ordinary Internet traffic and it never stores provider credentials. Each decision intersects the workload's Fleet membership, one immutable access-profile version, and the current Captain ceiling for one exact provider resource and environment.
+AgentOS uses a private OpenFGA deployment for provider/API authorization. It does not proxy ordinary Internet traffic and it never stores provider credentials. Its typed compiler materializes a grant only after intersecting the workload's Fleet membership, one immutable access-profile version, and the current Captain ceiling—including rate class and expiry—for one exact provider resource and environment. OpenFGA stores that auditable result and makes the strongly consistent decision.
 
 ## What gets deployed
 
