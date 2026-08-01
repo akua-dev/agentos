@@ -125,8 +125,10 @@ Keep the previous checkout branch or exact commit reachable. Record the prior
 immutable images, version and source metadata, ControllerRevision, PVC UID and
 native Pi session reference before changing Git or Kubernetes. When an
 installation-owned declarative source exists, also preserve its exact prior
-release fields and secret-safe rendered comparison. The native session is the
-recovery record; create no upgrade-state file, shadow manifest or database row.
+release fields and secret-safe rendered comparison. The native session remains
+the session authority; create no upgrade-state file or shadow manifest. Use the
+released SQL runtime-operation journal only for bounded rollout intent and
+phase evidence, never as a copy of these native observations.
 
 When an installation-owned declarative source exists, treat it as canonical and
 change only its release fields through the native Kustomize or resource path.
@@ -148,17 +150,28 @@ Preserve PVC templates, mounts, environment, credentials, ServiceAccount,
 RBAC, database wiring, probes, resources, pull policies and unrelated
 annotations. Any other diff requires separate authority or a smaller patch.
 
+Compute the reviewed render's SHA-256 and begin one stable `rollout` runtime
+operation for the named Mate, namespace, workload and retained PVC before
+activation. An exact retry reuses its UUID. A conflicting or already-active
+operation requires reconciliation before any Git or Kubernetes mutation.
+
 ## Activate one Mate once
 
 1. Switch the clean persistent checkout to the verified release tag without
    deleting the previous branch.
 2. Apply the reviewed rendered source or live patch once to the named Mate.
+   Record `applied` on the same SQL runtime operation after the synchronous
+   apply returns.
 3. Wait for that StatefulSet rollout within a bounded deadline. The replacement
    runtime invalidates its process-bound coordination marker by design; its
    startup recovery turn must re-arm and attest the targeted listener, catch up
    from current bearings, and confirm catch-up before the Pod becomes Ready.
    A live Pod reporting only those readiness reasons is recovering, not evidence
    for another restart.
+   Record `workload_ready` after the exact replacement workload is available
+   and `harness_ready` only after semantic readiness proves the restored native
+   session and coordination catch-up. Complete the operation after final target
+   verification.
 
 The expected single Pod replacement belongs to the StatefulSet's
 `RollingUpdate`. Do not manually delete the Pod, invoke another restart, update
@@ -183,6 +196,11 @@ Classify the first failed boundary as scheduling, image retrieval, init,
 runtime, readiness or native-session recovery. Do not hide it with a live
 dependency workaround, `NODE_PATH` change, PVC patch, credential change,
 unreviewed environment mutation, manual Pod deletion or update to another Mate.
+Record the ambiguous boundary as `recovery_required` with a stable privacy-safe
+decision code. Inspect Kubernetes, PVC and native session truth, then repair the
+same operation forward. If rollback changes the desired render, atomically
+supersede the failed operation with one linked replacement and the rollback
+digest; never overwrite the prior evidence or begin an unrelated operation.
 
 ## Finish verification before supervision
 

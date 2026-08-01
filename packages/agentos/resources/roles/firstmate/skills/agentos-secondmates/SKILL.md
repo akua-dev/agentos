@@ -77,6 +77,9 @@ AgentOS or project instruction change.
    `$agentos-harnesses` and patch its `AGENTOS_MODEL` and `AGENTOS_THINKING`
    values onto the `prepare-home` init container before rendering or applying
    the workload. Do not add an omitted axis or a shared release default.
+   The runtime workflow must begin one SQL `provision` operation from the
+   reviewed render digest before apply and advance that same operation through
+   apply, workload and harness evidence.
 5. Render and inspect the complete overlay, then apply its reviewed Namespace
    resource first. Verify its concrete Fleet and owner-Agent labels, restricted
    Pod Security profile and absence of an egress policy. Create or select one
@@ -105,6 +108,10 @@ AgentOS or project instruction change.
    native Pi session and effective selected profile.
 9. In one short database transaction, record the verified Kubernetes and Herdr locators, set useful status text and change lifecycle state from `provisioning` to `active`.
    On partial failure, preserve the row and runtime evidence in `provisioning` state for reconciliation; do not create a replacement identity or destructively roll back the PVC.
+   Complete the same runtime operation only after this transaction commits. On
+   an ambiguous boundary, mark it `recovery_required`, inspect native truth and
+   repair forward. A changed desired render uses atomic supersession, not an
+   unlinked new operation.
 10. Move accepted in-scope Tasks with
     `agentos.handoff_task_assignment`. Preserve the stable Task, Assignment
     history, dependencies, complete destination brief and concrete dispatch
@@ -146,12 +153,18 @@ Retirement is explicit, never an idle timeout.
 3. Require the Second Mate to hand off every active child Agent and durable decision thread.
 4. Preserve delivered artifacts, reports, Inbox history and charter history.
 5. Call `agentos.retire_agent` only after the database accepts that no active Assignments or children remain.
-6. Remove the StatefulSet, Service and ServiceAccount without deleting retained
+6. Begin one `teardown` runtime operation bound to the retired Agent, exact
+   namespace/workload and desired render digest. Declare the recorded PVC with
+   explicit `retain` or separately approved `discard` disposition; the SQL
+   boundary rejects active work or an omitted PVC decision.
+7. Remove the StatefulSet, Service and ServiceAccount without deleting retained
    PVCs. Keep the domain Namespace and its controls while any retained PVC or
    recoverable state remains.
-7. Delete retained PVCs and then the Namespace only after separate explicit
+   Record `applied` after the exact resources are absent and complete the
+   operation only after the retained-resource disposition is verified.
+8. Delete retained PVCs and then the Namespace only after separate explicit
    Captain approval for that destructive discard. Namespace deletion is never
    routine cleanup because it deletes namespaced PVC objects regardless of the
    StatefulSet retention policy.
-8. Never use a forced runtime or Namespace deletion to bypass database
+9. Never use a forced runtime or Namespace deletion to bypass database
    retirement guards.

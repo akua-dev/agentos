@@ -220,3 +220,27 @@ idempotent acceptance evidence, migrates stored acceptance requests to the
 new signature, and reapplies runtime grants. The published-history test locks
 all first 16 migration tags, timestamps and checksums; the package-unification
 test exercises the forward upgrade from that exact historical schema.
+
+`0017_runtime_operation_journal.sql` adds the resumable runtime-operation
+contract used around native Kubernetes and Herdr work. A caller-selected UUID
+binds one operation to its target Agent, supervising owner, optional
+Assignment, namespace, workload, action, SHA-256 desired-render digest and a
+closed list of retained PVC/worktree identities and dispositions. Exact begin
+retries return the same UUID; conflicting identity, owner or render fails
+closed, and a partial unique index permits only one active operation per Agent.
+
+Mates advance operations only through `begin_runtime_operation`,
+`observe_runtime_operation`, `complete_runtime_operation`,
+`fail_runtime_operation` and `supersede_runtime_operation`. The current phase
+is paired with append-only phase events so interruption after prepare, apply,
+workload readiness or harness readiness can be repaired forward from fresh
+native observations. Supersession atomically links a replacement operation to
+the same Agent, Assignment, namespace, workload and action; it creates no
+Agent, Task, Assignment, PVC or worktree. Teardown refuses active Assignments
+and requires an explicit disposition for the Agent's recorded PVC. Completed
+operations and all events are immutable.
+
+The journal deliberately stores no Kubernetes YAML or status, Herdr output,
+logs, transcripts, credentials or heartbeats. Registered Agents retain the
+Fleet-wide read view; only First and Second Mates receive the hierarchy-checked
+Functions, and no runtime controller or database wrapper service is added.
