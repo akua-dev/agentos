@@ -2,13 +2,19 @@ export {
   assertPiSkillName,
   assertQualifiedName,
   preflightAgentOSRegistrations,
+  preflightAgentOSRegistrationsEffect,
   registerAgentOSRuntime,
+  registerAgentOSRuntimeEffect,
   type AgentOSNameClaimsV1,
   type AgentOSRegistrationV1,
 } from "./preflight.ts";
 export {
   createDefaultAgentOSEntrypoint,
+  DefaultAgentOSRoleSchema,
   loadPackagedRoleSetup,
+  loadPackagedRoleSetupEffect,
+  registerDefaultAgentOSEntrypointEffect,
+  selectedDefaultAgentOSRoleEffect,
   type DefaultAgentOSEntrypointOptions,
   type DefaultAgentOSRole,
   type DefaultRoleSetupV1,
@@ -31,17 +37,23 @@ export {
 } from "./coordination-readiness/extension.ts";
 export {
   attestPiProviderReadiness,
+  attestPiProviderReadinessEffect,
   CoordinationReadinessState,
   CrewmateReadinessState,
   invalidateCoordinationReadiness,
+  invalidateCoordinationReadinessEffect,
   PiProviderReadinessState,
   ReadinessStateError,
   writeCoordinationReadiness,
+  writeCoordinationReadinessEffect,
   writeCrewmateReadiness,
+  writeCrewmateReadinessEffect,
 } from "./readiness-state.ts";
 export {
   buildAgentOSInstructions,
+  buildAgentOSInstructionsEffect,
   registerAgentOSInstructions,
+  registerAgentOSInstructionsEffect,
   type AgentOSInstructionSourceV1,
 } from "./instructions.ts";
 export {
@@ -72,15 +84,21 @@ export {
 } from "./openai-server-compaction/extension.ts";
 export {
   discoverAgentOSSkillNames,
+  discoverAgentOSSkillNamesEffect,
   registerAgentOSResources,
+  registerAgentOSResourcesEffect,
   resolveAgentOSResources,
+  resolveAgentOSResourcesEffect,
   type AgentOSResourceInputV1,
   type AgentOSResourcesV1,
 } from "./resources.ts";
 export {
   buildAgentOSStartupPrompt,
+  buildAgentOSStartupPromptEffect,
   preflightAgentOSStartup,
+  preflightAgentOSStartupEffect,
   registerAgentOSStartup,
+  registerAgentOSStartupEffect,
   type AgentOSStartupContributionV1,
   type AgentOSStartupOptions,
 } from "./startup.ts";
@@ -143,3 +161,31 @@ export {
   registerAgentOSObservability,
   type AgentOSObservabilityDependencies,
 } from "./telemetry/pi-extension.ts";
+export {
+  AgentOSInstructionSourceV1Schema,
+  AgentOSNameClaimsV1Schema,
+  AgentOSResourceInputV1Schema,
+  AgentOSResourcesV1Schema,
+  AgentOSStartupContributionV1Schema,
+  NonBlankStringSchema,
+  PiSkillNameSchema,
+  QualifiedNameSchema,
+  decodeAgentOSContract,
+} from "./shared/contracts.ts";
+export {
+  AgentOSContractError,
+  AgentOSFailureEnvelope,
+  AgentOSValidationError,
+  decodeOrValidationError,
+  makeValidationError,
+  toAgentOSFailureEnvelope,
+} from "./shared/errors.ts";
+export {
+  AgentOSDiagnostic,
+  AgentOSDiagnostics,
+  AgentOSIdentifier,
+  AgentOSIdentifierUnavailable,
+  safeDiagnosticAttributes,
+  type AgentOSDiagnosticAttributeValue,
+  type AgentOSDiagnosticInput,
+} from "./shared/services.ts";

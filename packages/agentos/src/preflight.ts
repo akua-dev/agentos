@@ -1,13 +1,20 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Effect, Schema } from "effect";
 
-export type AgentOSNameClaimsV1 = {
-  version: 1;
-  tools?: readonly string[];
-  commands?: readonly string[];
-  skills?: readonly string[];
-  messages?: readonly string[];
-  entries?: readonly string[];
-};
+import {
+  AgentOSNameClaimsV1Schema,
+  PiSkillNameSchema,
+  QualifiedNameSchema,
+  type AgentOSNameClaimsV1,
+} from "./shared/contracts.ts";
+import {
+  AgentOSValidationError,
+  decodeOrValidationError,
+  makeValidationError as validationError,
+} from "./shared/errors.ts";
+import { runSyncLegacy } from "./shared/legacy.ts";
+
+export type { AgentOSNameClaimsV1 } from "./shared/contracts.ts";
 
 export type AgentOSRegistrationV1 = {
   version: 1;
@@ -16,54 +23,118 @@ export type AgentOSRegistrationV1 = {
   register(pi: ExtensionAPI): void | Promise<void>;
 };
 
-const claimKinds = [
+type ClaimKind = "tools" | "commands" | "skills" | "messages" | "entries";
+
+const claimKinds: ReadonlyArray<ClaimKind> = [
   "tools",
   "commands",
   "skills",
   "messages",
   "entries",
-] as const;
+];
 
-const singularClaimKind = {
+const singularClaimKind: Readonly<Record<ClaimKind, string>> = {
   tools: "tool",
   commands: "command",
   skills: "skill",
   messages: "message",
   entries: "entry",
-} as const;
+};
 
 const MAX_PI_SKILL_NAME_CHARACTERS = 64;
-const PI_SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const Version1 = Schema.Literal(1);
+const RegistrationFunction = Schema.declare(
+  (value): value is AgentOSRegistrationV1["register"] =>
+    typeof value === "function",
+  { identifier: "AgentOSRegistrationFunction" },
+);
 
-export function preflightAgentOSRegistrations(
-  registrations: readonly AgentOSRegistrationV1[],
-): void {
+export const preflightAgentOSRegistrationsEffect = Effect.fn(
+  "agentos.preflight.registrations",
+)(function*(registrations: readonly AgentOSRegistrationV1[]) {
   const registrationIds = new Set<string>();
   const owners = new Map<string, string>();
 
   for (const registration of registrations) {
-    assertVersion(registration.version, `registration "${registration.id}"`);
-    assertQualifiedName(registration.id, "registration id");
+    yield* decodeOrValidationError(
+      Version1,
+      registration.version,
+      validationError(
+        "unsupported_version",
+        "registration",
+        "version",
+        `registration "${registration.id}" uses unsupported AgentOS registration version`,
+      ),
+    );
+    yield* validateQualifiedNameEffect(
+      registration.id,
+      "registration id",
+      "registration",
+      "id",
+    );
+    yield* decodeOrValidationError(
+      RegistrationFunction,
+      registration.register,
+      validationError(
+        "invalid_shape",
+        "registration",
+        "register",
+        `registration "${registration.id}" must provide a register function`,
+      ),
+    );
     if (registrationIds.has(registration.id)) {
-      throw new Error(`duplicate AgentOS registration id "${registration.id}"`);
+      return yield* validationError(
+        "duplicate_name",
+        "registration",
+        "id",
+        `duplicate AgentOS registration id "${registration.id}"`,
+      );
     }
     registrationIds.add(registration.id);
-    assertVersion(
+    yield* decodeOrValidationError(
+      Version1,
       registration.names.version,
-      `name claims for "${registration.id}"`,
+      validationError(
+        "unsupported_version",
+        "registration",
+        "names.version",
+        `name claims for "${registration.id}" uses unsupported AgentOS registration version`,
+      ),
     );
 
     for (const kind of claimKinds) {
-      for (const name of registration.names[kind] ?? []) {
+      const names = yield* decodeOrValidationError(
+        Schema.Array(Schema.Unknown),
+        registration.names[kind] ?? [],
+        validationError(
+          "invalid_shape",
+          "registration",
+          kind,
+          `AgentOS ${kind} claims must be an array`,
+        ),
+      );
+      for (const name of names) {
         if (kind === "skills") {
-          assertPiSkillName(name, singularClaimKind[kind]);
+          yield* validatePiSkillNameEffect(
+            name,
+            singularClaimKind[kind],
+            "registration",
+            kind,
+          );
         } else {
-          assertClaimName(name, singularClaimKind[kind]);
+          yield* validateClaimNameEffect(
+            name,
+            singularClaimKind[kind],
+            kind,
+          );
         }
         const key = `${kind}:${name}`;
         const prior = owners.get(key);
         if (prior) {
-          throw new Error(
+          return yield* validationError(
+            "duplicate_name",
+            "registration",
+            kind,
             `AgentOS ${singularClaimKind[kind]} "${name}" is claimed by both "${prior}" and "${registration.id}"`,
           );
         }
@@ -71,6 +142,33 @@ export function preflightAgentOSRegistrations(
       }
     }
   }
+});
+
+export const registerAgentOSRuntimeEffect = Effect.fn(
+  "agentos.preflight.registerRuntime",
+)(function*(
+  pi: ExtensionAPI,
+  registrations: readonly AgentOSRegistrationV1[],
+) {
+  yield* preflightAgentOSRegistrationsEffect(registrations);
+  for (const registration of registrations) {
+    yield* Effect.tryPromise({
+      try: () => Promise.resolve(registration.register(pi)),
+      catch: () =>
+        validationError(
+          "registration_failed",
+          "registration",
+          "register",
+          `AgentOS registration "${registration.id}" failed`,
+        ),
+    });
+  }
+});
+
+export function preflightAgentOSRegistrations(
+  registrations: readonly AgentOSRegistrationV1[],
+): void {
+  runLegacyValidation(preflightAgentOSRegistrationsEffect(registrations));
 }
 
 export function registerAgentOSRuntime(
@@ -93,50 +191,81 @@ export function registerAgentOSRuntime(
   return pending;
 }
 
-function assertVersion(version: unknown, owner: string): asserts version is 1 {
-  if (version !== 1) {
-    throw new Error(`${owner} uses unsupported AgentOS registration version`);
-  }
-}
-
-export function assertQualifiedName(value: unknown, label: string): asserts value is string {
-  if (
-    typeof value !== "string" ||
-    value.length === 0 ||
-    value.length > 128 ||
-    !/^[A-Za-z0-9@._:/-]+$/.test(value)
-  ) {
-    throw new Error(
-      `${label} must be a package-qualified name of at most 128 characters`,
-    );
-  }
+export function assertQualifiedName(
+  value: unknown,
+  label: string,
+): asserts value is string {
+  runLegacyValidation(
+    validateQualifiedNameEffect(value, label, "qualified_name", label),
+  );
 }
 
 export function assertPiSkillName(
   value: unknown,
   label: string,
 ): asserts value is string {
-  if (
-    typeof value !== "string" ||
-    value.length === 0 ||
-    value.length > MAX_PI_SKILL_NAME_CHARACTERS ||
-    !PI_SKILL_NAME.test(value)
-  ) {
-    throw new Error(
-      `${label} must be a valid Pi Skill name of at most ${MAX_PI_SKILL_NAME_CHARACTERS} lowercase letters, numbers, and non-consecutive hyphens`,
-    );
-  }
+  runLegacyValidation(
+    validatePiSkillNameEffect(value, label, "pi_skill_name", label),
+  );
 }
 
-function assertClaimName(value: unknown, kind: string): asserts value is string {
-  if (
-    typeof value !== "string" ||
-    value.length === 0 ||
-    value.length > 128 ||
-    !/^[A-Za-z0-9@._:/-]+$/.test(value)
-  ) {
-    throw new Error(
+const validateQualifiedNameEffect = Effect.fn(
+  "agentos.preflight.qualifiedName",
+)(function*(
+  value: unknown,
+  label: string,
+  boundary: string,
+  field: string,
+) {
+  return yield* decodeOrValidationError(
+    QualifiedNameSchema,
+    value,
+    validationError(
+      "invalid_name",
+      boundary,
+      field,
+      `${label} must be a package-qualified name of at most 128 characters`,
+    ),
+  );
+});
+
+const validatePiSkillNameEffect = Effect.fn(
+  "agentos.preflight.piSkillName",
+)(function*(
+  value: unknown,
+  label: string,
+  boundary: string,
+  field: string,
+) {
+  return yield* decodeOrValidationError(
+    PiSkillNameSchema,
+    value,
+    validationError(
+      "invalid_name",
+      boundary,
+      field,
+      `${label} must be a valid Pi Skill name of at most ${MAX_PI_SKILL_NAME_CHARACTERS} lowercase letters, numbers, and non-consecutive hyphens`,
+    ),
+  );
+});
+
+const validateClaimNameEffect = Effect.fn(
+  "agentos.preflight.claimName",
+)(function*(value: unknown, kind: string, field: string) {
+  return yield* decodeOrValidationError(
+    QualifiedNameSchema,
+    value,
+    validationError(
+      "invalid_name",
+      "registration",
+      field,
       `AgentOS ${kind} name must be non-empty, namespaced, and at most 128 characters`,
-    );
-  }
+    ),
+  );
+});
+
+function runLegacyValidation<A>(
+  effect: Effect.Effect<A, AgentOSValidationError>,
+): A {
+  return runSyncLegacy(effect);
 }

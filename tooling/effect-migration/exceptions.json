@@ -7,6 +7,20 @@
       "match": "BunRuntime.runMain",
       "maximumOccurrences": 1,
       "reason": "The executable policy checker needs one reviewed Bun process entry boundary."
+    },
+    {
+      "path": "packages/agentos/src/shared/legacy.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runSync",
+      "maximumOccurrences": 1,
+      "reason": "Published synchronous APIs retain one reviewed adapter while consumers migrate to typed Effect programs."
+    },
+    {
+      "path": "packages/agentos/src/shared/legacy.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runPromise",
+      "maximumOccurrences": 1,
+      "reason": "Published Promise and framework APIs retain one reviewed adapter while consumers migrate to typed Effect programs."
     }
   ]
 }
