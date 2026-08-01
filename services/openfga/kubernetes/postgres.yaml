@@ -1,0 +1,35 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: openfga-postgres
+  labels:
+    app.kubernetes.io/name: openfga-postgres
+    app.kubernetes.io/component: authorization-database
+    app.kubernetes.io/part-of: agentos
+spec:
+  instances: 3
+  enableSuperuserAccess: false
+  primaryUpdateStrategy: unsupervised
+  bootstrap:
+    initdb:
+      database: openfga
+      owner: openfga
+      dataChecksums: true
+  storage:
+    size: 10Gi
+  walStorage:
+    size: 5Gi
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: 256MB
+  monitoring:
+    enablePodMonitor: false
+  backup:
+    target: prefer-standby
+    volumeSnapshot:
+      online: true
+      snapshotOwnerReference: backup
+      onlineConfiguration:
+        immediateCheckpoint: false
+        waitForArchive: false

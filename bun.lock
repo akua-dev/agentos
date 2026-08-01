@@ -113,6 +113,15 @@
         "@types/proper-lockfile": "4.1.4",
       },
     },
+    "services/openfga": {
+      "name": "@agentos/openfga",
+      "version": "0.0.0",
+      "dependencies": {
+        "@akua-dev/agentos": "workspace:*",
+        "@effect/platform-bun": "4.0.0-beta.102",
+        "effect": "4.0.0-beta.102",
+      },
+    },
     "services/otel-collector": {
       "name": "@agentos/otel-collector",
       "version": "0.0.0",
@@ -185,6 +194,8 @@
     "@agentos/database": ["@agentos/database@workspace:database"],
 
     "@agentos/github-app-token": ["@agentos/github-app-token@workspace:clis/github-app-token"],
+
+    "@agentos/openfga": ["@agentos/openfga@workspace:services/openfga"],
 
     "@agentos/otel-collector": ["@agentos/otel-collector@workspace:services/otel-collector"],
 
