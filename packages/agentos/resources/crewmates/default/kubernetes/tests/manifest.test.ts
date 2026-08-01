@@ -91,6 +91,7 @@ describe("Crewmate Kubernetes base", () => {
           "00000000-0000-4000-8000-000000000003",
         "agentos.akua.dev/assignment-id":
           "00000000-0000-4000-8000-000000000005",
+        "agentos.akua.dev/github-client": "true",
         "agentos.akua.dev/otel-client": "true",
         "agentos.akua.dev/owner-agent-id":
           "00000000-0000-4000-8000-000000000002",
@@ -112,7 +113,7 @@ describe("Crewmate Kubernetes base", () => {
       runAsUser: 1000,
       seccompProfile: { type: "RuntimeDefault" },
     });
-    expect(pod.initContainers).toHaveLength(2);
+    expect(pod.initContainers).toHaveLength(3);
     expect(pod.containers).toHaveLength(1);
     const install = pod.initContainers[0];
     const prepare = pod.initContainers[1];
@@ -121,7 +122,12 @@ describe("Crewmate Kubernetes base", () => {
       [...pod.initContainers, container].map(
         ({ image }: { image: string }) => image,
       ),
-    ).toEqual(["agentos:dev", "agentos:dev", "agentos:dev"]);
+    ).toEqual([
+      "agentos:dev",
+      "agentos:dev",
+      "agentos:dev",
+      "agentos:dev",
+    ]);
     expect(
       [...pod.initContainers, container].map(
         ({ resources }: { resources: Record<string, unknown> }) => resources,
@@ -136,17 +142,22 @@ describe("Crewmate Kubernetes base", () => {
         requests: { cpu: "250m", memory: "512Mi" },
       },
       {
+        limits: { cpu: "250m", memory: "128Mi" },
+        requests: { cpu: "25m", memory: "32Mi" },
+      },
+      {
         limits: { cpu: "2", memory: "4Gi" },
         requests: { cpu: "250m", memory: "512Mi" },
       },
     ]);
     expect(
-      [install, prepare, container].map(
-        ({ workingDir }: { workingDir: string }) => workingDir,
+      [...pod.initContainers, container].map(
+        ({ workingDir }: { workingDir?: string }) => workingDir,
       ),
     ).toEqual([
       "/opt/agentos/packages/agentos/resources/crewmates/default",
       "/opt/agentos/packages/agentos/resources/crewmates/default",
+      undefined,
       "/opt/agentos/packages/agentos/resources/crewmates/default",
     ]);
     expect(install.command).toEqual(["mise"]);
@@ -225,6 +236,11 @@ describe("Crewmate Kubernetes base", () => {
         name: "agentos-egress-identity",
         readOnly: true,
       },
+      {
+        mountPath: "/var/run/config/agentos-github",
+        name: "agentos-github-ca",
+        readOnly: true,
+      },
     ]);
     expect(prepare.volumeMounts).toEqual([
       { mountPath: "/home/agent", name: "home" },
@@ -253,6 +269,14 @@ describe("Crewmate Kubernetes base", () => {
               path: "token",
             },
           }],
+        },
+      },
+      {
+        name: "agentos-github-ca",
+        configMap: {
+          defaultMode: 292,
+          items: [{ key: "ca.pem", path: "ca.pem" }],
+          name: "agentos-github-ca",
         },
       },
     ]);

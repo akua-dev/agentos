@@ -228,6 +228,7 @@ describe("AgentWorkloadSpec native Kustomize output", () => {
             initContainers: [
               { name: "install-tools", image: workloadImage },
               { name: "prepare-home", image: workloadImage },
+              { name: "prepare-github-provider", image: workloadImage },
             ],
             serviceAccountName: "agentos-crewmate-api",
           },
@@ -283,6 +284,7 @@ describe("AgentWorkloadSpec native Kustomize output", () => {
             initContainers: [
               { name: "install-tools", image: workloadImage },
               { name: "prepare-home", image: workloadImage },
+              { name: "prepare-github-provider", image: workloadImage },
             ],
             serviceAccountName: "agentos-platform-mate",
           },

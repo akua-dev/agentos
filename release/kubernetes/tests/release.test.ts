@@ -124,12 +124,18 @@ describe("First Mate release artifacts", () => {
         image,
         image,
         image,
+        image,
       ]);
       expect(
         containers.map(
           ({ imagePullPolicy }: { imagePullPolicy: string }) => imagePullPolicy,
         ),
-      ).toEqual(["IfNotPresent", "IfNotPresent", "IfNotPresent"]);
+      ).toEqual([
+        "IfNotPresent",
+        "IfNotPresent",
+        "IfNotPresent",
+        "IfNotPresent",
+      ]);
     }
     expect(database).toEqual([
       {

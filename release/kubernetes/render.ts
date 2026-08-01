@@ -132,8 +132,8 @@ function validateFirstMate(resources: Resource[], image: string, version: string
   }
   const pod = statefulSet.spec.template.spec;
   const containers = [...pod.initContainers, ...pod.containers];
-  if (containers.length !== 3) {
-    throw new Error(`Expected three First Mate containers, found ${containers.length}.`);
+  if (containers.length !== 4) {
+    throw new Error(`Expected four First Mate containers, found ${containers.length}.`);
   }
   for (const container of containers) {
     if (container.image !== image || container.imagePullPolicy !== "IfNotPresent") {
@@ -200,6 +200,8 @@ patches:
               - name: install-tools
                 imagePullPolicy: IfNotPresent
               - name: prepare-home
+                imagePullPolicy: IfNotPresent
+              - name: prepare-github-provider
                 imagePullPolicy: IfNotPresent
             containers:
               - name: agentos

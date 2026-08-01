@@ -110,6 +110,7 @@ COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/agentgateway/package.json services/agentgateway/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY services/github-broker/package.json services/github-broker/package.json
 COPY services/openfga/package.json services/openfga/package.json
 COPY services/otel-collector/package.json services/otel-collector/package.json
 COPY website/apps/docs/package.json website/apps/docs/package.json
@@ -126,6 +127,7 @@ RUN bun install \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
       --filter @agentos/ai-gateway \
+      --filter @agentos/github-broker \
       --filter @agentos/openfga \
   && bun clis/github-app-token/github-app-token.ts --help >/dev/null \
   && bun clis/pg-listen/pg-listen.ts --help >/dev/null
@@ -141,6 +143,7 @@ COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/agentgateway/package.json services/agentgateway/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY services/github-broker/package.json services/github-broker/package.json
 COPY services/openfga/package.json services/openfga/package.json
 COPY services/otel-collector/package.json services/otel-collector/package.json
 COPY website/apps/docs/package.json website/apps/docs/package.json
@@ -168,6 +171,9 @@ COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/ai-gateway/node_modules/ \
   /opt/agentos/services/ai-gateway/node_modules/
 COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/services/github-broker/node_modules/ \
+  /opt/agentos/services/github-broker/node_modules/
+COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/openfga/node_modules/ \
   /opt/agentos/services/openfga/node_modules/
 COPY --from=agentos-runtime-dependencies \
@@ -187,10 +193,13 @@ RUN chmod 0644 \
     /opt/agentos/packages/agentos/resources/roles/secondmate/mise.toml \
   && chmod 0755 \
     /opt/agentos/packages/agentos/runtime/prepare-home.ts \
+    /opt/agentos/packages/agentos/runtime/github-provider-main.ts \
+    /opt/agentos/packages/agentos/runtime/github-workload-auth-main.ts \
     /opt/agentos/packages/agentos/runtime/create-image-seed.ts \
     /opt/agentos/packages/agentos/runtime/run-mate.ts \
     /opt/agentos/packages/agentos/runtime/health.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \
+    /opt/agentos/services/github-broker/src/main.ts \
     /opt/agentos/services/openfga/src/bootstrap.ts \
     /opt/agentos/services/openfga/src/readiness.ts \
   && chmod 0755 \
@@ -205,6 +214,15 @@ RUN chmod 0644 \
   && ln -s \
     /opt/agentos/services/ai-gateway/src/main.ts \
     /usr/local/bin/ai-gateway \
+  && ln -s \
+    /opt/agentos/services/github-broker/src/main.ts \
+    /usr/local/bin/agentos-github-broker \
+  && ln -s \
+    /opt/agentos/packages/agentos/runtime/github-provider-main.ts \
+    /usr/local/bin/agentos-github-provider \
+  && ln -s \
+    /opt/agentos/packages/agentos/runtime/github-workload-auth-main.ts \
+    /usr/local/bin/agentos-github-workload-auth \
   && ln -s \
     /opt/agentos/services/openfga/src/bootstrap.ts \
     /usr/local/bin/agentos-openfga-bootstrap \
@@ -224,7 +242,7 @@ ENV HOME=/home/agent \
     MISE_SYSTEM_CONFIG_FILE=/etc/mise/config.toml \
     MISE_TRUSTED_CONFIG_PATHS=/opt/agentos \
     PI_CODING_AGENT_DIR=/home/agent/.pi/agent \
-    PATH=/home/agent/.local/share/mise/shims:/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin
+    PATH=/home/agent/.local/bin:/home/agent/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin
 
 USER 1000:1000
 WORKDIR /opt/agentos

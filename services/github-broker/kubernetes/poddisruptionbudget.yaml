@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: github-broker
+  labels:
+    app.kubernetes.io/name: github-broker
+    app.kubernetes.io/part-of: agentos
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: github-broker

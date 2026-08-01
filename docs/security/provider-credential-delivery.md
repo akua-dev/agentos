@@ -28,6 +28,17 @@ The pinned agentgateway v1.4.1 source accepts `{ file: ... }` for static keys an
 
 The reviewed Helm input in [`services/agentgateway/kubernetes/values.yaml`](../../services/agentgateway/kubernetes/values.yaml) demonstrates the OpenAI broker domain. `agentgateway-openai` mounts no Fleet AI Gateway client Secret. It validates the caller through fail-closed HTTP external authorization, copies only the closed bounded grant into the request, and forwards to the private AI Gateway. That provider broker owns its OAuth vault and replaces the workload credential before OpenAI. Static provider domains may still use the one-file projection described above, but they require separate instances and plans. Kustomize remains the production authority; the Helm input is the pinned upstream render comparison for #96.
 
+The GitHub domain is implemented by
+[`services/github-broker`](../../services/github-broker/README.md) and the
+pinned [`github-values.yaml`](../../services/agentgateway/kubernetes/github-values.yaml).
+Native GitHub clients present only the projected ServiceAccount identity to an
+explicit internal HTTPS endpoint. Agentgateway obtains a closed repository and
+capability grant; the Effect broker alone mounts the GitHub App Secret and
+mints an exact-repository, exact-permission installation token. The previous
+First-Mate App-key mount and per-Agent installation-token Secret flow are
+retired. Agent Pods receive only the public endpoint CA, never the App key or a
+GitHub token.
+
 ## Rotation and recovery
 
 Use the managed Secret procedure released in #80: create on absence, replace only with the current `resourceVersion`, keep UID stable, use the exact ownership labels and data keys, reject takeover, never write a last-applied annotation, and keep credential bytes out of command output and artifacts. After a successful replacement:

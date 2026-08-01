@@ -71,7 +71,7 @@ spec:
             - name: MISE_TRUSTED_CONFIG_PATHS
               value: /opt/agentos
             - name: PATH
-              value: /home/agent/.local/share/mise/shims:/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin
+              value: /home/agent/.local/bin:/home/agent/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin
           securityContext: &container-security
             allowPrivilegeEscalation: false
             capabilities:

@@ -93,128 +93,46 @@ On failure, keep the agent in bootstrap or degraded mode. Preserve the existing 
 
 ## GitHub identity
 
-Present two complete paths and let the Captain choose:
+Organization-owned Fleet access uses the GitHub broker. Do not run `gh auth
+login`, mint an installation token, create a per-Agent GitHub Secret, or mount
+the GitHub App private key into a First Mate, Second Mate or Crewmate.
 
-- Personal or individual development: authenticate the owning persistent Mate
-  through native `gh auth login` and its provider-supported browser or device
-  flow. Keep the resulting `gh` state on that Mate's PVC; never copy a local
-  credential store into the Pod.
-- Organization-owned Fleet identity: use one dedicated GitHub App whose
-  repository selection and permissions the Captain has reviewed. A broad
-  installation is valid only when the Captain deliberately accepts that broad
-  provider authority; GitHub authentication still grants no AgentOS authority.
+The only Agent-side credential is the kubelet-rotated, audience-bound
+ServiceAccount token at `/var/run/secrets/agentos-egress/token`. The released
+home reconciler configures native `git`, `gh` and `gh-axi` to call
+`https://agentgateway-github.agentos.svc.cluster.local`. The workload helper
+reads the projected token immediately before each native invocation, passes it
+only in that child process environment, and never writes it to a remote URL,
+Git credential store, `hosts.yml`, shell history or command argument. Do not
+bypass the wrapper or run `gh auth` commands in broker mode.
 
-The GitHub App client secret is not used for installation-token authentication
-and must not be transferred. Inventory the non-secret App ID, installation ID,
-effective repository selection and permissions. Have the Captain place the App
-private key in a mode-`0600` file outside the repository. With explicit
-credential and workload-mutation approval, use `$agentos-secrets` to create or
-rotate `Secret/agentos-github-app` in the owning namespace with owner
-`firstmate`, scope `github-app-installation`, schema `github-app-v1`, and these
-keys:
+Agentgateway authenticates the workload and asks the Effect authorizer plus
+OpenFGA for the exact Mate, active Assignment, repository and operation. The
+closed grant reaches the GitHub broker without a credential value. Only the
+broker mounts `Secret/agentos-github-app`; it mints an installation token for
+one repository and one minimum permission, strips every AgentOS identity or
+grant header, injects the provider token, and streams the native response.
 
-- `app-id`
-- `installation-id`
-- `private-key.pem`
+A Mate requests the exact repository and capability through durable Inbox.
+Use `request` inside standing authority and `approval_request` when the access
+or provider-visible action is consequential. First Mate maintains reusable
+OpenFGA profiles and assignment ceilings; it does not mint or distribute
+tokens. Relevant capabilities are repository read, contents write, issue
+read/write, pull-request read/write and Actions read/dispatch. Unknown REST,
+Git smart-HTTP or GraphQL shapes fail closed. Opaque GraphQL node mutations are
+unsupported because their repository cannot be proven from the request.
 
-Do not print or persist the rendered Secret manifest. Apply the released
-`packages/agentos/resources/roles/firstmate/kubernetes/patches/github-app.yaml`
-to the effective First
-Mate StatefulSet without replacing its image, PVC, database wiring or unrelated
-configuration. The patch mounts only the private key into only the First Mate
-runtime at `/var/run/secrets/agentos/github`; init containers, Second Mates and
-Crewmates do not receive it. Ask before the required First Mate Pod replacement,
-then verify the retained PVC and native Pi session after rollout.
+Verify a harmless native read first. Preserve the real `git`, `gh` or `gh-axi`
+status, stderr and provider response when reporting a denial or failure. A
+`401` from GitHub invalidates the broker cache so the next authorized call
+mints a new exact-scope token. If OpenFGA revokes the Assignment, profile,
+ceiling or repository relation, later calls deny without waiting for the
+provider token to expire.
 
-`github-app-token` performs only installation-token minting. It reads the
-mounted key and non-secret IDs, requests one short-lived token from GitHub and
-by default writes only that token to standard output. Never run it bare in a
-recorded terminal. Consume it directly through the provider's standard
-environment so the acting command and its real failure remain visible, for
-example:
-
-```console
-GH_TOKEN="$(github-app-token)" gh-axi repo view akua-dev/agentos
-```
-
-For HTTPS Git operations, configure Git's native GitHub CLI credential helper
-once through `gh auth setup-git`, then give each `git` invocation a fresh
-`GH_TOKEN` environment value from the same command substitution. Do not export
-or cache the installation token in shell startup state, Pi settings, Fleet
-rows, task briefs or Agent home.
-
-Verify a harmless read first. A provider-visible write remains separately
-gated by the accepted delivery workflow or an explicit Captain approval; after
-one approved proof, verify GitHub attributes it to the App. On expiry, mint a
-new token rather than recovering an old one. For rotation, update the Secret,
-replace one First Mate Pod and verify the new key before revoking the old key.
-For revocation, remove the mount and Secret and revoke or uninstall the App as
-selected; report any retained provider sessions or repository access.
-
-### Delegated GitHub App access
-
-Keep the App private key in First Mate. A Second Mate or Crewmate that needs
-provider access requests the exact repository names, permission levels,
-purpose and Assignment through durable Inbox. Use `request` inside existing
-standing authority and `approval_request` when new consequential provider
-authority is required. A Second Mate relays an eligible child request upward;
-it never receives the key or mints another token itself. First Mate may approve
-scope already covered by the reviewed App installation and standing Captain
-authority. Anything broader or materially consequential returns to the
-Captain.
-
-GitHub installation tokens expire after one hour. They may contain fewer
-repositories and permissions than the installation, never more. Select the
-least scope that still permits the declared delivery workflow: cloning needs
-`contents: read`; pushing needs `contents: write`; pull-request creation or
-updates need `pull_requests: write`; changing workflow files additionally
-needs `workflows: write`. Add issue or other permissions only when the
-Assignment actually uses those provider surfaces.
-
-First Mate creates a mode-`0700` staging directory outside Git, writes a
-mode-`0600` non-secret JSON scope file, then asks the helper to materialize the
-token and its non-secret provider metadata without printing either:
-
-```console
-github-app-token \
-  --scope-file "$staging/scope.json" \
-  --token-file "$staging/token" \
-  --metadata-file "$staging/metadata.json"
-```
-
-The scope object uses GitHub's native request fields: one of `repositories` or
-`repository_ids`, plus optional `permissions`. The helper rejects unknown
-fields, ambiguous repository selectors, empty selection arrays and more than
-500 selected repositories before contacting GitHub. Its metadata contains the
-provider expiry and granted scope but never the token.
-
-Create or update one uniquely named Kubernetes Secret for the Agent and
-Assignment through `$agentos-secrets`, using the Agent as owner, the Assignment
-as scope, schema `github-installation-token-v1`, and keys `token` and
-`metadata.json`. Its create-on-absence and resourceVersion-guarded replacement
-keep credentials out of argv and output, preserve UID during rotation, and
-reject conflicting ownership, scope, key sets, or annotations. In the reviewed
-per-Agent Kustomize overlay, mount that Secret read-only without `subPath` at
-`/var/run/secrets/agentos/github`, set `GITHUB_TOKEN_FILE` to its `token` file
-and `GITHUB_TOKEN_METADATA_FILE` to its `metadata.json` file, and expose neither
-App ID nor private key. Record only the requested and granted scope, provider
-expiry and Secret name in the relevant durable work context. Do not introduce a
-credential table, broker or controller.
-
-The child reads `GITHUB_TOKEN_FILE` afresh for every native provider or Git
-command instead of exporting it into startup state. Configure Git's native
-GitHub CLI credential helper once with the file value present, and provide a
-fresh `GH_TOKEN` to each `git`, `gh-axi` or `gh` invocation. A projected Secret
-update is eventually visible without a Pod restart; First Mate verifies the
-new projection before relying on it.
-
-After minting, First Mate arms one bounded supervision wake early enough to
-replace the Secret before `expires_at`; this is a situation-specific background
-wait, not a static daemon. Refresh repeats the same scope request and atomically
-updates the Secret. A child that observes `401`, missing scope or an expired
-file keeps its Assignment active and reports the exact failure and requested
-delta upward. It does not request, recover or retain the App key. At handoff,
-scope follows the new owner through a new Agent-specific Secret; at retirement
-or authorized revocation, remove the mount and Secret and let any issued token
-expire. Remove the staging directory after the Secret and projection are
-verified.
+The Captain creates or rotates `Secret/agentos-github-app` only in the core
+`agentos` namespace, with keys `app-id`, `installation-id`,
+`installation-owner`, and `private-key.pem`. Roll only the two-replica GitHub
+broker after replacement. Agent Pods and domain namespaces are not restarted
+and must never receive that Secret. Revocation removes the OpenFGA relation or
+ceiling first; App key rotation and App uninstall remain separate provider
+operations.
