@@ -1,0 +1,16 @@
+---
+title: Access profiles
+description: Publish, bind, inspect, revoke, and recover reusable provider-access profiles.
+---
+
+First Mate can publish reusable provider-access profiles and bind one immutable version to one live Mate or Assignment. It cannot invent capabilities, exceed the current Captain ceiling, or receive the OpenFGA administrative key.
+
+Profile publication uses optimistic concurrency: the expected previous version must still be the durable head. A successful edit creates the next immutable version and emits a PostgreSQL wake hint. Existing bindings continue to name their exact version; adopting the new version is an explicit rebind, never a silent privilege change. The reload SLO is 15 seconds.
+
+Binding and revocation are repair-forward operations. PostgreSQL first records one or two closed tuple/check stages and a stable operation UUID. Before any external call, the core guard reloads the durable ceiling/profile/binding state, recompiles the canonical plan, and requires exact equality; schema-valid caller tuples are not trusted. The core executor—not the First Mate Pod—then applies each idempotent OpenFGA stage, verifies every affected decision with higher consistency, advances the exact stage, invalidates the subject cache, and completes the journal. A changed tuple condition is deleted and observed denied before its replacement is written, creating a fail-closed window. Creates remain pending and revocations remain active until verification finishes. Exact retries resume from the stored stage without duplicate grants or audit; conflicting retries fail closed. The revocation SLO is 60 seconds.
+
+Ceiling revisions with active bindings also remain pending. First Mate must reconcile the complete active-subject set; only a strongly verified completion supersedes the previous ceiling and activates the shrink. One subject has one live v1 binding, so its named profile is the finite composite access policy and cannot race another profile over the same direct grant.
+
+Every completed mutation records actor, target, old/new profile version, finite reason, decision, correlation ID, and time. Credentials, authorization headers, prompts, provider payloads, bodies, arbitrary metadata, and arbitrary error text are outside the schema. Registered Mates may inspect Fleet access state, but only First Mate can invoke the mutation functions.
+
+See `docs/security/first-mate-access-control.md` in the repository for the complete Effect and SQL contract.
