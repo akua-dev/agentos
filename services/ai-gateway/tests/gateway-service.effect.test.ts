@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 import {
+  AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
   ProviderBudgetSettlementReporter,
   providerAuthorizationGrantHeaders,
   type ProviderAuthorizationGrantV1,
@@ -13,6 +14,11 @@ import {
   makeAIGatewayApplication,
   type AIGatewayApplicationOptions,
 } from "../src/gateway-service.ts";
+import {
+  AIGatewayTelemetry,
+  type AIGatewayRequestTelemetry,
+  noopAIGatewayTelemetry,
+} from "../src/observability.ts";
 import { AIProviderHttp } from "../src/provider-http.ts";
 import { CodexQuota } from "../src/quota.ts";
 import {
@@ -206,6 +212,7 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
 function makeApplication(
   services: TestServices,
   applicationOptions: AIGatewayApplicationOptions = options,
+  telemetry: AIGatewayTelemetry["Service"] = noopAIGatewayTelemetry,
 ) {
   return makeAIGatewayApplication(applicationOptions).pipe(
     Effect.provideService(ManagedAccountVault, services.vault),
@@ -216,10 +223,82 @@ function makeApplication(
       ProviderBudgetSettlementReporter,
       services.settlements,
     ),
+    Effect.provideService(AIGatewayTelemetry, telemetry),
   );
 }
 
+const makeQuotaTelemetryRecorder = Effect.fn(
+  "test.aiGateway.makeQuotaTelemetryRecorder",
+)(function*() {
+  const observations = yield* Ref.make<ReadonlyArray<{
+    readonly ageSeconds: number;
+    readonly stale: boolean;
+  }>>([]);
+  const requestTelemetry: AIGatewayRequestTelemetry = {
+    attemptId: "attempt-safe",
+    authenticate: () => Effect.void,
+    routeStarted: Effect.void,
+    routeEnded: () => Effect.void,
+    quotaObservation: (ageSeconds, stale) =>
+      Ref.update(observations, (current) => [
+        ...current,
+        { ageSeconds, stale },
+      ]),
+    upstreamStarted: () => Effect.void,
+    upstreamHeaders: () => Effect.void,
+    upstreamFailed: () => Effect.void,
+    streamChunk: () => Effect.void,
+    routeReleaseStarted: Effect.void,
+    routeReleased: Effect.void,
+    routeReleaseFailed: Effect.void,
+    end: () => Effect.void,
+  };
+  return {
+    observations,
+    telemetry: AIGatewayTelemetry.of({
+      enabled: true,
+      start: () => Effect.succeed(requestTelemetry),
+    }),
+  };
+});
+
 describe("Effect AI Gateway application", () => {
+  it.effect("emits bounded quota age and staleness during route acquisition", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const telemetry = yield* makeQuotaTelemetryRecorder();
+      const observedAt = now -
+        (AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS + 60) * 1_000;
+      const application = yield* makeApplication({
+        ...services,
+        quota: CodexQuota.of({
+          observe: (input) =>
+            Ref.update(services.quotaCalls, (count) => count + 1).pipe(
+              Effect.as({
+                accountId: input.managedAccountId,
+                observedAt,
+                stale: true,
+                shortWindow: {
+                  usedPercent: 10,
+                  resetsAt: now + 3_600_000,
+                },
+                weeklyWindow: {
+                  usedPercent: 20,
+                  resetsAt: now + 86_400_000,
+                },
+              }),
+            ),
+        }),
+      }, options, telemetry.telemetry);
+      const response = yield* application.handle(providerRequest());
+      yield* Effect.tryPromise(() => response.arrayBuffer());
+      assert.deepStrictEqual(yield* Ref.get(telemetry.observations), [{
+        ageSeconds: AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
+        stale: true,
+      }]);
+    }));
+
   it.effect("routes a healthy OAuth account and settles exact terminal usage", () =>
     Effect.gen(function*() {
       yield* TestClock.setTime(now);
