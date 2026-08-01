@@ -135,6 +135,26 @@
       "status": "migrated"
     },
     {
+      "id": "provider-policy-decision-effect-tests",
+      "issue": 96,
+      "pattern": "^packages/agentos/src/access/tests/policy-decision\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "clock", "crypto", "database", "authorization"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-policy-decision",
+      "issue": 96,
+      "pattern": "^packages/agentos/src/access/policy-decision\\.ts$",
+      "runtime": "shared-bun-postgresql",
+      "package": "@akua-dev/agentos",
+      "io": ["clock", "crypto", "database", "authorization", "schema"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90],
+      "status": "migrated"
+    },
+    {
       "id": "provider-workload-identity-effect-tests",
       "issue": 87,
       "pattern": "^packages/agentos/src/access/tests/identity\\.effect\\.test\\.ts$",

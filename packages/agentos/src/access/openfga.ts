@@ -379,6 +379,26 @@ export function openFgaSubject(subject: AccessBindingSubjectV1) {
   return objectName(subject.kind, authorizationSubjectName(subject));
 }
 
+export function openFgaProfile(
+  fleet: string,
+  profile: Pick<AccessProfileVersionV1, "profileId" | "profileVersion">,
+) {
+  return objectName(
+    "access_profile",
+    `fleet:${fleet}/profile:${profile.profileId}@v${profile.profileVersion}`,
+  );
+}
+
+export function openFgaCeiling(
+  fleet: string,
+  ceiling: Pick<AccessCeilingV1, "ceilingId" | "revision">,
+) {
+  return objectName(
+    "access_ceiling",
+    `fleet:${fleet}/ceiling:${ceiling.ceilingId}@r${ceiling.revision}`,
+  );
+}
+
 export function openFgaTarget(
   fleet: string,
   permission: AccessPermissionV1,
@@ -432,14 +452,8 @@ export const compileOpenFgaAuthorizationState = Effect.fn(
     `fleet:${fleetName}/domain:${binding.subject.domain}`,
   );
   const subject = openFgaSubject(binding.subject);
-  const profileObject = objectName(
-    "access_profile",
-    `fleet:${fleetName}/profile:${profile.profileId}@v${profile.profileVersion}`,
-  );
-  const ceilingObject = objectName(
-    "access_ceiling",
-    `fleet:${fleetName}/ceiling:${ceiling.ceilingId}@r${ceiling.revision}`,
-  );
+  const profileObject = openFgaProfile(fleetName, profile);
+  const ceilingObject = openFgaCeiling(fleetName, ceiling);
   const tuples: Array<OpenFgaTupleV1> = [
     tuple(domain, "domain", fleet),
     tuple(subject, "member", domain),

@@ -1,10 +1,12 @@
 # Effect architecture
 
-AgentOS uses Effect as the composition model for repository-owned TypeScript
-that performs work. Pure calculations and presentational TS/TSX remain plain
-TypeScript. Framework callbacks, executable entrypoints and third-party APIs
-are adapters: they translate once into an Effect program and do not leak their
-ambient runtime into domain code.
+AgentOS requires Effect as the composition model for every repository-owned
+TypeScript or TSX path that performs work. Pure calculations and presentational
+TS/TSX may remain plain TypeScript. Framework callbacks, executable entrypoints
+and third-party APIs are one-way adapters: they enter one managed Effect runtime
+and do not leak their ambient runtime or domain orchestration back across the
+boundary. Inventoried legacy is finite migration debt, never an alternative
+architecture or precedent for new code.
 
 The repository [`effect-ts` Skill](../.agents/skills/effect-ts/SKILL.md) is the
 coding standard. This document owns migration boundaries, dependency direction
@@ -50,14 +52,14 @@ The released shared foundation lives in `packages/agentos/src/shared`:
 | `contracts.ts` | Versioned wire Schemas and safe boundary decoders |
 | `errors.ts` | Tagged failures and the stable public failure envelope |
 | `services.ts` | Identifier and diagnostic services with live and deterministic test Layers |
-| `legacy.ts` | The only reviewed sync/Promise execution adapters for the published compatibility API |
+| `legacy.ts` | Temporary, explicitly inventoried compatibility debt scheduled for removal; never a pattern for new code |
 
 Instructions, registration preflight, resources, role configuration, startup,
-and semantic readiness expose composable `*Effect` programs. Existing plain
-and Promise-returning exports remain narrow adapters over those programs while
-downstream packages migrate. Readiness programs require `FileSystem`, `Path`,
-and `AgentOSIdentifier`; their compatibility exports provide Bun live Layers at
-the package edge.
+and semantic readiness expose composable `*Effect` programs. Remaining plain
+or Promise-returning legacy exports must be replaced as their inventory slices
+land; no new compatibility adapter is allowed. Readiness programs require
+`FileSystem`, `Path`, and `AgentOSIdentifier`; the executable edge supplies Bun
+live Layers once.
 
 Do not call `runPromise` inside a service, hide dependencies in globals, wrap
 native Kubernetes/Git/SQL authority with shadow state, or provide a live Layer
@@ -132,19 +134,20 @@ same review as the inventory because ignored source cannot be migrated.
 
 Each slice has one status:
 
-- `planned`: inventoried legacy code; strict Effect rules do not apply yet.
+- `planned`: inventoried legacy removal work; strict rules are pending only so
+  the repository stays buildable while that finite slice is migrated.
 - `migrated`: effectful code whose strict rules and conformance tests apply.
 - `pure`: reviewed code with no runtime effect; keep it free of unnecessary
   Effect wrapping and reclassify it if I/O is introduced.
 - `runtime-boundary`: a deliberately narrow framework/executable adapter. It
   is enforced like migrated code, with exact exceptions for required escapes.
 
-The Oxc AST gate rejects these patterns only in enforced paths: async
+The Oxc AST gate rejects these patterns in enforced paths: async
 functions, constructed Promises, thrown failures, ambient environment reads,
 unreviewed Effect runtime execution, raw HTTP/filesystem/process calls, unsafe
-type assertions, untyped JSON parsing and native timers. This is deliberately
-progressive: untouched legacy remains buildable, but a completed directory
-cannot regress.
+type assertions, untyped JSON parsing and native timers. Enforcement rolls out
+in finite slices so untouched legacy remains buildable; the required end state
+is zero legacy effectful TypeScript, and completed paths cannot regress.
 
 [`exceptions.json`](../tooling/effect-migration/exceptions.json) is the only
 escape registry. Each record names one file, one rule, an exact source match,
