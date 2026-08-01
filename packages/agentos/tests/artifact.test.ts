@@ -290,6 +290,7 @@ describe("publishable AgentOS Pi artifacts", () => {
       skills: ["./skills"],
     });
     expect(manifest.dependencies).toEqual({
+      "@effect/platform-bun": "4.0.0-beta.102",
       "@opentelemetry/api": "1.9.1",
       "@opentelemetry/exporter-metrics-otlp-http": "0.221.0",
       "@opentelemetry/exporter-trace-otlp-http": "0.221.0",

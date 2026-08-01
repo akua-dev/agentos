@@ -43,6 +43,22 @@ entry/framework adapter -> live Layer composition -> domain Effect workflow
 test adapter            -> deterministic Layers -> the same domain workflow
 ```
 
+The released shared foundation lives in `packages/agentos/src/shared`:
+
+| Module | Authority |
+| --- | --- |
+| `contracts.ts` | Versioned wire Schemas and safe boundary decoders |
+| `errors.ts` | Tagged failures and the stable public failure envelope |
+| `services.ts` | Identifier and diagnostic services with live and deterministic test Layers |
+| `legacy.ts` | The only reviewed sync/Promise execution adapters for the published compatibility API |
+
+Instructions, registration preflight, resources, role configuration, startup,
+and semantic readiness expose composable `*Effect` programs. Existing plain
+and Promise-returning exports remain narrow adapters over those programs while
+downstream packages migrate. Readiness programs require `FileSystem`, `Path`,
+and `AgentOSIdentifier`; their compatibility exports provide Bun live Layers at
+the package edge.
+
 Do not call `runPromise` inside a service, hide dependencies in globals, wrap
 native Kubernetes/Git/SQL authority with shadow state, or provide a live Layer
 deep inside business logic. Kubernetes remains live-workload truth,

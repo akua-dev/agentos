@@ -22,6 +22,69 @@
       "status": "pure"
     },
     {
+      "id": "shared-foundation-effect-tests",
+      "issue": 101,
+      "pattern": "^packages/agentos/src/shared/tests/.*\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": [
+        "test",
+        "clock",
+        "random",
+        "telemetry"
+      ],
+      "migrationDependencies": [
+        100
+      ],
+      "status": "migrated"
+    },
+    {
+      "id": "shared-foundation",
+      "issue": 101,
+      "pattern": "^packages/agentos/src/shared/(?!legacy\\.ts$)",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": [
+        "config",
+        "schema",
+        "telemetry"
+      ],
+      "migrationDependencies": [
+        100
+      ],
+      "status": "migrated"
+    },
+    {
+      "id": "shared-legacy-runtime-adapter",
+      "issue": 101,
+      "pattern": "^packages/agentos/src/shared/legacy\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": [
+        "runtime-adapter"
+      ],
+      "migrationDependencies": [
+        100
+      ],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "shared-foundation-consumers",
+      "issue": 101,
+      "pattern": "^packages/agentos/src/(?:instructions|preflight|readiness-state|resources|startup)\\.ts$|^packages/agentos/src/roles/default\\.ts$",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": [
+        "config",
+        "filesystem",
+        "schema"
+      ],
+      "migrationDependencies": [
+        100
+      ],
+      "status": "migrated"
+    },
+    {
       "id": "effect-test-conformance",
       "issue": 102,
       "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",
