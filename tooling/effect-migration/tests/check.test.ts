@@ -63,7 +63,7 @@ const makeFixture = Effect.fn("test.makeEffectMigrationFixture")(function*(optio
       "@effect/opentelemetry",
       "@effect/vitest"
     ],
-    ignoredDirectories: [".git", ".repos", "node_modules", "dist"],
+    ignoredDirectories: [".git", ".open-next", ".repos", "node_modules", "dist"],
     ignoredPaths: [],
     strictRules: [
       "no-async-function",
@@ -145,6 +145,7 @@ const writeFixtureBaseline = Effect.fn("test.writeFixtureBaseline")(
     yield* writeJson(path.join(root, "tooling/effect-migration/baseline.json"), {
       schemaVersion: 1,
       entries: [{
+        path: "src/example.ts",
         slice: "fixture",
         issue: 100,
         violationCount: violations.length,
@@ -236,6 +237,8 @@ layer(Layer.merge(BunFileSystem.layer, BunPath.layer))("Effect migration policy"
         ["no-ambient-env", "export const value = process.env.VALUE\n"],
         ["no-runtime-execution", "import { Effect } from \"effect\"\nEffect.runPromise(Effect.void)\n"],
         ["no-raw-http", "export const value = fetch(\"https://example.test\")\n"],
+        ["no-raw-http", "export const fetchImpl = fetch\n"],
+        ["no-raw-http", "export const fetchImpl = globalThis.fetch\n"],
         ["no-raw-filesystem", "import { readFile } from \"node:fs\"\nexport { readFile }\n"],
         ["no-raw-process", "import { spawn } from \"node:child_process\"\nexport { spawn }\n"],
         ["no-type-assertion", "export const value = 1 as number\n"],

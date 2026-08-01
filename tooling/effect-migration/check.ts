@@ -67,6 +67,7 @@ const Exceptions = Schema.Struct({
 })
 
 const LegacyBaselineEntry = Schema.Struct({
+  path: Schema.String,
   slice: Schema.String,
   issue: Schema.Number,
   violationCount: Schema.Number,
@@ -208,6 +209,20 @@ const asNode = (value: unknown): AstNode | undefined => {
   return value
 }
 
+const isNonReferencePropertyName = (
+  parent: AstNode | undefined,
+  key: string | undefined
+) => parent !== undefined &&
+  key === "key" &&
+  [
+    "Property",
+    "MethodDefinition",
+    "PropertyDefinition",
+    "TSMethodSignature",
+    "TSPropertySignature"
+  ].includes(parent.type) &&
+  parent.computed !== true
+
 const expressionName = (expression: AstNode | undefined): string => {
   if (expression === undefined) return ""
   if (expression.type === "Identifier" && typeof expression.name === "string") return expression.name
@@ -244,7 +259,18 @@ const inspectAst = (
     })
   }
 
-  const visit = (node: AstNode): void => {
+  const visit = (
+    node: AstNode,
+    parent?: AstNode,
+    parentKey?: string
+  ): void => {
+    if (
+      node.type === "Identifier" &&
+      node.name === "fetch" &&
+      !isNonReferencePropertyName(parent, parentKey)
+    ) {
+      add("no-raw-http", node, "Use the Effect HTTP client service.")
+    }
     if (["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"].includes(node.type)) {
       if (node.async === true) add("no-async-function", node, "Use Effect for asynchronous work in migrated code.")
     }
@@ -282,9 +308,6 @@ const inspectAst = (
       if (["Effect.runPromise", "Effect.runPromiseExit", "Effect.runSync", "Effect.runSyncExit", "BunRuntime.runMain"].includes(name)) {
         add("no-runtime-execution", node, "Run Effect only in a reviewed application or framework entry adapter.")
       }
-      if (name === "fetch") {
-        add("no-raw-http", node, "Use the Effect HTTP client service.")
-      }
       if (["Bun.file", "Bun.write"].includes(name)) {
         add("no-raw-filesystem", node, "Use the Effect FileSystem service.")
       }
@@ -304,11 +327,11 @@ const inspectAst = (
       if (Array.isArray(child)) {
         for (const item of child) {
           const childNode = asNode(item)
-          if (childNode !== undefined) visit(childNode)
+          if (childNode !== undefined) visit(childNode, node, key)
         }
       } else {
         const childNode = asNode(child)
-        if (childNode !== undefined) visit(childNode)
+        if (childNode !== undefined) visit(childNode, node, key)
       }
     }
   }
@@ -499,22 +522,21 @@ const applyLegacyBaseline = Effect.fn("effectMigration.applyLegacyBaseline")(
     rawViolations: ReadonlyArray<PolicyViolation>,
     entries: ReadonlyArray<LegacyBaselineEntry>,
     assignments: ReadonlyMap<string, InventorySlice>,
-    slices: ReadonlyArray<InventorySlice>,
     enabledRules: ReadonlySet<StrictRule>
   ) {
     const violations: Array<PolicyViolation> = []
     const grouped = new Map<string, Array<PolicyViolation>>()
-    const entriesBySlice = new Map<string, LegacyBaselineEntry>()
+    const entriesByPath = new Map<string, LegacyBaselineEntry>()
 
     for (const entry of entries) {
-      if (entriesBySlice.has(entry.slice)) {
+      if (entriesByPath.has(entry.path)) {
         violations.push({
           rule: "legacy-baseline-duplicate",
           path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline slice ${entry.slice} is declared more than once.`
+          message: `Legacy baseline path ${entry.path} is declared more than once.`
         })
       } else {
-        entriesBySlice.set(entry.slice, entry)
+        entriesByPath.set(entry.path, entry)
       }
     }
 
@@ -524,35 +546,43 @@ const applyLegacyBaseline = Effect.fn("effectMigration.applyLegacyBaseline")(
         assignment?.status === "planned" &&
         isStrictRule(violation.rule, enabledRules)
       ) {
-        const current = grouped.get(assignment.id) ?? []
+        const current = grouped.get(violation.path) ?? []
         current.push(violation)
-        grouped.set(assignment.id, current)
+        grouped.set(violation.path, current)
       } else {
         violations.push(violation)
       }
     }
 
     const now = yield* Clock.currentTimeMillis
-    for (const slice of slices) {
-      const entry = entriesBySlice.get(slice.id)
-      const current = grouped.get(slice.id) ?? []
+    for (const [path, current] of grouped) {
+      const entry = entriesByPath.get(path)
       if (entry === undefined) {
         violations.push(...current)
         continue
       }
-      if (slice.status !== "planned") {
+      const assignment = assignments.get(path)
+      if (assignment === undefined) {
         violations.push({
-          rule: "legacy-baseline-outside-planned-slice",
+          rule: "legacy-baseline-unknown-path",
           path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline slice ${slice.id} is ${slice.status}; migrate or remove its baseline entry.`
+          message: `Legacy baseline path ${path} is not assigned by inventory.json.`
         })
         continue
       }
-      if (entry.issue !== slice.issue) {
+      if (assignment.status !== "planned") {
+        violations.push({
+          rule: "legacy-baseline-outside-planned-slice",
+          path: `${manifestDirectory}/baseline.json`,
+          message: `Legacy baseline path ${path} belongs to ${assignment.status} slice ${assignment.id}.`
+        })
+        continue
+      }
+      if (entry.slice !== assignment.id || entry.issue !== assignment.issue) {
         violations.push({
           rule: "legacy-baseline-owner-mismatch",
           path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline slice ${slice.id} must be owned by issue #${slice.issue}.`
+          message: `Legacy baseline path ${path} must be owned by slice ${assignment.id} and issue #${assignment.issue}.`
         })
         continue
       }
@@ -560,7 +590,7 @@ const applyLegacyBaseline = Effect.fn("effectMigration.applyLegacyBaseline")(
         violations.push({
           rule: "legacy-baseline-removal-condition",
           path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline slice ${slice.id} needs a substantive removal condition.`
+          message: `Legacy baseline path ${path} needs a substantive removal condition.`
         })
         continue
       }
@@ -569,15 +599,7 @@ const applyLegacyBaseline = Effect.fn("effectMigration.applyLegacyBaseline")(
         violations.push({
           rule: "legacy-baseline-expired",
           path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline slice ${slice.id} expired on ${entry.expiresOn}.`
-        })
-        continue
-      }
-      if (current.length === 0) {
-        violations.push({
-          rule: "legacy-baseline-stale",
-          path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline slice ${slice.id} has no remaining violations and must be removed.`
+          message: `Legacy baseline path ${path} expired on ${entry.expiresOn}.`
         })
         continue
       }
@@ -589,17 +611,23 @@ const applyLegacyBaseline = Effect.fn("effectMigration.applyLegacyBaseline")(
         violations.push({
           rule: "legacy-baseline-mismatch",
           path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline slice ${slice.id} changed: expected ${entry.violationCount}/${entry.digest}, found ${current.length}/${digest}. Migrate every touched finding; do not refresh debt in place.`
+          message: `Legacy baseline path ${path} changed: expected ${entry.violationCount}/${entry.digest}, found ${current.length}/${digest}. Migrate every finding in the touched file; do not refresh debt in place.`
         })
       }
     }
 
     for (const entry of entries) {
-      if (!slices.some((slice) => slice.id === entry.slice)) {
+      if (!assignments.has(entry.path)) {
         violations.push({
-          rule: "legacy-baseline-unknown-slice",
+          rule: "legacy-baseline-unknown-path",
           path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline slice ${entry.slice} is not present in inventory.json.`
+          message: `Legacy baseline path ${entry.path} is not assigned by inventory.json.`
+        })
+      } else if (!grouped.has(entry.path)) {
+        violations.push({
+          rule: "legacy-baseline-stale",
+          path: `${manifestDirectory}/baseline.json`,
+          message: `Legacy baseline path ${entry.path} has no remaining violations and must be removed.`
         })
       }
     }
@@ -685,7 +713,6 @@ export const auditRepository = Effect.fn("effectMigration.auditRepository")(func
     exceptionFiltered,
     legacyBaseline.entries,
     assignedSlices,
-    inventory.slices,
     enabledRules
   ))
   violations.push(...yield* auditVersions(root, entries, policy))
