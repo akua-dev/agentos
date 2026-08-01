@@ -198,7 +198,11 @@ harness stderr and exit status stay visible to the supervising Mate; do not
 hide provider failures behind an AgentOS queue or wrapper. Launch is complete
 only when the exact Agent record matches the intended harness and cwd and it
 enters `working` without a trust or routine command-approval dialog. Retain its
-native session reference when Herdr reports one. If the turn finishes before
+native session reference when Herdr reports one. For a released Crewmate Pod,
+the owning Mate must then invoke its `crewmate:confirm-readiness` Mise task;
+that task independently checks the configured identities, brief digest, Herdr
+Agent, cwd, native session and foreground harness process before making the Pod
+ready. If the turn finishes before
 inspection, require fresh durable or bounded terminal evidence from that exact
 Agent instead of assuming the brief landed.
 

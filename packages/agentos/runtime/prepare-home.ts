@@ -25,7 +25,10 @@ import {
   relative,
 } from "node:path";
 
-import { createMateMemoryStore } from "@akua-dev/agentos";
+import {
+  attestPiProviderReadiness,
+  createMateMemoryStore,
+} from "@akua-dev/agentos";
 import { Effect } from "effect";
 
 import {
@@ -105,11 +108,19 @@ if (!(await exists(herdrConfig))) {
 }
 
 if (usesPi) {
+  const stateDirectory = join(home, ".local", "state", "agentos");
   await Effect.runPromise(
-    reconcilePiConfiguration({
-      environment: process.env,
-      piAgentDirectory,
-      stateDirectory: join(home, ".local", "state", "agentos"),
+    Effect.gen(function*() {
+      yield* reconcilePiConfiguration({
+        environment: process.env,
+        piAgentDirectory,
+        stateDirectory,
+      });
+      yield* attestPiProviderReadiness({
+        environment: process.env,
+        piAgentDirectory,
+        stateDirectory,
+      });
     }),
   );
 }

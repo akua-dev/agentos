@@ -1,64 +1,150 @@
 #!/usr/bin/env bun
 
-import { $ } from "bun";
+import { open, stat } from "node:fs/promises";
+import { Effect } from "effect";
+import {
+  evaluateSemanticHealth,
+  type HealthCommandResult,
+  type HealthFileMetadata,
+  type SemanticHealthRuntime,
+} from "./readiness";
 
-type Agent = { name?: unknown; pane_id?: unknown };
-type AgentList = { result?: { agents?: Agent[] } };
+function isMissingFile(cause: unknown): boolean {
+  return cause instanceof Error && "code" in cause && cause.code === "ENOENT";
+}
 
-const agentName = requiredEnvironment("AGENTOS_AGENT_NAME");
-const session = process.env.HERDR_SESSION ?? `agentos-${agentName}`;
+const runtime: SemanticHealthRuntime = {
+  run: (args) =>
+    Effect.promise(async (): Promise<HealthCommandResult> => {
+      try {
+        const child = Bun.spawn([...args], {
+          env: process.env,
+          stderr: "ignore",
+          stdout: "pipe",
+        });
+        const [exitCode, stdout] = await Promise.all([
+          child.exited,
+          new Response(child.stdout).text(),
+        ]);
+        return { exitCode, stdout };
+      } catch {
+        return { exitCode: 1, stdout: "" };
+      }
+    }),
+  readText: (path, maximumBytes) =>
+    Effect.promise(async () => {
+      try {
+        let handle;
+        try {
+          handle = await open(path, "r");
+        } catch (cause) {
+          if (isMissingFile(cause)) return undefined;
+          throw cause;
+        }
+        try {
+          const buffer = Buffer.alloc(maximumBytes + 1);
+          const { bytesRead } = await handle.read(
+            buffer,
+            0,
+            buffer.length,
+            0,
+          );
+          if (bytesRead > maximumBytes) return undefined;
+          return new TextDecoder("utf-8", { fatal: true }).decode(
+            buffer.subarray(0, bytesRead),
+          );
+        } finally {
+          await handle.close();
+        }
+      } catch {
+        return undefined;
+      }
+    }),
+  readFirstLine: (path, maximumBytes) =>
+    Effect.promise(async () => {
+      try {
+        let handle;
+        try {
+          handle = await open(path, "r");
+        } catch (cause) {
+          if (isMissingFile(cause)) return undefined;
+          throw cause;
+        }
+        try {
+          const bytes: number[] = [];
+          const next = Buffer.alloc(1);
+          for (let offset = 0; offset <= maximumBytes; offset += 1) {
+            const { bytesRead } = await handle.read(next, 0, 1, offset);
+            if (bytesRead === 0) {
+              return bytes.length === 0
+                ? undefined
+                : new TextDecoder("utf-8", { fatal: true }).decode(
+                    Buffer.from(bytes),
+                  );
+            }
+            const byte = next[0];
+            if (byte === undefined) return undefined;
+            if (byte === 0x0a) {
+              return new TextDecoder("utf-8", { fatal: true }).decode(
+                Buffer.from(bytes),
+              );
+            }
+            if (offset === maximumBytes) return undefined;
+            bytes.push(byte);
+          }
+          return undefined;
+        } finally {
+          await handle.close();
+        }
+      } catch {
+        return undefined;
+      }
+    }),
+  metadata: (path) =>
+    Effect.promise(async (): Promise<HealthFileMetadata | undefined> => {
+      try {
+        try {
+          const metadata = await stat(path);
+          return {
+            isFile: metadata.isFile(),
+            mode: metadata.mode,
+            size: metadata.size,
+          };
+        } catch (cause) {
+          if (isMissingFile(cause)) return undefined;
+          throw cause;
+        }
+      } catch {
+        return undefined;
+      }
+    }),
+  processExists: (processId) =>
+    Effect.sync(() => {
+      if (!Number.isSafeInteger(processId) || processId <= 0) return false;
+      try {
+        process.kill(processId, 0);
+        return true;
+      } catch (cause) {
+        return (
+          cause instanceof Error &&
+          "code" in cause &&
+          cause.code === "EPERM"
+        );
+      }
+    }),
+};
+
 const mode = process.argv[2];
-
-if (mode === "live") {
-  process.exitCode = (
-    await $`herdr status --json --session ${session}`.nothrow()
-  ).exitCode;
-} else if (mode === "ready") {
-  process.exitCode = await readiness();
-} else {
-  console.error("Usage: health.ts <live|ready>");
+if (mode !== "live" && mode !== "ready") {
+  process.stderr.write("Usage: health.ts <live|ready>\n");
   process.exitCode = 2;
-}
-
-async function readiness(): Promise<number> {
-  if (
-    (
-      await $`herdr status --json --session ${session}`.quiet().nothrow()
-    ).exitCode !== 0
-  ) {
-    return 1;
-  }
-
-  const result = await agentList();
-  const agents = result?.result?.agents;
-  const matches = Array.isArray(agents)
-    ? agents.filter(({ name }) => name === agentName)
-    : [];
-  if (matches.length !== 1 || typeof matches[0]?.pane_id !== "string") {
-    return 1;
-  }
-
-  return (
-    await $`herdr pane process-info --pane ${matches[0].pane_id} --session ${session}`
-      .quiet()
-      .nothrow()
-  ).exitCode;
-}
-
-async function agentList(): Promise<AgentList | undefined> {
-  const result = await $`herdr agent list --session ${session}`
-    .quiet()
-    .nothrow();
-  if (result.exitCode !== 0) return undefined;
-  try {
-    return JSON.parse(result.stdout.toString()) as AgentList;
-  } catch {
-    return undefined;
-  }
-}
-
-function requiredEnvironment(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} must be configured for the Mate runtime`);
-  return value;
+} else {
+  const diagnostic = await Effect.runPromise(
+    evaluateSemanticHealth(process.env, mode, runtime),
+  );
+  process.stdout.write(`${JSON.stringify(diagnostic)}\n`);
+  process.exitCode =
+    diagnostic.status === "not_live" || diagnostic.status === "not_ready"
+      ? 1
+      : 0;
 }

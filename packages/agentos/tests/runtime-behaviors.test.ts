@@ -32,6 +32,8 @@ describe("released AgentOS Pi registrations", () => {
       "get_background_command_output",
       "list_background_commands",
       "kill_background_command",
+      "attest_coordination_listener",
+      "confirm_coordination_catchup",
       "set_mate_memory_state",
       "memory_delete_topic",
     ]);

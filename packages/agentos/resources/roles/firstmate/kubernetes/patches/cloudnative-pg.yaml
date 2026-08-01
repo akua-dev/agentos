@@ -18,6 +18,8 @@ spec:
       containers:
         - name: agentos
           env:
+            - name: AGENTOS_DATABASE_IDENTITY
+              value: agentos
             - name: DATABASE_URL
               value: postgresql://agentos@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos?sslmode=verify-full
             - name: NODE_EXTRA_CA_CERTS

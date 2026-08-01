@@ -15,6 +15,7 @@ import type {
   Candidate,
   CandidateExplanation,
   RoutingConfig,
+  SelectionDecision,
 } from "./types.ts";
 
 export interface AcquiredReservation {
@@ -121,6 +122,22 @@ export async function createRoutingState(path: string, config: RoutingConfig) {
       };
     },
 
+    async evaluate(input: {
+      candidates: Candidate[];
+      now: number;
+    }): Promise<SelectionDecision> {
+      const summary = await Effect.runPromise(handle.state.summary(input.now));
+      return selectAccount({
+        candidates: overlayRoutingSummary(
+          input.candidates,
+          summary,
+          true,
+        ),
+        config,
+        now: input.now,
+      });
+    },
+
     async renew(leaseToken: string, now: number): Promise<boolean> {
       return await Effect.runPromise(
         handle.state.renew(LeaseToken.make(leaseToken), now),
@@ -165,6 +182,7 @@ function overlayRoutingSummary(
       requiresReauthentication: boolean;
     }>;
   },
+  recoverFreshCredentials = false,
 ): Candidate[] {
   return candidates.map((candidate) => {
     const account = summary.accounts.find(
@@ -179,7 +197,9 @@ function overlayRoutingSummary(
         (candidate.activeReservations ?? 0) +
         (account?.activeReservations ?? 0),
       needsReauth:
-        candidate.needsReauth || account?.requiresReauthentication === true,
+        candidate.needsReauth ||
+        (account?.requiresReauthentication === true &&
+          !recoverFreshCredentials),
       ...(candidate.block
         ? { block: candidate.block }
         : blockKind

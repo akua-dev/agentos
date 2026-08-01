@@ -33,6 +33,8 @@ spec:
               value: mate
             - name: AGENTOS_AGENT_ROLE
               value: mate
+            - name: AGENTOS_PROVIDER_CREDENTIAL_KIND
+              value: pi_auth
             - name: HERDR_CONFIG_PATH
               value: /home/agent/.config/herdr/config.toml
             - name: HERDR_SESSION

@@ -232,6 +232,13 @@ if (args.join(" ") === "integration install pi") {
       "agentos",
       "pi-provider.json",
     );
+    const providerReadiness = join(
+      home,
+      ".local",
+      "state",
+      "agentos",
+      "pi-provider-readiness.json",
+    );
     expect(
       JSON.parse(await readFile(piModels, "utf8")).providers["openai-codex"],
     ).toEqual({
@@ -247,6 +254,24 @@ if (args.join(" ") === "integration install pi") {
     expect(await readFile(piModels, "utf8")).not.toContain(
       "synthetic-fleet-token",
     );
+    const gatewayReadiness = JSON.parse(
+      await readFile(providerReadiness, "utf8"),
+    );
+    expect(gatewayReadiness).toMatchObject({
+      files: {
+        markerSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+        modelsSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+        settingsSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      },
+      mode: "ai_gateway",
+      selectedModel: "openai-codex/gpt-5.6-sol",
+      selectedThinking: "xhigh",
+      version: 1,
+    });
+    expect(JSON.stringify(gatewayReadiness)).not.toContain(
+      "synthetic-fleet-token",
+    );
+    expect((await stat(providerReadiness)).mode & 0o777).toBe(0o600);
     expect(await readFile(join(home, ".pgpass"), "utf8")).toBe(
       "postgres.example.internal:5432:agentos:runtime_second:secret\n",
     );
@@ -338,6 +363,13 @@ if (args.join(" ") === "integration install pi") {
       JSON.parse(await readFile(piModels, "utf8")).providers["openai-codex"],
     ).toBeUndefined();
     expect(await Bun.file(providerMarker).exists()).toBe(false);
+    expect(JSON.parse(await readFile(providerReadiness, "utf8"))).toMatchObject({
+      files: { markerSha256: null },
+      mode: "direct",
+      selectedModel: "openai-codex/gpt-5.6-sol",
+      selectedThinking: "xhigh",
+      version: 1,
+    });
 
     const unpatched = await run(
       prepareHome,

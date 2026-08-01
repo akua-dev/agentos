@@ -164,6 +164,12 @@ Use released PostgreSQL schema for durable coordination and native tools against
    after an apply or scheduling race. Then start the
    selected harness through the pod-local Herdr CLI only after the complete
    rendered brief and required runtime inputs have reached the child home.
+   Calculate the rendered brief's SHA-256 before apply and replace the
+   all-zero `AGENTOS_BRIEF_SHA256` template value in the per-Agent overlay;
+   never use the placeholder as a launch digest. After launch evidence matches,
+   run the released `crewmate:confirm-readiness` task inside that exact Pod so
+   Kubernetes readiness is bound to the Agent, Task, Assignment, brief,
+   harness, Herdr session and live process.
    Confirm the selected Crewmate setup's native Skill catalog and required
    instruction entrypoints; a configured path or catalog entry alone is not
    proof that the worker loaded them. Before launch, provision and verify the selected

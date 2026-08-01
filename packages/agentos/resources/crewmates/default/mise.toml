@@ -1,3 +1,11 @@
 [tasks."crewmate:prepare"]
 description = "Reconcile the isolated Crewmate home"
 file = "../../../runtime/prepare-home.ts"
+
+[tasks."crewmate:health"]
+description = "Check Crewmate liveness or semantic readiness"
+file = "../../../runtime/health.ts"
+
+[tasks."crewmate:confirm-readiness"]
+description = "Confirm a verified Crewmate harness launch"
+file = "../../../runtime/readiness-state-main.ts"

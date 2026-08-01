@@ -15,6 +15,7 @@ import {
   registerAgentosSupervisionGuard,
   type AgentOSSupervisionGuardOptions,
 } from "./supervision-guard/extension.ts";
+import { registerCoordinationReadiness } from "./coordination-readiness/extension.ts";
 import {
   registerAgentOSObservability,
   type AgentOSObservabilityDependencies,
@@ -46,13 +47,16 @@ export function createAgentOSBackgroundTasksRegistration(
         "get_background_command_output",
         "list_background_commands",
         "kill_background_command",
+        "attest_coordination_listener",
+        "confirm_coordination_catchup",
       ],
       commands: ["background-commands"],
       messages: ["agentos-background-command-completion"],
       entries: ["agentos-background-command-lifecycle"],
     },
     register(pi) {
-      registerAgentosBackgroundTasks(pi, options);
+      const broker = registerAgentosBackgroundTasks(pi, options);
+      registerCoordinationReadiness(pi, { broker });
     },
   };
 }

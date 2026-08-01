@@ -14,6 +14,8 @@ spec:
           env:
             - name: AGENTOS_PI_PROVIDER_MODE
               value: ai-gateway
+            - name: AGENTOS_PROVIDER_CREDENTIAL_KIND
+              value: ai_gateway
             - name: AI_GATEWAY_URL
               value: http://ai-gateway.agentos.svc.cluster.local:8787
             - name: AI_GATEWAY_TOKEN
@@ -26,6 +28,8 @@ spec:
           env:
             - name: AGENTOS_PI_PROVIDER_MODE
               value: ai-gateway
+            - name: AGENTOS_PROVIDER_CREDENTIAL_KIND
+              value: ai_gateway
             - name: AI_GATEWAY_URL
               value: http://ai-gateway.agentos.svc.cluster.local:8787
             - name: AI_GATEWAY_TOKEN

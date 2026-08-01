@@ -39,6 +39,7 @@ export type TaskSnapshot = {
   outputTail: string;
   outputTruncated: boolean;
   outputBytes: number;
+  processId?: number;
   exitCode?: number | null;
   signal?: NodeJS.Signals | null;
   error?: string;
@@ -54,6 +55,7 @@ export type TaskEvent = {
 };
 
 export type TaskHandle = {
+  readonly processId?: number;
   completion: Promise<TaskTerminalResult>;
   stop(): Promise<TaskTerminalResult>;
 };
