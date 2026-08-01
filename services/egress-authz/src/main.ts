@@ -30,6 +30,7 @@ const startup = Effect.gen(function*() {
     maximumHeaderCount: config.maximumHeaderCount,
     maximumHeaderBytes: config.maximumHeaderBytes,
     maximumHeaderValueBytes: config.maximumHeaderValueBytes,
+    maximumSettlementBodyBytes: config.maximumSettlementBodyBytes,
   }).pipe(Layer.provide(live));
   const application = HttpRouter.serve(routes, {
     disableListenLog: true,

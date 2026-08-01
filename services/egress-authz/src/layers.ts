@@ -4,10 +4,12 @@ import {
   AGENTOS_OPENFGA_HEALTH_RELATION,
   AGENTOS_OPENFGA_HEALTH_USER,
   AgentOSWorkloadIdentityStorePostgresLayer,
+  KubernetesBoundServiceAccountAuthenticator,
   OpenFgaAuthorizationApi,
   OpenFgaAuthorizationApiHttpLayer,
   ProviderAccessDatabaseSqlLayer,
   ProviderBudgetEnforcerPostgresLayer,
+  ProviderBudgetSettlementCallerAuthenticator,
   ProviderDecisionReferenceGeneratorLiveLayer,
   ProviderPolicySnapshotStorePostgresLayer,
   WorkloadIdentityAuthenticator,
@@ -69,8 +71,16 @@ export function makeEgressAuthorizerLiveLayer(
     timeoutMillis: config.kubernetesTimeoutMillis,
     maximumResponseBytes: config.kubernetesMaximumResponseBytes,
   });
+  const boundServiceAccountAuthenticator =
+    KubernetesBoundServiceAccountAuthenticator.layer.pipe(
+      Layer.provide(kubernetesIdentity),
+    );
   const authenticator = WorkloadIdentityAuthenticator.layer.pipe(
     Layer.provide(Layer.merge(kubernetesIdentity, identityStore)),
+  );
+  const settlementCallerAuthenticator =
+    ProviderBudgetSettlementCallerAuthenticator.layer.pipe(
+      Layer.provide(boundServiceAccountAuthenticator),
   );
 
   const openFgaTransport = makeOpenFgaHttpTransportLayer({
@@ -116,6 +126,8 @@ export function makeEgressAuthorizerLiveLayer(
 
   return Layer.mergeAll(
     authenticator,
+    settlementCallerAuthenticator,
+    providerBudgets,
     decisionPoint,
     ProviderDecisionReferenceGeneratorLiveLayer,
     readiness,

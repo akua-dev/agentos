@@ -69,6 +69,21 @@ describe("GitHub broker Kubernetes boundary", () => {
       assert.include(rendered, '"secretName":"agentos-github-app"');
       assert.include(rendered, '"GITHUB_APP_PRIVATE_KEY_FILE"');
       assert.include(rendered, '"automountServiceAccountToken":false');
+      assert.include(
+        rendered,
+        '"AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL"',
+      );
+      assert.include(
+        rendered,
+        '"value":"http://agentos-egress-authz.agentos.svc.cluster.local:9001"',
+      );
+      assert.include(rendered, '"audience":"agentos-provider-budget-settlement"');
+      assert.include(rendered, '"expirationSeconds":600');
+      assert.include(
+        rendered,
+        '"mountPath":"/var/run/secrets/agentos-budget-settlement"',
+      );
+      assert.include(rendered, '"path":"token"');
       assert.notInclude(rendered, "ClusterRole");
       assert.notInclude(rendered, "ClusterRoleBinding");
     }).pipe(Effect.provide(platform)));

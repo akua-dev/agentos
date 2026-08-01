@@ -112,10 +112,10 @@ spec:
       volumes:
         - name: database
           secret:
-            secretName: agentos-postgres-app
+            secretName: agentos-egress-authz-database
             defaultMode: 0440
             items:
-              - key: uri
+              - key: database-url
                 path: database-url
         - name: openfga-admin
           secret:

@@ -20,6 +20,12 @@ For every `/authorize` request the service:
 6. returns only a closed grant with a maximum 15-second lifetime and a lease
    bounded by that reservation.
 
+`POST /settle` is a separate private provider boundary. It accepts at most a
+4 KiB closed terminal-usage report, authenticates a live Pod-bound token for
+the dedicated `agentos-provider-budget-settlement` audience, and derives the
+provider and credential domain from the exact registered ServiceAccount. Its
+body cannot select a Mate, Assignment, provider or credential domain.
+
 It never receives a provider credential and never forwards provider traffic.
 Tokens, authorization values, prompts, request bodies, policy documents and
 dependency error text are absent from responses and lifecycle logs. Requests
@@ -51,15 +57,22 @@ kubectl apply -k services/egress-authz/kubernetes
 ```
 
 Deploy the AgentOS PostgreSQL schema and OpenFGA bootstrap first. The Deployment
-expects CloudNativePG's `agentos-postgres-app` Secret key `uri`, the
+expects the managed `agentos-egress-authz-database` Secret key `database-url`
+for the dedicated non-privileged `agentos_egress_authz` login, the
 `openfga-admin` Secret key `preshared-key`, and the bootstrap-generated
-`openfga-deployment` ConfigMap. All three are mounted as files. Secret values
-are never accepted directly through environment variables.
+`openfga-deployment` ConfigMap. It deliberately avoids CloudNativePG's
+`agentos-postgres-app` owner credential as a runtime dependency. All inputs are
+mounted as files; secret values are never accepted directly through environment
+variables. The schema owner must run
+`configure_egress_authorizer_privileges('agentos_egress_authz')` after every
+migration before readiness is enabled.
 
 The Service is private at
 `agentos-egress-authz.agentos.svc.cluster.local:9001`; there is no Ingress. Its
-NetworkPolicy restricts inbound traffic to labeled AgentGateway Pods but has no
-egress policy. Agent and service Pods retain ordinary direct Internet access.
+NetworkPolicy restricts inbound traffic to core-namespace Pods with a registered
+credential-domain label—AgentGateway for authorization and provider adapters
+for settlement—but has no egress policy. Agent and service Pods retain ordinary
+direct Internet access.
 The authorizer's ClusterRole is limited to creating TokenReviews and getting
 Pods and ServiceAccounts so it can validate identities across Fleet and domain
 namespaces.

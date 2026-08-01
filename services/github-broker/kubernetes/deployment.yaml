@@ -63,6 +63,10 @@ spec:
               value: 0.0.0.0
             - name: GITHUB_BROKER_LISTEN_PORT
               value: "8789"
+            - name: AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL
+              value: http://agentos-egress-authz.agentos.svc.cluster.local:9001
+            - name: AGENTOS_PROVIDER_BUDGET_SETTLEMENT_TOKEN_FILE
+              value: /var/run/secrets/agentos-budget-settlement/token
           ports:
             - name: http
               containerPort: 8789
@@ -100,6 +104,9 @@ spec:
             - name: github-app
               mountPath: /var/run/secrets/agentos-github-app
               readOnly: true
+            - name: budget-settlement
+              mountPath: /var/run/secrets/agentos-budget-settlement
+              readOnly: true
             - name: tmp
               mountPath: /tmp
       volumes:
@@ -110,6 +117,14 @@ spec:
             items:
               - key: private-key.pem
                 path: private-key.pem
+        - name: budget-settlement
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  audience: agentos-provider-budget-settlement
+                  expirationSeconds: 600
+                  path: token
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi

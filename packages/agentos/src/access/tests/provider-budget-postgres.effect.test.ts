@@ -9,6 +9,7 @@ import { SqlError } from "effect/unstable/sql/SqlError";
 
 import {
   ProviderBudgetEnforcer,
+  type ProviderBudgetProviderSettlementInputV1,
   type ProviderBudgetReservationInputV1,
   type ProviderBudgetSettlementInputV1,
 } from "../provider-budget.ts";
@@ -215,5 +216,48 @@ describe("PostgreSQL provider budget enforcer", () => {
         Effect.flip,
       );
       assert.strictEqual(failure.outcome, "policy_stale");
+    }));
+
+  it.effect("settles through the provider-scoped security-definer function", () =>
+    Effect.gen(function*() {
+      const calls: Array<{
+        readonly statement: string;
+        readonly parameters: ReadonlyArray<unknown>;
+      }> = [];
+      const settlement: ProviderBudgetProviderSettlementInputV1 = {
+        schemaVersion: 1,
+        decisionRef: input.decisionRef,
+        provider: "github",
+        credentialDomain: "github",
+        forwardOutcome: "completed",
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedInputTokens: 0,
+        spendMicros: 0,
+        settledAtMillis: now + 2_000,
+      };
+      const layer = liveLayer((statement, parameters) => {
+        calls.push({ statement, parameters });
+        return Effect.succeed([{
+          outcome: "settled",
+          forwardOutcome: settlement.forwardOutcome,
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedInputTokens: 0,
+          spendMicros: 0,
+          settledAtMillis: settlement.settledAtMillis,
+        }]);
+      });
+      const result = yield* ProviderBudgetEnforcer.pipe(
+        Effect.flatMap((budgets) => budgets.settleProvider(settlement)),
+        Effect.provide(layer),
+      );
+      assert.strictEqual(result.outcome, "settled");
+      assert.match(calls[0]!.statement, /settle_provider_budget_for_provider/);
+      assert.deepStrictEqual(calls[0]!.parameters.slice(0, 3), [
+        input.decisionRef,
+        "github",
+        "github",
+      ]);
     }));
 });

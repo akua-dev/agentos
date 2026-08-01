@@ -6,6 +6,7 @@ import {
   AGENTOS_EGRESS_TOKEN_AUDIENCE,
   AGENTOS_IDENTITY_POSITIVE_CACHE_TTL_MILLIS,
   AgentOSWorkloadIdentityStore,
+  KubernetesBoundServiceAccountAuthenticator,
   KubernetesTokenReviewer,
   KubernetesWorkloadIdentityLookup,
   WorkloadAuthenticationError,
@@ -135,6 +136,27 @@ function authenticate(
 }
 
 describe("Pod-bound workload identity", () => {
+  it.effect("reuses the exact TokenReview and live Kubernetes binding without resolving an Agent", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(Now);
+      const bound = yield* KubernetesBoundServiceAccountAuthenticator;
+      assert.deepStrictEqual(yield* bound.authenticate({
+        bearerToken: jwt(Now + 600_000),
+        audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
+      }), {
+        schemaVersion: 1,
+        tokenExpiresAtMillis: Now + 600_000,
+        kubernetesNamespace: Namespace,
+        kubernetesPod: PodName,
+        podUid: PodUid,
+        serviceAccountName: ServiceAccountName,
+        serviceAccountUid: ServiceAccountUid,
+      });
+    }).pipe(
+      Effect.provide(KubernetesBoundServiceAccountAuthenticator.layer),
+      Effect.provide(fixtureLayer()),
+    ));
+
   it.effect("derives one exact live Mate and active Assignment", () =>
     Effect.gen(function*() {
       yield* TestClock.setTime(Now);

@@ -290,12 +290,22 @@ schema, table, sequence and Function grants before granting only these readers:
 - `read_egress_assignments(uuid)`; and
 - `read_egress_policy_snapshots(jsonb)`.
 
+`0020_provider_budget_enforcement.sql` adds the exact reservation function.
+`0021_provider_budget_provider_settlement.sql` adds provider-side settlement
+without accepting the authorized Mate or Assignment subject. After `0021`, the
+configurator grants `reserve_provider_budget(...)` and
+`settle_provider_budget_for_provider(...)`; it explicitly removes the older
+subject-bearing `settle_provider_budget(...)` grant.
+
 Run the configurator during install and after an upgrade before making the
 authorizer ready. Do not register this login as an Agent principal: it is a
 service identity with narrower access than the Fleet-wide Agent read view.
 Supply its password and verified TLS connection configuration only to the
-authorizer through the deployment's approved Kubernetes secret source. Never
-place them in a migration, manifest value, command argument, log or error.
+authorizer through `Secret/agentos-egress-authz-database`, key `database-url`,
+created by the approved managed-secret workflow. The authorizer Deployment
+must never mount CloudNativePG's `agentos-postgres-app` owner credential. Never
+place either credential in a migration, manifest value, command argument, log
+or error.
 
 The workload reader resolves an exact namespace/Pod locator. Fleet and domain
 come only from a current active mate or Assignment access binding; it never
