@@ -155,6 +155,26 @@
       "status": "migrated"
     },
     {
+      "id": "provider-credential-delivery-effect-tests",
+      "issue": 95,
+      "pattern": "^packages/agentos/src/access/tests/credential-delivery\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "schema", "authorization", "credentials"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-credential-delivery",
+      "issue": 95,
+      "pattern": "^packages/agentos/src/access/credential-delivery\\.ts$",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": ["schema", "authorization", "credentials", "kubernetes-manifest"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90],
+      "status": "migrated"
+    },
+    {
       "id": "openfga-service-core",
       "issue": 90,
       "pattern": "^services/openfga/src/kubernetes\\.ts$",

@@ -3,7 +3,7 @@ import { documentationRoutes } from './docs-contract';
 
 describe('documentationRoutes', () => {
   it('defines the complete ordered AgentOS documentation map', () => {
-    expect(documentationRoutes).toHaveLength(59);
+    expect(documentationRoutes).toHaveLength(62);
     expect(documentationRoutes[0]).toMatchObject({ path: '/docs', title: 'AgentOS documentation' });
     expect(documentationRoutes).toEqual(
       expect.arrayContaining([

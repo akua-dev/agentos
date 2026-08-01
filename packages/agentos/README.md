@@ -29,6 +29,14 @@ credential-free review summary. It performs no filesystem, Kubernetes or
 database operation; the runtime operation boundary owns canonical path
 resolution, exact file writes and native `kubectl` dry-run/diff/apply/verify.
 
+Provider access uses the same inert, Effect-native boundary. The public root
+exports separate policy-enforcement, policy-decision, and credential-delivery
+service contracts plus `compileProviderCredentialPlan` and
+`resolveProviderCredentialRouteState`. Plans carry one credential-domain
+reference and finite outcomes, never provider credential values. Secret-backed
+plans reject Mate-domain namespaces; unsupported clients require a reviewed
+provider broker instead of receiving a token.
+
 `agentWorkloadProfilesV1` and `resolveAgentWorkloadProfile` publish the finite
 versioned mechanics used before compilation. The resolver accepts an exact
 profile ID, explicit resolved dispatch requirements and optional domain

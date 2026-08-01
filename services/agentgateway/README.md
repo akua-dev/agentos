@@ -60,6 +60,10 @@ Clients with a provider base-URL setting point it at an explicit AgentOS gateway
 
 Agentgateway's external authorization policy defaults to fail closed. The AgentOS adapter must return a stable, payload-free failure envelope so `identity_invalid`, `identity_expired`, `profile_denied`, `budget_denied`, and `policy_unavailable` are distinguishable without logging the token or request body. Provider, upstream and gateway failures retain their real HTTP/gRPC status. This contract is implemented in [#87](https://github.com/akua-dev/agentos/issues/87), [#90](https://github.com/akua-dev/agentos/issues/90), and [#92](https://github.com/akua-dev/agentos/issues/92).
 
+The provider-delivery contract is now released in [`docs/security/provider-credential-delivery.md`](../../docs/security/provider-credential-delivery.md). Its closed Effect Schemas and separate PEP/PDP/CDP services carry decision and Secret references but never credential values. Static and OAuth client Secrets are projected as one read-only file into one provider adapter. AWS/GCP use workload identity without a Secret. GitHub App and refresh-token cases select a provider-only broker; unsupported native clients fail closed instead of receiving a token.
+
+Pinned v1.4.1 loads file-backed static and OAuth secrets while parsing configuration, so a projected Secret update is not described as a live credential reload. Rotation uses #80's resource-version-guarded replacement, then rolls only the affected two-replica adapter. The deterministic route-state contract permits a stale resource version for at most 60 seconds; at the deadline that provider route becomes `credential_unavailable`. Agent Pods and unrelated provider adapters are not restarted.
+
 | Failure class                | Authoritative signal                                                    | Owner                                    |
 | ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------- |
 | workload identity            | `401/403` plus `identity_invalid` or `identity_expired`                 | TokenReview adapter                      |
@@ -161,7 +165,7 @@ MCP `2026-07-28`, task cancellation, unified gateways and standalone Helm packag
 2. [#87](https://github.com/akua-dev/agentos/issues/87): audience-bound projected identity and TokenReview adapter.
 3. [#90](https://github.com/akua-dev/agentos/issues/90): OpenFGA PDP and hot-reloadable authorization data.
 4. [#89](https://github.com/akua-dev/agentos/issues/89): reusable provider/API access profiles selected by typed workloads.
-5. [#95](https://github.com/akua-dev/agentos/issues/95): split credential delivery and secret-store mounting.
+5. [#95](https://github.com/akua-dev/agentos/issues/95): released split credential delivery, one-domain Secret mounting, and bounded rotation state.
 6. [#91](https://github.com/akua-dev/agentos/issues/91): replace Agent-facing Fleet AI Gateway shared auth with workload identity mediation.
 7. [#94](https://github.com/akua-dev/agentos/issues/94): GitHub API broker and exact `gh` compatibility.
 8. [#96](https://github.com/akua-dev/agentos/issues/96): owned Kustomize operations, readiness, canary upgrade and rollback.

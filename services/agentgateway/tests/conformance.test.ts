@@ -680,9 +680,45 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
             const containers = Array.isArray(podSpec.containers)
               ? podSpec.containers
               : [];
+            const gatewayContainer = recordOf(containers[0]);
             assert.strictEqual(
-              recordOf(containers[0]).image,
+              gatewayContainer.image,
               "cr.agentgateway.dev/agentgateway@sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29",
+            );
+            const providerMounts = Array.isArray(gatewayContainer.volumeMounts)
+              ? gatewayContainer.volumeMounts
+              : [];
+            assert.deepStrictEqual(
+              providerMounts.filter(
+                (mount) =>
+                  recordOf(mount).name === "provider-credential-openai",
+              ),
+              [
+                {
+                  mountPath: "/var/run/secrets/agentos-provider/openai",
+                  name: "provider-credential-openai",
+                  readOnly: true,
+                },
+              ],
+            );
+            const providerVolumes = Array.isArray(podSpec.volumes)
+              ? podSpec.volumes
+              : [];
+            assert.deepStrictEqual(
+              providerVolumes.filter(
+                (volume) =>
+                  recordOf(volume).name === "provider-credential-openai",
+              ),
+              [
+                {
+                  name: "provider-credential-openai",
+                  secret: {
+                    defaultMode: 288,
+                    items: [{ key: "token", path: "credential" }],
+                    secretName: "agentgateway-ai-gateway-client",
+                  },
+                },
+              ],
             );
             assert.strictEqual(
               renderedResource(renderedDocuments, "NetworkPolicy"),
@@ -698,22 +734,27 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
             );
             const renderedConfig = recordOf(configMap.data)["config.yaml"];
             assert.strictEqual(typeof renderedConfig, "string");
+            const renderedCredential = path.join(
+              root,
+              "rendered-provider-credential",
+            );
+            yield* fs.writeFileString(
+              renderedCredential,
+              "conformance-only\n",
+            );
+            const validationConfig = typeof renderedConfig === "string"
+              ? renderedConfig.replace(
+                  "/var/run/secrets/agentos-provider/openai/credential",
+                  renderedCredential,
+                )
+              : "";
             const renderedValidation = yield* runCommand(
               [
                 executable,
                 "--validate-only",
                 "-c",
-                typeof renderedConfig === "string" ? renderedConfig : "",
+                validationConfig,
               ],
-              {
-                ...Object.fromEntries(
-                  Object.entries(process.env).filter(
-                    (entry): entry is [string, string] =>
-                      entry[1] !== undefined,
-                  ),
-                ),
-                AGENTOS_AI_GATEWAY_TOKEN: "conformance-only",
-              },
             );
             assert.strictEqual(
               renderedValidation.exitCode,
