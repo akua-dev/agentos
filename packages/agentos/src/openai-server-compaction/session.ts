@@ -3,6 +3,7 @@ import {
   type CompactionEntry,
   type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
+import { Option, Schema } from "effect";
 import {
   messagesToResponseItems,
   type ResponseItem,
@@ -10,7 +11,6 @@ import {
 import {
   JsonObjectSchema,
   NativeCompactionStateSchema,
-  NativeCompactionStateV2Schema,
   ProviderRequestPayloadSchema,
   type NativeCompactionState,
   type NativeCompactionApi,
@@ -24,10 +24,13 @@ export type { NativeCompactionState } from "./schemas.ts";
 export const NATIVE_DETAILS_KEY = "agentosOpenAIServerCompaction";
 
 function readState(entry: CompactionEntry): NativeCompactionState | undefined {
-  const details = JsonObjectSchema.safeParse(entry.details);
-  if (!details.success) return undefined;
-  const state = NativeCompactionStateSchema.safeParse(details.data[NATIVE_DETAILS_KEY]);
-  return state.success ? state.data : undefined;
+  const details = Schema.decodeUnknownOption(JsonObjectSchema)(entry.details);
+  if (Option.isNone(details)) return undefined;
+  return Option.getOrUndefined(
+    Schema.decodeUnknownOption(NativeCompactionStateSchema, {
+      onExcessProperty: "error",
+    })(details.value[NATIVE_DETAILS_KEY]),
+  );
 }
 
 function latestCompaction(entries: SessionEntry[]) {
@@ -45,15 +48,33 @@ export function nativeCompactionDetails(
   replacementInput: ResponseItem[],
   usage?: ResponseUsage,
 ): Record<typeof NATIVE_DETAILS_KEY, NativeCompactionState> {
-  const state = NativeCompactionStateV2Schema.parse({
-    version: 2,
-    implementation: "responses_compaction_v2",
-    provider,
-    api,
-    model,
-    replacementInput,
-    ...(usage ? { usage } : {}),
-  });
+  const state: NativeCompactionState = provider === "openai" && api === "openai-responses"
+    ? {
+      version: 2,
+      implementation: "responses_compaction_v2",
+      provider,
+      api,
+      model,
+      replacementInput,
+      ...(usage ? { usage } : {}),
+    }
+    : provider === "openai-codex" && api === "openai-codex-responses"
+    ? {
+      version: 2,
+      implementation: "responses_compaction_v2",
+      provider,
+      api,
+      model,
+      replacementInput,
+      ...(usage ? { usage } : {}),
+    }
+    : {
+      version: 1,
+      provider,
+      model,
+      replacementInput,
+      ...(usage ? { usage } : {}),
+    };
   return {
     [NATIVE_DETAILS_KEY]: state,
   };
@@ -141,13 +162,15 @@ export function rewriteResponsesPayload(
   api: NativeCompactionApi,
   model: string,
 ): ProviderRequestPayload | undefined {
-  const parsed = ProviderRequestPayloadSchema.safeParse(payload);
-  if (!parsed.success) return undefined;
-  if (parsed.data.model !== undefined && parsed.data.model !== model) return undefined;
+  const parsed = Schema.decodeUnknownOption(ProviderRequestPayloadSchema, {
+    onExcessProperty: "preserve",
+  })(payload);
+  if (Option.isNone(parsed)) return undefined;
+  if (parsed.value.model !== undefined && parsed.value.model !== model) return undefined;
   const native = matchingState(entries, provider, api, model);
   if (!native) return undefined;
   return {
-    ...parsed.data,
+    ...parsed.value,
     input: [
       ...native.state.replacementInput,
       ...matchingTrailingMessages(
