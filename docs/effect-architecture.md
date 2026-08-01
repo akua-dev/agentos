@@ -122,6 +122,14 @@ Profile selection remains Assignment dispatch judgment. Released profiles own
 exact Kustomize base references and definition digests; future profiles remain
 visible for compatibility checks but fail closed at the compiler boundary.
 
+The provider authorization HTTP boundary follows the same rule without a
+Promise bridge. `services/egress-authz` registers an Effect Platform router,
+composes scoped PostgreSQL, Kubernetes HTTP, OpenFGA, cryptography, identity and
+PDP Layers, and launches them through one reviewed Bun entry call. Header/body
+limits, concurrency admission, dependency timeouts, readiness and cancellation
+all remain in the Effect program. Its tests are `@effect/vitest` programs with
+deterministic services and TestClock.
+
 ## Inventory and progressive enforcement
 
 [`inventory.json`](../tooling/effect-migration/inventory.json) assigns every

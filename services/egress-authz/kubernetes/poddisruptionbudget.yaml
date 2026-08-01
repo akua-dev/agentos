@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agentos-egress-authz
+  labels:
+    app.kubernetes.io/name: agentos-egress-authz
+    app.kubernetes.io/component: authorization
+    app.kubernetes.io/part-of: agentos
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-egress-authz

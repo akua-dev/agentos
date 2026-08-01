@@ -35,6 +35,23 @@ slice; their outcomes are reserved here and are not claimed as active quota
 enforcement yet. Any failure stops composition before provider forwarding or a
 credential volume is reachable.
 
+The production HTTP boundary is
+[`services/egress-authz`](../../services/egress-authz/README.md). It is an
+Effect Platform Bun server with one reviewed outer runtime call, scoped server
+and PostgreSQL lifecycles, Effect Config, file-only redacted secrets, bounded
+headers and body, immediate concurrency admission, request timeouts and
+interruption-safe permit release. It rejects caller-supplied grant headers
+before authentication. Its readiness requires PostgreSQL and a higher-
+consistency check of the pinned OpenFGA health tuple; it does not report ready
+merely because the socket is listening.
+
+The authorizer has no provider credential and no forwarding API. Its two-
+replica Kustomize deployment mounts only the AgentOS database URI, the OpenFGA
+preshared key and the bootstrap-generated store/model references. Those values
+are files, never environment values. The Service is private, inbound access is
+limited to labeled AgentGateway Pods, and there is deliberately no egress
+NetworkPolicy. Ordinary Internet access does not depend on this service.
+
 `compileProviderCredentialPlan` decodes closed input, requires the capability and resource provider to agree, rejects duplicate upstream hosts, and emits one adapter ServiceAccount, one credential domain, one route-host set, and zero or one Secret projection. Secret-backed plans accept only namespace `agentos`; `agentos-domain-*` is rejected. A process that serves one compiled plan therefore has no contract or mount through which it can read another domain's credential. Production network and workload enforcement of the emitted isolation plan belongs to the owned manifests in #96.
 
 ## Strategy selection
@@ -84,7 +101,7 @@ Cloud workload identity uses its provider-session expiry rather than a Kubernete
 
 The public plan, decision, route-state, failure, and receipt Schemas contain references and finite outcomes only. They deliberately exclude provider tokens, authorization values, client secrets, refresh tokens, private keys, credential payloads, upstream bodies, arbitrary error messages, and arbitrary metadata. Unknown fields fail decoding. These same closed shapes are the only permitted journal, event, log, trace, and persisted-configuration representation for the credential-delivery control plane.
 
-The four provider failure outcomes are `credential_unavailable`, `credential_rejected`, `credential_rotating`, and `credential_exchange_failed`. They carry provider, credential domain, retryability, and correlation ID. Provider response bodies and secrets remain outside telemetry. The eventual HTTP/gRPC adapter maps these finite outcomes to the stable gateway envelope without placing credential material in a response.
+The four provider failure outcomes are `credential_unavailable`, `credential_rejected`, `credential_rotating`, and `credential_exchange_failed`. They carry provider, credential domain, retryability, and correlation ID. Provider response bodies and secrets remain outside telemetry. The HTTP authorizer maps authentication failure to a finite `401`, policy denial to a finite `403`, and transient PostgreSQL/OpenFGA/reference failure to a finite `503`; no dependency text or credential material enters the response.
 
 ## External references
 

@@ -110,6 +110,7 @@ COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/agentgateway/package.json services/agentgateway/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY services/egress-authz/package.json services/egress-authz/package.json
 COPY services/github-broker/package.json services/github-broker/package.json
 COPY services/openfga/package.json services/openfga/package.json
 COPY services/otel-collector/package.json services/otel-collector/package.json
@@ -127,6 +128,7 @@ RUN bun install \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
       --filter @agentos/ai-gateway \
+      --filter @agentos/egress-authz \
       --filter @agentos/github-broker \
       --filter @agentos/openfga \
   && bun clis/github-app-token/github-app-token.ts --help >/dev/null \
@@ -143,6 +145,7 @@ COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/agentgateway/package.json services/agentgateway/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY services/egress-authz/package.json services/egress-authz/package.json
 COPY services/github-broker/package.json services/github-broker/package.json
 COPY services/openfga/package.json services/openfga/package.json
 COPY services/otel-collector/package.json services/otel-collector/package.json
@@ -170,6 +173,9 @@ COPY --from=agentos-runtime-dependencies \
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/ai-gateway/node_modules/ \
   /opt/agentos/services/ai-gateway/node_modules/
+COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/services/egress-authz/node_modules/ \
+  /opt/agentos/services/egress-authz/node_modules/
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/github-broker/node_modules/ \
   /opt/agentos/services/github-broker/node_modules/
@@ -199,6 +205,7 @@ RUN chmod 0644 \
     /opt/agentos/packages/agentos/runtime/run-mate.ts \
     /opt/agentos/packages/agentos/runtime/health.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \
+    /opt/agentos/services/egress-authz/src/main.ts \
     /opt/agentos/services/github-broker/src/main.ts \
     /opt/agentos/services/openfga/src/bootstrap.ts \
     /opt/agentos/services/openfga/src/readiness.ts \
@@ -214,6 +221,9 @@ RUN chmod 0644 \
   && ln -s \
     /opt/agentos/services/ai-gateway/src/main.ts \
     /usr/local/bin/ai-gateway \
+  && ln -s \
+    /opt/agentos/services/egress-authz/src/main.ts \
+    /usr/local/bin/agentos-egress-authz \
   && ln -s \
     /opt/agentos/services/github-broker/src/main.ts \
     /usr/local/bin/agentos-github-broker \

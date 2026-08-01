@@ -59,7 +59,7 @@ Clients with a provider base-URL setting point it at an explicit AgentOS gateway
 | credential component   | one provider/domain secret or token exchange                                                         | authorization decision                                                 |
 | Fleet AI Gateway       | Codex/OpenAI login and account/session/quota semantics                                               | non-OpenAI provider roots, general Fleet authorization                 |
 
-Agentgateway's external authorization policy defaults to fail closed. The AgentOS adapter must return a stable, payload-free failure envelope so `identity_invalid`, `identity_expired`, `profile_denied`, `budget_denied`, and `policy_unavailable` are distinguishable without logging the token or request body. Provider, upstream and gateway failures retain their real HTTP/gRPC status. This contract is implemented in [#87](https://github.com/akua-dev/agentos/issues/87), [#90](https://github.com/akua-dev/agentos/issues/90), and [#92](https://github.com/akua-dev/agentos/issues/92).
+Agentgateway's external authorization policy defaults to fail closed. The Effect-native [`agentos-egress-authz`](../egress-authz/README.md) adapter returns only finite, payload-free `401`, `403`, or `503` authorization outcomes and closed grant headers; it never logs the token or request body. Provider, upstream and gateway failures retain their real HTTP/gRPC status. More granular rate-limit and budget outcomes remain owned by #92 rather than being falsely reported by the initial adapter.
 
 The provider-delivery contract is now released in [`docs/security/provider-credential-delivery.md`](../../docs/security/provider-credential-delivery.md). Its closed Effect Schemas and separate PEP/PDP/CDP services carry decision and Secret references but never credential values. Static and OAuth client Secrets are projected as one read-only file into one provider adapter. AWS/GCP use workload identity without a Secret. GitHub App and refresh-token cases select a provider-only broker; unsupported native clients fail closed instead of receiving a token.
 
@@ -67,10 +67,10 @@ Pinned v1.4.1 loads file-backed static and OAuth secrets while parsing configura
 
 | Failure class                | Authoritative signal                                                    | Owner                                    |
 | ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------- |
-| workload identity            | `401/403` plus `identity_invalid` or `identity_expired`                 | TokenReview adapter                      |
-| authorization/profile        | `403` plus `profile_denied`                                             | OpenFGA adapter                          |
+| workload identity            | finite content-free `401/403`                                           | TokenReview adapter                      |
+| authorization/profile        | finite content-free `403`                                               | OpenFGA adapter                          |
 | budget/kill switch           | `429` plus `budget_denied`                                              | authorization adapter and budget service |
-| policy dependency            | `503` plus `policy_unavailable`                                         | authorization adapter                    |
+| policy dependency            | finite content-free `503`                                               | authorization adapter                    |
 | credential delivery/exchange | `502/503` plus `credential_unavailable` or `credential_exchange_failed` | provider-scoped credential component     |
 | agentgateway process/config  | readiness/config-synchronization signal and gateway-local `5xx`         | gateway operations                       |
 | governed provider/upstream   | original upstream HTTP status or gRPC status                            | provider adapter/backend                 |

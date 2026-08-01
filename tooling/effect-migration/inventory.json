@@ -155,6 +155,56 @@
       "status": "migrated"
     },
     {
+      "id": "provider-http-authorizer-effect-tests",
+      "issue": 96,
+      "pattern": "^packages/agentos/src/access/tests/http-authorizer\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "clock", "http", "identity", "authorization"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-http-authorizer",
+      "issue": 96,
+      "pattern": "^packages/agentos/src/access/http-authorizer\\.ts$",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": ["clock", "http", "identity", "authorization", "schema"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90],
+      "status": "migrated"
+    },
+    {
+      "id": "egress-authorizer-effect-tests",
+      "issue": 96,
+      "pattern": "^services/egress-authz/tests/.*\\.effect\\.test\\.ts$",
+      "runtime": "bun-kubernetes-postgresql",
+      "package": "@agentos/egress-authz",
+      "io": ["test", "clock", "http", "identity", "authorization", "database"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90],
+      "status": "migrated"
+    },
+    {
+      "id": "egress-authorizer-entrypoint",
+      "issue": 96,
+      "pattern": "^services/egress-authz/src/main\\.ts$",
+      "runtime": "bun-entrypoint",
+      "package": "@agentos/egress-authz",
+      "io": ["config", "filesystem", "http", "kubernetes", "database", "authorization", "runtime-adapter"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "egress-authorizer-runtime",
+      "issue": 96,
+      "pattern": "^services/egress-authz/src/(?!main\\.ts$)",
+      "runtime": "bun-kubernetes-postgresql",
+      "package": "@agentos/egress-authz",
+      "io": ["config", "filesystem", "http", "kubernetes", "database", "authorization"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90],
+      "status": "migrated"
+    },
+    {
       "id": "provider-workload-identity-effect-tests",
       "issue": 87,
       "pattern": "^packages/agentos/src/access/tests/identity\\.effect\\.test\\.ts$",
@@ -302,6 +352,16 @@
       "package": "github-broker",
       "io": ["test", "clock", "filesystem", "http", "process", "stream"],
       "migrationDependencies": [100, 101, 88],
+      "status": "migrated"
+    },
+    {
+      "id": "production-dependencies-effect-test",
+      "issue": 102,
+      "pattern": "^packages/agentos/runtime/tests/production-dependencies\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "config", "filesystem", "process", "stream"],
+      "migrationDependencies": [100, 101],
       "status": "migrated"
     },
     {

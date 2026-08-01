@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agentos-egress-authz
+  labels:
+    app.kubernetes.io/name: agentos-egress-authz
+    app.kubernetes.io/component: authorization
+    app.kubernetes.io/part-of: agentos
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-egress-authz
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: agentos
+          podSelector:
+            matchExpressions:
+              - key: agentos.akua.dev/credential-domain
+                operator: Exists
+      ports:
+        - protocol: TCP
+          port: 8787
