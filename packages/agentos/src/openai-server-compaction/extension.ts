@@ -23,8 +23,8 @@ import {
 } from "./remote.ts";
 import { normalizeResponseItemsForPrompt } from "./messages.ts";
 import {
-  JsonObjectSchema,
-  JsonValueSchema,
+  parseJsonObject,
+  parseJsonValue,
   type JsonObject,
   type ResponseUsage,
 } from "./schemas.ts";
@@ -272,11 +272,11 @@ function mergedDetails(
   localDetails: unknown,
   nativeDetails: ReturnType<typeof nativeCompactionDetails>,
 ): JsonObject {
-  const localObject = JsonObjectSchema.safeParse(localDetails);
-  if (localObject.success) return { ...localObject.data, ...nativeDetails };
-  const localValue = JsonValueSchema.safeParse(localDetails);
+  const localObject = parseJsonObject(localDetails);
+  if (localObject) return { ...localObject, ...nativeDetails };
+  const localValue = parseJsonValue(localDetails);
   return {
-    ...(localValue.success ? { piCompactionDetails: localValue.data } : {}),
+    ...(localValue !== undefined ? { piCompactionDetails: localValue } : {}),
     ...nativeDetails,
   };
 }
@@ -527,14 +527,14 @@ function requestShapeKey(ctx: ExtensionContext): string {
 }
 
 function requestShapeFromPayload(payload: unknown): ProviderRequestShape | undefined {
-  const parsed = JsonObjectSchema.safeParse(payload);
-  if (!parsed.success) return undefined;
-  const reasoning = JsonObjectSchema.safeParse(parsed.data.reasoning);
-  const text = JsonObjectSchema.safeParse(parsed.data.text);
-  if (!reasoning.success && !text.success) return undefined;
+  const parsed = parseJsonObject(payload);
+  if (!parsed) return undefined;
+  const reasoning = parseJsonObject(parsed.reasoning);
+  const text = parseJsonObject(parsed.text);
+  if (!reasoning && !text) return undefined;
   return {
-    ...(reasoning.success ? { reasoning: reasoning.data } : {}),
-    ...(text.success ? { text: text.data } : {}),
+    ...(reasoning ? { reasoning } : {}),
+    ...(text ? { text } : {}),
   };
 }
 

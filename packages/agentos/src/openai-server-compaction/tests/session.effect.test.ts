@@ -211,6 +211,29 @@ describe("native compaction session replay", () => {
     ).toEqual({ model: "gpt-5.4", input: [...output, expect.any(Object)] });
   });
 
+  test("makes a mismatched provider API pair non-replayable", () => {
+    const artifact: CompactionArtifact = {
+      type: "compaction",
+      encrypted_content: "opaque",
+    };
+
+    expect(
+      nativeCompactionDetails(
+        "openai",
+        "openai-codex-responses",
+        "gpt-5.4",
+        [artifact],
+      ),
+    ).toEqual({
+      [NATIVE_DETAILS_KEY]: {
+        version: 1,
+        provider: "openai",
+        model: "gpt-5.4",
+        replacementInput: [artifact],
+      },
+    });
+  });
+
   test("clears pending messages at an empty assistant turn boundary", () => {
     const artifact: CompactionArtifact = {
       type: "compaction",
