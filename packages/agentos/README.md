@@ -14,10 +14,13 @@ effective pre-session catalog.
 The public root exports versioned Effect Schemas, tagged failures, deterministic
 service Layers, composable `*Effect` programs, and compatibility helpers for
 registration preflight, instructions, resources, bounded startup, role loading,
-and semantic readiness. Existing plain and Promise-returning APIs remain narrow
-adapters, so ecosystem packages can migrate incrementally. Every registration
-accepts Pi's `ExtensionAPI` explicitly, and packages remain free to use any
-ordinary Pi API beside these helpers.
+and semantic readiness. Effect is mandatory for all AgentOS-owned effectful
+TypeScript and TSX. Pure helpers may remain ordinary pure functions inside
+Effect-native modules. A framework or executable edge may only enter one
+managed Effect runtime and cannot contain domain orchestration. Tracked legacy
+adapters are migration debt, not an accepted extension surface. Every
+registration accepts Pi's `ExtensionAPI` explicitly, and packages remain free
+to use any ordinary Pi API beside these helpers through an Effect boundary.
 
 The root also exports `AgentWorkloadSpecV1Schema` and the pure
 `compileAgentWorkloadSpec` Effect. A caller supplies canonical distribution and

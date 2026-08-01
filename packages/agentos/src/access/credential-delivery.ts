@@ -329,6 +329,30 @@ export const ProviderPolicyDecisionRefV1Schema = Schema.Struct({
   rateClass: AccessRateClassIdSchema,
 });
 
+const ProviderPolicyDecisionOutcome = Schema.Literals([
+  "invalid_route",
+  "identity_rejected",
+  "database_unavailable",
+  "policy_stale",
+  "profile_denied",
+  "ceiling_denied",
+  "effective_policy_denied",
+  "rate_class_disabled",
+  "rate_class_exceeded",
+  "rate_limited",
+  "budget_exhausted",
+  "openfga_unavailable",
+  "decision_reference_unavailable",
+]);
+
+export class ProviderPolicyDecisionError extends Schema.TaggedErrorClass<ProviderPolicyDecisionError>()(
+  "ProviderPolicyDecisionError",
+  {
+    outcome: ProviderPolicyDecisionOutcome,
+    retryable: Schema.Boolean,
+  },
+) {}
+
 export const ProviderEnforcementRequestV1Schema = Schema.Struct({
   schemaVersion: Schema.Literal(1),
   correlationId: CorrelationId,
@@ -417,7 +441,10 @@ export class ProviderPolicyDecisionPoint extends Context.Service<
   {
     readonly decide: (
       request: ProviderPolicyDecisionRequestV1,
-    ) => Effect.Effect<ProviderPolicyDecisionRefV1, ProviderRouteOutcomeV1>;
+    ) => Effect.Effect<
+      ProviderPolicyDecisionRefV1,
+      ProviderPolicyDecisionError
+    >;
   }
 >()("agentos/access/ProviderPolicyDecisionPoint") {}
 

@@ -48,7 +48,11 @@ Mise task strings. A Mise task may point to a typed executable file.
 
 ## Effect architecture and migration
 
-AgentOS-owned effectful TypeScript migrates incrementally to Effect. Read
+Effect is the mandatory architecture for all AgentOS-owned effectful
+TypeScript and TSX. Pure computation may remain ordinary pure TypeScript, but
+asynchronous work, I/O, resource ownership, configuration, concurrency, tests,
+CLIs and services must use Effect. A framework or executable edge may only
+enter one managed Effect runtime and must not contain domain orchestration. Read
 [`docs/effect-architecture.md`](./docs/effect-architecture.md) before changing
 an effectful path and follow the repository
 [`effect-ts` Skill](./.agents/skills/effect-ts/SKILL.md) for exact patterns.
@@ -61,6 +65,9 @@ inventory. New or moved paths therefore require an inventory update in the
 same change. Mark a slice `migrated` only after its behavior and boundary tests
 are ready; the strict AST rules then prevent Promise, throw, ambient config,
 raw I/O and unreviewed runtime execution from returning. Keep `pure` code pure.
+`planned` and baseline entries are finite legacy removal work, not permission
+to add more non-Effect code. Touching legacy effectful code requires migrating
+the touched file completely and removing its baseline entry.
 An unavoidable framework or process entry escape needs one exact, bounded
 entry in `exceptions.json`; broad directory exceptions are not accepted.
 
