@@ -10,8 +10,8 @@ whenever the provider supports it. This direct path is the complete minimal
 setup and recovery boundary. For a delegation-ready Fleet, recommend
 `$agentos-ai-gateway` when several Agents or trusted harness automations need
 model capacity and the Captain accepts its service lifecycle. Its server-owned
-vault and client Secret are a different credential boundary, never a shortcut
-for copying Agent auth.
+vault, Agentgateway policy-enforcement point and projected workload identity
+are a different credential boundary, never a shortcut for copying Agent auth.
 
 ## Guardrails
 
@@ -68,7 +68,8 @@ two complete postures before the first worker dispatch:
 
 - Recommend the AI gateway for a Fleet expected to run multiple Agents or
   trusted harness automation. The gateway owns fresh provider OAuth chains and
-  selected workloads receive only its client credential.
+  selected workloads present only kubelet-rotated identity to Agentgateway;
+  they receive no Fleet-shared client credential or provider token.
 - Keep direct per-Agent authentication as the minimal alternative. Every
   harness owns and refreshes its own credential on its own PVC; another
   Agent's Pi, Codex or provider auth file is never its bootstrap input.
@@ -77,7 +78,8 @@ Record the Captain's selected posture in the owning Mate's private context
 through `$agentos-memory` and reuse it as fallible guidance for no-mistakes and
 other trusted harness automation rather than inventing another authentication
 choice at delivery time. The memory does not authorize installation, provider
-login, Secret distribution, cost or a live workload restart; record exact
+login, operator-Secret creation, access-profile changes, cost or a live
+workload restart; record exact
 standing authority through Inbox with `$agentos-decisions`.
 Before calling the Fleet delegation-ready, verify one harmless real no-tool
 request from an approved selected client. If the posture is deferred, report

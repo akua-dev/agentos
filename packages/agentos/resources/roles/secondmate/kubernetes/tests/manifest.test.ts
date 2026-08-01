@@ -201,24 +201,23 @@ describe("Second Mate Kubernetes base", () => {
     ).toEqual(["install-tools", "prepare-home"]);
 
     expect(spec.template.metadata.labels).toMatchObject({
-      "agentos.akua.dev/ai-gateway-client": "true",
+      "agentos.akua.dev/agentgateway-client": "true",
     });
     expect(environment.AI_GATEWAY_URL).toBe(
-      "http://ai-gateway.agentos.svc.cluster.local:8787",
+      "http://agentgateway-openai.agentos.svc.cluster.local:8788",
     );
-    expect(environment.AI_GATEWAY_TOKEN).toEqual({
-      secretKeyRef: { key: "token", name: "ai-gateway-client" },
-    });
+    expect(environment.AI_GATEWAY_TOKEN).toBeUndefined();
+    expect(environment.AGENTOS_EGRESS_TOKEN_FILE).toBe(
+      "/var/run/secrets/agentos-egress/token",
+    );
     expect(environment.AGENTOS_PI_PROVIDER_MODE).toBe("ai-gateway");
     expect(environment.AGENTOS_PROVIDER_CREDENTIAL_KIND).toBe("ai_gateway");
     expect(prepareEnvironment).toMatchObject({
       AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
-      AI_GATEWAY_TOKEN: {
-        secretKeyRef: { key: "token", name: "ai-gateway-client" },
-      },
       AI_GATEWAY_URL:
-        "http://ai-gateway.agentos.svc.cluster.local:8787",
+        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
     });
+    expect(prepareEnvironment.AI_GATEWAY_TOKEN).toBeUndefined();
     expect(environment.AGENTOS_MODEL).toBeUndefined();
     expect(environment.AGENTOS_THINKING).toBeUndefined();
     expect(prepareEnvironment.AGENTOS_MODEL).toBeUndefined();
@@ -263,7 +262,7 @@ describe("Second Mate Kubernetes base", () => {
     expect(runtimeEnvironment.AI_GATEWAY_URL).toBeUndefined();
     expect(runtimeEnvironment.AI_GATEWAY_TOKEN).toBeUndefined();
     expect(statefulSet.spec!.template.metadata.labels).not.toHaveProperty(
-      "agentos.akua.dev/ai-gateway-client",
+      "agentos.akua.dev/agentgateway-client",
     );
   });
 

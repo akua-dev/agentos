@@ -31,6 +31,7 @@ import {
   type AgentOSAIStreamMode,
   type AgentOSAIStreamOutcome,
   type AgentOSTelemetryAttributes,
+  type ProviderAuthorizationGrantV1,
 } from "@akua-dev/agentos";
 
 export type GatewayRouteOutcome = "acquired" | "unavailable" | "error";
@@ -43,7 +44,11 @@ export interface GatewayRequestOutcome {
 
 export interface GatewayRequestTelemetry {
   readonly attemptId: string;
-  authenticate(authenticated: boolean): void;
+  authenticate(
+    authenticated: boolean,
+    authorization?: ProviderAuthorizationGrantV1,
+    failureStatus?: 401 | 403,
+  ): void;
   routeStarted(): void;
   routeEnded(outcome: GatewayRouteOutcome, error?: unknown): void;
   quotaObservation(ageSeconds: number, stale: boolean): void;
@@ -149,7 +154,7 @@ function startGatewayRequest(options: {
     options.propagator,
   );
   const requestId = options.id();
-  const base = requestAttributes(options.request.headers, requestId);
+  let base = requestAttributes(options.request.headers, requestId);
   const requestStartedAt = options.clock();
   const requestSpan = options.tracer.startSpan(
     "ai-gateway.request",
@@ -184,17 +189,29 @@ function startGatewayRequest(options: {
     get attemptId() {
       return attemptId;
     },
-    authenticate(authenticated) {
+    authenticate(authenticated, authorization, failureStatus) {
       safely(() => {
+        const attribution = authorization === undefined
+          ? {}
+          : authorizationTelemetryAttributes(authorization);
+        if (authenticated && authorization !== undefined) {
+          base = safeTelemetryAttributes({ ...base, ...attribution }, "span");
+          requestSpan.setAttributes(
+            safeTelemetryAttributes(attribution, "span"),
+          );
+        }
         const span = options.tracer.startSpan(
           "ai-gateway.authenticate",
           undefined,
           requestContext,
         );
-        const attributes = outcomeAttributes(
-          authenticated ? 200 : 401,
-          undefined,
-        );
+        const attributes = safeTelemetryAttributes({
+          ...attribution,
+          ...outcomeAttributes(
+            authenticated ? 200 : (failureStatus ?? 401),
+            undefined,
+          ),
+        }, "span");
         span.setAttributes(attributes);
         finishSpan(span, attributes);
       });
@@ -452,6 +469,24 @@ function startGatewayRequest(options: {
     options.instruments.activeStreams.add(1, metricBase());
     streamActive = true;
   }
+}
+
+function authorizationTelemetryAttributes(
+  authorization: ProviderAuthorizationGrantV1,
+): AgentOSTelemetryAttributes {
+  return safeTelemetryAttributes({
+    "agentos.identity.agent_id": authorization.identity.agentId,
+    ...(authorization.identity.assignmentId === null
+      ? {}
+      : {
+          "agentos.identity.assignment_id":
+            authorization.identity.assignmentId,
+        }),
+    "agentos.authz.decision_ref": authorization.decisionRef,
+    "agentos.authz.profile_id": authorization.profile.profileId,
+    "agentos.authz.profile_version": authorization.profile.profileVersion,
+    "agentos.authz.rate_class": authorization.rateClass,
+  }, "span");
 }
 
 function createInstruments(meter: Meter): Instruments {

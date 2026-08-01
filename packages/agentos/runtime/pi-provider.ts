@@ -266,7 +266,6 @@ function gatewayProviderEntry(baseUrl: string): JsonObject {
   return {
     apiKey: publicCodexTransportPlaceholder,
     baseUrl,
-    headers: { "X-AI-Gateway-Token": "$AI_GATEWAY_TOKEN" },
   };
 }
 
@@ -382,7 +381,6 @@ function selectedSettings(
 const validateWithPi = Effect.fn("agentos.piProvider.validateWithPi")(
   function*(options: {
     readonly authPath: string;
-    readonly gatewayToken: string | undefined;
     readonly gatewayUrl: string | undefined;
     readonly modelsPath: string;
     readonly mode: ProviderMode;
@@ -419,13 +417,12 @@ const validateWithPi = Effect.fn("agentos.piProvider.validateWithPi")(
         if (model.provider !== providerId || model.baseUrl !== options.gatewayUrl) {
           throw new Error("Pi did not compose the AgentOS Gateway provider");
         }
-        const auth = await runtime.getAuth(model, {
-          env: { AI_GATEWAY_TOKEN: options.gatewayToken ?? "" },
-        });
+        const auth = await runtime.getAuth(model, { env: {} });
         if (
-          auth?.auth.headers?.["X-AI-Gateway-Token"] !== options.gatewayToken
+          auth?.auth.apiKey !== publicCodexTransportPlaceholder ||
+          auth.auth.headers?.["X-AI-Gateway-Token"] !== undefined
         ) {
-          throw new Error("Pi did not resolve the Gateway token header");
+          throw new Error("Pi did not compose workload-authenticated Gateway transport");
         }
       },
       catch: (cause) =>
@@ -511,7 +508,6 @@ export const reconcilePiConfiguration = Effect.fn(
     });
 
     let gatewayUrl: string | undefined;
-    let gatewayToken: string | undefined;
     let desiredProvider: JsonObject | undefined;
     if (mode === "ai-gateway") {
       gatewayUrl = yield* Effect.try({
@@ -526,22 +522,6 @@ export const reconcilePiConfiguration = Effect.fn(
           cause instanceof PiProviderConfigurationError
             ? cause
             : configurationError("Invalid AI_GATEWAY_URL"),
-      });
-      gatewayToken = yield* Effect.try({
-        try: () => {
-          const token = optionalEnvironment(
-            options.environment,
-            "AI_GATEWAY_TOKEN",
-          );
-          if (token === undefined) {
-            throw configurationError("AI_GATEWAY_TOKEN must be configured");
-          }
-          return token;
-        },
-        catch: (cause) =>
-          cause instanceof PiProviderConfigurationError
-            ? cause
-            : configurationError("Invalid AI_GATEWAY_TOKEN"),
       });
       if (selectedModel !== undefined) {
         const parts = yield* Effect.try({
@@ -587,7 +567,6 @@ export const reconcilePiConfiguration = Effect.fn(
     yield* writePrivateJson(validationAuth, {});
     yield* validateWithPi({
       authPath: validationAuth,
-      gatewayToken,
       gatewayUrl,
       modelsPath: modelsNext,
       mode,

@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   CompactionResult,
   ExtensionAPI,
@@ -284,7 +287,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
         model: {
           ...model(),
           headers: {
-            "X-AI-Gateway-Token": "fleet-token",
+            "X-Model-Feature": "enabled",
             Authorization: "Bearer configured-token",
           },
         } as any,
@@ -299,7 +302,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
     );
 
     expect(request.headers).toEqual({
-      "X-AI-Gateway-Token": "fleet-token",
+      "X-Model-Feature": "enabled",
       authorization: "Bearer resolved-header",
       "X-Resolved": "yes",
       traceparent: expect.stringMatching(
@@ -308,7 +311,7 @@ describe("AgentOS OpenAI server-compaction extension", () => {
       "x-agentos-request-attempt-id": "attempt-3",
     });
     expect(localRequest.auth.headers).toEqual({
-      "X-AI-Gateway-Token": "fleet-token",
+      "X-Model-Feature": "enabled",
       authorization: "Bearer resolved-header",
       "X-Resolved": "yes",
       traceparent: expect.stringMatching(
@@ -317,6 +320,64 @@ describe("AgentOS OpenAI server-compaction extension", () => {
       "x-agentos-request-attempt-id": "attempt-2",
     });
     expect(localRequest.auth.headers).not.toBe(request.headers);
+  });
+
+  test("uses projected workload identity for its internal Gateway requests", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "agentos-compaction-identity-"));
+    const tokenFile = join(directory, "token");
+    const token = "eyJhbGciOiJFZERTQSJ9.eyJhdWQiOiJhZ2VudG9zLWVncmVzcyJ9.signature";
+    const assignmentId = "11111111-1111-4111-8111-111111111111";
+    await writeFile(tokenFile, token, { mode: 0o400 });
+
+    try {
+      let localRequest: any;
+      let remoteRequest: any;
+      const handlers = harness({
+        workloadIdentity: {
+          environment: {
+            AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
+            AI_GATEWAY_URL: "http://gateway:8787",
+            AGENTOS_ASSIGNMENT_ID: assignmentId,
+          },
+          tokenFile,
+        },
+        runLocalCompaction: async (value) => {
+          localRequest = value;
+          return local;
+        },
+        runServerCompaction: async (value) => {
+          remoteRequest = value;
+          return { output: [{ type: "compaction", encrypted_content: "opaque" }] };
+        },
+      });
+
+      await handlers.get("session_before_compact")?.(
+        event,
+        context({
+          modelRegistry: {
+            getApiKeyAndHeaders: async () => ({
+              ok: true,
+              apiKey: "agentos-workload-identity",
+              headers: {
+                Authorization: "Bearer forged-placeholder",
+                "X-AgentOS-Authz-Decision-Ref": "forged-decision",
+              },
+            }),
+          } as any,
+        }),
+      );
+
+      const expectedIdentity = {
+        authorization: `Bearer ${token}`,
+        "x-agentos-assignment-id": assignmentId,
+      };
+      expect(localRequest.auth.apiKey).toBeUndefined();
+      expect(localRequest.auth.headers).toEqual(expectedIdentity);
+      expect(remoteRequest.apiKey).toBeUndefined();
+      expect(remoteRequest.headers).toEqual(expectedIdentity);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   test("keeps portable custom instructions out of the native request", async () => {

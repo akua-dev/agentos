@@ -32,7 +32,7 @@ function resource(resources: Resource[], kind: string, name: string): Resource {
 }
 
 describe("optional Fleet AI gateway", () => {
-  test("renders one private non-root service with retained state and selected-client ingress", async () => {
+  test("renders one private non-root service with retained state and Agentgateway-only ingress", async () => {
     const resources = await render(aiGatewayDirectory);
     expect(resources.map(({ kind, metadata }) => `${kind}/${metadata.name}`).sort()).toEqual([
       "NetworkPolicy/ai-gateway",
@@ -118,9 +118,11 @@ describe("optional Fleet AI gateway", () => {
       ]),
     );
     expect(environment.AI_GATEWAY_STATE_DIR).toBe("/var/lib/ai-gateway");
-    expect(environment.AI_GATEWAY_TOKEN).toEqual({
-      secretKeyRef: { key: "token", name: "ai-gateway-client" },
+    expect(environment.AI_GATEWAY_CLIENT_AUTH_MODE).toBe("workload_identity");
+    expect(environment.AI_GATEWAY_OPERATOR_TOKEN).toEqual({
+      secretKeyRef: { key: "token", name: "ai-gateway-operator" },
     });
+    expect(environment.AI_GATEWAY_TOKEN).toBeUndefined();
     expect(environment.OPENAI_API_KEY).toBeUndefined();
     expect(environment.AI_GATEWAY_ALLOW_API_KEY_FALLBACK).toBeUndefined();
 
@@ -130,11 +132,10 @@ describe("optional Fleet AI gateway", () => {
         {
           from: [
             {
-              namespaceSelector: {
-                matchLabels: { "agentos.akua.dev/fleet": "default" },
-              },
               podSelector: {
-                matchLabels: { "agentos.akua.dev/ai-gateway-client": "true" },
+                matchLabels: {
+                  "agentos.akua.dev/ai-gateway-upstream": "true",
+                },
               },
             },
           ],

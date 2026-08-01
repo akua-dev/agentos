@@ -14,12 +14,9 @@ spec:
     - Ingress
   ingress:
     - from:
-        - namespaceSelector:
+        - podSelector:
             matchLabels:
-              agentos.akua.dev/fleet: default
-          podSelector:
-            matchLabels:
-              agentos.akua.dev/ai-gateway-client: "true"
+              agentos.akua.dev/ai-gateway-upstream: "true"
       ports:
         - protocol: TCP
           port: 8787

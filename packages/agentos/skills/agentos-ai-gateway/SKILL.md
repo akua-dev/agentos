@@ -1,6 +1,6 @@
 ---
 name: agentos-ai-gateway
-description: Install, configure, inspect, recover, rotate, or retire the optional AgentOS Fleet AI Gateway for pooled Codex subscriptions and an explicit OpenAI API-key fallback. Use when a First or Second Mate considers shared AI capacity, server-owned provider OAuth, native Pi or Codex routing through the gateway, quota-aware account routing, gateway client Secrets, or gateway 401/429 failures.
+description: Install, configure, inspect, recover, rotate, or retire the optional AgentOS Fleet AI Gateway for pooled Codex subscriptions and an explicit OpenAI API-key fallback. Use when a First or Second Mate considers shared AI capacity, server-owned provider OAuth, native Pi or Codex routing through Agentgateway with projected workload identity, quota-aware account routing, operator access, or gateway 401/403/429 failures.
 ---
 
 # Operate the Fleet AI Gateway
@@ -19,9 +19,11 @@ and refresh after restart. The vault's `needsReauth` flag is the single
 authentication-eligibility authority and is reconciled into router state after
 a fresh Gateway-owned login.
 
-Use `ai-gateway`, `AI_GATEWAY_*` and the AI-gateway client label consistently.
-Never create a second StatefulSet or copy its credential vault during an
-upgrade.
+Use `ai-gateway` for the provider broker and `agentgateway-openai` for its
+policy-enforcement point. Agent clients carry
+`agentos.akua.dev/agentgateway-client: "true"`; only Agentgateway carries
+`agentos.akua.dev/ai-gateway-upstream: "true"`. Never create a second
+StatefulSet or copy the AI Gateway credential vault during an upgrade.
 
 The pre-release identity replacement is intentionally breaking. Do not apply
 this topology over an existing differently named experimental gateway: there
@@ -54,9 +56,10 @@ separately approved last-resort credential source for the in-cluster Gateway.
 1. Resolve the exact AgentOS revision, Kubernetes context, `agentos` namespace,
    intended clients and current provider authentication.
 2. Inspect whether `StatefulSet/ai-gateway`, `Service/ai-gateway`,
-   `Secret/ai-gateway-client`, its PVC and the selected-client NetworkPolicy
+   `Secret/ai-gateway-operator`, `Service/agentgateway-openai`,
+   `Service/agentos-egress-authz`, the retained PVC and their NetworkPolicies
    already exist. Inspect only metadata and non-secret status; do not print
-   Secret data or the vault.
+   Secret data, projected tokens, grants or the vault.
 3. Compare the four complete postures above. For pooled capacity inside an
    AgentOS Fleet, prefer the in-cluster Gateway or mixed posture. Keep direct
    native authentication available for at least one approved recovery path.
@@ -76,8 +79,8 @@ separately approved last-resort credential source for the in-cluster Gateway.
    installation, account changes and shared Secret changes through First Mate
    unless its exact charter and standing authorization cover them.
 
-Ask before installing the service, initially creating or distributing its
-client Secret, starting each provider login, enabling API-key fallback,
+Ask before installing the service, initially creating its operator Secret,
+starting each provider login, enabling API-key fallback,
 changing an Agent's provider/environment, interrupting a live harness, deleting
 an account, or removing retained state unless exact durable standing authority
 covers that client and action. State the credential blast radius and whether
@@ -88,15 +91,20 @@ the action can incur provider cost.
 Use the reviewed topology at
 `services/ai-gateway/kubernetes`. Render and inspect it before
 apply. It must remain one non-root replica, a ClusterIP without Ingress, a
-retained ReadWriteOnce PVC and the selected-client NetworkPolicy.
+retained ReadWriteOnce PVC and an upstream-only NetworkPolicy. The production
+path is usable only when the fail-closed Agentgateway and authorization
+adapter are deployed; never expose the AI Gateway directly to Agents as a
+temporary substitute.
 
-Create a high-entropy client token in a mode-`0600` file outside Git. Use
-`$agentos-secrets` with owner `ai-gateway`, scope `fleet-client`, schema
+Create a high-entropy operator token in a mode-`0600` file outside Git. Use
+`$agentos-secrets` with owner `ai-gateway`, scope `operator`, schema
 `token-v1`, and key `token` to create, retry, rotate, take over, or revoke
-`Secret/ai-gateway-client`. That lifecycle keeps the value out of argv and
+`Secret/ai-gateway-operator`. That lifecycle keeps the value out of argv and
 terminal output, rejects conflicting metadata, preserves UID during rotation,
-and never adds a credential-bearing annotation. Then install the service from
-the reviewed render:
+and never adds a credential-bearing annotation. The Secret is mounted only in
+the AI Gateway and protects operator status endpoints; it is never valid for
+inference and is never distributed to Agents or Agentgateway. Then install the
+service from the reviewed render:
 
 ```console
 kubectl --context <context> kustomize services/ai-gateway/kubernetes
@@ -109,8 +117,8 @@ the StatefulSet rollout to complete. Add an approved credential below, verify
 readiness, and only then run `kubectl rollout status`.
 
 Delete the private token file only after the live Secret metadata and service
-takeover are verified. Never put the token value in argv, chat, an Assignment,
-a manifest or a log.
+takeover are verified. Never put the operator token, projected workload token
+or authorization grant in argv, chat, an Assignment, a manifest or a log.
 
 Add each subscription with a fresh device login owned by the gateway Pod:
 
@@ -146,9 +154,17 @@ does not substitute another model and its real OpenAI response remains visible.
 Patch only explicitly approved or standing-authorized client Pods with this
 common client boundary:
 
-- label `agentos.akua.dev/ai-gateway-client: "true"`;
-- `AI_GATEWAY_URL=http://ai-gateway.agentos.svc.cluster.local:8787`;
-- `AI_GATEWAY_TOKEN` from `Secret/ai-gateway-client` key `token`.
+- label `agentos.akua.dev/agentgateway-client: "true"`;
+- `AI_GATEWAY_URL=http://agentgateway-openai.agentos.svc.cluster.local:8788`;
+- `AGENTOS_EGRESS_TOKEN_FILE=/var/run/secrets/agentos-egress/token`.
+
+The token is kubelet-rotated, audience-bound workload identity from the
+standard projected ServiceAccount volume. No client Secret is created or
+copied into a domain namespace. Agentgateway sends the token to the
+TokenReview/OpenFGA authorizer and replaces every grant header with the closed
+decision returned by that adapter. The grant expires within 15 seconds. The AI
+Gateway validates it, strips identity and decision headers, then injects only
+the selected upstream provider credential.
 
 The First- and Second-Mate patches additionally set
 `AGENTOS_PI_PROVIDER_MODE=ai-gateway` on `prepare-home` and the Mate runtime so
@@ -156,15 +172,11 @@ the retained Pi configuration has one explicit transport authority. The Codex
 Crewmate uses its native provider configuration below and does not receive Pi
 provider mode.
 
-The client Namespace must carry the same `agentos.akua.dev/fleet` label as the
-core `agentos` Namespace or the Gateway NetworkPolicy denies it. Kubernetes
-Secret references are namespace-local, so First Mate creates the approved
-`Secret/ai-gateway-client` in each selected domain through `$agentos-secrets`
-without printing the token. Use that domain's stable owner identity and keep
-the `fleet-client` scope plus `token-v1` schema unchanged.
-Treat that token as visible to the domain's Second Mate: its workload-create
-authority can mount every Secret in its namespace. Do not copy the Gateway's
-OAuth vault, provider accounts or Fleet-root credentials into a domain.
+The AI Gateway NetworkPolicy admits only the core Agentgateway Pods. Domain
+Agents need ordinary network reachability to the private Agentgateway Service;
+unrelated Internet egress remains direct and available. Second Mates may manage
+Crewmates in their own namespace without gaining the operator Secret, provider
+OAuth vault, another domain's identity or Fleet-root credentials.
 
 The default distribution ships one additive client patch for each workload:
 
@@ -201,8 +213,8 @@ normal native Kubernetes workflow.
 Posture 2 composes the patch for every approved pooled client. Posture 3
 composes it only for selected workers or trusted automation and leaves the
 other Mates' workload plus native harness authentication unchanged. A workload
-without the patch cannot pass the Gateway NetworkPolicy and receives neither
-Gateway environment variable.
+without the patch has no Agentgateway provider route; its ordinary Internet
+egress remains unchanged.
 
 Render the effective StatefulSet and inspect the diff. Environment changes need
 a real process/Pod restart; Pi `/reload` cannot change environment. Ask before
@@ -225,20 +237,19 @@ The reconciled provider entry is:
 {
   "providers": {
     "openai-codex": {
-      "baseUrl": "http://ai-gateway.agentos.svc.cluster.local:8787",
-      "apiKey": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoiZmxlZXQtZ2F0ZXdheSJ9fQ.placeholder",
-      "headers": {
-        "X-AI-Gateway-Token": "$AI_GATEWAY_TOKEN"
-      }
+      "baseUrl": "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+      "apiKey": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoiZmxlZXQtZ2F0ZXdheSJ9fQ.placeholder"
     }
   }
 }
 ```
 
-The JWT-shaped value is a public, non-secret transport placeholder required for
-Pi to construct Codex headers. The dedicated header resolves
-`AI_GATEWAY_TOKEN` only in memory; the token is never written to the PVC. The
-gateway strips both before injecting the selected upstream account.
+The JWT-shaped API key is a public, non-secret transport placeholder required
+for Pi to construct the request. AgentOS's first `before_provider_headers` behavior
+removes that placeholder and every client-supplied decision header, rereads the
+projected token file for each request, and supplies it only in memory. A
+missing, malformed or stale projection fails closed before network I/O. Direct
+provider mode remains untouched.
 
 The Gateway patch never chooses a model or thinking level. When the Captain has
 selected either axis, follow `$agentos-harnesses` and add
@@ -254,41 +265,52 @@ compaction while preserving Pi's built-in transport; its artifact and fallback
 contract is documented in [`ARCHITECTURE.md`](../../../../ARCHITECTURE.md).
 
 A selected Mate may retain its direct Pi login as a recovery path while a
-Codex process used by no-mistakes or another trusted automation explicitly uses
-`fleet-codex`. Configure and verify that process through the same selected
+Codex Crewmate or trusted automation explicitly uses the managed provider.
+Configure and verify that process through the same selected
 client boundary; do not require an unrelated second browser login merely
 because the automation uses another harness.
 
-For a Codex Crewmate, use its native provider configuration and the existing
-unattended launch contract from `$agentos-harnesses`:
+For a Codex Crewmate, `prepare-home` atomically owns the reserved
+`model_providers.agentos-gateway` entry in `~/.codex/config.toml`. It uses the
+native Responses wire API and Codex's command-backed provider authentication:
 
-```console
-codex -c 'model_provider="fleet-codex"' \
-  -c 'model_providers.fleet-codex.name="Fleet Codex"' \
-  -c 'model_providers.fleet-codex.base_url="http://ai-gateway.agentos.svc.cluster.local:8787/v1"' \
-  -c 'model_providers.fleet-codex.env_key="AI_GATEWAY_TOKEN"' \
-  -c 'model_providers.fleet-codex.wire_api="responses"' \
-  -c 'model_providers.fleet-codex.supports_websockets=false' \
-  --model <model> <reviewed-unattended-options>
+```toml
+[model_providers.agentos-gateway]
+name = "AgentOS Gateway"
+base_url = "http://agentgateway-openai.agentos.svc.cluster.local:8788/v1"
+wire_api = "responses"
+supports_websockets = false
+request_max_retries = 0
+stream_max_retries = 0
+env_http_headers = { "x-agentos-assignment-id" = "AGENTOS_ASSIGNMENT_ID" }
+
+[model_providers.agentos-gateway.auth]
+command = "/home/agent/.local/share/mise/shims/bun"
+args = ["/opt/agentos/packages/agentos/runtime/codex-token.ts"]
+timeout_ms = 5000
+refresh_interval_ms = 60000
 ```
 
-Do not add an AgentOS Codex wrapper. The Secret-backed environment is the client
-credential; the gateway replaces it before the upstream request. This custom
-provider can expose a different native model-picker surface than ChatGPT login,
-so select and verify the exact model before dispatch.
+Codex invokes that helper natively, refreshes proactively and retries auth once.
+The helper prints only the current validated projected token on success. It
+does not wrap Codex and never persists the token. The managed entry can expose
+a different model-picker surface than ChatGPT login, so select and verify the
+exact model before dispatch.
 
 ## Verify, recover and retire
 
-Verify public `/readyz`, authenticated `/readyz/client`, `ai-gateway status`,
-the selected Agent environment and one separately authorized short fixed
-no-tool response. Both readiness endpoints are local, read-only eligibility
-diagnostics and never refresh a credential, probe quota, send a prompt or
-reserve an account. `ready` means a locally eligible route or explicit API-key
-fallback exists; `degraded` keeps the Pod ready when valid credentials exist
+Verify public `/readyz`, operator-authenticated `/readyz/client`,
+`ai-gateway status`, the selected Agent environment and one separately
+authorized short fixed no-tool response. Both readiness endpoints are local,
+read-only eligibility diagnostics and never refresh a credential, probe quota,
+send a prompt or reserve an account. The client endpoint uses the operator
+Secret and does not prove inference authorization. `ready` means a locally
+eligible route or explicit API-key fallback exists; `degraded` keeps the Pod
+ready when valid credentials exist
 but cached capacity is unknown or temporarily blocked; `not_ready` means the
-client identity or provider credential boundary is unavailable. The client
-endpoint must receive the Secret-backed token through a header without printing
-it. Record only effective provider/model, the opaque managed account label/ID
+operator identity or provider credential boundary is unavailable. Pass the
+operator token through a header without printing it. Record only effective
+provider/model, the opaque managed account label/ID
 and success. `quota-axi` may provide additional read-only provider observations;
 it never selects accounts or mutates the gateway.
 
@@ -307,7 +329,8 @@ Gateway, change only the Gateway client boundary:
    `auth.json`, unrelated providers, saved model/thinking settings, and every
    AgentOS extension. Do not edit either JSON file by hand.
 3. Render the replacement and confirm it removes `AI_GATEWAY_URL`,
-   `AI_GATEWAY_TOKEN`, and `agentos.akua.dev/ai-gateway-client`, keeps the
+   `AGENTOS_EGRESS_TOKEN_FILE`, and
+   `agentos.akua.dev/agentgateway-client`, keeps the
    standard `OTEL_*` environment, and does not remove the
    `@akua-dev/agentos` package or its `agentos-observability`, `mate-memory`,
    `openai-server-compaction`, background-task, or supervision registrations.
@@ -336,9 +359,9 @@ silent cross-account retry.
 
 To retire the capability, first return every client to verified direct auth and
 remove its gateway provider environment/label. Then stop the StatefulSet, revoke
-or remove managed accounts and the client Secret, and ask separately before
-deleting the retained PVC. A rollback that leaves either provider credentials
-or an untracked client token behind is incomplete.
+or remove managed accounts and the operator Secret, and ask separately before
+deleting the retained PVC. A rollback that leaves provider credentials or an
+untracked authorization route behind is incomplete.
 
 ## External Cloudflare Worker
 

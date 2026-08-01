@@ -110,6 +110,31 @@ describe("ai-gateway executable", () => {
     expect(telemetryShutdown).toBe(true);
   });
 
+  test("serves in workload-identity mode without a shared client token", async () => {
+    const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-workload-cli-"));
+    let servedFetch: ((request: Request) => Response | Promise<Response>) | undefined;
+    const result = await runAIGatewayCli(["serve"], {
+      environment: {
+        AI_GATEWAY_CLIENT_AUTH_MODE: "workload_identity",
+        AI_GATEWAY_OPERATOR_TOKEN: "operator-only",
+        AI_GATEWAY_STATE_DIR: stateDirectory,
+      },
+      writeLine: () => undefined,
+      writeError: () => undefined,
+      refresh: async () => credentials("provider-a"),
+      startServer: ({ fetch }) => {
+        servedFetch = fetch;
+        return { stop: () => undefined };
+      },
+      waitForShutdown: async () => undefined,
+    });
+
+    expect(result).toBe(0);
+    expect(servedFetch).toBeDefined();
+    expect((await servedFetch!(new Request("http://gateway.test/healthz"))).status)
+      .toBe(200);
+  });
+
   test("ignores Kubernetes Service-link metadata as a listen-port choice", async () => {
     const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-service-link-cli-"));
     let binding: { hostname: string; port: number } | undefined;
@@ -154,5 +179,28 @@ describe("ai-gateway executable", () => {
     expect(authorization as unknown).toBe("Bearer fleet-secret");
     expect(lines).toEqual(['{"accounts":[],"apiKeyFallback":false}']);
     expect(lines.join("\n")).not.toContain("fleet-secret");
+  });
+
+  test("status prefers the separate operator credential in workload mode", async () => {
+    const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-status-cli-"));
+    let authorization: string | null = null;
+    const result = await runAIGatewayCli(["status"], {
+      environment: {
+        AI_GATEWAY_CLIENT_AUTH_MODE: "workload_identity",
+        AI_GATEWAY_OPERATOR_TOKEN: "operator-only",
+        AI_GATEWAY_STATE_DIR: stateDirectory,
+      },
+      writeLine: () => undefined,
+      writeError: () => undefined,
+      refresh: async () => credentials("provider-a"),
+      fetchImpl: async (input, init) => {
+        authorization = new Request(String(input), init).headers.get(
+          "authorization",
+        );
+        return Response.json({ accounts: [], apiKeyFallback: false });
+      },
+    });
+    expect(result).toBe(0);
+    expect(authorization as unknown).toBe("Bearer operator-only");
   });
 });

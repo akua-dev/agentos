@@ -35,8 +35,8 @@ describe("AgentOS AI Gateway operator skill", () => {
     expect(skill).toContain("Gateway-only First Mate recovery");
     expect(skill).toContain("models.json");
     expect(skill).toContain("AI_GATEWAY_URL");
-    expect(skill).toContain("AI_GATEWAY_TOKEN");
-    expect(skill).toContain("agentos.akua.dev/ai-gateway-client");
+    expect(skill).toContain("AGENTOS_EGRESS_TOKEN_FILE");
+    expect(skill).toContain("agentos.akua.dev/agentgateway-client");
     expect(skill).toContain("@akua-dev/agentos");
     expect(skill).toContain("agentos-observability");
     expect(skill).toContain("mate-memory");
@@ -46,5 +46,17 @@ describe("AgentOS AI Gateway operator skill", () => {
     expect(skill).toContain("ai-gateway-direct-auth.yaml");
     expect(skill).toContain("AGENTOS_PI_PROVIDER_MODE=direct");
     expect(skill).toContain("pi-provider.json");
+  });
+
+  test("uses projected workload identity without a shared inference Secret", async () => {
+    const skill = await readFile(skillPath, "utf8");
+
+    expect(skill).toContain("Secret/ai-gateway-operator");
+    expect(skill).toContain("agentgateway-openai.agentos.svc.cluster.local:8788");
+    expect(skill).toContain("before_provider_headers");
+    expect(skill).toContain("model_providers.agentos-gateway.auth");
+    expect(skill).toContain("refresh_interval_ms = 60000");
+    expect(skill).not.toContain("Secret/ai-gateway-client");
+    expect(skill).not.toContain("X-AI-Gateway-Token");
   });
 });
