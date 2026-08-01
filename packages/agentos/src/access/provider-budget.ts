@@ -155,15 +155,43 @@ const ProviderBudgetForwardOutcome = Schema.Literals([
   "transport_failed",
 ]);
 
-export const ProviderBudgetSettlementInputV1Schema = Schema.Struct({
+const ProviderBudgetSettlementReportV1Fields = {
   schemaVersion: Schema.Literal(1),
   decisionRef: DecisionRef,
-  subject: AccessBindingSubjectV1Schema,
   forwardOutcome: ProviderBudgetForwardOutcome,
   inputTokens: SafeNonNegativeInteger,
   outputTokens: SafeNonNegativeInteger,
   cachedInputTokens: SafeNonNegativeInteger,
   spendMicros: SafeNonNegativeInteger,
+};
+
+const settlementUsageCheck = Schema.makeFilter(
+  (input: { readonly cachedInputTokens: number; readonly inputTokens: number }) =>
+    input.cachedInputTokens <= input.inputTokens,
+  { title: "cached input tokens cannot exceed input tokens" },
+);
+
+export const ProviderBudgetSettlementReportV1Schema = Schema.Struct(
+  ProviderBudgetSettlementReportV1Fields,
+).pipe(
+  Schema.check(settlementUsageCheck),
+);
+
+export const ProviderBudgetSettlementInputV1Schema = Schema.Struct({
+  ...ProviderBudgetSettlementReportV1Fields,
+  subject: AccessBindingSubjectV1Schema,
+  settledAtMillis: EpochMillis,
+}).pipe(
+  Schema.check(Schema.makeFilter(
+    (input) => input.cachedInputTokens <= input.inputTokens,
+    { title: "cached input tokens cannot exceed input tokens" },
+  )),
+);
+
+export const ProviderBudgetProviderSettlementInputV1Schema = Schema.Struct({
+  ...ProviderBudgetSettlementReportV1Fields,
+  provider: AccessProviderIdSchema,
+  credentialDomain: CredentialDomain,
   settledAtMillis: EpochMillis,
 }).pipe(
   Schema.check(Schema.makeFilter(
@@ -190,6 +218,10 @@ export type ProviderBudgetReservationV1 =
   typeof ProviderBudgetReservationV1Schema.Type;
 export type ProviderBudgetSettlementInputV1 =
   typeof ProviderBudgetSettlementInputV1Schema.Type;
+export type ProviderBudgetSettlementReportV1 =
+  typeof ProviderBudgetSettlementReportV1Schema.Type;
+export type ProviderBudgetProviderSettlementInputV1 =
+  typeof ProviderBudgetProviderSettlementInputV1Schema.Type;
 export type ProviderBudgetSettlementV1 =
   typeof ProviderBudgetSettlementV1Schema.Type;
 
@@ -215,6 +247,9 @@ export interface ProviderBudgetStore {
   ) => Effect.Effect<unknown, unknown>;
   readonly settle: (
     input: ProviderBudgetSettlementInputV1,
+  ) => Effect.Effect<unknown, unknown>;
+  readonly settleProvider: (
+    input: ProviderBudgetProviderSettlementInputV1,
   ) => Effect.Effect<unknown, unknown>;
 }
 
@@ -248,6 +283,12 @@ export class ProviderBudgetEnforcer extends Context.Service<
     >;
     readonly settle: (
       input: ProviderBudgetSettlementInputV1,
+    ) => Effect.Effect<
+      ProviderBudgetSettlementV1,
+      ProviderBudgetEnforcementError
+    >;
+    readonly settleProvider: (
+      input: ProviderBudgetProviderSettlementInputV1,
     ) => Effect.Effect<
       ProviderBudgetSettlementV1,
       ProviderBudgetEnforcementError
@@ -316,7 +357,31 @@ export function makeProviderBudgetEnforcerLayer(store: ProviderBudgetStore) {
     );
   });
 
-  return Layer.succeed(ProviderBudgetEnforcer, { reserve, settle });
+  const settleProvider = Effect.fn(
+    "agentos.providerBudget.settleProvider",
+  )(function*(untrusted: unknown) {
+    const input = yield* Schema.decodeUnknownEffect(
+      ProviderBudgetProviderSettlementInputV1Schema,
+      { onExcessProperty: "error" },
+    )(untrusted).pipe(
+      Effect.mapError(() => enforcementError("invalid_settlement", false)),
+    );
+    const raw = yield* store.settleProvider(input).pipe(
+      Effect.mapError(() => enforcementError("database_unavailable", true)),
+    );
+    return yield* Schema.decodeUnknownEffect(
+      ProviderBudgetSettlementV1Schema,
+      { onExcessProperty: "error" },
+    )(raw).pipe(
+      Effect.mapError(() => enforcementError("policy_stale", true)),
+    );
+  });
+
+  return Layer.succeed(ProviderBudgetEnforcer, {
+    reserve,
+    settle,
+    settleProvider,
+  });
 }
 
 export const providerBudgetKey = Effect.fn(

@@ -16,11 +16,17 @@ The implementation is Effect-native end to end:
 - [`provider-budget-postgres.ts`](../../packages/agentos/src/access/provider-budget-postgres.ts)
   computes one SHA-256 subject/route key with Effect Crypto and calls only the
   narrow security-definer database functions through Effect SQL;
+- [`provider-budget-settlement-http.ts`](../../packages/agentos/src/access/provider-budget-settlement-http.ts)
+  rereads a rotating audience-bound Pod token for each closed settlement
+  report and uses only Effect FileSystem, HTTP, timeout and stream boundaries;
 - [`policy-decision.ts`](../../packages/agentos/src/access/policy-decision.ts)
   reserves capacity only after exact live policy and OpenFGA checks; and
 - [`0020_provider_budget_enforcement.sql`](../../database/migrations/0020_provider_budget_enforcement.sql)
   atomically revalidates the binding and policy, locks deterministic windows,
-  records reservations and settlements, and applies First-Mate overrides.
+  records reservations and settlements, and applies First-Mate overrides; and
+- [`0021_provider_budget_provider_settlement.sql`](../../database/migrations/0021_provider_budget_provider_settlement.sql)
+  removes subject-bearing settlement authority from the egress-authorizer
+  role and exposes only exact provider/credential-domain settlement.
 
 ## Stable isolation key
 
@@ -60,8 +66,16 @@ conflicting reuse of a decision or operation identity fails closed.
 An expired lease prevents an abandoned call from holding concurrency forever.
 Provider components must settle every terminal result (`completed`,
 `cancelled`, `provider_rejected`, or `transport_failed`) so token and spend
-usage becomes authoritative promptly. The PostgreSQL settlement API is shipped;
-provider-specific settlement adapters remain required before #107 can close.
+usage becomes authoritative promptly. `agentos-egress-authz` exposes a private
+`POST /settle` endpoint. Its body cannot name a subject, provider or credential
+domain: a dedicated Kubernetes TokenReview audience binds the live Pod and
+ServiceAccount, and a finite registry derives those two authority fields.
+
+The GitHub broker settles after a streamed response terminates, distinguishes
+native provider rejection, downstream cancellation and transport failure, and
+uses zero token/spend values. A settlement dependency failure never replaces
+the provider response; the still-active 15-minute lease remains the fail-closed
+fallback. The OpenAI adapter remains required before #107 can close.
 
 ## Surgical kill switches
 
@@ -80,10 +94,11 @@ Captain ceiling or manufacture access. Every set/revoke appends immutable
 control audit and emits `agentos_access_control` notification for bounded
 invalidation consumers.
 
-The egress-authorizer role cannot select counters or mutate overrides. It can
-only read the already-minimized policy snapshot and invoke reservation or
-settlement. First-Mate roles can invoke the narrow override mutation and no
-provider credential is involved.
+The egress-authorizer role cannot select counters, mutate overrides or invoke
+the subject-bearing settlement function. It can only read the already-minimized
+policy snapshot, reserve capacity, and settle an exact reservation for the
+provider/credential domain authenticated at the HTTP boundary. First-Mate roles
+can invoke the narrow override mutation and no provider credential is involved.
 
 ## Failure and network behavior
 
@@ -104,8 +119,11 @@ of PostgreSQL, OpenFGA, AgentGateway and this budget service.
 bunx vitest run database/tests/provider-budget-enforcement.effect.test.ts \
   packages/agentos/src/access/tests/provider-budget.effect.test.ts \
   packages/agentos/src/access/tests/provider-budget-postgres.effect.test.ts \
+  packages/agentos/src/access/tests/provider-budget-settlement.effect.test.ts \
+  packages/agentos/src/access/tests/provider-budget-settlement-http.effect.test.ts \
   packages/agentos/src/access/tests/policy-decision.effect.test.ts \
-  packages/agentos/src/access/tests/http-authorizer.effect.test.ts
+  packages/agentos/src/access/tests/http-authorizer.effect.test.ts \
+  services/egress-authz/tests services/github-broker/tests
 bun run effect:check
 bun run --cwd database migration:check
 bun run typecheck

@@ -1,11 +1,17 @@
 import { assert, describe, it } from "@effect/vitest";
 import {
+  ProviderBudgetEnforcementError,
+  ProviderBudgetEnforcer,
+  ProviderBudgetSettlementCallerAuthenticator,
+  ProviderBudgetSettlementCallerAuthenticationError,
   ProviderDecisionReferenceGenerator,
   ProviderPolicyDecisionError,
   ProviderPolicyDecisionPoint,
   WorkloadAuthenticationError,
   WorkloadIdentityAuthenticator,
   type ProviderPolicyDecisionRefV1,
+  type ProviderBudgetSettlementReportV1,
+  type ProviderBudgetSettlementCallerV1,
   type WorkloadIdentityV1,
 } from "@akua-dev/agentos";
 import {
@@ -57,6 +63,27 @@ const decision: ProviderPolicyDecisionRefV1 = {
   rateClass: "standard",
 };
 
+const settlementCaller: ProviderBudgetSettlementCallerV1 = {
+  schemaVersion: 1,
+  provider: "github",
+  credentialDomain: "github",
+  kubernetesNamespace: "agentos",
+  kubernetesPod: "github-broker-0",
+  podUid: "github-broker-pod-uid",
+  serviceAccountName: "github-broker",
+  serviceAccountUid: "github-broker-service-account-uid",
+};
+
+const settlementBody: ProviderBudgetSettlementReportV1 = {
+  schemaVersion: 1,
+  decisionRef: "decision_22222222222222222222222222222222",
+  forwardOutcome: "completed",
+  inputTokens: 0,
+  outputTokens: 0,
+  cachedInputTokens: 0,
+  spendMicros: 0,
+};
+
 function request(path = "/authorize", method = "POST") {
   return new Request(`http://egress-authz.test${path}`, {
     method,
@@ -69,8 +96,26 @@ function request(path = "/authorize", method = "POST") {
   });
 }
 
+function settlementRequest(
+  body: unknown = settlementBody,
+  authorization = "Bearer projected-provider-jwt",
+) {
+  const encoded = JSON.stringify(body);
+  return new Request("http://egress-authz.test/settle", {
+    method: "POST",
+    headers: {
+      authorization,
+      "content-type": "application/json",
+      "content-length": String(new TextEncoder().encode(encoded).byteLength),
+    },
+    body: encoded,
+  });
+}
+
 function services(options?: {
   readonly authenticate?: WorkloadIdentityAuthenticator["Service"]["authenticate"];
+  readonly authenticateSettlement?: ProviderBudgetSettlementCallerAuthenticator["Service"]["authenticate"];
+  readonly settleProvider?: ProviderBudgetEnforcer["Service"]["settleProvider"];
   readonly ready?: Effect.Effect<boolean, unknown>;
 }) {
   return Layer.mergeAll(
@@ -87,6 +132,25 @@ function services(options?: {
     Layer.succeed(ProviderDecisionReferenceGenerator, {
       next: Effect.succeed("44444444444444444444444444444444"),
     }),
+    Layer.succeed(ProviderBudgetSettlementCallerAuthenticator, {
+      authenticate: options?.authenticateSettlement ??
+        (() => Effect.succeed(settlementCaller)),
+    }),
+    Layer.succeed(ProviderBudgetEnforcer, {
+      reserve: () => Effect.die("reserve is owned by the policy decision point"),
+      settle: () => Effect.die("subject settlement is not an HTTP boundary"),
+      settleProvider: options?.settleProvider ?? ((input) => Effect.succeed({
+        schemaVersion: 1,
+        decisionRef: input.decisionRef,
+        outcome: "settled",
+        forwardOutcome: input.forwardOutcome,
+        inputTokens: input.inputTokens,
+        outputTokens: input.outputTokens,
+        cachedInputTokens: input.cachedInputTokens,
+        spendMicros: input.spendMicros,
+        settledAtMillis: input.settledAtMillis,
+      })),
+    }),
     Layer.succeed(EgressAuthorizerReadiness, {
       check: options?.ready ?? Effect.succeed(true),
     }),
@@ -100,6 +164,7 @@ const makeHandler = makeEgressAuthorizerRequestHandler({
   maximumHeaderCount: 32,
   maximumHeaderBytes: 8 * 1_024,
   maximumHeaderValueBytes: 4 * 1_024,
+  maximumSettlementBodyBytes: 4 * 1_024,
   clock: Effect.succeed(now),
 });
 
@@ -114,6 +179,7 @@ describe("Effect egress authorization HTTP application", () => {
           maximumHeaderCount: 32,
           maximumHeaderBytes: 8 * 1_024,
           maximumHeaderValueBytes: 4 * 1_024,
+          maximumSettlementBodyBytes: 4 * 1_024,
           clock: Effect.succeed(now),
         }).pipe(Layer.provide(services())),
         { disableLogger: true },
@@ -265,5 +331,116 @@ describe("Effect egress authorization HTTP application", () => {
       assert.deepStrictEqual(yield* Effect.tryPromise(() => response.json()), {
         error: "authorization_unavailable",
       });
+    }));
+
+  it.effect("authenticates a provider Pod and derives settlement authority outside the body", () =>
+    Effect.gen(function*() {
+      const seen = yield* Ref.make<unknown>(null);
+      const handler = yield* makeHandler.pipe(
+        Effect.provide(services({
+          settleProvider: (input) =>
+            Ref.set(seen, input).pipe(
+              Effect.as({
+                schemaVersion: 1,
+                decisionRef: input.decisionRef,
+                outcome: "settled",
+                forwardOutcome: input.forwardOutcome,
+                inputTokens: input.inputTokens,
+                outputTokens: input.outputTokens,
+                cachedInputTokens: input.cachedInputTokens,
+                spendMicros: input.spendMicros,
+                settledAtMillis: input.settledAtMillis,
+              }),
+            ),
+        })),
+      );
+      const response = yield* handler(settlementRequest());
+      assert.strictEqual(response.status, 200);
+      assert.deepStrictEqual(yield* Effect.tryPromise(() => response.json()), {
+        schemaVersion: 1,
+        decisionRef: settlementBody.decisionRef,
+        outcome: "settled",
+      });
+      assert.deepStrictEqual(yield* Ref.get(seen), {
+        ...settlementBody,
+        provider: "github",
+        credentialDomain: "github",
+        settledAtMillis: now,
+      });
+    }));
+
+  it.effect("rejects malformed or oversized settlement bodies before database work", () =>
+    Effect.gen(function*() {
+      const calls = yield* Ref.make(0);
+      const handler = yield* makeHandler.pipe(
+        Effect.provide(services({
+          settleProvider: (input) =>
+            Ref.update(calls, (count) => count + 1).pipe(
+              Effect.as({
+                schemaVersion: 1,
+                decisionRef: input.decisionRef,
+                outcome: "settled",
+                forwardOutcome: input.forwardOutcome,
+                inputTokens: input.inputTokens,
+                outputTokens: input.outputTokens,
+                cachedInputTokens: input.cachedInputTokens,
+                spendMicros: input.spendMicros,
+                settledAtMillis: input.settledAtMillis,
+              }),
+            ),
+        })),
+      );
+      const excessive = settlementRequest({
+        ...settlementBody,
+        provider: "github",
+      });
+      assert.strictEqual((yield* handler(excessive)).status, 400);
+
+      const oversized = settlementRequest(settlementBody);
+      oversized.headers.set("content-length", String(4 * 1_024 + 1));
+      assert.strictEqual((yield* handler(oversized)).status, 400);
+      assert.strictEqual(yield* Ref.get(calls), 0);
+    }));
+
+  it.effect("maps settlement identity and dependency failures to finite responses", () =>
+    Effect.gen(function*() {
+      const handler = yield* makeHandler.pipe(Effect.provide(services()));
+      const forbiddenHandler = yield* makeHandler.pipe(
+        Effect.provide(services({
+          authenticateSettlement: () =>
+            Effect.fail(
+              ProviderBudgetSettlementCallerAuthenticationError.make({
+                outcome: "forbidden",
+              }),
+            ),
+        })),
+      );
+      const unavailableHandler = yield* makeHandler.pipe(
+        Effect.provide(services({
+          authenticateSettlement: () =>
+            Effect.fail(
+              ProviderBudgetSettlementCallerAuthenticationError.make({
+                outcome: "dependency_unavailable",
+              }),
+            ),
+        })),
+      );
+      const databaseHandler = yield* makeHandler.pipe(
+        Effect.provide(services({
+          settleProvider: () =>
+            Effect.fail(ProviderBudgetEnforcementError.make({
+              outcome: "database_unavailable",
+              retryable: true,
+              retryAtMillis: null,
+            })),
+        })),
+      );
+      const missing = settlementRequest();
+      missing.headers.delete("authorization");
+      assert.strictEqual((yield* handler(missing)).status, 401);
+
+      assert.strictEqual((yield* forbiddenHandler(settlementRequest())).status, 403);
+      assert.strictEqual((yield* unavailableHandler(settlementRequest())).status, 503);
+      assert.strictEqual((yield* databaseHandler(settlementRequest())).status, 503);
     }));
 });

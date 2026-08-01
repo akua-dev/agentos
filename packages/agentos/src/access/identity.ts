@@ -81,6 +81,16 @@ export const KubernetesServiceAccountIdentityV1Schema = Schema.Struct({
   deletionTimestampMillis: Schema.NullOr(EpochMillis),
 });
 
+export const KubernetesBoundServiceAccountIdentityV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  tokenExpiresAtMillis: EpochMillis,
+  kubernetesNamespace: KubernetesName,
+  kubernetesPod: KubernetesName,
+  podUid: KubernetesUid,
+  serviceAccountName: KubernetesName,
+  serviceAccountUid: KubernetesUid,
+});
+
 export const AgentOSWorkloadAgentV1Schema = Schema.Struct({
   agentId: Uuid,
   role: Schema.Literals(["first_mate", "second_mate", "crewmate"]),
@@ -218,6 +228,8 @@ export type KubernetesPodIdentityV1 =
   typeof KubernetesPodIdentityV1Schema.Type;
 export type KubernetesServiceAccountIdentityV1 =
   typeof KubernetesServiceAccountIdentityV1Schema.Type;
+export type KubernetesBoundServiceAccountIdentityV1 =
+  typeof KubernetesBoundServiceAccountIdentityV1Schema.Type;
 export type AgentOSWorkloadAgentV1 =
   typeof AgentOSWorkloadAgentV1Schema.Type;
 export type AgentOSWorkloadAssignmentV1 =
@@ -251,6 +263,11 @@ export interface AgentOSWorkloadReference {
 export interface WorkloadIdentityAuthenticationRequest {
   readonly bearerToken: string;
   readonly assignmentRequirement: "not_required" | "required";
+}
+
+export interface KubernetesBoundServiceAccountAuthenticationRequest {
+  readonly bearerToken: string;
+  readonly audience: string;
 }
 
 export class KubernetesTokenReviewer extends Context.Service<
@@ -301,6 +318,79 @@ export class AgentOSWorkloadIdentityStore extends Context.Service<
   }
 >()("agentos/access/AgentOSWorkloadIdentityStore") {}
 
+export class KubernetesBoundServiceAccountAuthenticator extends Context.Service<
+  KubernetesBoundServiceAccountAuthenticator,
+  {
+    readonly authenticate: (
+      request: KubernetesBoundServiceAccountAuthenticationRequest,
+    ) => Effect.Effect<
+      KubernetesBoundServiceAccountIdentityV1,
+      WorkloadAuthenticationError | WorkloadIdentityDependencyUnavailable
+    >;
+  }
+>()("agentos/access/KubernetesBoundServiceAccountAuthenticator") {
+  static readonly layer = Layer.effect(
+    KubernetesBoundServiceAccountAuthenticator,
+    Effect.gen(function*() {
+      const tokenReviewer = yield* KubernetesTokenReviewer;
+      const kubernetes = yield* KubernetesWorkloadIdentityLookup;
+      return KubernetesBoundServiceAccountAuthenticator.of({
+        authenticate: Effect.fn(
+          "KubernetesBoundServiceAccountAuthenticator.authenticate",
+        )(function*(request) {
+          if (
+            tokenPayloadSegment(request.bearerToken) === null ||
+            request.audience.length === 0 ||
+            request.audience.length > 253 ||
+            /\s/.test(request.audience)
+          ) {
+            return yield* authenticationError("invalid_token");
+          }
+          const reviewed = yield* tokenReviewer.review({
+            token: request.bearerToken,
+            audiences: [request.audience],
+          });
+          const binding = yield* reviewedBinding(reviewed, request.audience);
+          const tokenExpiresAtMillis = yield* tokenExpirationMillis(
+            request.bearerToken,
+          );
+          const reviewedAtMillis = yield* Clock.currentTimeMillis;
+          if (tokenExpiresAtMillis <= reviewedAtMillis) {
+            return yield* authenticationError("token_expired");
+          }
+          const resources = yield* Effect.all({
+            pod: kubernetes.getPod({
+              namespace: binding.namespace,
+              name: binding.podName,
+            }),
+            serviceAccount: kubernetes.getServiceAccount({
+              namespace: binding.namespace,
+              name: binding.serviceAccountName,
+            }),
+          }, { concurrency: 2 });
+          const live = yield* validateLiveKubernetesIdentity(
+            binding,
+            resources,
+          );
+          const validatedAtMillis = yield* Clock.currentTimeMillis;
+          if (tokenExpiresAtMillis <= validatedAtMillis) {
+            return yield* authenticationError("token_expired");
+          }
+          return {
+            schemaVersion: 1,
+            tokenExpiresAtMillis,
+            kubernetesNamespace: live.pod.namespace,
+            kubernetesPod: live.pod.name,
+            podUid: live.pod.uid,
+            serviceAccountName: live.serviceAccount.name,
+            serviceAccountUid: live.serviceAccount.uid,
+          } satisfies KubernetesBoundServiceAccountIdentityV1;
+        }),
+      });
+    }),
+  );
+}
+
 interface PositiveCacheEntry {
   readonly expiresAtMillis: number;
   readonly identity: WorkloadIdentityV1;
@@ -320,8 +410,8 @@ export class WorkloadIdentityAuthenticator extends Context.Service<
   static readonly layer = Layer.effect(
     WorkloadIdentityAuthenticator,
     Effect.gen(function*() {
-      const tokenReviewer = yield* KubernetesTokenReviewer;
-      const kubernetes = yield* KubernetesWorkloadIdentityLookup;
+      const boundServiceAccounts =
+        yield* KubernetesBoundServiceAccountAuthenticator;
       const identityStore = yield* AgentOSWorkloadIdentityStore;
       const cache = yield* Ref.make<ReadonlyMap<string, PositiveCacheEntry>>(
         new Map(),
@@ -341,41 +431,24 @@ export class WorkloadIdentityAuthenticator extends Context.Service<
           return cached.identity;
         }
 
-        const reviewed = yield* tokenReviewer.review({
-          token: request.bearerToken,
-          audiences: [AGENTOS_EGRESS_TOKEN_AUDIENCE],
+        const bound = yield* boundServiceAccounts.authenticate({
+          bearerToken: request.bearerToken,
+          audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
         });
-        const binding = yield* reviewedBinding(reviewed);
-        const tokenExpiresAtMillis = yield* tokenExpirationMillis(
-          request.bearerToken,
-        );
-        const reviewedAtMillis = yield* Clock.currentTimeMillis;
-        if (tokenExpiresAtMillis <= reviewedAtMillis) {
-          return yield* authenticationError("token_expired");
-        }
-
-        const resources = yield* Effect.all({
-          pod: kubernetes.getPod({
-            namespace: binding.namespace,
-            name: binding.podName,
-          }),
-          serviceAccount: kubernetes.getServiceAccount({
-            namespace: binding.namespace,
-            name: binding.serviceAccountName,
-          }),
-        }, { concurrency: 2 });
-        const live = yield* validateLiveKubernetesIdentity(binding, resources);
 
         const agents = yield* identityStore.findAgentsByWorkload({
-          kubernetesNamespace: live.pod.namespace,
-          kubernetesPod: live.pod.name,
+          kubernetesNamespace: bound.kubernetesNamespace,
+          kubernetesPod: bound.kubernetesPod,
         });
-        const agent = yield* resolveActiveAgent(agents, live.pod);
+        const agent = yield* resolveActiveAgent(agents, {
+          namespace: bound.kubernetesNamespace,
+          name: bound.kubernetesPod,
+        });
         const assignmentId = request.assignmentRequirement === "required"
           ? yield* resolveActiveAssignment(identityStore, agent.agentId)
           : null;
         const validatedAtMillis = yield* Clock.currentTimeMillis;
-        if (tokenExpiresAtMillis <= validatedAtMillis) {
+        if (bound.tokenExpiresAtMillis <= validatedAtMillis) {
           return yield* authenticationError("token_expired");
         }
 
@@ -386,15 +459,15 @@ export class WorkloadIdentityAuthenticator extends Context.Service<
           fleet: agent.fleet,
           domain: agent.domain,
           assignmentId,
-          kubernetesNamespace: live.pod.namespace,
-          kubernetesPod: live.pod.name,
-          podUid: live.pod.uid,
-          serviceAccountName: live.serviceAccount.name,
-          serviceAccountUid: live.serviceAccount.uid,
+          kubernetesNamespace: bound.kubernetesNamespace,
+          kubernetesPod: bound.kubernetesPod,
+          podUid: bound.podUid,
+          serviceAccountName: bound.serviceAccountName,
+          serviceAccountUid: bound.serviceAccountUid,
         } satisfies WorkloadIdentityV1;
 
         const cacheExpiresAtMillis = Math.min(
-          tokenExpiresAtMillis,
+          bound.tokenExpiresAtMillis,
           validatedAtMillis + AGENTOS_IDENTITY_POSITIVE_CACHE_TTL_MILLIS,
         );
         if (cacheExpiresAtMillis > validatedAtMillis) {
@@ -439,7 +512,7 @@ export class WorkloadIdentityAuthenticator extends Context.Service<
         }),
       });
     }),
-  );
+  ).pipe(Layer.provide(KubernetesBoundServiceAccountAuthenticator.layer));
 }
 
 interface ReviewedBinding {
@@ -468,11 +541,11 @@ function identityResolutionError(
 }
 
 const reviewedBinding = Effect.fn("workloadIdentity.reviewedBinding")(
-  function*(reviewed: KubernetesReviewedIdentityV1) {
+  function*(reviewed: KubernetesReviewedIdentityV1, expectedAudience: string) {
     if (!reviewed.authenticated) {
       return yield* authenticationError("token_review_rejected");
     }
-    if (!reviewed.audiences.includes(AGENTOS_EGRESS_TOKEN_AUDIENCE)) {
+    if (!reviewed.audiences.includes(expectedAudience)) {
       return yield* authenticationError("wrong_audience");
     }
     const parsed = parseServiceAccountUsername(reviewed.username);
@@ -574,7 +647,7 @@ const validateLiveKubernetesIdentity = Effect.fn(
 const resolveActiveAgent = Effect.fn("workloadIdentity.resolveActiveAgent")(
   function*(
     agents: ReadonlyArray<AgentOSWorkloadAgentV1>,
-    pod: KubernetesPodIdentityV1,
+    pod: Pick<KubernetesPodIdentityV1, "namespace" | "name">,
   ) {
     if (agents.length === 0) {
       return yield* identityResolutionError("agent_not_found");

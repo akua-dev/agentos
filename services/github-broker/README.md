@@ -31,6 +31,14 @@ cached token. REST and Git smart HTTP resources are derived from the path.
 Repository-bound GraphQL reads are supported; opaque node-ID mutations fail
 closed because the repository cannot be proven from a native request.
 
+Every granted forward is also a durable budget reservation. The broker rereads
+its kubelet-rotated settlement token for each report and calls the private
+authorizer endpoint only after the response stream completes, fails or is
+cancelled. It reports `completed`, `provider_rejected`, `transport_failed`, or
+`cancelled` exactly once with zero token/spend usage. A settlement outage does
+not rewrite GitHub's native response; the reservation lease remains active
+until its fail-closed 15-minute expiry.
+
 ## Kubernetes inputs
 
 [`kubernetes/`](./kubernetes/) expects these core-namespace resources:
@@ -41,6 +49,11 @@ closed because the repository cannot be proven from a native request.
   Service DNS name;
 - `ConfigMap/agentos-github-ca` with the public `ca.pem` distributed to Agent
   workloads.
+
+The Deployment also projects a 10-minute Pod-bound ServiceAccount token with
+the `agentos-provider-budget-settlement` audience. This is identity, not a
+shared secret; the egress authorizer validates its live Pod, ServiceAccount,
+UIDs and audience through Kubernetes before deriving GitHub authority.
 
 Only the broker Deployment references `agentos-github-app`. Agent workloads
 mount the public CA and their audience-bound projected ServiceAccount token.

@@ -15,6 +15,7 @@ import {
   providerBudgetKey,
   providerBudgetRateClassesV1,
   type ProviderBudgetRateClassV1,
+  type ProviderBudgetProviderSettlementInputV1,
   type ProviderBudgetReservationInputV1,
   type ProviderBudgetStore,
 } from "../provider-budget.ts";
@@ -160,6 +161,7 @@ describe("provider budget enforcement", () => {
             })),
           ),
         settle: () => Effect.die("settlement not expected"),
+        settleProvider: () => Effect.die("provider settlement not expected"),
       };
       const enforcer = yield* ProviderBudgetEnforcer.pipe(
         Effect.provide(makeProviderBudgetEnforcerLayer(store)),
@@ -189,6 +191,7 @@ describe("provider budget enforcement", () => {
         settle: () => Ref.update(calls, (count) => count + 1).pipe(
           Effect.andThen(Effect.die("invalid input reached store")),
         ),
+        settleProvider: () => Effect.die("provider settlement not expected"),
       };
       const enforcer = yield* ProviderBudgetEnforcer.pipe(
         Effect.provide(makeProviderBudgetEnforcerLayer(store)),
@@ -207,5 +210,58 @@ describe("provider budget enforcement", () => {
       assert.strictEqual(failure.outcome, "invalid_settlement");
       assert.strictEqual(failure.retryable, false);
       assert.strictEqual(yield* Ref.get(calls), 0);
+    }));
+
+  it.effect("settles through provider-derived authority without accepting a subject", () =>
+    Effect.gen(function*() {
+      const seen = yield* Ref.make<
+        ReadonlyArray<ProviderBudgetProviderSettlementInputV1>
+      >([]);
+      const store: ProviderBudgetStore = {
+        reserve: () => Effect.die("reservation not expected"),
+        settle: () => Effect.die("subject settlement not expected"),
+        settleProvider: (input) =>
+          Ref.update(seen, (current) => [...current, input]).pipe(
+            Effect.as({
+              schemaVersion: 1,
+              decisionRef: input.decisionRef,
+              outcome: "settled",
+              forwardOutcome: input.forwardOutcome,
+              inputTokens: input.inputTokens,
+              outputTokens: input.outputTokens,
+              cachedInputTokens: input.cachedInputTokens,
+              spendMicros: input.spendMicros,
+              settledAtMillis: input.settledAtMillis,
+            }),
+          ),
+      };
+      const settlement: ProviderBudgetProviderSettlementInputV1 = {
+        schemaVersion: 1,
+        decisionRef: reservationInput.decisionRef,
+        provider: "github",
+        credentialDomain: "github",
+        forwardOutcome: "provider_rejected",
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedInputTokens: 0,
+        spendMicros: 0,
+        settledAtMillis: now + 1_000,
+      };
+      const result = yield* ProviderBudgetEnforcer.pipe(
+        Effect.flatMap((budgets) => budgets.settleProvider(settlement)),
+        Effect.provide(makeProviderBudgetEnforcerLayer(store)),
+      );
+      assert.deepStrictEqual(result, {
+        schemaVersion: 1,
+        decisionRef: settlement.decisionRef,
+        outcome: "settled",
+        forwardOutcome: "provider_rejected",
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedInputTokens: 0,
+        spendMicros: 0,
+        settledAtMillis: now + 1_000,
+      });
+      assert.deepStrictEqual(yield* Ref.get(seen), [settlement]);
     }));
 });

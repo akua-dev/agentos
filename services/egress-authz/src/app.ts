@@ -1,10 +1,16 @@
 import {
+  ProviderBudgetEnforcementError,
+  ProviderBudgetEnforcer,
+  ProviderBudgetSettlementCallerAuthenticator,
+  ProviderBudgetSettlementCallerAuthenticationError,
+  ProviderBudgetSettlementReportV1Schema,
   ProviderDecisionReferenceGenerator,
   ProviderPolicyDecisionPoint,
   WorkloadIdentityAuthenticator,
   createProviderAuthorizationHttpHandler,
 } from "@akua-dev/agentos";
 import {
+  Clock,
   Context,
   Effect,
   Layer,
@@ -29,6 +35,7 @@ const EgressAuthorizerLimitsSchema = Schema.Struct({
   maximumHeaderCount: PositiveInteger,
   maximumHeaderBytes: PositiveInteger,
   maximumHeaderValueBytes: PositiveInteger,
+  maximumSettlementBodyBytes: PositiveInteger,
 });
 
 export interface EgressAuthorizerLimits {
@@ -38,12 +45,18 @@ export interface EgressAuthorizerLimits {
   readonly maximumHeaderCount: number;
   readonly maximumHeaderBytes: number;
   readonly maximumHeaderValueBytes: number;
+  readonly maximumSettlementBodyBytes: number;
   readonly clock?: Effect.Effect<number>;
 }
 
 export class EgressAuthorizerConfigurationError extends Schema.TaggedErrorClass<EgressAuthorizerConfigurationError>()(
   "EgressAuthorizerConfigurationError",
   { code: Schema.Literal("invalid_limits") },
+) {}
+
+class InvalidSettlementRequest extends Schema.TaggedErrorClass<InvalidSettlementRequest>()(
+  "InvalidSettlementRequest",
+  {},
 ) {}
 
 export class EgressAuthorizerReadiness extends Context.Service<
@@ -69,9 +82,12 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
     ),
   );
   const readiness = yield* EgressAuthorizerReadiness;
+  const clock = options.clock ?? Clock.currentTimeMillis;
   const decisionReferences = yield* ProviderDecisionReferenceGenerator;
+  const settlementCallers = yield* ProviderBudgetSettlementCallerAuthenticator;
+  const providerBudgets = yield* ProviderBudgetEnforcer;
   const authorize = yield* createProviderAuthorizationHttpHandler({
-    clock: options.clock,
+    clock,
     id: decisionReferences.next,
   });
   const permits = yield* Semaphore.make(limits.maximumConcurrentRequests);
@@ -81,6 +97,49 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
   )((request: Request) =>
     permits.withPermitsIfAvailable(1)(
       authorize(request).pipe(
+        Effect.timeoutOption(limits.requestTimeoutMillis),
+      ),
+    ).pipe(
+      Effect.map((permitted) => {
+        if (Option.isNone(permitted)) return overloadedResponse();
+        return Option.match(permitted.value, {
+          onNone: unavailableResponse,
+          onSome: (response) => response,
+        });
+      }),
+    ));
+
+  const settle = Effect.fn("agentos.egressAuthz.settleProviderBudget")(
+    function*(request: Request) {
+      const bearerToken = settlementBearerToken(request.headers);
+      if (bearerToken === null) return unauthorizedResponse();
+      const caller = yield* settlementCallers.authenticate(bearerToken);
+      const report = yield* readSettlementReport(
+        request,
+        limits.maximumSettlementBodyBytes,
+      );
+      const result = yield* providerBudgets.settleProvider({
+        ...report,
+        provider: caller.provider,
+        credentialDomain: caller.credentialDomain,
+        settledAtMillis: yield* clock,
+      });
+      return Response.json({
+        schemaVersion: 1,
+        decisionRef: result.decisionRef,
+        outcome: result.outcome,
+      });
+    },
+  );
+
+  const handleSettlement = Effect.fn(
+    "agentos.egressAuthz.handleSettlement",
+  )((request: Request) =>
+    permits.withPermitsIfAvailable(1)(
+      settle(request).pipe(
+        Effect.catch((error) =>
+          Effect.succeed(responseForSettlementFailure(error))
+        ),
         Effect.timeoutOption(limits.requestTimeoutMillis),
       ),
     ).pipe(
@@ -116,12 +175,16 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
         { status: ready ? 200 : 503 },
       );
     }
-    if (url.pathname !== "/authorize") return notFoundResponse();
-    if (request.method !== "POST") return methodNotAllowedResponse();
-    if (!headersWithinLimits(request.headers, limits)) {
-      return invalidRequestResponse();
+    if (url.pathname === "/authorize" || url.pathname === "/settle") {
+      if (request.method !== "POST") return methodNotAllowedResponse();
+      if (!headersWithinLimits(request.headers, limits)) {
+        return invalidRequestResponse();
+      }
+      return url.pathname === "/authorize"
+        ? yield* handleAuthorization(request)
+        : yield* handleSettlement(request);
     }
-    return yield* handleAuthorization(request);
+    return notFoundResponse();
   });
   return handler;
 });
@@ -192,4 +255,82 @@ function unavailableResponse(): Response {
     { error: "authorization_unavailable" },
     { status: 503 },
   );
+}
+
+const readSettlementReport = Effect.fn(
+  "agentos.egressAuthz.readSettlementReport",
+)(function*(request: Request, maximumBytes: number) {
+  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+  const declaredLength = request.headers.get("content-length");
+  if (
+    !/^application\/json(?:\s*;.*)?$/.test(contentType) ||
+    declaredLength === null ||
+    !/^(?:0|[1-9][0-9]*)$/.test(declaredLength) ||
+    Number(declaredLength) > maximumBytes
+  ) {
+    return yield* InvalidSettlementRequest.make();
+  }
+  const source = yield* Effect.tryPromise({
+    try: () => request.text(),
+    catch: () => InvalidSettlementRequest.make(),
+  });
+  if (
+    source.length === 0 ||
+    new TextEncoder().encode(source).byteLength > maximumBytes
+  ) {
+    return yield* InvalidSettlementRequest.make();
+  }
+  const decoded = yield* Schema.decodeUnknownEffect(
+    Schema.fromJsonString(Schema.Unknown),
+  )(source).pipe(
+    Effect.mapError(() => InvalidSettlementRequest.make()),
+  );
+  return yield* Schema.decodeUnknownEffect(
+    ProviderBudgetSettlementReportV1Schema,
+    { onExcessProperty: "error" },
+  )(decoded).pipe(
+    Effect.mapError(() => InvalidSettlementRequest.make()),
+  );
+});
+
+function settlementBearerToken(headers: Headers): string | null {
+  const authorization = headers.get("authorization")?.trim();
+  const token = authorization === undefined
+    ? undefined
+    : /^Bearer\s+(\S+)$/i.exec(authorization)?.[1];
+  if (!token || token.length > 16 * 1_024 || /\s/.test(token)) return null;
+  return token;
+}
+
+function unauthorizedResponse(): Response {
+  return Response.json({ error: "unauthorized" }, { status: 401 });
+}
+
+function forbiddenResponse(): Response {
+  return Response.json({ error: "forbidden" }, { status: 403 });
+}
+
+function responseForSettlementFailure(error: unknown): Response {
+  if (error instanceof ProviderBudgetSettlementCallerAuthenticationError) {
+    switch (error.outcome) {
+      case "unauthorized":
+        return unauthorizedResponse();
+      case "forbidden":
+        return forbiddenResponse();
+      case "dependency_unavailable":
+        return unavailableResponse();
+    }
+  }
+  if (error instanceof ProviderBudgetEnforcementError) {
+    return error.outcome === "invalid_settlement"
+      ? invalidRequestResponse()
+      : unavailableResponse();
+  }
+  if (
+    typeof error === "object" && error !== null && "_tag" in error &&
+    error._tag === "InvalidSettlementRequest"
+  ) {
+    return invalidRequestResponse();
+  }
+  return unavailableResponse();
 }
