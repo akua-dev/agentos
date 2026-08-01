@@ -152,6 +152,15 @@ export {
   type PiWorkloadIdentityOptions,
 } from "./access/pi-workload-identity.ts";
 export {
+  KUBERNETES_SERVICE_ACCOUNT_CA_PATH,
+  KUBERNETES_SERVICE_ACCOUNT_TOKEN_PATH,
+  makeKubernetesApiHttpClientLayer,
+  makeKubernetesWorkloadIdentityHttpLayer,
+  makeKubernetesWorkloadIdentityLiveLayer,
+  type KubernetesWorkloadIdentityHttpOptions,
+  type KubernetesWorkloadIdentityLiveOptions,
+} from "./access/kubernetes-identity-http.ts";
+export {
   PROVIDER_AUTHORIZATION_GRANT_HEADERS,
   PROVIDER_AUTHORIZATION_GRANT_MAX_TTL_MILLIS,
   ProviderAuthorizationError,

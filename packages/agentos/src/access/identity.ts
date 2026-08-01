@@ -185,12 +185,24 @@ export class WorkloadIdentityDependencyUnavailable extends Schema.TaggedErrorCla
       "identity_store",
     ]),
     operation: Schema.Literals([
+      "configure_client",
       "review",
       "get_pod",
       "get_service_account",
       "find_agent",
       "find_assignment",
     ]),
+    code: Schema.optional(Schema.Literals([
+      "credential_unavailable",
+      "trust_unavailable",
+      "invalid_configuration",
+      "network_failure",
+      "timeout",
+      "unexpected_status",
+      "response_too_large",
+      "invalid_response",
+    ])),
+    status: Schema.optional(Schema.NullOr(Schema.Number)),
   },
 ) {}
 

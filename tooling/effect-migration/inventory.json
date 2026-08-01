@@ -85,6 +85,26 @@
       "status": "migrated"
     },
     {
+      "id": "provider-kubernetes-identity-effect-tests",
+      "issue": 96,
+      "pattern": "^packages/agentos/src/access/tests/kubernetes-identity-http\\.effect\\.test\\.ts$",
+      "runtime": "bun-kubernetes",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "filesystem", "http", "kubernetes", "stream"],
+      "migrationDependencies": [100, 101, 87, 88],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-kubernetes-identity",
+      "issue": 96,
+      "pattern": "^packages/agentos/src/access/kubernetes-identity-http\\.ts$",
+      "runtime": "shared-bun-kubernetes",
+      "package": "@akua-dev/agentos",
+      "io": ["filesystem", "http", "kubernetes", "stream"],
+      "migrationDependencies": [100, 101, 87, 88],
+      "status": "migrated"
+    },
+    {
       "id": "provider-workload-identity-effect-tests",
       "issue": 87,
       "pattern": "^packages/agentos/src/access/tests/identity\\.effect\\.test\\.ts$",
