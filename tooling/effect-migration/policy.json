@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "effectVersion": "4.0.0-beta.102",
+  "effectPackages": [
+    "effect",
+    "@effect/platform-browser",
+    "@effect/platform-bun",
+    "@effect/sql-pg",
+    "@effect/opentelemetry",
+    "@effect/vitest"
+  ],
+  "ignoredDirectories": [
+    ".git",
+    ".next",
+    ".repos",
+    ".source",
+    ".turbo",
+    "coverage",
+    "dist",
+    "node_modules",
+    "tmp"
+  ],
+  "ignoredPaths": [
+    "^website/apps/docs/next-env\\.d\\.ts$"
+  ],
+  "strictRules": [
+    "no-async-function",
+    "no-new-promise",
+    "no-throw",
+    "no-ambient-env",
+    "no-runtime-execution",
+    "no-raw-http",
+    "no-raw-filesystem",
+    "no-raw-process",
+    "no-type-assertion",
+    "no-untyped-json-parse",
+    "no-native-timer"
+  ]
+}

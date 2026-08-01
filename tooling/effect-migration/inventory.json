@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "slices": [
+    {
+      "id": "effect-foundation",
+      "issue": 100,
+      "pattern": "^tooling/effect-migration/",
+      "runtime": "bun",
+      "package": "@agentos/root",
+      "io": ["filesystem", "process", "ast", "test"],
+      "migrationDependencies": [],
+      "status": "migrated"
+    },
+    {
+      "id": "type-declarations",
+      "issue": 100,
+      "pattern": "\\.d\\.ts$",
+      "runtime": "types-only",
+      "package": "mixed",
+      "io": [],
+      "migrationDependencies": [],
+      "status": "pure"
+    },
+    {
+      "id": "effect-test-conformance",
+      "issue": 102,
+      "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",
+      "runtime": "bun-browser-kubernetes",
+      "package": "mixed",
+      "io": ["test", "filesystem", "process", "http", "database", "kubernetes"],
+      "migrationDependencies": [100, 101, 97, 98, 99, 104, 105],
+      "status": "planned"
+    },
+    {
+      "id": "pure-website-presentation",
+      "issue": 99,
+      "pattern": "^website/apps/docs/(?:components/ui/|lib/cn\\.ts$)",
+      "runtime": "browser",
+      "package": "@agentos/docs",
+      "io": [],
+      "migrationDependencies": [100],
+      "status": "pure"
+    },
+    {
+      "id": "benchmarks",
+      "issue": 97,
+      "pattern": "^benchmarks/",
+      "runtime": "bun",
+      "package": "@agentos/root",
+      "io": ["filesystem", "process", "stream"],
+      "migrationDependencies": [100, 101],
+      "status": "planned"
+    },
+    {
+      "id": "database-and-clis",
+      "issue": 97,
+      "pattern": "^(?:clis|database|release)/|^packages/agentos/build\\.ts$",
+      "runtime": "bun-postgresql-kubernetes",
+      "package": "database-clis-release",
+      "io": ["config", "database", "filesystem", "http", "process", "stream"],
+      "migrationDependencies": [100, 101],
+      "status": "planned"
+    },
+    {
+      "id": "pi-memory-compaction",
+      "issue": 98,
+      "pattern": "^packages/agentos/(?:extensions/|src/(?:mate-memory|memory|openai-server-compaction)/)",
+      "runtime": "pi-bun",
+      "package": "@akua-dev/agentos",
+      "io": ["filesystem", "http", "native-session", "process", "stream"],
+      "migrationDependencies": [100, 101],
+      "status": "planned"
+    },
+    {
+      "id": "shared-contracts-and-telemetry",
+      "issue": 101,
+      "pattern": "^packages/agentos/src/(?:behaviors|index|instructions|preflight|readiness-state|resources|startup)\\.ts$|^packages/agentos/src/(?:roles|telemetry)/",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": ["config", "schema", "telemetry"],
+      "migrationDependencies": [100],
+      "status": "planned"
+    },
+    {
+      "id": "agentos-runtime",
+      "issue": 104,
+      "pattern": "^packages/agentos/(?:runtime/|src/)",
+      "runtime": "bun-kubernetes-postgresql-herdr",
+      "package": "@akua-dev/agentos",
+      "io": ["config", "database", "filesystem", "http", "kubernetes", "process", "stream", "telemetry"],
+      "migrationDependencies": [100, 101],
+      "status": "planned"
+    },
+    {
+      "id": "provider-services",
+      "issue": 105,
+      "pattern": "^services/ai-gateway/",
+      "runtime": "bun-kubernetes",
+      "package": "@agentos/ai-gateway",
+      "io": ["config", "database", "http", "oauth", "stream", "telemetry"],
+      "migrationDependencies": [100, 101],
+      "status": "planned"
+    },
+    {
+      "id": "website",
+      "issue": 99,
+      "pattern": "^website/apps/docs/",
+      "runtime": "browser-nextjs-cloudflare",
+      "package": "@agentos/docs",
+      "io": ["config", "filesystem", "http", "worker"],
+      "migrationDependencies": [100, 101],
+      "status": "planned"
+    }
+  ]
+}
