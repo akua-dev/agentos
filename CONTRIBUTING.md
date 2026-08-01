@@ -46,6 +46,37 @@ AgentOS runtime automation is written in Bun and TypeScript. Do not introduce
 repository-owned shell scripts or hide runtime programs inside shell-backed
 Mise task strings. A Mise task may point to a typed executable file.
 
+## Effect architecture and migration
+
+AgentOS-owned effectful TypeScript migrates incrementally to Effect. Read
+[`docs/effect-architecture.md`](./docs/effect-architecture.md) before changing
+an effectful path and follow the repository
+[`effect-ts` Skill](./.agents/skills/effect-ts/SKILL.md) for exact patterns.
+The pinned upstream source used to resolve API questions is the
+`.repos/effect` submodule; initialize it with `git submodule update --init`
+when it is absent.
+
+Every TS/TSX path must match one entry in the machine-readable migration
+inventory. New or moved paths therefore require an inventory update in the
+same change. Mark a slice `migrated` only after its behavior and boundary tests
+are ready; the strict AST rules then prevent Promise, throw, ambient config,
+raw I/O and unreviewed runtime execution from returning. Keep `pure` code pure.
+An unavoidable framework or process entry escape needs one exact, bounded
+entry in `exceptions.json`; broad directory exceptions are not accepted.
+
+Run the focused gates while iterating:
+
+```console
+bun run effect:check
+bun run effect:test
+bun run build
+bun run typecheck
+```
+
+The normal `bun run check` and CI workflow run both Effect gates. Do not loosen
+a migrated slice to make a violation pass; either migrate the boundary or add
+a narrow reviewed runtime exception with its actual invariant.
+
 ## Contributing from a running Fleet
 
 The checkout at `/opt/agentos` is a root-owned Git seed baked at the image's

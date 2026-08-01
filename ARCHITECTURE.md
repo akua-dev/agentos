@@ -1031,6 +1031,7 @@ workspace. The tree reflects ownership, not deployment order:
 │   ├── ai-gateway/                   service, tests and optional K8s topology
 │   └── otel-collector/               Collector topology, overlays and tests
 ├── release/kubernetes/               reviewed manifest release assembly
+├── tooling/effect-migration/          Effect inventory, policy, examples and CI gate
 ├── docs/                             supporting assets and stable pointers
 ├── website/apps/docs/                public landing, Docs and Learn application
 ├── Dockerfile                        common AgentOS image build
