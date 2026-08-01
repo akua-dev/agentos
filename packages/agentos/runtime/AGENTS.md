@@ -25,6 +25,10 @@ runtime boundary in `../../../ARCHITECTURE.md` before changing its ownership.
   token or chooses a model. Fail on an ownership collision, and require one
   explicit `direct` reconciliation before removing the Gateway workload patch.
 - Use native tools directly. Do not add spawn, render or provider wrappers.
+- Keep capacity preflight a read-only Effect/Schema calculation over explicit
+  native Kubernetes observations. Its stdin program may classify one supplied
+  versioned snapshot; it must never query, apply, reserve, mirror or claim
+  authority over Kubernetes and must always report `reservation=false`.
 - Seed the image's exact Git revision once into the persistent AgentOS checkout,
   preserve its configured remotes, and run each Mate from that checkout.
 - Build the image seed through `create-image-seed.ts`: require clean committed

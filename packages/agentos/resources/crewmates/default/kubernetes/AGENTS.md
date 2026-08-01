@@ -13,6 +13,10 @@ This subtree owns the reusable separate-Pod Crewmate workload base.
   probes here.
 - Require a distinct ServiceAccount, home PVC, database identity, selected
   image and pod-local Herdr session.
+- Put matching Agent, owner, Task and Assignment UUID labels on the workload
+  and Pod template. Disable child ServiceAccount token automount, set explicit
+  CPU/memory requests and limits, and require every remote image to be pinned
+  by digest in the owning overlay.
 - Start the selected harness with its native command through Herdr only after
   the Pod and Assignment are verified.
 - Do not add shared-pod execution, custom spawn/render wrappers or a
