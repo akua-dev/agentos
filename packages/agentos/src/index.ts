@@ -88,6 +88,7 @@ export {
   ProviderEnforcementRequestV1Schema,
   ProviderForwardReceiptV1Schema,
   ProviderPolicyDecisionPoint,
+  ProviderPolicyDecisionError,
   ProviderPolicyDecisionRefV1Schema,
   ProviderPolicyDecisionRequestV1Schema,
   ProviderPolicyEnforcementPoint,
@@ -110,6 +111,13 @@ export {
   type ProviderRouteOutcomeV1,
   type ProviderSecretRefV1,
 } from "./access/credential-delivery.ts";
+export {
+  PROVIDER_POLICY_DECISION_MAX_TTL_MILLIS,
+  ProviderDecisionReferenceGenerator,
+  ProviderDecisionReferenceGeneratorLiveLayer,
+  makeProviderPolicyDecisionPointLayer,
+  type ProviderPolicyDecisionPointOptions,
+} from "./access/policy-decision.ts";
 export {
   AGENTOS_EGRESS_TOKEN_AUDIENCE,
   AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
@@ -206,6 +214,8 @@ export {
   compileOpenFgaAuthorizationState,
   diffOpenFgaTuplePlans,
   openFgaCapabilityRelation,
+  openFgaCeiling,
+  openFgaProfile,
   openFgaSubject,
   openFgaTarget,
   type OpenFgaActiveWindowConditionV1,

@@ -8,6 +8,33 @@ The released Effect contract is [`credential-delivery.ts`](../../packages/agento
 - `ProviderPolicyDecisionPoint` asks the strongly consistent authorization boundary for a bounded decision reference. Its request and result Schemas have no credential field.
 - `ProviderCredentialDeliveryPoint` accepts an opaque request handle plus an allowed decision reference, attaches one domain credential internally, forwards once, drops request-scoped credential material, and returns only a bounded receipt or typed provider-route outcome.
 
+The concrete decision implementation is
+[`policy-decision.ts`](../../packages/agentos/src/access/policy-decision.ts).
+The route resolver and workload authenticator supply its subject, provider,
+capability, and canonical resource; it accepts no identity or policy headers.
+The deployment supplies the environment scope. For each request it reads one
+current PostgreSQL binding/profile/ceiling snapshot, revalidates its effective
+window and internal references, and finds one exact permission at both policy
+layers. Missing, duplicate, expired, disabled, or ceiling-exceeding permissions
+fail before OpenFGA.
+
+An eligible request must then pass three checks against the pinned OpenFGA store
+and model with `HIGHER_CONSISTENCY` and one `current_time` context: the active
+profile grant, current ceiling grant, and effective subject allow. Only all
+three true results produce an `allow` decision. Its expiry is the earliest of
+15 seconds, binding expiry, profile-permission expiry, and ceiling-permission
+expiry. The decision reference is opaque and contains no subject, route, policy,
+provider response, or credential material.
+
+PDP failures use one content-free tagged contract. Invalid route, rejected
+identity, unavailable PostgreSQL, stale policy, profile denial, ceiling denial,
+effective-policy denial, disabled/exceeded rate class, rate limiting, budget
+exhaustion, unavailable OpenFGA, and reference-generation failure remain
+distinct. Rate-limit and budget consumers compose in the later enforcement
+slice; their outcomes are reserved here and are not claimed as active quota
+enforcement yet. Any failure stops composition before provider forwarding or a
+credential volume is reachable.
+
 `compileProviderCredentialPlan` decodes closed input, requires the capability and resource provider to agree, rejects duplicate upstream hosts, and emits one adapter ServiceAccount, one credential domain, one route-host set, and zero or one Secret projection. Secret-backed plans accept only namespace `agentos`; `agentos-domain-*` is rejected. A process that serves one compiled plan therefore has no contract or mount through which it can read another domain's credential. Production network and workload enforcement of the emitted isolation plan belongs to the owned manifests in #96.
 
 ## Strategy selection
