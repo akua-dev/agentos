@@ -201,8 +201,12 @@ delegation or database intake from this Skill.
    ```console
    kubectl --namespace <namespace> apply --server-side \
      --filename "$HOME/.local/state/agentos/workloads/<handle>/rendered.yaml"
-   kubectl --namespace <namespace> rollout status statefulset/<name>
    ```
+
+   For a Crewmate, semantic readiness deliberately remains false before the
+   brief and harness exist. Wait only for the named Pod and Herdr container to
+   start at this stage; do not weaken or bypass the readiness probe to make an
+   early `rollout status` pass.
 
 9. Verify observed image IDs, ServiceAccount, Pod, PVC, Secret mount, Agent
    environment and Herdr status; for a persistent Mate, also verify the
@@ -228,10 +232,17 @@ delegation or database intake from this Skill.
      sha256sum /home/agent/brief.md
    ```
 
-   The destination must match the workload's `AGENTOS_BRIEF_PATH`. Then use
+   The destination must match the workload's `AGENTOS_BRIEF_PATH`, and the
+   locally calculated digest must already have replaced the all-zero
+   `AGENTOS_BRIEF_SHA256` template value in the per-Agent overlay. Then use
    `$agentos-harnesses` to invoke
    `herdr agent start ... -- <native-harness-argv> <brief>` through
-   `kubectl exec`.
+   `kubectl exec`. After exact Herdr Agent, cwd, native session, harness process
+   and brief evidence match, run
+   `mise run --skip-tools crewmate:confirm-readiness -- confirm-crewmate` in
+   the Crewmate container. Only then use `kubectl rollout status
+   statefulset/<name>`; the confirmation is identity-, digest-, session- and
+   process-bound and does not make an unverified launch ready.
 10. Record verified Kubernetes and Herdr locators in Fleet state. Treat launch
    as successful only after the native harness is processing the complete brief
    without a trust or routine command-approval dialog. The owning Mate must use

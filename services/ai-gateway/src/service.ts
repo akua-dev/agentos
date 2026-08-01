@@ -54,6 +54,52 @@ export async function createAIGatewayService(
   const fallbackAvailable = () =>
     options.allowApiKeyFallback && Boolean(options.openAIApiKey?.trim());
 
+  const readiness = async () => {
+    if (!options.clientToken) {
+      return {
+        reasons: ["client_identity_unavailable"],
+        status: "not_ready",
+        version: 1,
+      } as const;
+    }
+    if (fallbackAvailable()) {
+      return { reasons: [], status: "ready", version: 1 } as const;
+    }
+    const accounts = await vault.list();
+    const candidates = accounts.map((account): Candidate => {
+      const snapshot = usage.get(account.id);
+      return {
+        accountId: account.id,
+        label: account.label,
+        needsReauth: account.needsReauth,
+        ...(snapshot === undefined ? {} : { usage: snapshot }),
+      };
+    });
+    const decision = await routing.evaluate({ candidates, now: clock() });
+    if (decision.accountId !== undefined) {
+      return { reasons: [], status: "ready", version: 1 } as const;
+    }
+    if (accounts.some((account) => !account.needsReauth)) {
+      const capacityUnknown = decision.candidates.some(
+        ({ rejectionCode }) => rejectionCode === "usage_unknown",
+      );
+      return {
+        reasons: [
+          capacityUnknown
+            ? "provider_capacity_unknown"
+            : "provider_capacity_degraded",
+        ],
+        status: "degraded",
+        version: 1,
+      } as const;
+    }
+    return {
+      reasons: ["provider_credential_unavailable"],
+      status: "not_ready",
+      version: 1,
+    } as const;
+  };
+
   const acquire = async (
     sessionKey: string | undefined,
     signal: AbortSignal,
@@ -195,14 +241,27 @@ export async function createAIGatewayService(
         return Response.json({ status: "ok" });
       }
       if (request.method === "GET" && url.pathname === "/readyz") {
-        const accounts = await vault.list();
-        const ready =
-          Boolean(options.clientToken) &&
-          (accounts.some((account) => !account.needsReauth) ||
-            fallbackAvailable());
+        const diagnostic = await readiness();
         return Response.json(
-          { status: ready ? "ready" : "not_ready" },
-          { status: ready ? 200 : 503 },
+          diagnostic,
+          { status: diagnostic.status === "not_ready" ? 503 : 200 },
+        );
+      }
+      if (request.method === "GET" && url.pathname === "/readyz/client") {
+        if (!isClientAuthorized(request, options.clientToken)) {
+          return Response.json(
+            {
+              reasons: ["client_unauthorized"],
+              status: "not_ready",
+              version: 1,
+            },
+            { status: 401 },
+          );
+        }
+        const diagnostic = await readiness();
+        return Response.json(
+          diagnostic,
+          { status: diagnostic.status === "not_ready" ? 503 : 200 },
         );
       }
       if (request.method === "GET" && url.pathname === "/status") {

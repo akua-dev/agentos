@@ -189,4 +189,25 @@ describe("canonical durable routing state adapter", () => {
       await routing.close();
     }
   });
+
+  test("evaluates current eligibility without acquiring or mutating a lease", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ai-gateway-routing-"));
+    const routing = await createRoutingState(
+      join(root, "routing.sqlite"),
+      defaultRoutingConfig,
+    );
+
+    try {
+      expect(await routing.evaluate({ candidates, now })).toMatchObject({
+        accountId: "a",
+        reason: "best_candidate",
+      });
+      expect(await routing.summary(now)).toEqual({
+        activeReservations: 0,
+        reservationsByAccount: {},
+      });
+    } finally {
+      await routing.close();
+    }
+  });
 });

@@ -69,6 +69,9 @@ export class BackgroundTaskBroker {
     const record = this.#createRecord(request);
     try {
       record.handle = await this.#startCommand(request, this.#context(record));
+      if (record.handle.processId !== undefined) {
+        record.snapshot.processId = record.handle.processId;
+      }
       void record.handle.completion.then(
         (result) => this.#finalize(record, result),
         (error: unknown) =>
@@ -122,6 +125,10 @@ export class BackgroundTaskBroker {
         return listed;
       })
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  }
+
+  getRequest(id: string): BackgroundCommandRequest {
+    return structuredClone(this.#requiredRecord(id).request);
   }
 
   restore(snapshots: readonly TaskSnapshot[]) {

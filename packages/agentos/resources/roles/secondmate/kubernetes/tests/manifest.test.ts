@@ -123,6 +123,8 @@ describe("Second Mate Kubernetes base", () => {
       "/home/agent/projects/agentos/packages/agentos",
     );
     expect(environment.AGENTOS_AGENT_ROLE).toBe("second_mate");
+    expect(environment.AGENTOS_DATABASE_IDENTITY).toBe("runtime_secondmate");
+    expect(environment.AGENTOS_PROVIDER_CREDENTIAL_KIND).toBe("pi_auth");
     expect(environment.AGENTOS_DATABASE_URL).toContain(
       "@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos",
     );
@@ -178,6 +180,7 @@ describe("Second Mate Kubernetes base", () => {
       secretKeyRef: { key: "token", name: "ai-gateway-client" },
     });
     expect(environment.AGENTOS_PI_PROVIDER_MODE).toBe("ai-gateway");
+    expect(environment.AGENTOS_PROVIDER_CREDENTIAL_KIND).toBe("ai_gateway");
     expect(prepareEnvironment).toMatchObject({
       AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
       AI_GATEWAY_TOKEN: {

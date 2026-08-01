@@ -48,9 +48,22 @@ describe("AI gateway service", () => {
     expect(
       (await service.fetch(new Request("http://gateway.test/healthz"))).status,
     ).toBe(200);
+    const emptyReadiness = await service.fetch(
+      new Request("http://gateway.test/readyz"),
+    );
+    expect(emptyReadiness.status).toBe(503);
+    expect(await emptyReadiness.json()).toEqual({
+      reasons: ["provider_credential_unavailable"],
+      status: "not_ready",
+      version: 1,
+    });
     expect(
-      (await service.fetch(new Request("http://gateway.test/readyz"))).status,
-    ).toBe(503);
+      (
+        await service.fetch(
+          new Request("http://gateway.test/readyz/client"),
+        )
+      ).status,
+    ).toBe(401);
     expect(
       (await service.fetch(new Request("http://gateway.test/status"))).status,
     ).toBe(401);
@@ -71,6 +84,17 @@ describe("AI gateway service", () => {
     expect(
       (await service.fetch(new Request("http://gateway.test/readyz"))).status,
     ).toBe(200);
+    const clientReadiness = await service.fetch(
+      new Request("http://gateway.test/readyz/client", {
+        headers: { authorization: "Bearer fleet-token" },
+      }),
+    );
+    expect(clientReadiness.status).toBe(200);
+    expect(await clientReadiness.json()).toEqual({
+      reasons: ["provider_capacity_unknown"],
+      status: "degraded",
+      version: 1,
+    });
     await service.vault.markNeedsReauth(accountId);
     expect(
       (await service.fetch(new Request("http://gateway.test/readyz"))).status,
@@ -198,6 +222,15 @@ describe("AI gateway service", () => {
     const second = await service.fetch(proxyRequest());
     expect(second.status).toBe(503);
     expect(responseCalls).toBe(1);
+    const degraded = await service.fetch(
+      new Request("http://gateway.test/readyz"),
+    );
+    expect(degraded.status).toBe(200);
+    expect(await degraded.json()).toEqual({
+      reasons: ["provider_capacity_degraded"],
+      status: "degraded",
+      version: 1,
+    });
     await service.close();
   });
 
