@@ -16,6 +16,9 @@ describe("AI Gateway host boundary", () => {
       );
       assert.include(source, "BunHttpServer.layer");
       assert.include(source, "HttpRouter.serve");
+      assert.match(source, /Layer\.build\(\s*makeAIRoutingStateLive/);
+      assert.include(source, "Context.get(routingContext, AIRoutingState)");
+      assert.notInclude(source, "AIRoutingState.pipe(");
       assert.strictEqual(source.match(/BunRuntime\.runMain/g)?.length, 1);
       for (const forbidden of [
         "Bun.serve",
