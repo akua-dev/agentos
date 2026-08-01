@@ -1,0 +1,95 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+    patch: |-
+      - op: add
+        path: /spec/template/metadata/labels/agentos.akua.dev~1github-client
+        value: "true"
+      - op: add
+        path: /spec/template/spec/volumes/-
+        value:
+          name: agentos-github-ca
+          configMap:
+            name: agentos-github-ca
+            defaultMode: 0444
+            items:
+              - key: ca.pem
+                path: ca.pem
+      - op: add
+        path: /spec/template/spec/initContainers/-
+        value:
+          name: prepare-github-provider
+          image: agentos:dev
+          imagePullPolicy: Never
+          command:
+            - agentos-github-provider
+          env:
+            - name: HOME
+              value: /home/agent
+            - name: AGENTOS_ASSIGNMENT_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['agentos.akua.dev/assignment-id']
+            - name: AGENTOS_EGRESS_TOKEN_FILE
+              value: /var/run/secrets/agentos-egress/token
+            - name: AGENTOS_GITHUB_CA_FILE
+              value: /var/run/config/agentos-github/ca.pem
+            - name: AGENTOS_GITHUB_ENDPOINT
+              value: https://agentgateway-github.agentos.svc.cluster.local
+            - name: AGENTOS_GITHUB_HOST
+              value: agentgateway-github.agentos.svc.cluster.local
+            - name: AGENTOS_GITHUB_PROVIDER_MODE
+              value: broker
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          volumeMounts:
+            - name: home
+              mountPath: /home/agent
+            - name: agentos-github-ca
+              mountPath: /var/run/config/agentos-github
+              readOnly: true
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AGENTOS_EGRESS_TOKEN_FILE
+          value: /var/run/secrets/agentos-egress/token
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AGENTOS_GITHUB_CA_FILE
+          value: /var/run/config/agentos-github/ca.pem
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AGENTOS_GITHUB_ENDPOINT
+          value: https://agentgateway-github.agentos.svc.cluster.local
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AGENTOS_GITHUB_HOST
+          value: agentgateway-github.agentos.svc.cluster.local
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AGENTOS_GITHUB_PROVIDER_MODE
+          value: broker
+      - op: add
+        path: /spec/template/spec/containers/0/volumeMounts/-
+        value:
+          name: agentos-github-ca
+          mountPath: /var/run/config/agentos-github
+          readOnly: true

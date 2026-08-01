@@ -162,6 +162,57 @@ const ValuesSchema = Schema.Struct({
   }),
 });
 
+const GitHubValuesSchema = Schema.Struct({
+  fullnameOverride: Schema.Literal("agentgateway-github"),
+  replicaCount: Schema.Literal(2),
+  mode: Schema.Literal("readonly"),
+  commonLabels: Schema.Struct({
+    "agentos.akua.dev/credential-domain": Schema.Literal("github"),
+    "agentos.akua.dev/github-broker-upstream": Schema.Literal("true"),
+  }),
+  gateway: Schema.Struct({
+    service: Schema.Struct({
+      type: Schema.Literal("ClusterIP"),
+      ports: Schema.Array(Schema.Struct({
+        port: Schema.Literal(443),
+        targetPort: Schema.Literal(4443),
+      })),
+    }),
+  }),
+  extraVolumes: Schema.Array(Schema.Struct({
+    secret: Schema.Struct({ secretName: Schema.Literal("agentos-github-tls") }),
+  })),
+  config: Schema.Struct({
+    gateways: Schema.Struct({
+      github: Schema.Struct({
+        port: Schema.Literal(4443),
+        protocol: Schema.Literal("HTTPS"),
+        tls: Schema.Struct({ cert: Schema.String, key: Schema.String }),
+      }),
+    }),
+    routes: Schema.Array(Schema.Struct({
+      name: Schema.String,
+      policies: Schema.Struct({
+        extAuthz: Schema.Struct({
+          failureMode: Schema.Literal("deny"),
+          includeRequestBody: Schema.optional(Schema.Struct({
+            maxRequestBytes: Schema.Literal(262144),
+            allowPartialMessage: Schema.Literal(false),
+          })),
+          protocol: Schema.Struct({
+            http: Schema.Struct({
+              includeResponseHeaders: Schema.Array(Schema.String),
+            }),
+          }),
+        }),
+      }),
+      backends: Schema.Array(Schema.Struct({
+        host: Schema.Literal("github-broker.agentos.svc.cluster.local:8789"),
+      })),
+    })),
+  }),
+});
+
 const readJson = Effect.fn("agentgatewayTest.readJson")(function* (
   file: string,
 ) {
@@ -222,6 +273,32 @@ layer(Layer.merge(BunFileSystem.layer, BunPath.layer))(
           values.config.routes[0]?.backends[0]?.host,
           "ai-gateway.agentos.svc.cluster.local:8787",
         );
+      }),
+    );
+
+    it.effect("pins the HTTPS GitHub PEP to the credentialless broker boundary", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const values = yield* readYaml(
+          path.join(testDirectory, "../kubernetes/github-values.yaml"),
+        ).pipe(Effect.flatMap(Schema.decodeUnknownEffect(GitHubValuesSchema)));
+        const graphql = values.config.routes.find((route) =>
+          route.name === "github-graphql"
+        );
+        const native = values.config.routes.find((route) =>
+          route.name === "github-native-rest-and-git"
+        );
+        assert.strictEqual(values.gateway.service.type, "ClusterIP");
+        assert.strictEqual(graphql?.policies.extAuthz.failureMode, "deny");
+        assert.strictEqual(
+          graphql?.policies.extAuthz.includeRequestBody?.maxRequestBytes,
+          262144,
+        );
+        assert.isUndefined(native?.policies.extAuthz.includeRequestBody);
+        const grantHeaders = graphql?.policies.extAuthz.protocol.http
+          .includeResponseHeaders ?? [];
+        assert.include(grantHeaders, "x-agentos-authz-resource-owner");
+        assert.include(grantHeaders, "x-agentos-authz-resource-repository");
       }),
     );
   },

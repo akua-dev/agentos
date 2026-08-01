@@ -9,6 +9,7 @@ resources:
   - ../../../../../runtime/kubernetes/mate
 components:
   - ../../../../../runtime/kubernetes/observability
+  - ../../../../../runtime/kubernetes/github-provider
 patches:
   - path: statefulset.patch.yaml
     target:

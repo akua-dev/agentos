@@ -225,6 +225,16 @@
       "status": "migrated"
     },
     {
+      "id": "github-broker-effect-tests",
+      "issue": 94,
+      "pattern": "^services/github-broker/tests/.*\\.effect\\.test\\.ts$|^packages/agentos/runtime/tests/github-(?:provider|workload-auth)\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "github-broker",
+      "io": ["test", "clock", "filesystem", "http", "process", "stream"],
+      "migrationDependencies": [100, 101, 88],
+      "status": "migrated"
+    },
+    {
       "id": "effect-test-conformance",
       "issue": 102,
       "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",
@@ -293,6 +303,36 @@
       "io": ["filesystem", "http", "native-session", "process", "stream"],
       "migrationDependencies": [100, 101],
       "status": "planned"
+    },
+    {
+      "id": "github-workload-auth-entrypoint",
+      "issue": 94,
+      "pattern": "^packages/agentos/runtime/github-(?:provider|workload-auth)-main\\.ts$",
+      "runtime": "bun-entrypoint",
+      "package": "@akua-dev/agentos",
+      "io": ["config", "process", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101, 88],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "github-broker-entrypoint",
+      "issue": 94,
+      "pattern": "^services/github-broker/src/main\\.ts$",
+      "runtime": "bun-entrypoint",
+      "package": "@agentos/github-broker",
+      "io": ["config", "filesystem", "http", "process", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101, 88],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "github-broker-runtime",
+      "issue": 94,
+      "pattern": "^services/github-broker/src/|^packages/agentos/runtime/github-(?:provider|workload-auth)\\.ts$",
+      "runtime": "bun-kubernetes",
+      "package": "github-broker",
+      "io": ["config", "filesystem", "http", "process", "stream"],
+      "migrationDependencies": [100, 101, 88],
+      "status": "migrated"
     },
     {
       "id": "shared-contracts-and-telemetry",
