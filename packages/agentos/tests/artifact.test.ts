@@ -295,6 +295,7 @@ describe("publishable AgentOS Pi artifacts", () => {
       "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
       "@opentelemetry/sdk-metrics": "2.10.0",
       "@opentelemetry/sdk-node": "0.221.0",
+      effect: "4.0.0-beta.102",
       yaml: "2.9.0",
       zod: "4.4.3",
     });
@@ -311,6 +312,7 @@ describe("publishable AgentOS Pi artifacts", () => {
           "agentos-observability.ts",
         ),
         join(installedAgentOS, "runtime", "create-image-seed.ts"),
+        join(installedAgentOS, "runtime", "pi-provider.ts"),
         join(installedAgentOS, "skills", "agentos-customization", "SKILL.md"),
         join(
           installedAgentOS,

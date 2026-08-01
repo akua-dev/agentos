@@ -49,6 +49,15 @@ async function run(script: string, env: Record<string, string>) {
   return { exitCode, stderr, stdout };
 }
 
+function withoutEnvironment(
+  environment: Record<string, string>,
+  names: ReadonlyArray<string>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(environment).filter(([name]) => !names.includes(name)),
+  );
+}
+
 describe("Mate home preparation", () => {
   test("reconciles Codex native OTEL config for a Crewmate from standard workload variables", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "agentos-crewmate-home-"));
@@ -170,7 +179,10 @@ if (args.join(" ") === "integration install pi") {
       AGENTOS_AGENT_ROLE: "first_mate",
       AGENTOS_DISTRIBUTION_ROOT: distributionRoot,
       AGENTOS_MODEL: "openai-codex/gpt-5.6-sol",
+      AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
       AGENTOS_THINKING: "xhigh",
+      AI_GATEWAY_TOKEN: "synthetic-fleet-token",
+      AI_GATEWAY_URL: "http://ai-gateway.agentos.svc.cluster.local:8787/",
       FAKE_LOG_DIRECTORY: logDirectory,
       HERDR_CONFIG_PATH: herdrConfig,
       HOME: home,
@@ -212,6 +224,29 @@ if (args.join(" ") === "integration install pi") {
       defaultThinkingLevel: "xhigh",
       theme: "agent-owned",
     });
+    const piModels = join(home, ".pi", "agent", "models.json");
+    const providerMarker = join(
+      home,
+      ".local",
+      "state",
+      "agentos",
+      "pi-provider.json",
+    );
+    expect(
+      JSON.parse(await readFile(piModels, "utf8")).providers["openai-codex"],
+    ).toEqual({
+      apiKey:
+        "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoiZmxlZXQtZ2F0ZXdheSJ9fQ.placeholder",
+      baseUrl: "http://ai-gateway.agentos.svc.cluster.local:8787",
+      headers: { "X-AI-Gateway-Token": "$AI_GATEWAY_TOKEN" },
+    });
+    expect(JSON.parse(await readFile(providerMarker, "utf8"))).toMatchObject({
+      _tag: "Active",
+      version: 1,
+    });
+    expect(await readFile(piModels, "utf8")).not.toContain(
+      "synthetic-fleet-token",
+    );
     expect(await readFile(join(home, ".pgpass"), "utf8")).toBe(
       "postgres.example.internal:5432:agentos:runtime_second:secret\n",
     );
@@ -289,6 +324,30 @@ if (args.join(" ") === "integration install pi") {
 
     expect(restarted).toEqual({ exitCode: 0, stderr: "", stdout: "" });
     expect(await readFile(persistentMarker, "utf8")).toBe("unfinished work\n");
+
+    const directEnvironment = {
+      ...withoutEnvironment(environment, [
+        "AI_GATEWAY_TOKEN",
+        "AI_GATEWAY_URL",
+      ]),
+      AGENTOS_PI_PROVIDER_MODE: "direct",
+    };
+    const direct = await run(prepareHome, directEnvironment);
+    expect(direct).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+    expect(
+      JSON.parse(await readFile(piModels, "utf8")).providers["openai-codex"],
+    ).toBeUndefined();
+    expect(await Bun.file(providerMarker).exists()).toBe(false);
+
+    const unpatched = await run(
+      prepareHome,
+      withoutEnvironment(environment, [
+        "AGENTOS_PI_PROVIDER_MODE",
+        "AI_GATEWAY_TOKEN",
+        "AI_GATEWAY_URL",
+      ]),
+    );
+    expect(unpatched).toEqual({ exitCode: 0, stderr: "", stdout: "" });
   });
 
   test("materializes a selected distribution into an existing retained checkout", async () => {

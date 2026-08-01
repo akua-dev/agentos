@@ -43,5 +43,8 @@ describe("AgentOS AI Gateway operator skill", () => {
     expect(skill).toContain("openai-server-compaction");
     expect(skill).toContain("AGENTOS_OPENAI_SERVER_COMPACTION_ENABLED");
     expect(skill).toContain("direct provider");
+    expect(skill).toContain("ai-gateway-direct-auth.yaml");
+    expect(skill).toContain("AGENTOS_PI_PROVIDER_MODE=direct");
+    expect(skill).toContain("pi-provider.json");
   });
 });

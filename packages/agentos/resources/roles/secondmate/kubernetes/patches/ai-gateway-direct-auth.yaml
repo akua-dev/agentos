@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-secondmate
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: install-tools
+        - name: prepare-home
+          env:
+            - name: AGENTOS_PI_PROVIDER_MODE
+              value: direct

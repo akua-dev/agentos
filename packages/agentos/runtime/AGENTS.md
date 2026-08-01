@@ -18,7 +18,12 @@ runtime boundary in `../../../ARCHITECTURE.md` before changing its ownership.
   reconcile a release-wide provider, model or thinking default. The
   `prepare-home` init step may merge an explicitly selected per-Mate
   `AGENTOS_MODEL=<provider>/<model>` and `AGENTOS_THINKING=<level>` into that
-  state before Pi starts; omission preserves the existing settings.
+  state before Pi starts; omission preserves the existing settings. An
+  explicit `AGENTOS_PI_PROVIDER_MODE=ai-gateway` may additionally reconcile
+  only AgentOS's marker-owned `openai-codex` transport override while
+  preserving unrelated providers and `auth.json`; it never stores the Gateway
+  token or chooses a model. Fail on an ownership collision, and require one
+  explicit `direct` reconciliation before removing the Gateway workload patch.
 - Use native tools directly. Do not add spawn, render or provider wrappers.
 - Seed the image's exact Git revision once into the persistent AgentOS checkout,
   preserve its configured remotes, and run each Mate from that checkout.
