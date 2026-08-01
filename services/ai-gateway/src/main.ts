@@ -14,6 +14,7 @@ import {
 import {
   ConfigProvider,
   Console,
+  Context,
   Data,
   Effect,
   FileSystem,
@@ -194,15 +195,17 @@ function makeAIGatewayRuntimeLive(
               aiGatewayEntrypointError("invalid_configuration")
             ),
           );
-          const routing = yield* AIRoutingState.pipe(
-            Effect.provide(makeAIRoutingStateLive(
+          const routingContext = yield* Layer.build(
+            makeAIRoutingStateLive(
               path.join(config.stateDirectory, "routing.sqlite"),
               defaultRoutingConfig,
-            )),
+            ),
+          ).pipe(
             Effect.mapError(() =>
               aiGatewayEntrypointError("server_unavailable")
             ),
           );
+          const routing = Context.get(routingContext, AIRoutingState);
           const telemetry = yield* acquireAIGatewayTelemetry();
           const clientAuthentication: AIForwardClientAuthentication =
             serveConfig.authentication.kind ===
