@@ -33,6 +33,9 @@ const defaultFirstMateCwd = join(
   "roles",
   "firstmate",
 );
+// run-mate deliberately allows Herdr 30 seconds to become ready. This test
+// must observe that contract instead of imposing a shorter startup deadline.
+const mateStartupObservationTimeout = 35_000;
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -50,6 +53,44 @@ async function waitFor(predicate: () => Promise<boolean>, timeout = 3_000) {
     await Bun.sleep(20);
   }
   throw new Error("Timed out waiting for fake Herdr activity");
+}
+
+async function waitForChildActivity(
+  child: Bun.Subprocess<"ignore", "pipe", "pipe">,
+  state: string,
+  predicate: () => Promise<boolean>,
+  timeout: number,
+) {
+  const started = Date.now();
+  while (Date.now() - started < timeout) {
+    if (await predicate()) return;
+    if (child.exitCode !== null) {
+      throw new Error(await childFailureDiagnostics(child, state, "exited"));
+    }
+    await Bun.sleep(20);
+  }
+
+  child.kill("SIGTERM");
+  throw new Error(await childFailureDiagnostics(child, state, "timed out"));
+}
+
+async function childFailureDiagnostics(
+  child: Bun.Subprocess<"ignore", "pipe", "pipe">,
+  state: string,
+  outcome: "exited" | "timed out",
+) {
+  const [exitCode, stdout, stderr, calls] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    readCalls(state),
+  ]);
+  return [
+    `Mate runtime ${outcome} before expected fake Herdr activity (exit ${exitCode}).`,
+    `Calls: ${JSON.stringify(calls)}`,
+    `stdout: ${stdout.trim() || "<empty>"}`,
+    `stderr: ${stderr.trim() || "<empty>"}`,
+  ].join("\n");
 }
 
 async function createHarness(
@@ -701,34 +742,39 @@ describe("Mate runtime", () => {
       stderr: "pipe",
       stdout: "pipe",
     });
-    const expectedObserve = [
-      "terminal",
-      "session",
-      "observe",
-      "firstmate",
-      "--cols",
-      "120",
-      "--rows",
-      "40",
+    // A live pane can make run-mate terminate its short-lived observer before
+    // the fake executable is scheduled. The awaited pane check is the stable
+    // proof that run-mate selected the native restore branch.
+    const expectedProcessInfo = [
+      "pane",
+      "process-info",
+      "--pane",
+      "w1:p1",
       "--session",
       "agentos-firstmate-test",
     ];
 
-    await waitFor(async () =>
-      (await readCalls(state)).some((call) =>
-        call.length === expectedObserve.length &&
-        call.every((argument, index) => argument === expectedObserve[index]),
-      ),
-      6_000,
+    await waitForChildActivity(
+      child,
+      state,
+      async () =>
+        (await readCalls(state)).some(
+          (call) =>
+            call.length === expectedProcessInfo.length &&
+            call.every(
+              (argument, index) => argument === expectedProcessInfo[index],
+            ),
+        ),
+      mateStartupObservationTimeout,
     );
     child.kill("SIGTERM");
     expect(await child.exited).toBe(0);
     const calls = await readCalls(state);
     expect(calls.filter((call) => call[0] === "agent" && call[1] === "start")).toEqual([]);
-    expect(calls.filter((call) => call.slice(0, 3).join(" ") === "terminal session observe")).toEqual([
-      expectedObserve,
+    expect(calls.filter((call) => call.slice(0, 2).join(" ") === "pane process-info")).toEqual([
+      expectedProcessInfo,
     ]);
-  }, 10_000);
+  }, 40_000);
 
   test("prepares a rollback-safe Pi session on the configured checkout", async () => {
     const paneId = "w1:p1";
