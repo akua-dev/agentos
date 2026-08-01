@@ -56,6 +56,7 @@ async function copyProductionInstallInputs(destination: string) {
     "clis/pg-listen/pg-listen.ts",
     "database/package.json",
     "packages/agentos/package.json",
+    "services/agentgateway/package.json",
     "services/ai-gateway/package.json",
     "services/otel-collector/package.json",
     ...(rootPackage.workspaces.includes("website/apps/docs")

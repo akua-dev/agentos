@@ -1,0 +1,11 @@
+{
+  "name": "@agentos/agentgateway",
+  "version": "0.0.0",
+  "description": "Pinned standalone agentgateway packaging and AgentOS semantic conformance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run tests/contract.effect.test.ts",
+    "conformance": "bun test tests/conformance.test.ts"
+  }
+}
