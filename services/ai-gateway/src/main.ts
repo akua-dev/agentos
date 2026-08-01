@@ -13,17 +13,14 @@ import {
 } from "@akua-dev/agentos";
 import {
   ConfigProvider,
-  Cause,
   Console,
   Data,
   Effect,
   FileSystem,
   Layer,
   Path,
-  Queue,
   Redacted,
   Runtime,
-  Stream,
 } from "effect";
 import {
   HttpClient,
@@ -33,7 +30,10 @@ import {
   HttpServerResponse,
 } from "effect/unstable/http";
 
-import { createAccountVault, createAccountVaultStore } from "./accounts.ts";
+import {
+  makeAccountVault,
+  makeAccountVaultStore,
+} from "./effect-accounts.ts";
 import {
   AIGatewayCliOutput,
   AIGatewayOAuth,
@@ -48,9 +48,9 @@ import {
   loadAIGatewayConfig,
 } from "./config.ts";
 import {
-  loginOpenAICodexDeviceCode,
-  refreshOpenAICodexToken,
-} from "./codex-oauth.ts";
+  type CodexOAuthClient,
+  makeOpenAICodexOAuthClient,
+} from "./codex-oauth-effect.ts";
 import { makeAIGatewayApplication } from "./gateway-service.ts";
 import type { AIForwardClientAuthentication } from "./forward.ts";
 import {
@@ -60,11 +60,11 @@ import {
 } from "./observability.ts";
 import { AIProviderHttp, AIProviderHttpLive } from "./provider-http.ts";
 import { CodexQuota, makeCodexQuotaLayer } from "./quota.ts";
+import { makeEffectManagedAccountVaultLayer } from "./managed-account-live.ts";
 import { defaultRoutingConfig } from "./selection.ts";
 import { makeAIRoutingStateLive } from "./state-live.ts";
 import {
   AIRoutingState,
-  makeManagedAccountVaultLayer,
   ManagedAccountVault,
 } from "./state.ts";
 import { createGatewayTelemetry } from "./telemetry.ts";
@@ -83,36 +83,14 @@ const AIGatewayCliOutputLive = Layer.succeed(
   }),
 );
 
-const AIGatewayOAuthLive = Layer.succeed(
-  AIGatewayOAuth,
-  AIGatewayOAuth.of({
+function makeAIGatewayOAuthLive(oauth: CodexOAuthClient) {
+  return Layer.succeed(AIGatewayOAuth, AIGatewayOAuth.of({
     login: (onDeviceCode) =>
-      Effect.scoped(Effect.gen(function*() {
-        const notifications = yield* Queue.unbounded<
-          Effect.Effect<void>,
-          Cause.Done
-        >();
-        const consume = Stream.fromQueue(notifications).pipe(
-          Stream.runForEach((notification) => notification),
-        );
-        const authenticate = Effect.tryPromise({
-          try: (signal) =>
-            loginOpenAICodexDeviceCode({
-              signal,
-              onDeviceCode(info) {
-                Queue.offerUnsafe(notifications, onDeviceCode(info));
-              },
-            }),
-          catch: () => aiGatewayEntrypointError("oauth_unavailable"),
-        }).pipe(Effect.ensuring(Queue.end(notifications)));
-        const [credentials] = yield* Effect.all(
-          [authenticate, consume],
-          { concurrency: 2 },
-        );
-        return credentials;
-      })),
-  }),
-);
+      oauth.login(onDeviceCode).pipe(
+        Effect.mapError(() => aiGatewayEntrypointError("oauth_unavailable")),
+      ),
+  }));
+}
 
 const AIGatewayStatusClientLive = Layer.effect(
   AIGatewayStatusClient,
@@ -172,16 +150,15 @@ function acquireAIGatewayTelemetry() {
 function makeManagedAccountVaultLive(
   config: AIGatewayConfig,
   path: Path.Path,
+  oauth: CodexOAuthClient,
 ) {
-  const vault = createAccountVault({
-    store: createAccountVaultStore(
+  return Effect.gen(function*() {
+    const store = yield* makeAccountVaultStore(
       path.join(config.stateDirectory, "accounts.json"),
-    ),
-    refreshDirectory: config.stateDirectory,
-    oauth: { refresh: refreshOpenAICodexToken },
-    clock: Date.now,
+    );
+    const vault = yield* makeAccountVault({ store, oauth });
+    return makeEffectManagedAccountVaultLayer(vault);
   });
-  return makeManagedAccountVaultLayer(vault);
 }
 
 function makeAIGatewayRuntimeLive(
@@ -296,7 +273,10 @@ function makeAIGatewayRoutesLayer(
 const startup = Effect.gen(function*() {
   const config = yield* loadAIGatewayConfig();
   const path = yield* Path.Path;
-  const accounts = makeManagedAccountVaultLive(config, path);
+  const oauth = yield* makeOpenAICodexOAuthClient().pipe(
+    Effect.mapError(() => aiGatewayEntrypointError("oauth_unavailable")),
+  );
+  const accounts = yield* makeManagedAccountVaultLive(config, path, oauth);
   const runtime = makeAIGatewayRuntimeLive(config, path).pipe(
     Layer.provide(accounts),
   );
@@ -304,7 +284,7 @@ const startup = Effect.gen(function*() {
     accounts,
     runtime,
     AIGatewayCliOutputLive,
-    AIGatewayOAuthLive,
+    makeAIGatewayOAuthLive(oauth),
     AIGatewayStatusClientLive,
   );
   const args = yield* Effect.sync(() => Bun.argv.slice(2));
