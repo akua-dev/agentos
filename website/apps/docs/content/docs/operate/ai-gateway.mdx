@@ -15,13 +15,15 @@ topology.
 Use the owning procedure before selecting, installing, authenticating, recovering, rotating or
 retiring the gateway. It keeps server-owned provider OAuth and quota-aware routing inside a
 deliberate service boundary. Client Agents receive only the scoped connection material intended
-for them.
+for them; they never receive a provider credential or Fleet-shared inference token.
 
-Clients may live in `agentos` or a labeled Second-Mate domain namespace. They call
-`ai-gateway.agentos.svc.cluster.local`; the Gateway NetworkPolicy requires both the Fleet Namespace
-label and the client Pod label. Kubernetes Secret references remain namespace-local, so First Mate
-places the approved client token in each selected domain and treats it as visible to that domain’s
-Second Mate. Provider OAuth and the Gateway vault never leave the core namespace.
+Clients may live in `agentos` or a Second-Mate domain namespace. They call
+`agentgateway-openai.agentos.svc.cluster.local` and authenticate with their kubelet-rotated,
+audience-bound ServiceAccount token. Agentgateway asks the TokenReview/OpenFGA authorizer for a
+closed grant lasting at most 15 seconds. Only Agentgateway can reach the AI Gateway through its
+NetworkPolicy; provider OAuth, the operator Secret and the Gateway vault remain in the core
+namespace. This lets a Second Mate manage Crewmates in its namespace without gaining another
+domain’s identity or provider credentials, while unrelated Internet traffic stays direct.
 
 ## What it does not own
 
@@ -30,7 +32,7 @@ semantics. It is not a universal LLM abstraction and does not make one account�
 organizational permission.
 
 Inspect accounts, health, routing state and observed provider failures through the service’s
-current interfaces. A `401` and a `429` have different causes; recovery does not silently swap
-identities or introduce an API-key fallback that was never approved.
+current interfaces. A `401`, `403` and `429` have different causes; recovery does not silently swap
+identities, bypass OpenFGA or introduce an API-key fallback that was never approved.
 
 Because the feature is optional, every core Docs path remains understandable without it.

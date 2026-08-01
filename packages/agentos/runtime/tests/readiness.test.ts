@@ -26,6 +26,7 @@ const settingsPath = `${home}/.pi/agent/settings.json`;
 const authPath = `${home}/.pi/agent/auth.json`;
 const pgpassPath = `${home}/.pgpass`;
 const coordinationState = `${home}/.local/state/agentos/readiness/coordination.json`;
+const egressTokenPath = "/var/run/secrets/agentos-egress/token";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -335,6 +336,33 @@ describe("semantic Agent readiness", () => {
     );
   });
 
+  test("requires the projected workload token in Gateway mode", async () => {
+    const environment = mateEnvironment({
+      AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
+      AGENTOS_PROVIDER_CREDENTIAL_KIND: "ai_gateway",
+      AI_GATEWAY_URL:
+        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+    });
+    const ready = await evaluate(
+      environment,
+      "ready",
+      healthyMateRuntime({
+        files: { [egressTokenPath]: "header.payload.signature" },
+      }),
+    );
+    expect(
+      ready.checks.find(({ component }) => component === "credential"),
+    ).toEqual({ component: "credential", status: "pass" });
+    expect(reasonCodes(ready)).not.toContain("provider_credential_unavailable");
+
+    const missing = await evaluate(
+      environment,
+      "ready",
+      healthyMateRuntime(),
+    );
+    expect(reasonCodes(missing)).toContain("provider_credential_unavailable");
+  });
+
   test("distinguishes database identity, database credential, listener, and catch-up recovery", async () => {
     const databaseUrl =
       "postgresql://runtime_firstmate@postgres.agentos.svc:5432/agentos?sslmode=require";
@@ -580,6 +608,95 @@ describe("semantic Agent readiness", () => {
       }),
     );
     expect(ready.status).toBe("ready");
+
+    const codexConfigPath = `${home}/.codex/config.toml`;
+    const codexProviderMarker = `${home}/.local/state/agentos/codex-provider.json`;
+    const codexEntry = {
+      name: "AgentOS workload gateway",
+      base_url:
+        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+      wire_api: "responses",
+      supports_websockets: false,
+      request_max_retries: 0,
+      stream_max_retries: 0,
+      env_http_headers: {
+        "X-AgentOS-Assignment-Id": "AGENTOS_ASSIGNMENT_ID",
+      },
+      auth: {
+        command: "/home/agent/.local/share/mise/shims/bun",
+        args: [
+          "/opt/agentos/packages/agentos/runtime/codex-token.ts",
+          egressTokenPath,
+        ],
+        timeout_ms: 5_000,
+        refresh_interval_ms: 60_000,
+      },
+    };
+    const codexConfig = [
+      'model_provider = "agentos-gateway"',
+      "",
+      "[model_providers.agentos-gateway]",
+      'name = "AgentOS workload gateway"',
+      'base_url = "http://agentgateway-openai.agentos.svc.cluster.local:8788"',
+      'wire_api = "responses"',
+      "supports_websockets = false",
+      "request_max_retries = 0",
+      "stream_max_retries = 0",
+      'env_http_headers = { "X-AgentOS-Assignment-Id" = "AGENTOS_ASSIGNMENT_ID" }',
+      "",
+      "[model_providers.agentos-gateway.auth]",
+      'command = "/home/agent/.local/share/mise/shims/bun"',
+      `args = ["/opt/agentos/packages/agentos/runtime/codex-token.ts","${egressTokenPath}"]`,
+      "timeout_ms = 5000",
+      "refresh_interval_ms = 60000",
+      "",
+    ].join("\n");
+    const gatewayCrewEnvironment = {
+      ...crewEnvironment,
+      AGENTOS_CODEX_PROVIDER_MODE: "ai-gateway",
+      AGENTOS_RELEASE_ROOT: "/opt/agentos",
+      AGENTOS_PROVIDER_CREDENTIAL_KIND: "ai_gateway",
+      AI_GATEWAY_URL:
+        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+    };
+    const gatewayCrewFiles = {
+      [briefPath]: crewBrief,
+      [crewState]: crewMarker,
+      [codexConfigPath]: codexConfig,
+      [codexProviderMarker]: `${JSON.stringify({
+        _tag: "Active",
+        entry: codexEntry,
+        previousModelProvider: null,
+        version: 1,
+      })}\n`,
+      [egressTokenPath]: "header.payload.signature",
+    };
+    const gatewayReady = await evaluate(
+      gatewayCrewEnvironment,
+      "ready",
+      runtime({ commands: crewCommands, files: gatewayCrewFiles }),
+    );
+    expect(
+      gatewayReady.checks.find(({ component }) => component === "provider"),
+    ).toEqual({ component: "provider", status: "pass" });
+
+    const driftedGateway = await evaluate(
+      gatewayCrewEnvironment,
+      "ready",
+      runtime({
+        commands: crewCommands,
+        files: {
+          ...gatewayCrewFiles,
+          [codexConfigPath]: codexConfig.replace(
+            "agentgateway-openai.agentos.svc.cluster.local",
+            "unreviewed.example",
+          ),
+        },
+      }),
+    );
+    expect(reasonCodes(driftedGateway)).toContain(
+      "provider_configuration_invalid",
+    );
 
     const wrongDatabaseIdentity = await evaluate(
       {

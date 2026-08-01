@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { Effect, Option, Schema } from "effect";
+
+import {
+  CODEX_GATEWAY_PROVIDER_ID,
+  codexGatewayProviderEntry,
+} from "./codex-provider.ts";
 
 const AgentRole = Schema.Literals([
   "crewmate",
@@ -193,6 +199,8 @@ const maximumConfigurationBytes = 1024 * 1024;
 const maximumBriefBytes = 1024 * 1024;
 const maximumStateBytes = 64 * 1024;
 const maximumSessionHeaderBytes = 4 * 1024;
+const maximumProjectedTokenBytes = 16 * 1024;
+const defaultEgressTokenPath = "/var/run/secrets/agentos-egress/token";
 
 function requiredEnvironment(
   environment: HealthEnvironment,
@@ -256,6 +264,22 @@ function parseUnknownJson(source: string): unknown | undefined {
   }
 }
 
+function parseUnknownToml(source: string): unknown | undefined {
+  try {
+    return Bun.TOML.parse(source);
+  } catch {
+    return undefined;
+  }
+}
+
+function objectRecord(
+  value: unknown,
+): Readonly<Record<string, unknown>> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value))
+    : undefined;
+}
+
 function decodeSource<S extends Schema.ConstraintDecoder<unknown>>(
   schema: S,
   source: string | undefined,
@@ -315,11 +339,9 @@ function foregroundProcess(
   return processes.find(({ argv0 }) => basename(argv0) === harness);
 }
 
-function gatewayMetadataAvailable(environment: HealthEnvironment): boolean {
+function gatewayMetadataValid(environment: HealthEnvironment): boolean {
   const rawUrl = requiredEnvironment(environment, "AI_GATEWAY_URL");
-  if (rawUrl === undefined || !Object.hasOwn(environment, "AI_GATEWAY_TOKEN")) {
-    return false;
-  }
+  if (rawUrl === undefined) return false;
   try {
     const url = new URL(rawUrl);
     return (
@@ -332,6 +354,19 @@ function gatewayMetadataAvailable(environment: HealthEnvironment): boolean {
   } catch {
     return false;
   }
+}
+
+function isSecureProjectedToken(
+  metadata: HealthFileMetadata | undefined,
+): boolean {
+  return (
+    metadata !== undefined &&
+    metadata.isFile &&
+    metadata.size > 0 &&
+    metadata.size <= maximumProjectedTokenBytes &&
+    (metadata.mode & 0o400) !== 0 &&
+    (metadata.mode & 0o027) === 0
+  );
 }
 
 const verifyProvider = Effect.fn("agentos.readiness.verifyProvider")(
@@ -420,7 +455,12 @@ const verifyCredential = Effect.fn("agentos.readiness.verifyCredential")(
           : "pi_auth");
     let available: boolean;
     if (kind === "ai_gateway") {
-      available = gatewayMetadataAvailable(environment);
+      const tokenPath =
+        requiredEnvironment(environment, "AGENTOS_EGRESS_TOKEN_FILE") ??
+        defaultEgressTokenPath;
+      available =
+        gatewayMetadataValid(environment) &&
+        isSecureProjectedToken(yield* probeRuntime.metadata(tokenPath));
     } else if (kind === "pi_auth") {
       const directory =
         requiredEnvironment(environment, "PI_CODING_AGENT_DIR") ??
@@ -447,6 +487,65 @@ const verifyCredential = Effect.fn("agentos.readiness.verifyCredential")(
     );
   },
 );
+
+const verifyCodexGatewayProvider = Effect.fn(
+  "agentos.readiness.verifyCodexGatewayProvider",
+)(function*(
+  environment: HealthEnvironment,
+  probeRuntime: SemanticHealthRuntime,
+  home: string,
+  evaluation: Evaluation,
+) {
+  if (
+    requiredEnvironment(environment, "AGENTOS_CODEX_PROVIDER_MODE") !==
+      "ai-gateway"
+  ) {
+    return;
+  }
+  const codexHome =
+    requiredEnvironment(environment, "CODEX_HOME") ?? join(home, ".codex");
+  const configPath = join(codexHome, "config.toml");
+  const markerPath = join(
+    home,
+    ".local",
+    "state",
+    "agentos",
+    "codex-provider.json",
+  );
+  const [source, markerSource, metadata] = yield* Effect.all([
+    probeRuntime.readText(configPath, maximumConfigurationBytes),
+    probeRuntime.readText(markerPath, maximumStateBytes),
+    probeRuntime.metadata(configPath),
+  ]);
+  const config = source === undefined
+    ? undefined
+    : objectRecord(parseUnknownToml(source));
+  const providers = objectRecord(config?.model_providers);
+  const entry = objectRecord(providers?.[CODEX_GATEWAY_PROVIDER_ID]);
+  const marker = markerSource === undefined
+    ? undefined
+    : objectRecord(parseUnknownJson(markerSource));
+  let expected: Readonly<Record<string, unknown>> | undefined;
+  try {
+    expected = codexGatewayProviderEntry(environment);
+  } catch {
+    expected = undefined;
+  }
+  const configurationValid =
+    isPrivateRegularFile(metadata) &&
+    config?.model_provider === CODEX_GATEWAY_PROVIDER_ID &&
+    expected !== undefined &&
+    isDeepStrictEqual(entry, expected) &&
+    marker?._tag === "Active" &&
+    marker.version === 1 &&
+    isDeepStrictEqual(objectRecord(marker.entry), expected);
+  addCheck(
+    evaluation,
+    "provider",
+    configurationValid ? "pass" : "fail",
+    configurationValid ? undefined : "provider_configuration_invalid",
+  );
+});
 
 const verifyDatabase = Effect.fn(
   "agentos.readiness.verifyDatabase",
@@ -843,6 +942,12 @@ export const evaluateSemanticHealth = Effect.fn(
       home,
       processId,
       harness,
+      evaluation,
+    );
+    yield* verifyCodexGatewayProvider(
+      environment,
+      probeRuntime,
+      home,
       evaluation,
     );
     yield* verifyDatabase(environment, probeRuntime, home, evaluation, false);

@@ -47,8 +47,12 @@ cancellations produce no failure observation. That observation never includes
 prompts, request or response bodies, credentials, URLs, headers,
 provider/routing/account/session identity, or full errors, messages or stacks.
 
-The package, executable, Kubernetes resources, Service DNS, Secret, PVC path,
-environment and client headers consistently use the `ai-gateway` identity.
+The package, executable, Kubernetes resources, Service DNS, operator Secret,
+PVC path and environment consistently use the `ai-gateway` identity. Inference
+clients reach it only through `agentgateway-openai`: they present projected
+workload identity to Agentgateway, and the AI Gateway accepts only the closed,
+short-lived authorization grant returned by `agentos-egress-authz`. No Agent
+Pod or Agentgateway Pod receives an AI Gateway shared client token.
 The default First Mate, Second Mate, and Crewmate Kubernetes subtrees each own
 one optional `patches/ai-gateway-client.yaml`. A reviewed per-Agent overlay
 composes only the approved clients. Repeated Gateway-owned device logins create

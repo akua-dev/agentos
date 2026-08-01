@@ -147,6 +147,25 @@ export {
   type WorkloadIdentityV1,
 } from "./access/identity.ts";
 export {
+  AGENTOS_EGRESS_TOKEN_FILE_ENV,
+  registerPiWorkloadIdentity,
+  type PiWorkloadIdentityOptions,
+} from "./access/pi-workload-identity.ts";
+export {
+  PROVIDER_AUTHORIZATION_GRANT_HEADERS,
+  PROVIDER_AUTHORIZATION_GRANT_MAX_TTL_MILLIS,
+  ProviderAuthorizationError,
+  ProviderAuthorizationGrantV1Schema,
+  ProviderAuthorizedIdentityV1Schema,
+  createProviderAuthorizationHttpHandler,
+  decodeProviderAuthorizationGrantHeaders,
+  providerAuthorizationGrantHeaders,
+  resolveProviderAuthorizationRoute,
+  type ProviderAuthorizationGrantV1,
+  type ProviderAuthorizationRouteV1,
+  type ProviderAuthorizedIdentityV1,
+} from "./access/http-authorizer.ts";
+export {
   AGENTOS_OPENFGA_HEALTH_OBJECT,
   AGENTOS_OPENFGA_HEALTH_RELATION,
   AGENTOS_OPENFGA_HEALTH_USER,
@@ -223,6 +242,7 @@ export {
   createAgentOSObservabilityRegistration,
   createAgentOSOpenAIServerCompactionRegistration,
   createAgentOSSupervisionGuardRegistration,
+  createAgentOSWorkloadIdentityRegistration,
   defaultAgentOSRuntime,
 } from "./behaviors.ts";
 export {

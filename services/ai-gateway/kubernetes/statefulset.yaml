@@ -120,10 +120,12 @@ spec:
               value: /opt/agentos
             - name: AI_GATEWAY_STATE_DIR
               value: /var/lib/ai-gateway
-            - name: AI_GATEWAY_TOKEN
+            - name: AI_GATEWAY_CLIENT_AUTH_MODE
+              value: workload_identity
+            - name: AI_GATEWAY_OPERATOR_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: ai-gateway-client
+                  name: ai-gateway-operator
                   key: token
           ports:
             - name: http

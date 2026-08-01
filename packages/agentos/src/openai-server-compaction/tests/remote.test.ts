@@ -291,7 +291,7 @@ describe("OpenAI server compaction transport", () => {
 
     const result = await requestServerCompaction({
       model: model(),
-      apiKey: "fleet-client-token",
+      apiKey: "resolved-provider-token",
       headers: { "x-extra": "kept" },
       sessionId: "session-1",
       input: [{ type: "message", role: "user", content: [{ type: "input_text", text: "hello" }] }],
@@ -319,7 +319,7 @@ describe("OpenAI server compaction transport", () => {
     });
     expect(request?.url).toBe("http://ai-gateway:8787/codex/responses");
     const headers = new Headers(request?.init.headers);
-    expect(headers.get("authorization")).toBe("Bearer fleet-client-token");
+    expect(headers.get("authorization")).toBe("Bearer resolved-provider-token");
     expect(headers.get("x-codex-beta-features")).toBe("remote_compaction_v2");
     expect(headers.get("x-codex-installation-id")).toBe(INSTALLATION_ID);
     expect(headers.get("x-codex-window-id")).toBe("session-1:0");

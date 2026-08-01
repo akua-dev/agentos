@@ -27,6 +27,27 @@ const BackendToken = "conformance-backend-token";
 const ProviderToken = "conformance-provider-token";
 const ExchangedToken = "conformance-exchanged-token";
 const ProtectedMarker = "protected-payload-must-not-enter-telemetry";
+const GrantHeaders = [
+  "x-agentos-authz-schema-version",
+  "x-agentos-authz-correlation-id",
+  "x-agentos-authz-decision-ref",
+  "x-agentos-authz-expires-at-millis",
+  "x-agentos-authz-credential-domain",
+  "x-agentos-authz-agent-id",
+  "x-agentos-authz-role",
+  "x-agentos-authz-fleet",
+  "x-agentos-authz-domain",
+  "x-agentos-authz-assignment-id",
+  "x-agentos-authz-capability",
+  "x-agentos-authz-resource-kind",
+  "x-agentos-authz-provider",
+  "x-agentos-authz-service",
+  "x-agentos-authz-profile-id",
+  "x-agentos-authz-profile-version",
+  "x-agentos-authz-ceiling-id",
+  "x-agentos-authz-ceiling-revision",
+  "x-agentos-authz-rate-class",
+] as const;
 const valuesPath = fileURLToPath(
   new URL("../kubernetes/values.yaml", import.meta.url),
 );
@@ -330,14 +351,15 @@ function authzPolicy(port: number) {
     includeRequestHeaders: [
       "authorization",
       "x-agentos-assignment-id",
-      "x-agentos-profile",
-      ":method",
-      ":path",
     ],
     protocol: {
       http: {
         path: '"/authorize"',
-        includeResponseHeaders: ["x-agentos-subject"],
+        addRequestHeaders: {
+          "x-agentos-original-method": "request.method",
+          "x-agentos-original-path": "request.path",
+        },
+        includeResponseHeaders: ["x-agentos-subject", ...GrantHeaders],
       },
     },
   };
@@ -395,7 +417,6 @@ function conformanceConfig(options: {
           {
             host: `127.0.0.1:${options.upstreamPort}`,
             policies: {
-              backendAuth: { key: "$CONFORMANCE_BACKEND_TOKEN" },
               http: { requestTimeout: "2s" },
             },
           },
@@ -411,7 +432,6 @@ function conformanceConfig(options: {
           {
             host: `127.0.0.1:${options.upstreamPort}`,
             policies: {
-              backendAuth: { key: "$CONFORMANCE_BACKEND_TOKEN" },
               http: { requestTimeout: "2s" },
             },
           },
@@ -580,6 +600,8 @@ function authorizedHeaders() {
     authorization: AllowedToken,
     "content-type": "application/json",
     "x-agentos-assignment-id": "assignment-conformance",
+    "x-agentos-authz-decision-ref":
+      "decision_ffffffffffffffffffffffffffffffff",
     "x-agentos-profile": "openai-responses@v1",
   };
 }
@@ -693,13 +715,7 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
                 (mount) =>
                   recordOf(mount).name === "provider-credential-openai",
               ),
-              [
-                {
-                  mountPath: "/var/run/secrets/agentos-provider/openai",
-                  name: "provider-credential-openai",
-                  readOnly: true,
-                },
-              ],
+              [],
             );
             const providerVolumes = Array.isArray(podSpec.volumes)
               ? podSpec.volumes
@@ -709,16 +725,7 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
                 (volume) =>
                   recordOf(volume).name === "provider-credential-openai",
               ),
-              [
-                {
-                  name: "provider-credential-openai",
-                  secret: {
-                    defaultMode: 288,
-                    items: [{ key: "token", path: "credential" }],
-                    secretName: "agentgateway-ai-gateway-client",
-                  },
-                },
-              ],
+              [],
             );
             assert.strictEqual(
               renderedResource(renderedDocuments, "NetworkPolicy"),
@@ -734,19 +741,8 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
             );
             const renderedConfig = recordOf(configMap.data)["config.yaml"];
             assert.strictEqual(typeof renderedConfig, "string");
-            const renderedCredential = path.join(
-              root,
-              "rendered-provider-credential",
-            );
-            yield* fs.writeFileString(
-              renderedCredential,
-              "conformance-only\n",
-            );
             const validationConfig = typeof renderedConfig === "string"
-              ? renderedConfig.replace(
-                  "/var/run/secrets/agentos-provider/openai/credential",
-                  renderedCredential,
-                )
+              ? renderedConfig
               : "";
             const renderedValidation = yield* runCommand(
               [
@@ -764,10 +760,14 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
 
             const authorizationRequests: Array<{
               readonly authorization: string | null;
+              readonly method: string | null;
+              readonly originalPath: string | null;
               readonly path: string;
             }> = [];
             const upstreamRequests: Array<{
+              readonly assignmentId: string | null;
               readonly authorization: string | null;
+              readonly decisionRef: string | null;
               readonly path: string;
               readonly subject: string | null;
             }> = [];
@@ -788,6 +788,8 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
               const requestUrl = new URL(request.url);
               authorizationRequests.push({
                 authorization: request.headers.get("authorization"),
+                method: request.headers.get("x-agentos-original-method"),
+                originalPath: request.headers.get("x-agentos-original-path"),
                 path: requestUrl.pathname,
               });
               if (request.headers.get("authorization") !== AllowedToken) {
@@ -801,14 +803,47 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
               }
               return new Response(null, {
                 status: 200,
-                headers: { "x-agentos-subject": "mate-conformance" },
+                headers: {
+                  "x-agentos-subject": "mate-conformance",
+                  "x-agentos-authz-schema-version": "1",
+                  "x-agentos-authz-correlation-id":
+                    "corr_00000000000000000000000000000001",
+                  "x-agentos-authz-decision-ref":
+                    "decision_00000000000000000000000000000001",
+                  "x-agentos-authz-expires-at-millis": "1785556860000",
+                  "x-agentos-authz-credential-domain": "openai-responses",
+                  "x-agentos-authz-agent-id":
+                    "10000000-0000-4000-8000-000000000001",
+                  "x-agentos-authz-role": "first_mate",
+                  "x-agentos-authz-fleet": "default",
+                  "x-agentos-authz-domain": "agentos",
+                  "x-agentos-authz-assignment-id":
+                    request.headers.has("x-agentos-assignment-id")
+                      ? "20000000-0000-4000-8000-000000000001"
+                      : "",
+                  "x-agentos-authz-capability": "openai.responses.create",
+                  "x-agentos-authz-resource-kind": "provider_service",
+                  "x-agentos-authz-provider": "openai",
+                  "x-agentos-authz-service": "responses",
+                  "x-agentos-authz-profile-id": "openai-responses",
+                  "x-agentos-authz-profile-version": "1",
+                  "x-agentos-authz-ceiling-id": "fleet-openai",
+                  "x-agentos-authz-ceiling-revision": "1",
+                  "x-agentos-authz-rate-class": "standard",
+                },
               });
             });
 
             const upstream = yield* acquireServer((request) => {
               const requestUrl = new URL(request.url);
               upstreamRequests.push({
+                assignmentId: request.headers.get(
+                  "x-agentos-authz-assignment-id",
+                ),
                 authorization: request.headers.get("authorization"),
+                decisionRef: request.headers.get(
+                  "x-agentos-authz-decision-ref",
+                ),
                 path: requestUrl.pathname,
                 subject: request.headers.get("x-agentos-subject"),
               });
@@ -858,6 +893,9 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
               return Response.json({
                 path: requestUrl.pathname,
                 authorization: request.headers.get("authorization"),
+                decisionRef: request.headers.get(
+                  "x-agentos-authz-decision-ref",
+                ),
                 subject: request.headers.get("x-agentos-subject"),
               });
             });
@@ -1049,7 +1087,8 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
             assert.strictEqual(echo.status, 200);
             assert.deepStrictEqual(yield* responseJson(echo), {
               path: "/echo",
-              authorization: `Bearer ${BackendToken}`,
+              authorization: AllowedToken,
+              decisionRef: "decision_00000000000000000000000000000001",
               subject: "mate-conformance",
             });
             assert.strictEqual(
@@ -1058,8 +1097,27 @@ describe("agentgateway v1.4.1 semantic conformance", () => {
             );
             assert.strictEqual(
               upstreamRequests.at(-1)?.authorization,
-              `Bearer ${BackendToken}`,
+              AllowedToken,
             );
+            assert.deepStrictEqual(authorizationRequests.at(-1), {
+              authorization: AllowedToken,
+              method: "GET",
+              originalPath: "/echo",
+              path: "/authorize",
+            });
+
+            const mateWithoutAssignment = yield* fetchEffect(
+              `http://127.0.0.1:${ports.gateway}/echo`,
+              {
+                headers: {
+                  authorization: AllowedToken,
+                  "x-agentos-authz-assignment-id":
+                    "20000000-0000-4000-8000-000000000099",
+                },
+              },
+            );
+            assert.strictEqual(mateWithoutAssignment.status, 200);
+            assert.strictEqual(upstreamRequests.at(-1)?.assignmentId, "");
 
             for (let index = 0; index < 3; index += 1) {
               yield* timedRequest(`http://127.0.0.1:${upstream.port}/latency`);

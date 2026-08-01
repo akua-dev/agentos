@@ -152,6 +152,48 @@ const rules: Readonly<Record<string, AttributeRule>> = Object.freeze({
     signals: allSignals,
     value: { kind: "boolean" },
   },
+  "agentos.identity.agent_id": {
+    signals: correlatedSignals,
+    value: {
+      kind: "opaque",
+      pattern:
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      maximumLength: 36,
+    },
+  },
+  "agentos.identity.assignment_id": {
+    signals: correlatedSignals,
+    value: {
+      kind: "opaque",
+      pattern:
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      maximumLength: 36,
+    },
+  },
+  "agentos.authz.decision_ref": {
+    signals: correlatedSignals,
+    value: {
+      kind: "opaque",
+      pattern: /^decision_[0-9a-f]{32}$/,
+      maximumLength: 41,
+    },
+  },
+  "agentos.authz.profile_id": {
+    signals: correlatedSignals,
+    value: {
+      kind: "opaque",
+      pattern: /^[a-z][a-z0-9-]{0,62}$/,
+      maximumLength: 63,
+    },
+  },
+  "agentos.authz.profile_version": {
+    signals: correlatedSignals,
+    value: { kind: "number", minimum: 1 },
+  },
+  "agentos.authz.rate_class": {
+    signals: correlatedSignals,
+    value: { kind: "enum", values: ["low", "standard", "high"] },
+  },
 });
 
 export function safeTelemetryAttributes(

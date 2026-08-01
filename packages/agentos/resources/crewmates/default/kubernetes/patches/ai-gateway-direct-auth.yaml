@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-crewmate
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: install-tools
+        - name: prepare-home
+          env:
+            - name: AGENTOS_CODEX_PROVIDER_MODE
+              value: direct

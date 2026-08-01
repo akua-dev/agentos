@@ -268,6 +268,9 @@ describe("Crewmate Kubernetes base", () => {
     const container = pod.containers.find(
       ({ name }: { name: string }) => name === "crewmate",
     );
+    const prepare = pod.initContainers.find(
+      ({ name }: { name: string }) => name === "prepare-home",
+    );
     const environment = Object.fromEntries(
       container.env.map(
         ({ name, value, valueFrom }: Record<string, unknown>) => [
@@ -276,18 +279,75 @@ describe("Crewmate Kubernetes base", () => {
         ],
       ),
     );
+    const prepareEnvironment = Object.fromEntries(
+      prepare.env.map(
+        ({ name, value, valueFrom }: Record<string, unknown>) => [
+          name,
+          value ?? valueFrom,
+        ],
+      ),
+    );
 
     expect(spec.template.metadata.labels).toMatchObject({
-      "agentos.akua.dev/ai-gateway-client": "true",
+      "agentos.akua.dev/agentgateway-client": "true",
     });
     expect(environment.AI_GATEWAY_URL).toBe(
-      "http://ai-gateway.agentos.svc.cluster.local:8787",
+      "http://agentgateway-openai.agentos.svc.cluster.local:8788",
     );
-    expect(environment.AI_GATEWAY_TOKEN).toEqual({
-      secretKeyRef: { key: "token", name: "ai-gateway-client" },
+    expect(environment.AI_GATEWAY_TOKEN).toBeUndefined();
+    expect(environment.AGENTOS_CODEX_PROVIDER_MODE).toBe("ai-gateway");
+    expect(environment.AGENTOS_EGRESS_TOKEN_FILE).toBe(
+      "/var/run/secrets/agentos-egress/token",
+    );
+    expect(prepareEnvironment).toMatchObject({
+      AGENTOS_ASSIGNMENT_ID: "00000000-0000-4000-8000-000000000005",
+      AGENTOS_CODEX_PROVIDER_MODE: "ai-gateway",
+      AGENTOS_EGRESS_TOKEN_FILE: "/var/run/secrets/agentos-egress/token",
+      AI_GATEWAY_URL:
+        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
     });
     expect(environment.AGENTOS_PROVIDER_CREDENTIAL_KIND).toBe("ai_gateway");
     expect(pod.serviceAccountName).toBe("agentos-crewmate");
     expect(spec.volumeClaimTemplates[0].metadata.name).toBe("home");
+  });
+
+  test("renders an explicit one-rollout return to direct Codex auth", async () => {
+    const resources = await render(
+      join(kubernetes, "tests", "fixtures", "ai-gateway-direct-auth"),
+    );
+    const statefulSet = resource(resources, "StatefulSet");
+    const pod = statefulSet.spec!.template.spec;
+    const prepare = pod.initContainers.find(
+      ({ name }: { name: string }) => name === "prepare-home",
+    );
+    const container = pod.containers.find(
+      ({ name }: { name: string }) => name === "crewmate",
+    );
+    const prepareEnvironment = Object.fromEntries(
+      prepare.env.map(({ name, value }: { name: string; value: string }) => [
+        name,
+        value,
+      ]),
+    );
+    const environment = Object.fromEntries(
+      container.env.map(({ name, value }: { name: string; value: string }) => [
+        name,
+        value,
+      ]),
+    );
+
+    expect(prepareEnvironment.AGENTOS_CODEX_PROVIDER_MODE).toBe("direct");
+    expect(prepareEnvironment.AGENTOS_ASSIGNMENT_ID).toBe(
+      "00000000-0000-4000-8000-000000000005",
+    );
+    expect(prepareEnvironment.AI_GATEWAY_URL).toBeUndefined();
+    expect(environment.AGENTOS_CODEX_PROVIDER_MODE).toBeUndefined();
+    expect(environment.AGENTOS_ASSIGNMENT_ID).toBe(
+      "00000000-0000-4000-8000-000000000005",
+    );
+    expect(environment.AI_GATEWAY_URL).toBeUndefined();
+    expect(statefulSet.spec!.template.metadata.labels).not.toHaveProperty(
+      "agentos.akua.dev/agentgateway-client",
+    );
   });
 });

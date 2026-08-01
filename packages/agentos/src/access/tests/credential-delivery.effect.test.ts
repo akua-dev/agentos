@@ -17,22 +17,22 @@ import {
 
 const staticHeaderInput = {
   schemaVersion: 1,
-  credentialDomain: "openai-responses",
-  provider: "openai",
-  capability: "openai.responses.create",
+  credentialDomain: "github-api",
+  provider: "github",
+  capability: "github.repository.read",
   resource: {
     kind: "provider_service",
-    provider: "openai",
-    service: "responses",
+    provider: "github",
+    service: "rest",
   },
-  upstreamHosts: ["ai-gateway.agentos.svc.cluster.local"],
+  upstreamHosts: ["api.github.com"],
   mechanism: {
     kind: "static_header",
     headerName: "authorization",
     prefix: "Bearer ",
     secretRef: {
       namespace: "agentos",
-      name: "agentgateway-ai-gateway-client",
+      name: "agentgateway-github-app-token",
       key: "token",
       resourceVersion: "18422",
     },
@@ -51,7 +51,7 @@ describe("provider-isolated credential delivery", () => {
       });
       assert.deepStrictEqual(plan.policyDecision, {
         service: "agentos-egress-authz",
-        capability: "openai.responses.create",
+        capability: "github.repository.read",
         resource: staticHeaderInput.resource,
         consistency: "strong",
         output: "bounded_decision_reference",
@@ -74,9 +74,9 @@ describe("provider-isolated credential delivery", () => {
       const request = {
         schemaVersion: 1,
         correlationId: "corr_11111111111111111111111111111111",
-        credentialDomain: "openai",
-        provider: "openai",
-        capability: "openai.responses.create",
+        credentialDomain: "github",
+        provider: "github",
+        capability: "github.repository.read",
         resource: staticHeaderInput.resource,
         subject: {
           kind: "mate",
@@ -98,9 +98,9 @@ describe("provider-isolated credential delivery", () => {
     Effect.gen(function*() {
       const plan = yield* compileProviderCredentialPlan(staticHeaderInput);
       assert.deepStrictEqual(plan.isolation, {
-        adapterServiceAccount: "agentgateway-openai-responses",
-        credentialDomain: "openai-responses",
-        acceptedRouteHosts: ["ai-gateway.agentos.svc.cluster.local"],
+        adapterServiceAccount: "agentgateway-github-api",
+        credentialDomain: "github-api",
+        acceptedRouteHosts: ["api.github.com"],
         secretCount: 1,
         crossDomainCredentialAccess: "none",
       });
@@ -111,7 +111,7 @@ describe("provider-isolated credential delivery", () => {
       assert.deepStrictEqual(delivery.secretProjection, {
         secretRef: staticHeaderInput.mechanism.secretRef,
         mountPath:
-          "/var/run/secrets/agentos-provider/openai-responses/credential",
+          "/var/run/secrets/agentos-provider/github-api/credential",
         mode: 0o440,
         readOnly: true,
       });
@@ -286,7 +286,7 @@ describe("provider-isolated credential delivery", () => {
             ...staticHeaderInput,
             resource: {
               kind: "provider_service",
-              provider: "github",
+              provider: "openai",
               service: "api",
             },
           },

@@ -18,7 +18,7 @@ workload owner:
 Compose the patch only in a reviewed overlay for an approved client. Applying
 all selected patches creates the in-cluster pooled posture; applying only
 worker or automation patches while Mates retain direct OAuth creates the mixed
-posture. `$agentos-ai-gateway` owns the exact Secret, login, client
+posture. `$agentos-ai-gateway` owns the exact operator Secret, login, client
 configuration, verification, recovery and retirement workflow.
 
 Storage provisioners do not agree on initial PVC ownership or mode. A short
@@ -27,14 +27,14 @@ retained mount and sets it to mode `0700` before the capability-free, non-root
 gateway starts. The init container receives only `CHOWN`; it runs no shell and
 does not read gateway credentials.
 
-Before applying the topology, First Mate creates the `ai-gateway-client` Secret in
-the `agentos` namespace with a high-entropy `token` key through the Captain's
-approved Secret workflow. The value is never committed or placed in argv. The
-same Secret is mounted only into approved Agent Pods, which carry the label
-`agentos.akua.dev/ai-gateway-client: "true"` to pass the NetworkPolicy.
-This is defense in depth only where the cluster CNI enforces Kubernetes
-NetworkPolicy; verify that behavior in the target cluster instead of treating
-the manifest's existence as proof of isolation.
+Before applying the topology, First Mate creates `Secret/ai-gateway-operator`
+in the `agentos` namespace with a high-entropy `token` key through the
+Captain's approved Secret workflow. It protects only `/status` and
+`/readyz/client`; it is not accepted as inference client authentication and is
+never mounted into Agent or Agentgateway Pods. Agentgateway Pods carry
+`agentos.akua.dev/ai-gateway-upstream: "true"`, the only selector admitted by
+the AI Gateway NetworkPolicy. Agents instead authenticate to Agentgateway with
+the kubelet-rotated projected identity already mounted by the workload base.
 
 The topology does not enable an OpenAI API-key fallback. Add `OPENAI_API_KEY` from a
 separate Secret and `AI_GATEWAY_ALLOW_API_KEY_FALLBACK=true` only after the

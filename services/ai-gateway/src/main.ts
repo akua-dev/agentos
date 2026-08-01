@@ -102,14 +102,18 @@ export async function runAIGatewayCli(
     }
 
     if (command === "status") {
-      const clientToken = environment.AI_GATEWAY_TOKEN?.trim();
-      if (!clientToken) {
-        writeError("AI_GATEWAY_TOKEN is required for status");
+      const operatorToken =
+        environment.AI_GATEWAY_OPERATOR_TOKEN?.trim() ||
+        environment.AI_GATEWAY_TOKEN?.trim();
+      if (!operatorToken) {
+        writeError(
+          "AI_GATEWAY_OPERATOR_TOKEN or legacy AI_GATEWAY_TOKEN is required for status",
+        );
         return 1;
       }
       const response = await (options.fetchImpl ?? fetch)(
         `http://127.0.0.1:${parsePort(environment.AI_GATEWAY_LISTEN_PORT)}/status`,
-        { headers: { authorization: `Bearer ${clientToken}` } },
+        { headers: { authorization: `Bearer ${operatorToken}` } },
       );
       if (!response.ok) {
         writeError(`ai-gateway status returned HTTP ${response.status}`);
@@ -134,8 +138,19 @@ export async function runAIGatewayCli(
     }
 
     if (command === "serve") {
+      const clientAuthenticationMode =
+        environment.AI_GATEWAY_CLIENT_AUTH_MODE?.trim() || "shared_token";
+      if (
+        clientAuthenticationMode !== "shared_token" &&
+        clientAuthenticationMode !== "workload_identity"
+      ) {
+        writeError(
+          "AI_GATEWAY_CLIENT_AUTH_MODE must be shared_token or workload_identity",
+        );
+        return 1;
+      }
       const clientToken = environment.AI_GATEWAY_TOKEN?.trim();
-      if (!clientToken) {
+      if (clientAuthenticationMode === "shared_token" && !clientToken) {
         writeError("AI_GATEWAY_TOKEN is required to serve");
         return 1;
       }
@@ -145,7 +160,16 @@ export async function runAIGatewayCli(
       try {
         const service = await createAIGatewayService({
           stateDirectory,
-          clientToken,
+          clientAuthentication: clientAuthenticationMode === "workload_identity"
+            ? { kind: "workload_identity" }
+            : { kind: "shared_token", token: clientToken! },
+          ...(environment.AI_GATEWAY_OPERATOR_TOKEN?.trim()
+            ? {
+                operatorToken: environment.AI_GATEWAY_OPERATOR_TOKEN.trim(),
+              }
+            : clientToken
+              ? { operatorToken: clientToken }
+              : {}),
           allowApiKeyFallback:
             environment.AI_GATEWAY_ALLOW_API_KEY_FALLBACK?.trim() === "true",
           ...(environment.OPENAI_API_KEY

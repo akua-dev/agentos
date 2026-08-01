@@ -45,6 +45,12 @@ import type {
   AgentOSProviderAttempt,
   AgentOSProviderAttemptOutcome,
 } from "../telemetry/runtime.ts";
+import {
+  isGatewaySecurityHeader,
+  resolvePiWorkloadIdentity,
+  type PiWorkloadIdentityOptions,
+} from "../access/pi-workload-identity.ts";
+import { runPromiseLegacy } from "../shared/legacy.ts";
 
 type ResolvedAuth = {
   apiKey?: string;
@@ -77,6 +83,7 @@ export type OpenAIServerCompactionDependencies = {
   runLocalCompaction(request: LocalCompactionRequest): Promise<CompactionResult>;
   runServerCompaction(request: ServerCompactionRequest): Promise<ServerCompactionResult>;
   telemetry?: AgentOSTelemetrySource;
+  workloadIdentity?: PiWorkloadIdentityOptions;
 };
 
 function isEnabled(): boolean {
@@ -334,10 +341,18 @@ async function handleCompaction(
 
   const resolved = await ctx.modelRegistry.getApiKeyAndHeaders(model);
   if (!resolved.ok) return undefined;
+  const workloadIdentity = await runPromiseLegacy(
+    resolvePiWorkloadIdentity(model, dependencies.workloadIdentity),
+  );
+  if (workloadIdentity.active && workloadIdentity.headers === undefined) {
+    return undefined;
+  }
   const hasAuthorization = Object.keys(resolved.headers ?? {}).some(
     (name) => name.toLowerCase() === "authorization",
   );
-  if (!resolved.apiKey && !hasAuthorization) return undefined;
+  if (!workloadIdentity.active && !resolved.apiKey && !hasAuthorization) {
+    return undefined;
+  }
 
   const thinkingLevel = pi.getThinkingLevel();
   const telemetryOperation = await startAgentOSAuxiliaryOperation(
@@ -358,6 +373,12 @@ async function handleCompaction(
     streamMode: model.provider === "openai-codex" ? "streaming" : "non_streaming",
   });
   const baseHeaders = mergedHeaders(model.headers, resolved.headers);
+  if (workloadIdentity.active) {
+    for (const name of Object.keys(baseHeaders)) {
+      if (isGatewaySecurityHeader(name)) delete baseHeaders[name];
+    }
+    Object.assign(baseHeaders, workloadIdentity.headers);
+  }
   const localHeaders = { ...baseHeaders };
   const remoteHeaders = { ...baseHeaders };
   localAttempt.inject(localHeaders);
@@ -365,7 +386,11 @@ async function handleCompaction(
   const localRequest = {
     event,
     model,
-    auth: { ...resolved, headers: localHeaders },
+    auth: {
+      ...resolved,
+      ...(workloadIdentity.active ? { apiKey: undefined } : {}),
+      headers: localHeaders,
+    },
     thinkingLevel,
     telemetry: {
       currentAttempt: () => localAttempt,
@@ -380,7 +405,7 @@ async function handleCompaction(
   const remoteRequest: ServerCompactionRequest = {
     model,
     route: agentOSRouteForModel(model),
-    apiKey: resolved.apiKey,
+    apiKey: workloadIdentity.active ? undefined : resolved.apiKey,
     headers: remoteHeaders,
     sessionId: ctx.sessionManager.getSessionId(),
     input: normalizeResponseItemsForPrompt(

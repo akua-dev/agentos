@@ -63,15 +63,13 @@ const gatewayEnvironment = {
   AGENTOS_MODEL: "openai-codex/gpt-5.6-sol",
   AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
   AGENTOS_THINKING: "xhigh",
-  AI_GATEWAY_TOKEN: "synthetic-fleet-token",
-  AI_GATEWAY_URL: "http://ai-gateway.agentos.svc.cluster.local:8787/",
+  AI_GATEWAY_URL: "http://agentgateway-openai.agentos.svc.cluster.local:8788/",
 };
 
 const managedGatewayProvider = {
   apiKey:
     "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoiZmxlZXQtZ2F0ZXdheSJ9fQ.placeholder",
-  baseUrl: "http://ai-gateway.agentos.svc.cluster.local:8787",
-  headers: { "X-AI-Gateway-Token": "$AI_GATEWAY_TOKEN" },
+  baseUrl: "http://agentgateway-openai.agentos.svc.cluster.local:8788",
 };
 
 describe("Pi provider reconciliation", () => {
@@ -111,11 +109,7 @@ describe("Pi provider reconciliation", () => {
     for (const path of [paths.models, paths.settings, paths.marker]) {
       expect((await stat(path)).mode & 0o777).toBe(0o600);
     }
-    for (const path of [paths.models, paths.settings, paths.marker]) {
-      expect(await readFile(path, "utf8")).not.toContain(
-        gatewayEnvironment.AI_GATEWAY_TOKEN,
-      );
-    }
+    expect(JSON.stringify(models)).not.toContain("AI_GATEWAY_TOKEN");
   });
 
   test("preserves unrelated providers, settings, and direct auth across idempotent retry", async () => {
@@ -138,8 +132,7 @@ describe("Pi provider reconciliation", () => {
 
     await run(paths, {
       AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
-      AI_GATEWAY_TOKEN: "synthetic-fleet-token",
-      AI_GATEWAY_URL: "http://ai-gateway.agentos.svc.cluster.local:8787",
+      AI_GATEWAY_URL: "http://agentgateway-openai.agentos.svc.cluster.local:8788",
     });
     const first = await Promise.all([
       readFile(paths.models, "utf8"),
@@ -148,8 +141,7 @@ describe("Pi provider reconciliation", () => {
     ]);
     await run(paths, {
       AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
-      AI_GATEWAY_TOKEN: "synthetic-fleet-token",
-      AI_GATEWAY_URL: "http://ai-gateway.agentos.svc.cluster.local:8787",
+      AI_GATEWAY_URL: "http://agentgateway-openai.agentos.svc.cluster.local:8788",
     });
 
     expect(await json(paths.auth)).toEqual(auth);
