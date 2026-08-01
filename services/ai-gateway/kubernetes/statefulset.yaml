@@ -122,6 +122,10 @@ spec:
               value: /var/lib/ai-gateway
             - name: AI_GATEWAY_CLIENT_AUTH_MODE
               value: workload_identity
+            - name: AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL
+              value: http://agentos-egress-authz.agentos.svc.cluster.local:9001
+            - name: AGENTOS_PROVIDER_BUDGET_SETTLEMENT_TOKEN_FILE
+              value: /var/run/secrets/agentos-budget-settlement/token
             - name: AI_GATEWAY_OPERATOR_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -134,6 +138,9 @@ spec:
           volumeMounts:
             - name: state
               mountPath: /var/lib/ai-gateway
+            - name: budget-settlement
+              mountPath: /var/run/secrets/agentos-budget-settlement
+              readOnly: true
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -156,6 +163,15 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
+      volumes:
+        - name: budget-settlement
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  audience: agentos-provider-budget-settlement
+                  expirationSeconds: 600
+                  path: token
   volumeClaimTemplates:
     - metadata:
         name: state

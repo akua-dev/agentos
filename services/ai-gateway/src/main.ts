@@ -1,251 +1,330 @@
 #!/usr/bin/env bun
 
-import { homedir } from "node:os";
-import { join } from "node:path";
-import type {
-  OAuthCredentials,
-  OAuthDeviceCodeInfo,
-} from "@earendil-works/pi-ai/oauth";
+import { layer as BunCryptoLayer } from "@effect/platform-bun/BunCrypto";
+import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
+import * as BunHttpClient from "@effect/platform-bun/BunHttpClient";
+import * as BunHttpServer from "@effect/platform-bun/BunHttpServer";
+import * as BunPath from "@effect/platform-bun/BunPath";
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import {
   initializeAgentOSTelemetryFromEnvironment,
-  type AgentOSTelemetry,
+  makeProviderBudgetSettlementHttpLayer,
+  ProviderBudgetSettlementReporter,
 } from "@akua-dev/agentos";
+import {
+  ConfigProvider,
+  Cause,
+  Console,
+  Data,
+  Effect,
+  FileSystem,
+  Layer,
+  Path,
+  Queue,
+  Redacted,
+  Runtime,
+  Stream,
+} from "effect";
+import {
+  HttpClient,
+  HttpClientRequest,
+  HttpRouter,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/unstable/http";
+
 import { createAccountVault, createAccountVaultStore } from "./accounts.ts";
+import {
+  AIGatewayCliOutput,
+  AIGatewayOAuth,
+  AIGatewayRuntime,
+  AIGatewayStatusClient,
+  runAIGatewayCli,
+} from "./cli.ts";
+import {
+  aiGatewayEntrypointError,
+  type AIGatewayConfig,
+  type AIGatewayServeConfig,
+  loadAIGatewayConfig,
+} from "./config.ts";
 import {
   loginOpenAICodexDeviceCode,
   refreshOpenAICodexToken,
 } from "./codex-oauth.ts";
-import { createAIGatewayService } from "./service.ts";
+import { makeAIGatewayApplication } from "./gateway-service.ts";
+import type { AIForwardClientAuthentication } from "./forward.ts";
 import {
-  createGatewayTelemetry,
-  createNoopGatewayTelemetry,
-} from "./telemetry.ts";
+  AIGatewayTelemetry,
+  makeLegacyAIGatewayTelemetry,
+  noopAIGatewayTelemetry,
+} from "./observability.ts";
+import { AIProviderHttp, AIProviderHttpLive } from "./provider-http.ts";
+import { CodexQuota, makeCodexQuotaLayer } from "./quota.ts";
+import { defaultRoutingConfig } from "./selection.ts";
+import { makeAIRoutingStateLive } from "./state-live.ts";
+import {
+  AIRoutingState,
+  makeManagedAccountVaultLayer,
+  ManagedAccountVault,
+} from "./state.ts";
+import { createGatewayTelemetry } from "./telemetry.ts";
 
-type Environment = Record<string, string | undefined>;
-type LoginImplementation = (options: {
-  onDeviceCode(info: OAuthDeviceCodeInfo): void;
-  signal?: AbortSignal;
-}) => Promise<OAuthCredentials>;
-type RefreshImplementation = (
-  refreshToken: string,
-) => Promise<OAuthCredentials>;
-type FetchImplementation = (
-  input: string | URL | Request,
-  init?: RequestInit,
-) => Promise<Response>;
-
-export interface ServerHandle {
-  stop(closeActiveConnections?: boolean): unknown;
+class AIGatewayProcessExit extends Data.TaggedError("AIGatewayProcessExit")<{
+  readonly code: number;
+}> {
+  override readonly [Runtime.errorExitCode] = this.code;
 }
 
-export interface RunAIGatewayCliOptions {
-  environment?: Environment;
-  writeLine?: (line: string) => void;
-  writeError?: (line: string) => void;
-  login?: LoginImplementation;
-  refresh?: RefreshImplementation;
-  fetchImpl?: FetchImplementation;
-  initializeTelemetry?: () => Promise<AgentOSTelemetry>;
-  startServer?: (options: {
-    hostname: string;
-    port: number;
-    fetch(request: Request): Response | Promise<Response>;
-  }) => ServerHandle;
-  waitForShutdown?: () => Promise<void>;
+const AIGatewayCliOutputLive = Layer.succeed(
+  AIGatewayCliOutput,
+  AIGatewayCliOutput.of({
+    line: (value) => Console.log(value),
+    error: (value) => Console.error(value),
+  }),
+);
+
+const AIGatewayOAuthLive = Layer.succeed(
+  AIGatewayOAuth,
+  AIGatewayOAuth.of({
+    login: (onDeviceCode) =>
+      Effect.scoped(Effect.gen(function*() {
+        const notifications = yield* Queue.unbounded<
+          Effect.Effect<void>,
+          Cause.Done
+        >();
+        const consume = Stream.fromQueue(notifications).pipe(
+          Stream.runForEach((notification) => notification),
+        );
+        const authenticate = Effect.tryPromise({
+          try: (signal) =>
+            loginOpenAICodexDeviceCode({
+              signal,
+              onDeviceCode(info) {
+                Queue.offerUnsafe(notifications, onDeviceCode(info));
+              },
+            }),
+          catch: () => aiGatewayEntrypointError("oauth_unavailable"),
+        }).pipe(Effect.ensuring(Queue.end(notifications)));
+        const [credentials] = yield* Effect.all(
+          [authenticate, consume],
+          { concurrency: 2 },
+        );
+        return credentials;
+      })),
+  }),
+);
+
+const AIGatewayStatusClientLive = Layer.effect(
+  AIGatewayStatusClient,
+  Effect.gen(function*() {
+    const client = yield* HttpClient.HttpClient;
+    const read = Effect.fn("agentos.aiGateway.readStatus")(
+      function*(port: number, token: Redacted.Redacted<string>) {
+        const request = HttpClientRequest.get(
+          `http://127.0.0.1:${port}/status`,
+        ).pipe(
+          HttpClientRequest.setHeader(
+            "authorization",
+            `Bearer ${Redacted.value(token)}`,
+          ),
+        );
+        return yield* Effect.scoped(Effect.gen(function*() {
+          const response = yield* client.execute(request).pipe(
+            Effect.mapError(() =>
+              aiGatewayEntrypointError("status_unavailable")
+            ),
+          );
+          if (response.status < 200 || response.status >= 300) {
+            return yield* aiGatewayEntrypointError("status_unavailable");
+          }
+          return yield* response.text.pipe(
+            Effect.mapError(() =>
+              aiGatewayEntrypointError("status_unavailable")
+            ),
+          );
+        }));
+      },
+    );
+    return AIGatewayStatusClient.of({ read });
+  }),
+);
+
+function acquireAIGatewayTelemetry() {
+  return Effect.acquireRelease(
+    Effect.tryPromise({
+      try: () => initializeAgentOSTelemetryFromEnvironment(),
+      catch: () => aiGatewayEntrypointError("telemetry_unavailable"),
+    }),
+    (telemetry) =>
+      Effect.tryPromise({
+        try: () => telemetry.shutdown(),
+        catch: () => aiGatewayEntrypointError("telemetry_unavailable"),
+      }).pipe(Effect.catchCause(() => Effect.void)),
+  ).pipe(
+    Effect.map((telemetry) =>
+      telemetry.enabled
+        ? makeLegacyAIGatewayTelemetry(createGatewayTelemetry())
+        : noopAIGatewayTelemetry
+    ),
+  );
 }
 
-export async function runAIGatewayCli(
-  args: string[],
-  options: RunAIGatewayCliOptions = {},
-): Promise<number> {
-  const environment = options.environment ?? process.env;
-  const writeLine = options.writeLine ?? console.log;
-  const writeError = options.writeError ?? console.error;
-  const stateDirectory =
-    environment.AI_GATEWAY_STATE_DIR?.trim() ||
-    join(homedir(), ".local", "state", "ai-gateway");
-  const refresh = options.refresh ?? refreshOpenAICodexToken;
+function makeManagedAccountVaultLive(
+  config: AIGatewayConfig,
+  path: Path.Path,
+) {
   const vault = createAccountVault({
-    store: createAccountVaultStore(join(stateDirectory, "accounts.json")),
-    refreshDirectory: stateDirectory,
-    oauth: { refresh },
+    store: createAccountVaultStore(
+      path.join(config.stateDirectory, "accounts.json"),
+    ),
+    refreshDirectory: config.stateDirectory,
+    oauth: { refresh: refreshOpenAICodexToken },
     clock: Date.now,
   });
-  const command = args[0] ?? "help";
+  return makeManagedAccountVaultLayer(vault);
+}
 
-  try {
-    if (command === "login") {
-      const label = args.slice(1).join(" ").trim() || "Codex account";
-      const credentials = await (options.login ?? loginOpenAICodexDeviceCode)({
-        onDeviceCode(info) {
-          writeLine(`Open ${info.verificationUri}`);
-          writeLine(`Enter code ${info.userCode}`);
-        },
-      });
-      const id = await vault.addFromOAuth(label, credentials);
-      writeLine(`Added ${label} (${id})`);
-      return 0;
-    }
-
-    if (command === "list") {
-      const accounts = await vault.list();
-      if (accounts.length === 0) {
-        writeLine("No Codex accounts configured");
-        return 0;
-      }
-      for (const account of accounts) {
-        writeLine(
-          `${account.id}\t${account.label}\t${account.needsReauth ? "needs_reauth" : "ready"}`,
-        );
-      }
-      return 0;
-    }
-
-    if (command === "status") {
-      const operatorToken =
-        environment.AI_GATEWAY_OPERATOR_TOKEN?.trim() ||
-        environment.AI_GATEWAY_TOKEN?.trim();
-      if (!operatorToken) {
-        writeError(
-          "AI_GATEWAY_OPERATOR_TOKEN or legacy AI_GATEWAY_TOKEN is required for status",
-        );
-        return 1;
-      }
-      const response = await (options.fetchImpl ?? fetch)(
-        `http://127.0.0.1:${parsePort(environment.AI_GATEWAY_LISTEN_PORT)}/status`,
-        { headers: { authorization: `Bearer ${operatorToken}` } },
+function makeAIGatewayRuntimeLive(
+  config: AIGatewayConfig,
+  path: Path.Path,
+) {
+  return Layer.effect(
+    AIGatewayRuntime,
+    Effect.gen(function*() {
+      const vault = yield* ManagedAccountVault;
+      const fileSystem = yield* FileSystem.FileSystem;
+      const provider = yield* AIProviderHttp.pipe(
+        Effect.provide(AIProviderHttpLive),
       );
-      if (!response.ok) {
-        writeError(`ai-gateway status returned HTTP ${response.status}`);
-        return 1;
-      }
-      writeLine(await response.text());
-      return 0;
-    }
+      const quota = yield* CodexQuota.pipe(
+        Effect.provide(makeCodexQuotaLayer(config.quotaTimeoutMillis)),
+      );
+      const settlements = yield* ProviderBudgetSettlementReporter.pipe(
+        Effect.provide(makeProviderBudgetSettlementHttpLayer({
+          baseUrl: config.settlementBaseUrl,
+          tokenPath: config.settlementTokenPath,
+          timeoutMillis: config.settlementTimeoutMillis,
+          maximumResponseBytes: config.settlementMaximumResponseBytes,
+        })),
+      );
 
-    if (command === "remove") {
-      const id = args[1];
-      if (!id) {
-        writeError("remove requires an opaque account ID from ai-gateway list");
-        return 2;
-      }
-      if (!(await vault.remove(id))) {
-        writeError(`No managed account exists for ${id}`);
-        return 1;
-      }
-      writeLine(`Removed ${id}`);
-      return 0;
-    }
-
-    if (command === "serve") {
-      const clientAuthenticationMode =
-        environment.AI_GATEWAY_CLIENT_AUTH_MODE?.trim() || "shared_token";
-      if (
-        clientAuthenticationMode !== "shared_token" &&
-        clientAuthenticationMode !== "workload_identity"
-      ) {
-        writeError(
-          "AI_GATEWAY_CLIENT_AUTH_MODE must be shared_token or workload_identity",
-        );
-        return 1;
-      }
-      const clientToken = environment.AI_GATEWAY_TOKEN?.trim();
-      if (clientAuthenticationMode === "shared_token" && !clientToken) {
-        writeError("AI_GATEWAY_TOKEN is required to serve");
-        return 1;
-      }
-      const telemetryRuntime = await (
-        options.initializeTelemetry ?? initializeAgentOSTelemetryFromEnvironment
-      )();
-      try {
-        const service = await createAIGatewayService({
-          stateDirectory,
-          clientAuthentication: clientAuthenticationMode === "workload_identity"
+      const serve = Effect.fn("agentos.aiGateway.serve")(
+        (serveConfig: AIGatewayServeConfig) => Effect.scoped(Effect.gen(function*() {
+          yield* fileSystem.makeDirectory(config.stateDirectory, {
+            recursive: true,
+          }).pipe(
+            Effect.mapError(() =>
+              aiGatewayEntrypointError("invalid_configuration")
+            ),
+          );
+          const routing = yield* AIRoutingState.pipe(
+            Effect.provide(makeAIRoutingStateLive(
+              path.join(config.stateDirectory, "routing.sqlite"),
+              defaultRoutingConfig,
+            )),
+            Effect.mapError(() =>
+              aiGatewayEntrypointError("server_unavailable")
+            ),
+          );
+          const telemetry = yield* acquireAIGatewayTelemetry();
+          const clientAuthentication: AIForwardClientAuthentication =
+            serveConfig.authentication.kind ===
+              "workload_identity"
             ? { kind: "workload_identity" }
-            : { kind: "shared_token", token: clientToken! },
-          ...(environment.AI_GATEWAY_OPERATOR_TOKEN?.trim()
-            ? {
-                operatorToken: environment.AI_GATEWAY_OPERATOR_TOKEN.trim(),
-              }
-            : clientToken
-              ? { operatorToken: clientToken }
-              : {}),
-          allowApiKeyFallback:
-            environment.AI_GATEWAY_ALLOW_API_KEY_FALLBACK?.trim() === "true",
-          ...(environment.OPENAI_API_KEY
-            ? { openAIApiKey: environment.OPENAI_API_KEY }
-            : {}),
-          oauth: { refresh },
-          fetchImpl: options.fetchImpl ?? fetch,
-          telemetry: telemetryRuntime.enabled
-            ? createGatewayTelemetry()
-            : createNoopGatewayTelemetry(),
-        });
-        try {
-          const hostname =
-            environment.AI_GATEWAY_LISTEN_HOST?.trim() || "0.0.0.0";
-          const port = parsePort(environment.AI_GATEWAY_LISTEN_PORT);
-          const server = (options.startServer ?? defaultStartServer)({
-            hostname,
-            port,
-            fetch: service.fetch,
-          });
-          writeLine(`ai-gateway listening on ${hostname}:${port}`);
-          await (options.waitForShutdown ?? waitForShutdown)();
-          await server.stop(false);
-          return 0;
-        } finally {
-          await service.close();
-        }
-      } finally {
-        await telemetryRuntime.shutdown();
-      }
-    }
+            : {
+                kind: "shared_token",
+                token: Redacted.value(serveConfig.authentication.token),
+              };
+          const openAIApiKey = Redacted.value(serveConfig.openAIApiKey);
+          const application = yield* makeAIGatewayApplication({
+            authentication: clientAuthentication,
+            operatorToken: Redacted.value(serveConfig.operatorToken),
+            allowApiKeyFallback: serveConfig.allowApiKeyFallback,
+            ...(openAIApiKey === "" ? {} : { openAIApiKey }),
+            heartbeatMillis: serveConfig.heartbeatMillis,
+            maximumUsageEventBytes: serveConfig.maximumUsageEventBytes,
+            usageCacheMillis: serveConfig.usageCacheMillis,
+          }).pipe(
+            Effect.provideService(ManagedAccountVault, vault),
+            Effect.provideService(AIRoutingState, routing),
+            Effect.provideService(AIProviderHttp, provider),
+            Effect.provideService(CodexQuota, quota),
+            Effect.provideService(
+              ProviderBudgetSettlementReporter,
+              settlements,
+            ),
+            Effect.provideService(AIGatewayTelemetry, telemetry),
+            Effect.mapError(() =>
+              aiGatewayEntrypointError("invalid_configuration")
+            ),
+          );
+          const routes = makeAIGatewayRoutesLayer(application);
+          const server = HttpRouter.serve(routes, {
+            disableListenLog: true,
+          }).pipe(
+            Layer.provide(BunHttpServer.layer({
+              hostname: serveConfig.hostname,
+              port: serveConfig.port,
+              gracefulShutdownTimeout: serveConfig.gracefulShutdownMillis,
+            })),
+          );
+          return yield* Layer.launch(server).pipe(
+            Effect.mapError(() =>
+              aiGatewayEntrypointError("server_unavailable")
+            ),
+          );
+        })),
+      );
+      return AIGatewayRuntime.of({ serve });
+    }),
+  );
+}
 
-    writeLine(
-      "Usage: ai-gateway <serve|login [label]|list|status|remove <id>>",
-    );
-    return command === "help" || command === "--help" || command === "-h"
-      ? 0
-      : 2;
-  } catch (error) {
-    const name = error instanceof Error ? error.name : "UnknownError";
-    writeError(`ai-gateway ${command} failed (${name})`);
-    return 1;
+function makeAIGatewayRoutesLayer(
+  application: { readonly handle: (request: Request) => Effect.Effect<Response> },
+) {
+  return Layer.effectDiscard(Effect.gen(function*() {
+    const router = yield* HttpRouter.HttpRouter;
+    yield* router.add("*", "/*", (request) =>
+      HttpServerRequest.toWeb(request).pipe(
+        Effect.flatMap(application.handle),
+        Effect.map(HttpServerResponse.fromWeb),
+      ));
+  }));
+}
+
+const startup = Effect.gen(function*() {
+  const config = yield* loadAIGatewayConfig();
+  const path = yield* Path.Path;
+  const accounts = makeManagedAccountVaultLive(config, path);
+  const runtime = makeAIGatewayRuntimeLive(config, path).pipe(
+    Layer.provide(accounts),
+  );
+  const live = Layer.mergeAll(
+    accounts,
+    runtime,
+    AIGatewayCliOutputLive,
+    AIGatewayOAuthLive,
+    AIGatewayStatusClientLive,
+  );
+  const args = yield* Effect.sync(() => Bun.argv.slice(2));
+  const exitCode = yield* runAIGatewayCli(args, config).pipe(
+    Effect.provide(live),
+  );
+  if (exitCode !== 0) {
+    return yield* Effect.fail(new AIGatewayProcessExit({ code: exitCode }));
   }
-}
-
-function parsePort(value: string | undefined): number {
-  if (value === undefined) return 8787;
-  const port = Number(value);
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error(
-      "AI_GATEWAY_LISTEN_PORT must be an integer from 1 to 65535",
-    );
-  }
-  return port;
-}
-
-function defaultStartServer(options: {
-  hostname: string;
-  port: number;
-  fetch(request: Request): Response | Promise<Response>;
-}): ServerHandle {
-  return Bun.serve(options);
-}
-
-function waitForShutdown(): Promise<void> {
-  return new Promise((resolve) => {
-    const stop = () => {
-      process.off("SIGINT", stop);
-      process.off("SIGTERM", stop);
-      resolve();
-    };
-    process.once("SIGINT", stop);
-    process.once("SIGTERM", stop);
-  });
-}
+}).pipe(Effect.scoped);
 
 if (import.meta.main) {
-  process.exitCode = await runAIGatewayCli(process.argv.slice(2));
+  const platform = Layer.mergeAll(
+    BunCryptoLayer,
+    BunFileSystem.layer,
+    BunHttpClient.layer,
+    BunPath.layer,
+    ConfigProvider.layer(ConfigProvider.fromEnv()),
+  );
+  BunRuntime.runMain(startup.pipe(Effect.provide(platform)), {
+    disableErrorReporting: true,
+  });
 }

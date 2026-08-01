@@ -515,6 +515,16 @@
       "status": "planned"
     },
     {
+      "id": "ai-gateway-entrypoint",
+      "issue": 105,
+      "pattern": "^services/ai-gateway/src/main\\.ts$",
+      "runtime": "bun-entrypoint",
+      "package": "@agentos/ai-gateway",
+      "io": ["config", "filesystem", "http", "oauth", "process", "stream", "telemetry", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "provider-services",
       "issue": 105,
       "pattern": "^services/ai-gateway/",
