@@ -162,4 +162,21 @@ describe("AgentOS AI telemetry contract v1", () => {
       ),
     ).toEqual({});
   });
+
+  test("keeps canonical workload attribution correlated but out of metric labels", () => {
+    const input = {
+      "agentos.identity.agent_id":
+        "10000000-0000-4000-8000-000000000001",
+      "agentos.identity.assignment_id":
+        "20000000-0000-4000-8000-000000000001",
+      "agentos.authz.decision_ref":
+        "decision_22222222222222222222222222222222",
+      "agentos.authz.profile_id": "openai-responses",
+      "agentos.authz.profile_version": 7,
+      "agentos.authz.rate_class": "standard",
+    };
+    expect(safeTelemetryAttributes(input, "span")).toEqual(input);
+    expect(safeTelemetryAttributes(input, "log")).toEqual(input);
+    expect(safeTelemetryAttributes(input, "metric")).toEqual({});
+  });
 });

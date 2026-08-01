@@ -19,7 +19,35 @@ import {
   createAgentOSMetricViews,
   AGENTOS_AI_DURATION_BUCKETS_SECONDS,
   AGENTOS_AI_METRICS,
+  type ProviderAuthorizationGrantV1,
 } from "@akua-dev/agentos";
+
+const authorization: ProviderAuthorizationGrantV1 = {
+  schemaVersion: 1,
+  correlationId: "corr_44444444444444444444444444444444",
+  decisionRef: "decision_22222222222222222222222222222222",
+  expiresAtMillis: 1_785_586_015_000,
+  credentialDomain: "openai-responses",
+  identity: {
+    agentId: "10000000-0000-4000-8000-000000000001",
+    role: "crewmate",
+    fleet: "agentos",
+    domain: "engineering",
+    assignmentId: "20000000-0000-4000-8000-000000000001",
+  },
+  capability: "openai.responses.create",
+  resource: {
+    kind: "provider_service",
+    provider: "openai",
+    service: "responses",
+  },
+  profile: { profileId: "openai-responses", profileVersion: 7 },
+  ceiling: {
+    ceilingId: "ceiling_33333333333333333333333333333333",
+    revision: 9,
+  },
+  rateClass: "standard",
+};
 
 function fixture() {
   const spans = new InMemorySpanExporter();
@@ -89,7 +117,7 @@ describe("AI Gateway telemetry", () => {
       },
     });
     const scope = test.telemetry.startRequest(request);
-    scope.authenticate(true);
+    scope.authenticate(true, authorization);
     scope.routeStarted();
     scope.routeEnded("acquired");
     scope.quotaObservation(1.25, true);
@@ -129,6 +157,12 @@ describe("AI Gateway telemetry", () => {
       "agentos.ai.provider.request_id": "req_safe_provider_1",
       "agentos.ai.request.kind": "compaction",
       "agentos.ai.status_class": "success",
+      "agentos.identity.agent_id": authorization.identity.agentId,
+      "agentos.identity.assignment_id": authorization.identity.assignmentId,
+      "agentos.authz.profile_id": authorization.profile.profileId,
+      "agentos.authz.profile_version": authorization.profile.profileVersion,
+      "agentos.authz.rate_class": authorization.rateClass,
+      "agentos.authz.decision_ref": authorization.decisionRef,
     });
     expect(
       finished.find((span) => span.name === "ai-gateway.stream")?.attributes,
@@ -154,6 +188,8 @@ describe("AI Gateway telemetry", () => {
     }
     expect(metricPayload).not.toContain("gateway-2");
     expect(metricPayload).not.toContain("req_safe_provider_1");
+    expect(metricPayload).not.toContain(authorization.identity.agentId);
+    expect(metricPayload).not.toContain(authorization.identity.assignmentId!);
     const exportedMetrics = test.metrics
       .getMetrics()
       .flatMap(({ scopeMetrics }) =>
@@ -267,5 +303,29 @@ describe("AI Gateway telemetry", () => {
       scope.end({ status: 503, streamOutcome: "not_streamed" });
     }).not.toThrow();
     expect([...headers]).toEqual([]);
+  });
+
+  test("records an authorization denial as 403 instead of authentication failure", async () => {
+    const test = fixture();
+    const scope = test.telemetry.startRequest(
+      new Request("http://gateway.test/responses"),
+    );
+    scope.authenticate(false, undefined, 403);
+    scope.end({ status: 403, streamOutcome: "not_streamed" });
+    await test.tracerProvider.forceFlush();
+
+    expect(
+      test.spans
+        .getFinishedSpans()
+        .find((span) => span.name === "ai-gateway.authenticate")
+        ?.attributes,
+    ).toMatchObject({
+      "agentos.ai.status_class": "client_error",
+      "http.response.status_code": 403,
+    });
+    await Promise.all([
+      test.tracerProvider.shutdown(),
+      test.meterProvider.shutdown(),
+    ]);
   });
 });

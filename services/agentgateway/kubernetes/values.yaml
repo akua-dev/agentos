@@ -11,6 +11,7 @@ strategy:
 commonLabels:
   app.kubernetes.io/part-of: agentos
   agentos.akua.dev/credential-domain: openai
+  agentos.akua.dev/ai-gateway-upstream: "true"
 podAnnotations:
   agentos.akua.dev/config-source: readonly
 serviceAccount:
@@ -37,18 +38,6 @@ resources:
   limits:
     cpu: "1"
     memory: 512Mi
-extraVolumes:
-  - name: provider-credential-openai
-    secret:
-      secretName: agentgateway-ai-gateway-client
-      defaultMode: 288
-      items:
-        - key: token
-          path: credential
-extraVolumeMounts:
-  - name: provider-credential-openai
-    mountPath: /var/run/secrets/agentos-provider/openai
-    readOnly: true
 config:
   config:
     adminAddr: 127.0.0.1:15000
@@ -68,17 +57,33 @@ config:
           host: agentos-egress-authz.agentos.svc.cluster.local:9001
           failureMode: deny
           protocol:
-            grpc: {}
+            http:
+              path: '"/authorize"'
+              addRequestHeaders:
+                x-agentos-original-method: request.method
+                x-agentos-original-path: request.path
+              includeResponseHeaders:
+                - x-agentos-authz-schema-version
+                - x-agentos-authz-correlation-id
+                - x-agentos-authz-decision-ref
+                - x-agentos-authz-expires-at-millis
+                - x-agentos-authz-credential-domain
+                - x-agentos-authz-agent-id
+                - x-agentos-authz-role
+                - x-agentos-authz-fleet
+                - x-agentos-authz-domain
+                - x-agentos-authz-assignment-id
+                - x-agentos-authz-capability
+                - x-agentos-authz-resource-kind
+                - x-agentos-authz-provider
+                - x-agentos-authz-service
+                - x-agentos-authz-profile-id
+                - x-agentos-authz-profile-version
+                - x-agentos-authz-ceiling-id
+                - x-agentos-authz-ceiling-revision
+                - x-agentos-authz-rate-class
           includeRequestHeaders:
             - authorization
-            - x-agentos-profile
             - x-agentos-assignment-id
-            - :method
-            - :path
       backends:
         - host: ai-gateway.agentos.svc.cluster.local:8787
-          policies:
-            backendAuth:
-              key:
-                value:
-                  file: /var/run/secrets/agentos-provider/openai/credential

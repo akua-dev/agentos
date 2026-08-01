@@ -16,13 +16,14 @@ Mate or Crewmate
           |
           v
 agentgateway-openai (PEP)
-  holds only the Fleet AI Gateway client credential
+  holds no Fleet AI Gateway or provider credential
           |                         |
-          | authorize               | decision only; no credentials
+          | authorize               | closed grant only; no credentials
           +----------------------> agentos-egress-authz
           |                         TokenReview identity + OpenFGA PDP
           v
 Fleet AI Gateway
+  validates the <=15-second grant and removes workload identity
   owns Codex/OpenAI login, account selection, quota and session semantics
           |
           v
@@ -51,8 +52,8 @@ Clients with a provider base-URL setting point it at an explicit AgentOS gateway
 
 | Boundary               | Owns                                                                                                 | Must not own                                                           |
 | ---------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Agent workload         | projected identity token, selected access-profile ID                                                 | provider API keys, OAuth refresh tokens, Fleet AI Gateway client token |
-| agentgateway PEP       | route enforcement, selected safe headers, one credential-domain attachment, protocol fidelity        | policy source of truth, all provider roots, Agent judgment             |
+| Agent workload         | projected identity token, selected access-profile ID                                                 | provider API keys, OAuth refresh tokens, shared AI Gateway token       |
+| agentgateway PEP       | route enforcement, workload identity forwarding, closed-grant replacement, protocol fidelity        | policy source of truth, provider credentials, Agent judgment           |
 | `agentos-egress-authz` | Kubernetes TokenReview adapter, request context normalization, OpenFGA check, stable denial envelope | provider credentials                                                   |
 | OpenFGA                | authorization model, tuples and reusable profile relations                                           | credentials, request forwarding                                        |
 | credential component   | one provider/domain secret or token exchange                                                         | authorization decision                                                 |
@@ -96,7 +97,7 @@ The release is stable, not an alpha or nightly build. The executable test valida
 | Generic HTTP reverse proxy                 | Passed; real path/status preserved                                                                  |
 | Latency                                    | Passed; emits direct/governed p50 and p95 plus proxy delta from 20 warmed requests                  |
 | Workload identity decision                 | Passed; missing identity denied before the backend                                                  |
-| Identity-to-backend credential replacement | Passed; backend saw only the injected credential and safe subject header                            |
+| Workload identity-to-grant mediation       | Passed; forged decision headers were replaced by the authorizer's bounded grant at the AI Gateway boundary |
 | External authorization failure mode        | Passed fail closed; denial body remained distinguishable                                            |
 | RFC 8693-style OAuth token exchange        | Passed; subject token exchanged and downstream bearer injected                                      |
 | OpenAI `/v1/responses`                     | Passed through the native LLM route                                                                 |
@@ -116,6 +117,13 @@ The release is stable, not an alpha or nightly build. The executable test valida
 | Readiness                                  | Process readiness passed, but remained `200` after a rejected reload; see the operational gap below |
 
 The retry result is intentionally narrow. OpenAI Responses and tool calls are not assumed idempotent and must not receive blanket retries. A profile can enable retry only where its operation contract and idempotency key make duplication safe. Agentgateway's documented route timeout ends at response headers, so stream-lifetime budgets and cancellation remain separate AgentOS policies. See the [timeout documentation](https://agentgateway.dev/docs/standalone/latest/configuration/resiliency/timeouts/).
+
+The OpenAI route uses HTTP external authorization. Agentgateway derives the
+original method and path inside its own configuration, forwards the projected
+bearer token and optional Assignment hint only to the authorizer, then
+overwrites every `x-agentos-grant-*` header from the authorization response.
+The AI Gateway independently verifies the signed grant and strips both the
+workload credential and all AgentOS decision headers before provider dispatch.
 
 The latency sample is informational rather than an environment-independent SLO. It measures the same local mock backend directly and through agentgateway with external authorization, alternates the paths after warm-up, and prints only numeric p50/p95 milliseconds and the median delta. Production latency SLOs belong to [#92](https://github.com/akua-dev/agentos/issues/92) on the actual cluster/network/provider path.
 

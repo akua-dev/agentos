@@ -60,6 +60,7 @@ const ValuesSchema = Schema.Struct({
   commonLabels: Schema.Struct({
     "app.kubernetes.io/part-of": Schema.Literal("agentos"),
     "agentos.akua.dev/credential-domain": Schema.Literal("openai"),
+    "agentos.akua.dev/ai-gateway-upstream": Schema.Literal("true"),
   }),
   podAnnotations: Schema.Struct({
     "agentos.akua.dev/config-source": Schema.Literal("readonly"),
@@ -91,30 +92,6 @@ const ValuesSchema = Schema.Struct({
     requests: Schema.Struct({ cpu: Schema.String, memory: Schema.String }),
     limits: Schema.Struct({ cpu: Schema.String, memory: Schema.String }),
   }),
-  extraVolumes: Schema.Array(
-    Schema.Struct({
-      name: Schema.Literal("provider-credential-openai"),
-      secret: Schema.Struct({
-        secretName: Schema.Literal("agentgateway-ai-gateway-client"),
-        defaultMode: Schema.Literal(288),
-        items: Schema.Array(
-          Schema.Struct({
-            key: Schema.Literal("token"),
-            path: Schema.Literal("credential"),
-          }),
-        ),
-      }),
-    }),
-  ),
-  extraVolumeMounts: Schema.Array(
-    Schema.Struct({
-      name: Schema.Literal("provider-credential-openai"),
-      mountPath: Schema.Literal(
-        "/var/run/secrets/agentos-provider/openai",
-      ),
-      readOnly: Schema.Literal(true),
-    }),
-  ),
   config: Schema.Struct({
     config: Schema.Struct({
       adminAddr: Schema.Literal("127.0.0.1:15000"),
@@ -135,14 +112,42 @@ const ValuesSchema = Schema.Struct({
           extAuthz: Schema.Struct({
             host: Schema.String,
             failureMode: Schema.Literal("deny"),
-            protocol: Schema.Struct({ grpc: Schema.Struct({}) }),
+            protocol: Schema.Struct({
+              http: Schema.Struct({
+                path: Schema.Literal('"/authorize"'),
+                addRequestHeaders: Schema.Struct({
+                  "x-agentos-original-method": Schema.Literal("request.method"),
+                  "x-agentos-original-path": Schema.Literal("request.path"),
+                }),
+                includeResponseHeaders: Schema.Array(
+                  Schema.Literals([
+                    "x-agentos-authz-schema-version",
+                    "x-agentos-authz-correlation-id",
+                    "x-agentos-authz-decision-ref",
+                    "x-agentos-authz-expires-at-millis",
+                    "x-agentos-authz-credential-domain",
+                    "x-agentos-authz-agent-id",
+                    "x-agentos-authz-role",
+                    "x-agentos-authz-fleet",
+                    "x-agentos-authz-domain",
+                    "x-agentos-authz-assignment-id",
+                    "x-agentos-authz-capability",
+                    "x-agentos-authz-resource-kind",
+                    "x-agentos-authz-provider",
+                    "x-agentos-authz-service",
+                    "x-agentos-authz-profile-id",
+                    "x-agentos-authz-profile-version",
+                    "x-agentos-authz-ceiling-id",
+                    "x-agentos-authz-ceiling-revision",
+                    "x-agentos-authz-rate-class",
+                  ]),
+                ),
+              }),
+            }),
             includeRequestHeaders: Schema.Array(
               Schema.Literals([
                 "authorization",
-                "x-agentos-profile",
                 "x-agentos-assignment-id",
-                ":method",
-                ":path",
               ]),
             ),
           }),
@@ -150,17 +155,6 @@ const ValuesSchema = Schema.Struct({
         backends: Schema.Array(
           Schema.Struct({
             host: Schema.String,
-            policies: Schema.Struct({
-              backendAuth: Schema.Struct({
-                key: Schema.Struct({
-                  value: Schema.Struct({
-                    file: Schema.Literal(
-                      "/var/run/secrets/agentos-provider/openai/credential",
-                    ),
-                  }),
-                }),
-              }),
-            }),
           }),
         ),
       }),
@@ -220,11 +214,13 @@ layer(Layer.merge(BunFileSystem.layer, BunPath.layer))(
         assert.strictEqual(values.gateway.service.type, "ClusterIP");
         assert.strictEqual(values.mode, "readonly");
         assert.strictEqual(values.replicaCount, 2);
-        assert.strictEqual(values.extraVolumes.length, 1);
-        assert.strictEqual(values.extraVolumeMounts.length, 1);
         assert.strictEqual(
           values.config.routes[0]?.policies.extAuthz.failureMode,
           "deny",
+        );
+        assert.strictEqual(
+          values.config.routes[0]?.backends[0]?.host,
+          "ai-gateway.agentos.svc.cluster.local:8787",
         );
       }),
     );

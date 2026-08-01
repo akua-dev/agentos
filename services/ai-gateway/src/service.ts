@@ -1,12 +1,17 @@
 import { join } from "node:path";
-import { AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS } from "@akua-dev/agentos";
+import {
+  AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
+  type ProviderAuthorizationGrantV1,
+} from "@akua-dev/agentos";
 import type { CodexOAuthClient, AccountVault } from "./accounts.ts";
 import { createAccountVault, createAccountVaultStore } from "./accounts.ts";
 import {
   createProxyHandler,
   isClientAuthorized,
+  type AIGatewayClientAuthentication,
   type FetchImplementation,
 } from "./proxy.ts";
+import { attributedSessionKey } from "./attribution.ts";
 import type { GatewayRequestTelemetry, GatewayTelemetry } from "./telemetry.ts";
 import { createRoutingState } from "./routing-state.ts";
 import { defaultRoutingConfig } from "./selection.ts";
@@ -17,7 +22,10 @@ const USAGE_CACHE_MS = 60_000;
 
 export interface AIGatewayServiceOptions {
   stateDirectory: string;
-  clientToken: string;
+  /** @deprecated Shared request authentication exists only for rollback. */
+  clientToken?: string;
+  clientAuthentication?: AIGatewayClientAuthentication;
+  operatorToken?: string;
   allowApiKeyFallback: boolean;
   openAIApiKey?: string;
   oauth: CodexOAuthClient;
@@ -36,6 +44,11 @@ export async function createAIGatewayService(
   options: AIGatewayServiceOptions,
 ): Promise<AIGatewayService> {
   const clock = options.clock ?? Date.now;
+  const clientAuthentication = options.clientAuthentication ?? {
+    kind: "shared_token" as const,
+    token: options.clientToken ?? "",
+  };
+  const operatorToken = options.operatorToken ?? options.clientToken ?? "";
   const vault = createAccountVault({
     store: createAccountVaultStore(
       join(options.stateDirectory, "accounts.json"),
@@ -55,7 +68,10 @@ export async function createAIGatewayService(
     options.allowApiKeyFallback && Boolean(options.openAIApiKey?.trim());
 
   const readiness = async () => {
-    if (!options.clientToken) {
+    if (
+      clientAuthentication.kind === "shared_token" &&
+      !clientAuthentication.token
+    ) {
       return {
         reasons: ["client_identity_unavailable"],
         status: "not_ready",
@@ -104,6 +120,7 @@ export async function createAIGatewayService(
     sessionKey: string | undefined,
     signal: AbortSignal,
     requestTelemetry: GatewayRequestTelemetry,
+    authorization: ProviderAuthorizationGrantV1 | undefined,
   ): Promise<RouteLease | undefined> => {
     const summaries = await vault.list();
     const candidates = await Promise.all(
@@ -169,10 +186,16 @@ export async function createAIGatewayService(
       );
     }
 
+    const canonicalSessionKey = attributedSessionKey(
+      sessionKey,
+      authorization,
+    );
     const reservation = await routing.acquire({
       candidates,
       now: clock(),
-      ...(sessionKey ? { sessionKey } : {}),
+      ...(canonicalSessionKey
+        ? { sessionKey: canonicalSessionKey }
+        : {}),
     });
     if (!reservation) {
       const apiKey = options.openAIApiKey?.trim();
@@ -226,7 +249,7 @@ export async function createAIGatewayService(
   };
 
   const proxy = createProxyHandler({
-    clientToken: options.clientToken,
+    clientAuthentication,
     acquire,
     fetchImpl: options.fetchImpl,
     ...(options.telemetry ? { telemetry: options.telemetry } : {}),
@@ -248,7 +271,7 @@ export async function createAIGatewayService(
         );
       }
       if (request.method === "GET" && url.pathname === "/readyz/client") {
-        if (!isClientAuthorized(request, options.clientToken)) {
+        if (!isClientAuthorized(request, operatorToken)) {
           return Response.json(
             {
               reasons: ["client_unauthorized"],
@@ -265,7 +288,7 @@ export async function createAIGatewayService(
         );
       }
       if (request.method === "GET" && url.pathname === "/status") {
-        if (!isClientAuthorized(request, options.clientToken)) {
+        if (!isClientAuthorized(request, operatorToken)) {
           return Response.json({ error: "unauthorized" }, { status: 401 });
         }
         const accounts = (await vault.list()).map((account) => {

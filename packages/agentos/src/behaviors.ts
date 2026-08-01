@@ -20,6 +20,23 @@ import {
   registerAgentOSObservability,
   type AgentOSObservabilityDependencies,
 } from "./telemetry/pi-extension.ts";
+import {
+  registerPiWorkloadIdentity,
+  type PiWorkloadIdentityOptions,
+} from "./access/pi-workload-identity.ts";
+
+export function createAgentOSWorkloadIdentityRegistration(
+  options: PiWorkloadIdentityOptions = {},
+): AgentOSRegistrationV1 {
+  return {
+    version: 1,
+    id: "@akua-dev/agentos:workload-identity",
+    names: { version: 1 },
+    register(pi) {
+      registerPiWorkloadIdentity(pi, options);
+    },
+  };
+}
 
 export function createAgentOSObservabilityRegistration(
   dependencies: AgentOSObservabilityDependencies = {},
@@ -116,6 +133,7 @@ export function createAgentOSSupervisionGuardRegistration(
 
 export const defaultAgentOSRuntime: readonly AgentOSRegistrationV1[] =
   Object.freeze([
+    createAgentOSWorkloadIdentityRegistration(),
     createAgentOSObservabilityRegistration(),
     createAgentOSBackgroundTasksRegistration(),
     createAgentOSMateMemoryRegistration(),

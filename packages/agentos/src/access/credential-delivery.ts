@@ -1,8 +1,11 @@
 import { Context, Effect, Schema } from "effect";
 
 import {
+  AccessCeilingRefV1Schema,
   AccessCapabilityIdSchema,
+  AccessProfileRefV1Schema,
   AccessProviderIdSchema,
+  AccessRateClassIdSchema,
   AuthorizationResourceV1Schema,
   AuthorizationSubjectV1Schema,
 } from "./contracts.ts";
@@ -321,6 +324,9 @@ export const ProviderPolicyDecisionRefV1Schema = Schema.Struct({
   expiresAtMillis: Schema.Number.pipe(
     Schema.check(Schema.isInt(), Schema.isGreaterThan(0)),
   ),
+  profile: AccessProfileRefV1Schema,
+  ceiling: AccessCeilingRefV1Schema,
+  rateClass: AccessRateClassIdSchema,
 });
 
 export const ProviderEnforcementRequestV1Schema = Schema.Struct({

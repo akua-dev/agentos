@@ -68,7 +68,13 @@ describe("Mate home preparation", () => {
     await makeExecutable(join(fakeBin, "mise"), "#!/bin/sh\nexit 0\n");
 
     const result = await run(prepareHome, {
+      AGENTOS_ASSIGNMENT_ID: "20000000-0000-4000-8000-000000000001",
       AGENTOS_AGENT_ROLE: "crewmate",
+      AGENTOS_CODEX_PROVIDER_MODE: "ai-gateway",
+      AGENTOS_EGRESS_TOKEN_FILE: "/var/run/secrets/agentos-egress/token",
+      AGENTOS_RELEASE_ROOT: repository,
+      AI_GATEWAY_URL:
+        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
       HOME: home,
       MISE_SYSTEM_CONFIG_FILE: join(repository, "mise.toml"),
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://agentos-otel-collector:4318",
@@ -84,9 +90,16 @@ describe("Mate home preparation", () => {
 
     expect(result).toEqual({ exitCode: 0, stderr: "", stdout: "" });
     const path = join(home, ".codex", "config.toml");
-    const parsed = Bun.TOML.parse(await readFile(path, "utf8")) as {
-      otel: Record<string, unknown>;
-    };
+    const parsed = Bun.TOML.parse(await readFile(path, "utf8")) as any;
+    expect(parsed.model_provider).toBe("agentos-gateway");
+    expect(parsed.model_providers["agentos-gateway"]).toMatchObject({
+      base_url:
+        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+      wire_api: "responses",
+      auth: {
+        refresh_interval_ms: 60_000,
+      },
+    });
     expect(parsed.otel.log_user_prompt).toBe(false);
     expect(parsed.otel.environment).toBe("test");
     expect(parsed.otel.trace_exporter).toEqual({
@@ -181,8 +194,7 @@ if (args.join(" ") === "integration install pi") {
       AGENTOS_MODEL: "openai-codex/gpt-5.6-sol",
       AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
       AGENTOS_THINKING: "xhigh",
-      AI_GATEWAY_TOKEN: "synthetic-fleet-token",
-      AI_GATEWAY_URL: "http://ai-gateway.agentos.svc.cluster.local:8787/",
+      AI_GATEWAY_URL: "http://agentgateway-openai.agentos.svc.cluster.local:8788/",
       FAKE_LOG_DIRECTORY: logDirectory,
       HERDR_CONFIG_PATH: herdrConfig,
       HOME: home,
@@ -244,16 +256,13 @@ if (args.join(" ") === "integration install pi") {
     ).toEqual({
       apiKey:
         "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoiZmxlZXQtZ2F0ZXdheSJ9fQ.placeholder",
-      baseUrl: "http://ai-gateway.agentos.svc.cluster.local:8787",
-      headers: { "X-AI-Gateway-Token": "$AI_GATEWAY_TOKEN" },
+      baseUrl: "http://agentgateway-openai.agentos.svc.cluster.local:8788",
     });
     expect(JSON.parse(await readFile(providerMarker, "utf8"))).toMatchObject({
       _tag: "Active",
       version: 1,
     });
-    expect(await readFile(piModels, "utf8")).not.toContain(
-      "synthetic-fleet-token",
-    );
+    expect(await readFile(piModels, "utf8")).not.toContain("AI_GATEWAY_TOKEN");
     const gatewayReadiness = JSON.parse(
       await readFile(providerReadiness, "utf8"),
     );
@@ -268,9 +277,7 @@ if (args.join(" ") === "integration install pi") {
       selectedThinking: "xhigh",
       version: 1,
     });
-    expect(JSON.stringify(gatewayReadiness)).not.toContain(
-      "synthetic-fleet-token",
-    );
+    expect(JSON.stringify(gatewayReadiness)).not.toContain("AI_GATEWAY_TOKEN");
     expect((await stat(providerReadiness)).mode & 0o777).toBe(0o600);
     expect(await readFile(join(home, ".pgpass"), "utf8")).toBe(
       "postgres.example.internal:5432:agentos:runtime_second:secret\n",
@@ -352,7 +359,6 @@ if (args.join(" ") === "integration install pi") {
 
     const directEnvironment = {
       ...withoutEnvironment(environment, [
-        "AI_GATEWAY_TOKEN",
         "AI_GATEWAY_URL",
       ]),
       AGENTOS_PI_PROVIDER_MODE: "direct",
@@ -375,7 +381,6 @@ if (args.join(" ") === "integration install pi") {
       prepareHome,
       withoutEnvironment(environment, [
         "AGENTOS_PI_PROVIDER_MODE",
-        "AI_GATEWAY_TOKEN",
         "AI_GATEWAY_URL",
       ]),
     );

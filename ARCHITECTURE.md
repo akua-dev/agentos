@@ -413,27 +413,37 @@ may be mounted separately as an explicitly enabled last-resort fallback and is
 never copied into the mutable OAuth vault.
 
 The product, package, Skill and executable are named Fleet AI Gateway and
-`ai-gateway`. Kubernetes objects, Service DNS, Secret, PVC path, environment,
-client label and headers use that identity consistently: `AI_GATEWAY_*`,
-`agentos.akua.dev/ai-gateway-client` and `x-ai-gateway-*`.
+`ai-gateway`. Agent Pods never authenticate to it with a Fleet-shared secret.
+They call the private `agentgateway-openai` PEP with a kubelet-rotated,
+audience-bound ServiceAccount token. HTTP external authorization performs
+TokenReview, resolves the canonical Mate or Assignment, asks the OpenFGA-backed
+PDP, and returns a closed grant lasting at most 15 seconds. Agentgateway
+overwrites every grant header and forwards the request to the AI Gateway; it
+mounts no AI Gateway client credential. A separate core-only operator Secret
+protects status endpoints and is never accepted on the inference request path.
 
-Every client request is authenticated before its body is read. Selected Agent
-Pods receive only a Fleet client token and are also constrained by a
-selected-client NetworkPolicy. The gateway removes inbound credentials, selects
+Every client request is authenticated and authorized before its body reaches
+the provider controller. The AI Gateway validates the bounded grant before
+selection, removes projected identity and all `x-agentos-*` headers, selects
 and reserves an eligible account, normalizes the OpenAI Responses path, injects
 that account's upstream credential and streams the actual response. Existing
 sessions remain sticky while eligible. A sent request is never retried silently
 on another account; upstream `401`, `429`, timeout and provider failures remain
 visible to Pi or Codex and affect only later selection.
 
-Pi routes its built-in `openai-codex` provider through the gateway with native
-`models.json` base-URL, authentication and header settings. For First and
+Pi routes its built-in `openai-codex` provider through Agentgateway with native
+`models.json` base-URL settings. For First and
 Second Mate, `prepare-home` atomically reconciles only an AgentOS-marker-owned
 provider override, validates the staged provider and any separately selected
 exact model with pinned Pi before commit, preserves `auth.json` and unrelated
-configuration, and resolves the Secret-backed Gateway header only in memory.
+configuration, and persists no workload or provider credential. The released
+`before_provider_headers` behavior rereads the projected token for every
+request, replaces Pi's public transport placeholder, and fails closed when the
+token cannot be read or validated.
 The Gateway client patch never selects a provider/model merely because the
-service exists. Codex uses native `model_providers` configuration.
+service exists. Codex Crewmates use a marker-owned native `model_providers`
+entry with command-backed authentication; Codex rereads the same projected
+token every 60 seconds and on an authentication retry.
 Independently, the persistent First- and
 Second-Mate Pi projects load one shared AgentOS-owned session-lifecycle
 extension that asks OpenAI for a native compaction result and persists the
@@ -481,15 +491,16 @@ reviewed Skill and RBAC without owning the component's source directory.
 Each default role owns an additive `ai-gateway-client.yaml` patch in its
 Kubernetes `patches/` directory. A reviewed per-Agent overlay composes that
 patch only for an approved client; it adds the selected-client label, private
-Service URL, Secret-backed Fleet client token and explicit Gateway provider
+Agentgateway Service URL and explicit Gateway provider
 mode without choosing a model or thinking level. Composing every approved
 client produces the pooled posture; composing selected clients only produces
-the mixed posture. A First or Second Mate returns to direct authentication by
+the mixed posture. A First Mate, Second Mate, or Crewmate returns to direct authentication by
 replacing the client patch with its role's `ai-gateway-direct-auth.yaml` for one
-successful rollout. That reconciliation removes only the owned provider entry
-and marker while preserving direct authentication and unrelated retained-home
-state; only then is the rollback patch removed. Omitting both modes while the
-marker remains fails startup rather than retaining an ambiguous route.
+successful rollout. Pi and Codex reconciliation remove only the owned provider
+entry and marker while preserving direct authentication and unrelated
+retained-home state; only then is the rollback patch removed. Omitting both
+modes while a marker remains fails startup rather than retaining an ambiguous
+route.
 
 An exceptional AgentOS client may use a standalone Cloudflare Worker only as a
 separate external credential and routing authority. The Worker never forwards
@@ -918,9 +929,10 @@ worker-capacity postures: the recommended Fleet AI Gateway for a delegation-read
 Fleet, or direct authentication owned separately by every worker harness. The
 Captain's selection is fallible guidance in the owning Mate's private
 context; exact approval and coupled state changes remain durable Inbox
-decisions. Installing the gateway, starting provider login and distributing
-its client Secret remain explicit or standing authorizations; recommendation
-never makes them implicit. Bootstrap may finish in minimal single-Mate mode
+decisions. Installing the gateway, creating its operator Secret, starting
+provider login and enabling a workload's access profile remain explicit or
+standing authorizations; recommendation never makes them implicit. Bootstrap
+may finish in minimal single-Mate mode
 without the gateway, but AgentOS does not call the Fleet delegation-ready
 until one approved worker or trusted harness automation has completed a
 harmless real model request through the selected capacity path.

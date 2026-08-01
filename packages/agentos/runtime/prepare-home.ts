@@ -36,6 +36,7 @@ import {
   resolvePersistentMateDistribution,
 } from "./distribution.ts";
 import { reconcileCodexOtelConfig } from "./codex-otel.ts";
+import { reconcileCodexProviderConfiguration } from "./codex-provider.ts";
 import { reconcilePiConfiguration } from "./pi-provider.ts";
 
 const home = requiredEnvironment("HOME");
@@ -125,6 +126,13 @@ if (usesPi) {
   );
 }
 if (usesCodex) {
+  await Effect.runPromise(
+    reconcileCodexProviderConfiguration({
+      configPath: join(codexHome, "config.toml"),
+      environment: process.env,
+      stateDirectory: join(home, ".local", "state", "agentos"),
+    }),
+  );
   await reconcileCodexOtelConfig(join(codexHome, "config.toml"), process.env);
 }
 

@@ -6,6 +6,11 @@ import {
   sanitizeRequestHeaders,
   sanitizeResponseHeaders,
 } from "@akua-dev/codex-router/codex";
+import {
+  decodeProviderAuthorizationGrantHeaders,
+  type ProviderAuthorizationGrantV1,
+  type ProviderAuthorizationError,
+} from "@akua-dev/agentos";
 import { Effect, Option, Result } from "effect";
 import {
   createNoopGatewayTelemetry,
@@ -37,11 +42,14 @@ export interface StreamFailureObservation {
 }
 
 export interface ProxyHandlerOptions {
-  clientToken: string;
+  /** @deprecated Use clientAuthentication.shared_token for rollback-only auth. */
+  clientToken?: string;
+  clientAuthentication?: AIGatewayClientAuthentication;
   acquire(
     sessionKey: string | undefined,
     signal: AbortSignal,
     telemetry: GatewayRequestTelemetry,
+    authorization: ProviderAuthorizationGrantV1 | undefined,
   ): Promise<RouteLease | undefined>;
   fetchImpl: FetchImplementation;
   heartbeatMs?: number;
@@ -51,18 +59,39 @@ export interface ProxyHandlerOptions {
   ): void | Promise<void>;
 }
 
+export type AIGatewayClientAuthentication =
+  | {
+      readonly kind: "shared_token";
+      readonly token: string;
+    }
+  | {
+      readonly kind: "workload_identity";
+      readonly clock?: () => number;
+    };
+
 export function createProxyHandler(options: ProxyHandlerOptions) {
   return async (request: Request): Promise<Response> => {
     const telemetry = (
       options.telemetry ?? createNoopGatewayTelemetry()
     ).startRequest(request);
-    const authenticated = isClientAuthorized(request, options.clientToken);
-    telemetry.authenticate(authenticated);
-    if (!authenticated) {
-      telemetry.end({ status: 401, streamOutcome: "not_streamed" });
-      return jsonResponse(401, { error: "unauthorized" });
-    }
     const url = new URL(request.url);
+    const authentication = await authenticateClient(options, request, url);
+    telemetry.authenticate(
+      authentication.authenticated,
+      authentication.authenticated
+        ? authentication.authorization
+        : undefined,
+      authentication.authenticated ? undefined : authentication.status,
+    );
+    if (!authentication.authenticated) {
+      telemetry.end({
+        status: authentication.status,
+        streamOutcome: "not_streamed",
+      });
+      return jsonResponse(authentication.status, {
+        error: authentication.status === 403 ? "forbidden" : "unauthorized",
+      });
+    }
     if (
       request.method !== "POST" ||
       !isSupportedResponsePath(url.pathname)
@@ -82,7 +111,12 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
     telemetry.routeStarted();
     let lease: RouteLease | undefined;
     try {
-      lease = await options.acquire(sessionKey, request.signal, telemetry);
+      lease = await options.acquire(
+        sessionKey,
+        request.signal,
+        telemetry,
+        authentication.authorization,
+      );
     } catch (error) {
       telemetry.routeEnded("error", error);
       telemetry.end({
@@ -176,6 +210,60 @@ export function createProxyHandler(options: ProxyHandlerOptions) {
       headers: responseHeaders,
     });
   };
+}
+
+type ClientAuthenticationResult =
+  | {
+      readonly authenticated: true;
+      readonly authorization: ProviderAuthorizationGrantV1 | undefined;
+    }
+  | {
+      readonly authenticated: false;
+      readonly status: 401 | 403;
+    };
+
+async function authenticateClient(
+  options: Pick<
+    ProxyHandlerOptions,
+    "clientAuthentication" | "clientToken"
+  >,
+  request: Request,
+  url: URL,
+): Promise<ClientAuthenticationResult> {
+  const authentication = options.clientAuthentication ?? {
+    kind: "shared_token" as const,
+    token: options.clientToken ?? "",
+  };
+  if (authentication.kind === "shared_token") {
+    return isClientAuthorized(request, authentication.token)
+      ? { authenticated: true, authorization: undefined }
+      : { authenticated: false, status: 401 };
+  }
+  const result = await Effect.runPromise(
+    Effect.result(
+      decodeProviderAuthorizationGrantHeaders(request.headers, {
+        method: request.method,
+        path: url.pathname,
+        nowMillis: (authentication.clock ?? Date.now)(),
+      }),
+    ),
+  );
+  if (Result.isSuccess(result)) {
+    return { authenticated: true, authorization: result.success };
+  }
+  return {
+    authenticated: false,
+    status: authorizationFailureStatus(result.failure),
+  };
+}
+
+function authorizationFailureStatus(
+  error: ProviderAuthorizationError,
+): 401 | 403 {
+  return error.code === "grant_route_mismatch" ||
+      error.code === "policy_denied" || error.code === "unsupported_route"
+    ? 403
+    : 401;
 }
 
 export function isClientAuthorized(request: Request, expected: string): boolean {
