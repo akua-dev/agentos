@@ -135,6 +135,26 @@
       "status": "migrated"
     },
     {
+      "id": "provider-access-control-effect-tests",
+      "issue": 89,
+      "pattern": "^packages/agentos/src/access/tests/control-plane\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "schema", "authorization", "database", "cache"],
+      "migrationDependencies": [100, 101, 87, 88, 90],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-access-control",
+      "issue": 89,
+      "pattern": "^packages/agentos/src/access/control-plane\\.ts$",
+      "runtime": "shared-bun-postgresql",
+      "package": "@akua-dev/agentos",
+      "io": ["schema", "authorization", "database", "cache", "telemetry"],
+      "migrationDependencies": [100, 101, 87, 88, 90],
+      "status": "migrated"
+    },
+    {
       "id": "openfga-service-core",
       "issue": 90,
       "pattern": "^services/openfga/src/kubernetes\\.ts$",
