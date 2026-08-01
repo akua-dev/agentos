@@ -26,9 +26,10 @@ bun run site:deploy
 
 `site:upload:worker` and `site:deploy:worker` operate on an existing
 OpenNext build. `site:deploy` builds and deploys in one command. The build
-script runs OpenNext as its top-level command, then finalizes the generated
-artifact. This keeps Cloudflare's build lifecycle attached directly to the
-adapter instead of nesting it below a custom process coordinator.
+script first materializes the Fumadocs source modules explicitly, then runs
+OpenNext and finalizes the generated artifact. Explicit generation keeps clean
+Cloudflare checkouts independent of a stale `.source` cache while leaving
+OpenNext as the top-level Worker adapter.
 
 Outside Workers Builds, finalization runs a native Wrangler dry run and fails
 if the compressed upload exceeds Cloudflare Workers' 3 MiB free-plan limit.
