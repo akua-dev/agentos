@@ -176,6 +176,11 @@ Use released PostgreSQL schema for durable coordination and native tools against
    direct credential or standing-authorized ai-gateway client boundary without
    copying another Agent's provider auth.
    Confirm its Agent identity, Task Assignment, PVC, pod and Herdr session without treating terminal text as durable state.
+   `$agentos-runtime` must wrap the approved native apply and launch boundaries
+   in the released SQL runtime operation for this exact Agent, Assignment,
+   namespace, workload, render digest and retained resources. A scheduler race
+   marks that same operation `recovery_required`; reconcile the existing Pod,
+   PVC and worktree forward instead of creating another Agent or Assignment.
 8. Load `$agentos-supervision` immediately after dispatch.
 
 ## Communicate and steer

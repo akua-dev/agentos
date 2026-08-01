@@ -109,7 +109,10 @@ canonical definition of work nor logic inside the Pi guard.
      returns only after PostgreSQL has registered `LISTEN`; immediately after
      that result, call `attest_coordination_listener` with its returned task ID.
      Then call `agentos.current_mate_bearings()` and drain the durable rows it
-     references with `psql`. After that catch-up succeeds and only while the
+     references with `psql`. Also query nonterminal `runtime_operations` owned
+     by this Mate (all nonterminal operations when First Mate is performing
+     administrative recovery) and reconcile each against native authorities;
+     the journal itself is not runtime health. After that catch-up succeeds and only while the
      exact listener is still running, call `confirm_coordination_catchup` with
      the same task ID. This ready-then-catch-up order closes the notification
      gap and is the Mate Pod's semantic readiness proof without putting Fleet

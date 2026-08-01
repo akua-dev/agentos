@@ -120,6 +120,13 @@
       "when": 1785457238000,
       "tag": "0016_unify_agentos_package",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785548881602,
+      "tag": "0017_runtime_operation_journal",
+      "breakpoints": true
     }
   ]
 }
