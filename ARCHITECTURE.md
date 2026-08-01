@@ -827,9 +827,23 @@ any Secret placed in its namespace through a child workload even without
 and places only domain-visible credentials in a domain namespace.
 
 The domain Namespace enforces the restricted Pod Security profile, carries a
-bounded object and storage quota, and applies ingress isolation that admits only
-same-namespace Pods. It deliberately defines no egress policy: Agents retain
-ordinary internet access. Labeled domain clients reach only explicitly
+bounded object, CPU, memory and retained-storage ResourceQuota plus per-container
+and per-claim LimitRange, and applies ingress isolation that admits only
+same-namespace Pods. One First-Mate/platform-owned cluster admission bundle uses
+stable CEL ValidatingAdmissionPolicy and namespace-selected bindings to protect
+every labeled managed domain. A Second Mate may create and update only
+one-replica retained Crewmate StatefulSets with matching Agent, owner, Task and
+Assignment labels, a dedicated ServiceAccount with child token automount off,
+digest-pinned remote images, bounded requests and limits, restricted security
+and no host access. It cannot mutate its own persistent Mate workload or any of
+the namespace, RBAC, quota, LimitRange, NetworkPolicy or cluster admission
+controls. The bundle is installed separately from each namespaced domain render
+because its policies and bindings are cluster-scoped.
+
+The domain deliberately defines no egress policy: Agents retain ordinary
+internet access. Provider-root credentials never enter a domain; an approved
+short-lived native or scoped gateway mechanism remains a separately reviewed
+capability. Labeled domain clients reach only explicitly
 admitting Fleet services through fully qualified names under
 `agentos.svc.cluster.local`. Sibling namespaces have neither Kubernetes RBAC
 nor ingress reachability. First Mate is bound into every domain for credential,
@@ -838,6 +852,23 @@ uses projected ServiceAccount identity; AgentOS never mints or persists a
 separate supervision bearer token. This is a Kubernetes supervision boundary,
 not the broader provider-credential mediation proposed in [the workload-identity
 exploration](https://github.com/akua-dev/agentos/issues/27), which remains open.
+
+Before a Crewmate apply, the owning Mate uses native Kubernetes reads to build
+the versioned Effect Schema capacity snapshot. It covers namespace quota,
+current requested CPU and memory, node allocatable resources and scheduling
+constraints, StorageClass binding/topology, retained PVC state and bound-PV
+node affinity. The pure classifier returns only `fits`, `provably_blocked` or
+`inconclusive`, with bounded evidence and `reservation=false`. Incomplete or
+unsupported observations can never become a fit. Portable versus node-local
+storage is explicit; an unbound node-local claim is inconclusive, while a
+retained one-writer claim already in use or bound to incompatible node affinity
+is blocked. A Second Mate may use its namespace-scoped observations; when a
+cluster-scoped fact is required, First Mate supplies the read-only observation
+instead of broadening sibling access. Server-side dry-run remains the final
+admission check, and the scheduler remains authoritative after apply. A race or
+later scheduling failure preserves the same Agent, Task, Assignment, desired
+workload and retained PVC for re-observation and repair rather than creating a
+duplicate Agent.
 
 StatefulSet deletion and replacement retain Agent homes. Domain retirement
 removes active workloads and authority but leaves the Namespace while retained

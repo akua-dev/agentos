@@ -122,11 +122,19 @@ delegation or database intake from this Skill.
    persist a bearer token or generated kubeconfig for steady-state child
    supervision. Verify that a Second Mate is bound to
    `Role/agentos-secondmate-workload-manager` only in its own domain.
+   Before the first managed domain is admitted, First Mate or the approved
+   platform identity must server-side apply the released
+   `roles/secondmate/kubernetes/admission` bundle once and verify both policies
+   report no CEL type-check warnings. A Second Mate never applies that
+   cluster-scoped bundle.
 3. Create `$HOME/.local/state/agentos/workloads/<handle>/kustomization.yaml`.
    Reference the released child base and patch every placeholder: resource
-   names, Agent labels and UUID, Herdr session, database URL and Secret, Task
-   and Assignment UUIDs where applicable, storage, selected image and image
-   pull policy. Published images require an immutable digest. A Crewmate
+   names, matching workload/Pod Agent, owner, Task and Assignment UUID labels,
+   Herdr session, database URL and Secret, Task
+   and Assignment UUIDs where applicable, storage, selected image, image
+   pull policy, CPU/memory requests and limits, and explicit child
+   `automountServiceAccountToken: false`. Published images require an immutable
+   digest. A Crewmate
    overlay contains only its dedicated ServiceAccount, headless Service and
    retained one-replica StatefulSet; reject Namespace, Role, RoleBinding,
    NetworkPolicy, ResourceQuota, LimitRange, Secret and cluster-scoped
@@ -146,14 +154,37 @@ delegation or database intake from this Skill.
    dedicated ServiceAccount, headless Service and retained one-replica
    StatefulSet and reject every control resource named in step 3. For a Second
    Mate, additionally require the exact released Namespace, two Roles, two
-   RoleBindings, ingress-only NetworkPolicy and ResourceQuota from the domain
-   composition. Verify concrete Fleet and owner-Agent Namespace labels, the
+   RoleBindings, ingress-only NetworkPolicy, ResourceQuota and LimitRange from
+   the domain composition. Verify concrete Fleet and owner-Agent Namespace
+   labels, the
    core First-Mate subject, the domain Second-Mate subject, restricted Pod
-   Security labels, no wildcard RBAC and no egress policy. The child Pod must
+   Security labels, the immutable admission selector, no wildcard RBAC and no
+   egress policy. Verify separately that the cluster admission policies and
+   bindings select that label. The child Pod must
    explicitly enable its projected ServiceAccount identity when it is a
    persistent Mate that will supervise its own children. Reject placeholder
    values, public endpoints, mutable remote images and ownership conflicts.
-6. Ask for any installation, cost or RBAC approval not already recorded. Then
+6. Before apply, collect fresh native Kubernetes observations without copying
+   them into Fleet state: domain ResourceQuota status, domain Pods and PVCs,
+   and the Nodes, cluster Pods, StorageClasses and PVs the current identity is
+   authorized to read. Normalize effective current Pod requests, desired
+   requests, selectors/tolerations, StorageClass binding/topology, PVC phase,
+   access modes and bound-PV node affinity into capacity snapshot version `1`.
+   Mark every unavailable observation `Complete: false`; never invent an empty
+   list. Declare storage as `portable` or `node_local` from its reviewed
+   StorageClass contract. Feed the JSON snapshot to the role task:
+
+   ```console
+   mise run secondmate:capacity-preflight < capacity-snapshot.json
+   # First Mate uses: mise run firstmate:capacity-preflight
+   ```
+
+   `provably_blocked` stops dispatch. `inconclusive` records the missing fact
+   and triggers owning-Mate judgment; request a cluster-scoped observation from
+   First Mate rather than granting sibling Pod reads. `fits` means only that no
+   modeled blocker exists at that instant. Every output carries
+   `reservation=false`; Kubernetes admission and scheduling remain final.
+7. Ask for any installation, cost or RBAC approval not already recorded. Then
    validate against the API server and inspect the diff:
 
    ```console
@@ -165,7 +196,7 @@ delegation or database intake from this Skill.
 
    `kubectl diff` exit status `1` means a diff exists; other non-zero statuses
    are failures.
-7. Apply synchronously and retain the native result:
+8. Apply synchronously and retain the native result:
 
    ```console
    kubectl --namespace <namespace> apply --server-side \
@@ -173,7 +204,7 @@ delegation or database intake from this Skill.
    kubectl --namespace <namespace> rollout status statefulset/<name>
    ```
 
-8. Verify observed image IDs, ServiceAccount, Pod, PVC, Secret mount, Agent
+9. Verify observed image IDs, ServiceAccount, Pod, PVC, Secret mount, Agent
    environment and Herdr status; for a persistent Mate, also verify the
    projected token mount. From a Second Mate identity, use `kubectl auth can-i`
    to verify namespaced StatefulSet, Service and ServiceAccount creation plus
@@ -201,14 +232,16 @@ delegation or database intake from this Skill.
    `$agentos-harnesses` to invoke
    `herdr agent start ... -- <native-harness-argv> <brief>` through
    `kubectl exec`.
-9. Record verified Kubernetes and Herdr locators in Fleet state. Treat launch
+10. Record verified Kubernetes and Herdr locators in Fleet state. Treat launch
    as successful only after the native harness is processing the complete brief
    without a trust or routine command-approval dialog. The owning Mate must use
    `$agentos-harnesses` to reconcile a missing unattended launch or reviewed
    repository-trust preflight instead of repeatedly pressing through ordinary
    commands. On partial failure, preserve the identity, PVC and rendered
    evidence for reconciliation; never create a replacement Agent to hide the
-   error.
+   error. If admission or scheduling changed after preflight, re-observe and
+   reconcile this same Agent, Task, Assignment, workload and retained PVC.
+   Never create a duplicate Agent to race the scheduler.
 
 ## Resolve tools with Mise
 
