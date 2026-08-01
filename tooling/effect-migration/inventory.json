@@ -85,6 +85,26 @@
       "status": "migrated"
     },
     {
+      "id": "provider-access-contract-effect-tests",
+      "issue": 88,
+      "pattern": "^packages/agentos/src/access/tests/.*\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "schema"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-access-contract",
+      "issue": 88,
+      "pattern": "^packages/agentos/src/access/(?!tests/)",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": ["schema"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
       "id": "agent-workload-profile-effect-tests",
       "issue": 124,
       "pattern": "^packages/agentos/src/workloads/tests/profiles\\.effect\\.test\\.ts$",
