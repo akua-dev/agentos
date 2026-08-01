@@ -64,6 +64,17 @@ and preserve it.
   Mate's PVC and never replaces Tasks, Assignments, Inbox or exact Captain
   decisions.
 - Preserve completed Assignment history. Retirement must reject active Assignments and active child Agents; never cascade or invent a handoff.
+- Keep runtime provisioning, rollout, recovery and teardown intent in the
+  released runtime-operation journal. Store only stable Agent, owner, optional
+  Assignment, namespace, workload, desired-render digest, retained-resource
+  identity/disposition, phase and privacy-safe decision codes. Kubernetes,
+  Herdr, PVCs and worktrees remain live truth; never copy manifests, status,
+  logs, transcripts or credentials into the journal.
+- Mutate runtime operations only through the released begin, observe,
+  complete, fail and supersede Functions. Preserve one active operation per
+  Agent, append-only phase events and completed-operation immutability. A
+  repair inspects native authorities and moves the same operation forward; it
+  never creates replacement Agent, Task, Assignment, PVC or worktree identity.
 - Bind external reconciliation to the authenticated `session_user`. Only First and Second Mates receive the claim Functions, and direct runtime updates to external-event coordination columns stay forbidden.
 - Preserve First Mate's owner-level administration of the Fleet. Do not grant `SUPERUSER`, `CREATEDB`, `CREATEROLE` or `BYPASSRLS` merely to administer AgentOS.
 - Keep child identity creation behind `agentos.provision_agent`: First Mate may

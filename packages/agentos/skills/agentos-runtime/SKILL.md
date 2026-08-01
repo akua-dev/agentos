@@ -164,6 +164,13 @@ delegation or database intake from this Skill.
    explicitly enable its projected ServiceAccount identity when it is a
    persistent Mate that will supervise its own children. Reject placeholder
    values, public endpoints, mutable remote images and ownership conflicts.
+   Compute the rendered file's SHA-256. After all required authority is present
+   and before the first external mutation, use `$agentos-database` to begin one
+   stable runtime operation for this Agent, owner, optional Assignment,
+   namespace, workload and retained-resource set. Use action `provision` for a
+   new runtime and `recover` for repair of the existing one. Reuse the same
+   caller-selected operation UUID on retry; a conflict or another active
+   operation is a hard stop, not a reason to mint another identity.
 6. Before apply, collect fresh native Kubernetes observations without copying
    them into Fleet state: domain ResourceQuota status, domain Pods and PVCs,
    and the Nodes, cluster Pods, StorageClasses and PVs the current identity is
@@ -207,6 +214,11 @@ delegation or database intake from this Skill.
    brief and harness exist. Wait only for the named Pod and Herdr container to
    start at this stage; do not weaken or bypass the readiness probe to make an
    early `rollout status` pass.
+   After the synchronous apply returns, record `applied` on the same runtime
+   operation. If the call, session or scheduler boundary is ambiguous, record
+   `recovery_required` with a stable reason, inspect the exact named resources,
+   and repair this operation forward; never repeat provisioning under a new
+   Agent or operation.
 
 9. Verify observed image IDs, ServiceAccount, Pod, PVC, Secret mount, Agent
    environment and Herdr status; for a persistent Mate, also verify the
@@ -243,6 +255,8 @@ delegation or database intake from this Skill.
    the Crewmate container. Only then use `kubectl rollout status
    statefulset/<name>`; the confirmation is identity-, digest-, session- and
    process-bound and does not make an unverified launch ready.
+   Record `workload_ready` only after the exact named Pod and Herdr runtime are
+   available, then `harness_ready` only after this semantic confirmation.
 10. Record verified Kubernetes and Herdr locators in Fleet state. Treat launch
    as successful only after the native harness is processing the complete brief
    without a trust or routine command-approval dialog. The owning Mate must use
@@ -253,6 +267,10 @@ delegation or database intake from this Skill.
    error. If admission or scheduling changed after preflight, re-observe and
    reconcile this same Agent, Task, Assignment, workload and retained PVC.
    Never create a duplicate Agent to race the scheduler.
+   Complete the runtime operation only after the locator transaction and
+   harness-ready evidence agree. A terminal failure remains audit evidence; a
+   changed desired render must atomically supersede it with one linked
+   replacement operation rather than rewriting the prior row.
 
 ## Resolve tools with Mise
 
@@ -286,6 +304,11 @@ needed to apply and verify that choice through native interfaces.
 - Reconcile a stopped worker against its recorded Assignment and Treehouse
   worktree before resume. Preserve same-task work and refuse a fresh workspace
   while ownership is ambiguous.
+- Query the target Agent's nonterminal runtime operation before repair. Record
+  `recovery_required` when a partial native boundary is ambiguous, then inspect
+  exact Kubernetes, Herdr, PVC and worktree truth and advance that same
+  operation to the verified phase. Do not infer live state from the journal,
+  copy native status into it, or begin a second active operation.
 - Preserve the Herdr Agent's native session reference before a deliberate exit.
   For a distribution working-directory change, load `$agentos-customization`:
   it owns the transactional Pi-session relocation and rollback rather than an

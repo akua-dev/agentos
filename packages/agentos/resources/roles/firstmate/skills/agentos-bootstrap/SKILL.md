@@ -82,7 +82,10 @@ For a dedicated or direct existing cluster, the temporary seed needs only a comp
    backend.
 11. Leave bootstrap mode only after runtime, First-Mate authentication, schema,
     `current_agent_id()` resolving the single active root First Mate, and every
-    security check implemented by the selected release pass. Treat step 9's
+    security check implemented by the selected release pass. Query every
+    nonterminal SQL runtime operation and reconcile it against exact
+    Kubernetes, Herdr, PVC and worktree truth before accepting a conflicting
+    lifecycle mutation; a journal phase is never live-state proof. Treat step 9's
     successful capacity probe as the separate boundary for claiming that the
     Fleet is delegation-ready.
 
