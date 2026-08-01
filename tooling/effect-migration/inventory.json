@@ -85,9 +85,19 @@
       "status": "migrated"
     },
     {
+      "id": "provider-workload-identity-effect-tests",
+      "issue": 87,
+      "pattern": "^packages/agentos/src/access/tests/identity\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "clock", "cache", "kubernetes", "database", "telemetry"],
+      "migrationDependencies": [100, 101, 88],
+      "status": "migrated"
+    },
+    {
       "id": "provider-access-contract-effect-tests",
       "issue": 88,
-      "pattern": "^packages/agentos/src/access/tests/.*\\.effect\\.test\\.ts$",
+      "pattern": "^packages/agentos/src/access/tests/contracts\\.effect\\.test\\.ts$",
       "runtime": "bun",
       "package": "@akua-dev/agentos",
       "io": ["test", "schema"],
@@ -95,9 +105,19 @@
       "status": "migrated"
     },
     {
+      "id": "provider-workload-identity",
+      "issue": 87,
+      "pattern": "^packages/agentos/src/access/identity\\.ts$",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": ["clock", "cache", "kubernetes", "database", "telemetry"],
+      "migrationDependencies": [100, 101, 88],
+      "status": "migrated"
+    },
+    {
       "id": "provider-access-contract",
       "issue": 88,
-      "pattern": "^packages/agentos/src/access/(?!tests/)",
+      "pattern": "^packages/agentos/src/access/contracts\\.ts$",
       "runtime": "shared-bun",
       "package": "@akua-dev/agentos",
       "io": ["schema"],
