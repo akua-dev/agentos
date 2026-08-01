@@ -219,6 +219,40 @@ const settle = Effect.fn("test.providerBudget.settle")(function*(input: {
   `).pipe(Effect.map((rows) => rows[0]!));
 });
 
+const settleProvider = Effect.fn("test.providerBudget.settleProvider")(
+  function*(input: {
+    readonly decision: string;
+    readonly provider?: string;
+    readonly credentialDomain?: string;
+    readonly forwardOutcome?: string;
+    readonly inputTokens?: number;
+    readonly outputTokens?: number;
+    readonly cachedInputTokens?: number;
+    readonly spendMicros?: number;
+    readonly atMillis?: number;
+  }) {
+    const database = yield* TestDatabase;
+    return yield* database.query<{
+      readonly outcome: string;
+      readonly forwardOutcome: string;
+      readonly inputTokens: number;
+      readonly outputTokens: number;
+      readonly cachedInputTokens: number;
+      readonly spendMicros: number;
+      readonly settledAtMillis: number;
+    }>(`
+      SELECT * FROM agentos.settle_provider_budget_for_provider(
+        '${input.decision}', '${input.provider ?? "github"}',
+        '${input.credentialDomain ?? "github"}',
+        '${input.forwardOutcome ?? "completed"}',
+        ${input.inputTokens ?? 0}, ${input.outputTokens ?? 0},
+        ${input.cachedInputTokens ?? 0}, ${input.spendMicros ?? 0},
+        ${input.atMillis ?? now + 1_000}
+      )
+    `).pipe(Effect.map((rows) => rows[0]!));
+  },
+);
+
 layer(databaseLayer)("durable provider budgets", (it) => {
   it.effect("isolates request and concurrency capacity by durable subject", () =>
     Effect.gen(function*() {
@@ -300,6 +334,79 @@ layer(databaseLayer)("durable provider budgets", (it) => {
       ]);
     }));
 
+  it.effect("settles only the provider and credential domain bound to the reservation", () =>
+    Effect.gen(function*() {
+      const decision = `decision_${"e".repeat(32)}`;
+      yield* reserve({
+        decision,
+        budgetKey: `budget_${"2".repeat(64)}`,
+      });
+      const settled = yield* settleProvider({
+        decision,
+        inputTokens: 40,
+        outputTokens: 10,
+        cachedInputTokens: 5,
+        spendMicros: 700,
+      });
+      assert.deepStrictEqual(settled, {
+        outcome: "settled",
+        forwardOutcome: "completed",
+        inputTokens: 40,
+        outputTokens: 10,
+        cachedInputTokens: 5,
+        spendMicros: 700,
+        settledAtMillis: now + 1_000,
+      });
+
+      const wrongProviderDecision = `decision_${"f".repeat(32)}`;
+      yield* reserve({
+        decision: wrongProviderDecision,
+        budgetKey: `budget_${"3".repeat(64)}`,
+      });
+      const wrongProvider = yield* settleProvider({
+        decision: wrongProviderDecision,
+        provider: "openai",
+      }).pipe(Effect.exit);
+      assert.isTrue(wrongProvider._tag === "Failure");
+
+      const wrongDomainDecision = `decision_${"0".repeat(32)}`;
+      yield* reserve({
+        decision: wrongDomainDecision,
+        budgetKey: `budget_${"4".repeat(64)}`,
+      });
+      const wrongDomain = yield* settleProvider({
+        decision: wrongDomainDecision,
+        credentialDomain: "openai-responses",
+      }).pipe(Effect.exit);
+      assert.isTrue(wrongDomain._tag === "Failure");
+    }));
+
+  it.effect("makes provider settlement exactly idempotent and rejects conflicting usage", () =>
+    Effect.gen(function*() {
+      const decision = `decision_${"1".repeat(31)}e`;
+      yield* reserve({
+        decision,
+        budgetKey: `budget_${"5".repeat(64)}`,
+      });
+      const input = {
+        decision,
+        forwardOutcome: "provider_rejected",
+        inputTokens: 20,
+        outputTokens: 3,
+        cachedInputTokens: 2,
+        spendMicros: 400,
+        atMillis: now + 2_000,
+      };
+      const first = yield* settleProvider(input);
+      const retry = yield* settleProvider(input);
+      assert.deepStrictEqual(retry, first);
+      const conflict = yield* settleProvider({
+        ...input,
+        outputTokens: input.outputTokens + 1,
+      }).pipe(Effect.exit);
+      assert.isTrue(conflict._tag === "Failure");
+    }));
+
   it.effect("applies and removes one binding-local zero-rate kill switch", () =>
     Effect.gen(function*() {
       const database = yield* TestDatabase;
@@ -357,7 +464,7 @@ layer(databaseLayer)("durable provider budgets", (it) => {
       ]);
     }));
 
-  it.effect("grants the authorizer only reserve and settle functions", () =>
+  it.effect("grants the authorizer reserve and provider settlement but not subject settlement", () =>
     Effect.gen(function*() {
       const database = yield* TestDatabase;
       yield* database.exec(`
@@ -373,6 +480,8 @@ layer(databaseLayer)("durable provider budgets", (it) => {
       const privileges = yield* database.query<{
         readonly countersSelect: boolean;
         readonly reserveExecute: boolean;
+        readonly providerSettleExecute: boolean;
+        readonly subjectSettleExecute: boolean;
         readonly overrideExecute: boolean;
       }>(`
         SELECT
@@ -387,6 +496,16 @@ layer(databaseLayer)("durable provider budgets", (it) => {
           ) AS "reserveExecute",
           has_function_privilege(
             'provider_budget_egress',
+            'agentos.settle_provider_budget_for_provider(text,text,text,text,bigint,bigint,bigint,bigint,bigint)',
+            'EXECUTE'
+          ) AS "providerSettleExecute",
+          has_function_privilege(
+            'provider_budget_egress',
+            'agentos.settle_provider_budget(text,jsonb,text,bigint,bigint,bigint,bigint,bigint)',
+            'EXECUTE'
+          ) AS "subjectSettleExecute",
+          has_function_privilege(
+            'provider_budget_egress',
             'agentos.mutate_provider_budget_override(uuid,text,text,jsonb,text,bigint,text,text,text,uuid)',
             'EXECUTE'
           ) AS "overrideExecute"
@@ -394,6 +513,8 @@ layer(databaseLayer)("durable provider budgets", (it) => {
       assert.deepStrictEqual(privileges, [{
         countersSelect: false,
         reserveExecute: true,
+        providerSettleExecute: true,
+        subjectSettleExecute: false,
         overrideExecute: false,
       }]);
     }));

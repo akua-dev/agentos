@@ -4,6 +4,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import {
   makeProviderBudgetEnforcerLayer,
   providerBudgetKey,
+  type ProviderBudgetProviderSettlementInputV1,
   type ProviderBudgetReservationInputV1,
   type ProviderBudgetSettlementInputV1,
   type ProviderBudgetStore,
@@ -37,7 +38,7 @@ function normalizeReservation(
 }
 
 function normalizeSettlement(
-  input: ProviderBudgetSettlementInputV1,
+  input: Pick<ProviderBudgetSettlementInputV1, "decisionRef">,
   row: ProviderBudgetRow | undefined,
 ): unknown {
   return {
@@ -98,7 +99,29 @@ export const ProviderBudgetEnforcerPostgresLayer = Layer.unwrap(
         return normalizeSettlement(input, rows[0]);
       },
     );
-    const store: ProviderBudgetStore = { reserve, settle };
+    const settleProvider = Effect.fn(
+      "ProviderBudgetStorePostgres.settleProvider",
+    )(function*(input: ProviderBudgetProviderSettlementInputV1) {
+      const rows = yield* sql<ProviderBudgetRow>`
+        SELECT * FROM agentos.settle_provider_budget_for_provider(
+          ${input.decisionRef},
+          ${input.provider},
+          ${input.credentialDomain},
+          ${input.forwardOutcome},
+          ${input.inputTokens},
+          ${input.outputTokens},
+          ${input.cachedInputTokens},
+          ${input.spendMicros},
+          ${input.settledAtMillis}
+        )
+      `;
+      return normalizeSettlement(input, rows[0]);
+    });
+    const store: ProviderBudgetStore = {
+      reserve,
+      settle,
+      settleProvider,
+    };
     return makeProviderBudgetEnforcerLayer(store);
   }),
 );

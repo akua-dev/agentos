@@ -66,6 +66,9 @@ const RawConfig = Config.all({
   maximumHeaderValueBytes: Config.int(
     "EGRESS_AUTHZ_MAX_HEADER_VALUE_BYTES",
   ).pipe(Config.withDefault(16 * 1_024)),
+  maximumSettlementBodyBytes: Config.int(
+    "EGRESS_AUTHZ_MAX_SETTLEMENT_BODY_BYTES",
+  ).pipe(Config.withDefault(4 * 1_024)),
   kubernetesBaseUrl: Config.url("KUBERNETES_API_URL").pipe(
     Config.withDefault(new URL("https://kubernetes.default.svc")),
   ),
@@ -121,6 +124,7 @@ export interface EgressAuthorizerConfig {
   readonly maximumHeaderCount: number;
   readonly maximumHeaderBytes: number;
   readonly maximumHeaderValueBytes: number;
+  readonly maximumSettlementBodyBytes: number;
   readonly kubernetesBaseUrl: string;
   readonly kubernetesServiceAccountTokenPath: string;
   readonly kubernetesServiceAccountCaPath: string;
@@ -163,6 +167,7 @@ export const loadEgressAuthorizerConfig = Effect.fn(
     maximumHeaderCount: raw.maximumHeaderCount,
     maximumHeaderBytes: raw.maximumHeaderBytes,
     maximumHeaderValueBytes: raw.maximumHeaderValueBytes,
+    maximumSettlementBodyBytes: raw.maximumSettlementBodyBytes,
     kubernetesBaseUrl: raw.kubernetesBaseUrl.toString(),
     kubernetesServiceAccountTokenPath:
       raw.kubernetesServiceAccountTokenPath,
@@ -243,6 +248,7 @@ function validateRawConfig(raw: Config.Success<typeof RawConfig>) {
     raw.maximumHeaderCount,
     raw.maximumHeaderBytes,
     raw.maximumHeaderValueBytes,
+    raw.maximumSettlementBodyBytes,
     raw.kubernetesTimeoutMillis,
     raw.kubernetesMaximumResponseBytes,
     raw.databaseMaximumConnections,

@@ -77,8 +77,12 @@ describe("egress authorizer Kubernetes boundary", () => {
       assert.include(rendered, '"command":["agentos-egress-authz"]');
       assert.include(rendered, '"automountServiceAccountToken":true');
       assert.include(rendered, '"agentos.akua.dev/openfga-client":"true"');
-      assert.include(rendered, '"secretName":"agentos-postgres-app"');
-      assert.include(rendered, '"key":"uri","path":"database-url"');
+      assert.include(
+        rendered,
+        '"secretName":"agentos-egress-authz-database"',
+      );
+      assert.include(rendered, '"key":"database-url","path":"database-url"');
+      assert.notInclude(rendered, '"secretName":"agentos-postgres-app"');
       assert.include(rendered, '"secretName":"openfga-admin"');
       assert.include(rendered, '"key":"preshared-key","path":"preshared-key"');
       assert.include(rendered, '"name":"openfga-deployment"');

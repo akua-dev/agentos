@@ -1,6 +1,9 @@
 import { assert, describe, it } from "@effect/vitest";
 import {
+  ProviderBudgetSettlementHttpError,
+  ProviderBudgetSettlementReporter,
   providerAuthorizationGrantHeaders,
+  type ProviderBudgetSettlementReportV1,
   type ProviderAuthorizationGrantV1,
 } from "@akua-dev/agentos";
 import { Effect, Ref } from "effect";
@@ -18,6 +21,14 @@ import type {
 import { githubBrokerError } from "../src/types.ts";
 
 const now = 1_785_586_000_000;
+
+const successfulSettlements = ProviderBudgetSettlementReporter.of({
+  report: (report) => Effect.succeed({
+    schemaVersion: 1,
+    decisionRef: report.decisionRef,
+    outcome: "settled",
+  }),
+});
 
 function grant(
   capability: ProviderAuthorizationGrantV1["capability"] =
@@ -118,6 +129,7 @@ describe("GitHub workload broker", () => {
         tokens: tokens.provider,
         apiUrl: "https://api.github.test",
         gitUrl: "https://github.test",
+        settlements: successfulSettlements,
         now: Effect.succeed(now),
       }).pipe(Effect.provideService(GitHubProviderHttp, http));
       const response = yield* handleGitHubBrokerRequest(
@@ -171,6 +183,7 @@ describe("GitHub workload broker", () => {
         tokens: tokens.provider,
         apiUrl: "https://api.github.test",
         gitUrl: "https://github.test",
+        settlements: successfulSettlements,
         now: Effect.succeed(now),
       }).pipe(Effect.provideService(GitHubProviderHttp, http));
       const missing = brokerRequest(
@@ -214,6 +227,7 @@ describe("GitHub workload broker", () => {
         tokens: tokens.provider,
         apiUrl: "https://api.github.test",
         gitUrl: "https://github.test",
+        settlements: successfulSettlements,
         now: Effect.succeed(now),
       }).pipe(Effect.provideService(GitHubProviderHttp, http));
       const response = yield* handleGitHubBrokerRequest(
@@ -266,6 +280,7 @@ describe("GitHub workload broker", () => {
         tokens: tokens.provider,
         apiUrl: "https://api.github.test",
         gitUrl: "https://github.test",
+        settlements: successfulSettlements,
         now: Effect.succeed(now),
       }).pipe(Effect.provideService(GitHubProviderHttp, http));
       const readBody = JSON.stringify({
@@ -324,6 +339,7 @@ describe("GitHub workload broker", () => {
         tokens: tokens.provider,
         apiUrl: "https://api.github.test",
         gitUrl: "https://github.test",
+        settlements: successfulSettlements,
         now: Effect.succeed(now),
       }).pipe(Effect.provideService(GitHubProviderHttp, http));
       const first = yield* handleGitHubBrokerRequest(
@@ -341,5 +357,177 @@ describe("GitHub workload broker", () => {
         "Bearer ghs_stale",
         "Bearer ghs_fresh",
       ]);
+    }));
+
+  it.effect("settles completed and provider-rejected forwards after their bodies terminate", () =>
+    Effect.gen(function*() {
+      const tokens = yield* makeTokenProvider();
+      const reports = yield* Ref.make<ReadonlyArray<
+        ProviderBudgetSettlementReportV1
+      >>([]);
+      const statuses = yield* Ref.make<ReadonlyArray<number>>([200, 422]);
+      const http = GitHubProviderHttp.of({
+        execute: () =>
+          Ref.modify(statuses, (remaining) => [
+            new Response("provider body", { status: remaining[0] ?? 500 }),
+            remaining.slice(1),
+          ]),
+      });
+      const settlements = ProviderBudgetSettlementReporter.of({
+        report: (report) =>
+          Ref.update(reports, (current) => [...current, report]).pipe(
+            Effect.as({
+              schemaVersion: 1,
+              decisionRef: report.decisionRef,
+              outcome: "settled",
+            }),
+          ),
+      });
+      const handler = yield* makeGitHubBrokerHandler({
+        tokens: tokens.provider,
+        apiUrl: "https://api.github.test",
+        gitUrl: "https://github.test",
+        settlements,
+        now: Effect.succeed(now),
+      }).pipe(Effect.provideService(GitHubProviderHttp, http));
+
+      const completed = yield* handleGitHubBrokerRequest(
+        handler,
+        brokerRequest("/api/v3/repos/akua-dev/agentos/issues/94"),
+      );
+      assert.deepStrictEqual(yield* Ref.get(reports), []);
+      yield* Effect.tryPromise(() => completed.text());
+
+      const rejected = yield* handleGitHubBrokerRequest(
+        handler,
+        brokerRequest("/api/v3/repos/akua-dev/agentos/issues/94"),
+      );
+      yield* Effect.tryPromise(() => rejected.text());
+      assert.deepStrictEqual(yield* Ref.get(reports), [
+        {
+          schemaVersion: 1,
+          decisionRef: grant().decisionRef,
+          forwardOutcome: "completed",
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedInputTokens: 0,
+          spendMicros: 0,
+        },
+        {
+          schemaVersion: 1,
+          decisionRef: grant().decisionRef,
+          forwardOutcome: "provider_rejected",
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedInputTokens: 0,
+          spendMicros: 0,
+        },
+      ]);
+    }));
+
+  it.effect("settles transport failures while a settlement outage never replaces provider semantics", () =>
+    Effect.gen(function*() {
+      const tokens = yield* makeTokenProvider();
+      const reports = yield* Ref.make<ReadonlyArray<
+        ProviderBudgetSettlementReportV1
+      >>([]);
+      const transportFailure = GitHubProviderHttp.of({
+        execute: () => Effect.fail(githubBrokerError("provider_unavailable")),
+      });
+      const recordingSettlements = ProviderBudgetSettlementReporter.of({
+        report: (report) =>
+          Ref.update(reports, (current) => [...current, report]).pipe(
+            Effect.as({
+              schemaVersion: 1,
+              decisionRef: report.decisionRef,
+              outcome: "settled",
+            }),
+          ),
+      });
+      const failedHandler = yield* makeGitHubBrokerHandler({
+        tokens: tokens.provider,
+        apiUrl: "https://api.github.test",
+        gitUrl: "https://github.test",
+        settlements: recordingSettlements,
+        now: Effect.succeed(now),
+      }).pipe(Effect.provideService(GitHubProviderHttp, transportFailure));
+      assert.strictEqual((yield* handleGitHubBrokerRequest(
+        failedHandler,
+        brokerRequest("/api/v3/repos/akua-dev/agentos/issues/94"),
+      )).status, 502);
+      assert.deepStrictEqual(
+        (yield* Ref.get(reports)).map(({ forwardOutcome }) => forwardOutcome),
+        ["transport_failed"],
+      );
+
+      const upstream = GitHubProviderHttp.of({
+        execute: () => Effect.succeed(new Response("native response")),
+      });
+      const unavailableSettlements = ProviderBudgetSettlementReporter.of({
+        report: () =>
+          Effect.fail(ProviderBudgetSettlementHttpError.make({
+            code: "dependency_unavailable",
+            status: 503,
+          })),
+      });
+      const preservedHandler = yield* makeGitHubBrokerHandler({
+        tokens: tokens.provider,
+        apiUrl: "https://api.github.test",
+        gitUrl: "https://github.test",
+        settlements: unavailableSettlements,
+        now: Effect.succeed(now),
+      }).pipe(Effect.provideService(GitHubProviderHttp, upstream));
+      const preserved = yield* handleGitHubBrokerRequest(
+        preservedHandler,
+        brokerRequest("/api/v3/repos/akua-dev/agentos/issues/94"),
+      );
+      assert.strictEqual(preserved.status, 200);
+      assert.strictEqual(
+        yield* Effect.tryPromise(() => preserved.text()),
+        "native response",
+      );
+    }));
+
+  it.effect("settles a downstream-cancelled response as cancelled exactly once", () =>
+    Effect.gen(function*() {
+      const tokens = yield* makeTokenProvider();
+      const reports = yield* Ref.make<ReadonlyArray<
+        ProviderBudgetSettlementReportV1
+      >>([]);
+      const http = GitHubProviderHttp.of({
+        execute: () => Effect.succeed(new Response(new ReadableStream({
+          pull: (controller) => controller.enqueue(new Uint8Array([1])),
+        }))),
+      });
+      const settlements = ProviderBudgetSettlementReporter.of({
+        report: (report) =>
+          Ref.update(reports, (current) => [...current, report]).pipe(
+            Effect.as({
+              schemaVersion: 1,
+              decisionRef: report.decisionRef,
+              outcome: "settled",
+            }),
+          ),
+      });
+      const handler = yield* makeGitHubBrokerHandler({
+        tokens: tokens.provider,
+        apiUrl: "https://api.github.test",
+        gitUrl: "https://github.test",
+        settlements,
+        now: Effect.succeed(now),
+      }).pipe(Effect.provideService(GitHubProviderHttp, http));
+      const response = yield* handleGitHubBrokerRequest(
+        handler,
+        brokerRequest("/api/v3/repos/akua-dev/agentos/issues/94"),
+      );
+      const body = response.body;
+      assert.isNotNull(body);
+      if (body !== null) {
+        yield* Effect.tryPromise(() => body.cancel());
+      }
+      assert.deepStrictEqual(
+        (yield* Ref.get(reports)).map(({ forwardOutcome }) => forwardOutcome),
+        ["cancelled"],
+      );
     }));
 });

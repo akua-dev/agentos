@@ -2,9 +2,10 @@ import {
   PROVIDER_AUTHORIZATION_GRANT_HEADERS,
   ProviderAuthorizationError,
   decodeProviderAuthorizationGrantHeaders,
+  type ProviderBudgetSettlementReporter,
   type ProviderAuthorizationGrantV1,
 } from "@akua-dev/agentos";
-import { Clock, Effect } from "effect";
+import { Cause, Clock, Effect, Exit, Stream } from "effect";
 
 import { GitHubProviderHttp } from "./http.ts";
 import {
@@ -17,6 +18,7 @@ export interface GitHubBrokerOptions {
   readonly tokens: GitHubInstallationTokenProvider;
   readonly apiUrl: string;
   readonly gitUrl: string;
+  readonly settlements: ProviderBudgetSettlementReporter["Service"];
   readonly now?: Effect.Effect<number>;
 }
 
@@ -101,11 +103,23 @@ export const makeGitHubBrokerHandler = Effect.fn(
       },
       catch: () => githubBrokerError("provider_unavailable"),
     });
-    const upstream = yield* http.execute(upstreamRequest);
+    const upstream = yield* http.execute(upstreamRequest).pipe(
+      Effect.tapError(() =>
+        reportSettlement(
+          options.settlements,
+          grant.decisionRef,
+          "transport_failed",
+        )
+      ),
+    );
     if (upstream.status === 401) {
       yield* options.tokens.invalidate(scope);
     }
-    return copyProviderResponse(upstream);
+    return yield* copyProviderResponse(
+      upstream,
+      grant.decisionRef,
+      options.settlements,
+    );
   });
   return handler;
 });
@@ -254,16 +268,83 @@ function upstreamHeaders(source: Headers): Headers {
   return headers;
 }
 
-function copyProviderResponse(response: Response): Response {
+const copyProviderResponse = Effect.fn(
+  "agentos.githubBroker.copyProviderResponse",
+)(function*(
+  response: Response,
+  decisionRef: string,
+  settlements: ProviderBudgetSettlementReporter["Service"],
+) {
   const headers = new Headers();
   for (const [name, value] of response.headers) {
     if (!HOP_BY_HOP_HEADERS.has(name)) headers.append(name, value);
   }
-  return new Response(response.body, {
+  const terminalOutcome = response.status >= 400
+    ? "provider_rejected"
+    : "completed";
+  const responseBody = response.body;
+  if (responseBody === null) {
+    yield* reportSettlement(settlements, decisionRef, terminalOutcome);
+    return new Response(null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+  const bodyStream: Stream.Stream<Uint8Array, GitHubBrokerError> =
+    Stream.fromReadableStream({
+      evaluate: () => responseBody,
+      onError: () => githubBrokerError("provider_unavailable"),
+      releaseLockOnEnd: true,
+    }).pipe(
+      Stream.onExit((exit) =>
+        reportSettlement(
+          settlements,
+          decisionRef,
+          streamSettlementOutcome(exit, terminalOutcome),
+        )
+      ),
+    );
+  const body = yield* Stream.toReadableStreamEffect(bodyStream);
+  return new Response(body, {
     status: response.status,
     statusText: response.statusText,
     headers,
   });
+});
+
+function streamSettlementOutcome(
+  exit: Exit.Exit<unknown, GitHubBrokerError>,
+  terminalOutcome: "completed" | "provider_rejected",
+): "completed" | "cancelled" | "provider_rejected" | "transport_failed" {
+  if (Exit.isSuccess(exit)) return terminalOutcome;
+  return Cause.interruptors(exit.cause).size > 0
+    ? "cancelled"
+    : "transport_failed";
+}
+
+function reportSettlement(
+  settlements: ProviderBudgetSettlementReporter["Service"],
+  decisionRef: string,
+  forwardOutcome:
+    | "completed"
+    | "cancelled"
+    | "provider_rejected"
+    | "transport_failed",
+): Effect.Effect<void> {
+  return settlements.report({
+    schemaVersion: 1,
+    decisionRef,
+    forwardOutcome,
+    inputTokens: 0,
+    outputTokens: 0,
+    cachedInputTokens: 0,
+    spendMicros: 0,
+  }).pipe(
+    Effect.asVoid,
+    Effect.catchCause(() => Effect.void),
+    Effect.uninterruptible,
+  );
 }
 
 function errorResponse(error: unknown): Response {
