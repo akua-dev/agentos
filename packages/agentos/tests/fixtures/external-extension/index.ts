@@ -1,12 +1,29 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
+  AGENTOS_EGRESS_TOKEN_AUDIENCE,
   buildAgentOSStartupPrompt,
   registerAgentOSInstructions,
   registerAgentOSRuntime,
   registerAgentOSStartup,
   type AgentOSRegistrationV1,
   type AgentOSStartupContributionV1,
+  type WorkloadIdentityV1,
 } from "@akua-dev/agentos";
+
+export const exampleEgressAudience = AGENTOS_EGRESS_TOKEN_AUDIENCE;
+export const exampleWorkloadIdentity: WorkloadIdentityV1 = {
+  schemaVersion: 1,
+  agentId: "11111111-1111-4111-8111-111111111111",
+  role: "second_mate",
+  fleet: "agentos",
+  domain: "platform",
+  assignmentId: null,
+  kubernetesNamespace: "agentos-domain-platform",
+  kubernetesPod: "agentos-platform-mate-0",
+  podUid: "22222222-2222-4222-8222-222222222222",
+  serviceAccountName: "agentos-platform-mate",
+  serviceAccountUid: "33333333-3333-4333-8333-333333333333",
+};
 
 export const contribution: AgentOSStartupContributionV1 = {
   version: 1,

@@ -3,6 +3,11 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import {
+  AGENTOS_EGRESS_TOKEN_AUDIENCE,
+  AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+} from "../../../../../src/access/identity.ts";
+
 type Resource = {
   apiVersion: string;
   kind: string;
@@ -189,7 +194,14 @@ describe("First Mate Kubernetes resources", () => {
       { mountPath: "/home/agent", name: "home" },
     ]);
     expect(prepare.volumeMounts).toEqual(install.volumeMounts);
-    expect(firstmate.volumeMounts).toEqual(install.volumeMounts);
+    expect(firstmate.volumeMounts).toEqual([
+      ...install.volumeMounts,
+      {
+        mountPath: "/var/run/secrets/agentos-egress",
+        name: "agentos-egress-identity",
+        readOnly: true,
+      },
+    ]);
     expect(install.command).toEqual(["mise"]);
     expect(install.args).toEqual([
       "install",
@@ -235,6 +247,19 @@ describe("First Mate Kubernetes resources", () => {
     expect(firstmate.securityContext).toEqual({
       allowPrivilegeEscalation: false,
       capabilities: { drop: ["ALL"] },
+    });
+    expect(pod.volumes).toContainEqual({
+      name: "agentos-egress-identity",
+      projected: {
+        defaultMode: 288,
+        sources: [{
+          serviceAccountToken: {
+            audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
+            expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+            path: "token",
+          },
+        }],
+      },
     });
     expect(
       resources.filter(({ kind }) =>

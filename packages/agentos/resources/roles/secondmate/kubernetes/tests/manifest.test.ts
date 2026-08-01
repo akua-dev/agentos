@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
+import {
+  AGENTOS_EGRESS_TOKEN_AUDIENCE,
+  AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+} from "../../../../../src/access/identity.ts";
+
 type Resource = {
   kind: string;
   metadata: {
@@ -93,6 +98,19 @@ describe("Second Mate Kubernetes base", () => {
           secretName: "agentos-secondmate-postgres",
         },
       },
+      {
+        name: "agentos-egress-identity",
+        projected: {
+          defaultMode: 288,
+          sources: [{
+            serviceAccountToken: {
+              audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
+              expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+              path: "token",
+            },
+          }],
+        },
+      },
     ]);
     expect(pod.initContainers).toHaveLength(2);
     expect(pod.containers).toHaveLength(1);
@@ -133,6 +151,18 @@ describe("Second Mate Kubernetes base", () => {
     );
     expect(environment.AGENTOS_MODEL).toBeUndefined();
     expect(environment.AGENTOS_THINKING).toBeUndefined();
+    expect(container.volumeMounts).toContainEqual({
+      mountPath: "/var/run/secrets/agentos-egress",
+      name: "agentos-egress-identity",
+      readOnly: true,
+    });
+    for (const initContainer of pod.initContainers) {
+      expect(initContainer.volumeMounts).not.toContainEqual({
+        mountPath: "/var/run/secrets/agentos-egress",
+        name: "agentos-egress-identity",
+        readOnly: true,
+      });
+    }
     expect(container.args).toEqual(["run", "--skip-tools", "secondmate:run"]);
   });
 

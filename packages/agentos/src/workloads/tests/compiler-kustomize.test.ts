@@ -5,6 +5,10 @@ import { join } from "node:path";
 import { Effect } from "effect";
 import { parseAllDocuments } from "yaml";
 
+import {
+  AGENTOS_EGRESS_TOKEN_AUDIENCE,
+  AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+} from "../../access/identity.ts";
 import { compileAgentWorkloadSpec } from "../compiler.ts";
 
 const roots: string[] = [];
@@ -160,6 +164,38 @@ function resourceIdentity(resource: unknown): string {
   return `${resource.kind}/${resource.metadata.name}`;
 }
 
+function expectEgressIdentityProjection(pod: Record<string, any>) {
+  expect(pod.volumes).toContainEqual({
+    name: "agentos-egress-identity",
+    projected: {
+      defaultMode: 288,
+      sources: [
+        {
+          serviceAccountToken: {
+            audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
+            expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+            path: "token",
+          },
+        },
+      ],
+    },
+  });
+  for (const container of pod.containers) {
+    expect(container.volumeMounts).toContainEqual({
+      mountPath: "/var/run/secrets/agentos-egress",
+      name: "agentos-egress-identity",
+      readOnly: true,
+    });
+  }
+  for (const container of pod.initContainers) {
+    expect(container.volumeMounts).not.toContainEqual({
+      mountPath: "/var/run/secrets/agentos-egress",
+      name: "agentos-egress-identity",
+      readOnly: true,
+    });
+  }
+}
+
 describe("AgentWorkloadSpec native Kustomize output", () => {
   test("renders one isolated interactive Crewmate from ordinary native resources", async () => {
     const { plan, resources } = await render("interactive-crewmate");
@@ -202,6 +238,10 @@ describe("AgentWorkloadSpec native Kustomize output", () => {
     expect(JSON.stringify(resources)).toContain(
       "agentos-crewmate-api-postgres",
     );
+    const statefulSet = resources.find((resource) =>
+      resourceIdentity(resource) === "StatefulSet/agentos-crewmate-api"
+    ) as Record<string, any>;
+    expectEgressIdentityProjection(statefulSet.spec.template.spec);
   });
 
   test("renders the persistent Mate and exact released domain controls", async () => {
@@ -255,5 +295,9 @@ describe("AgentWorkloadSpec native Kustomize output", () => {
     expect(JSON.stringify(resources)).toContain(
       "agentos-platform-mate-postgres",
     );
+    const statefulSet = resources.find((resource) =>
+      resourceIdentity(resource) === "StatefulSet/agentos-platform-mate"
+    ) as Record<string, any>;
+    expectEgressIdentityProjection(statefulSet.spec.template.spec);
   });
 });
