@@ -108,6 +108,7 @@ COPY clis/github-app-token/package.json clis/github-app-token/package.json
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
+COPY services/agentgateway/package.json services/agentgateway/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
 COPY services/otel-collector/package.json services/otel-collector/package.json
 COPY website/apps/docs/package.json website/apps/docs/package.json
@@ -136,6 +137,7 @@ COPY clis/github-app-token/package.json clis/github-app-token/package.json
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
+COPY services/agentgateway/package.json services/agentgateway/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
 COPY services/otel-collector/package.json services/otel-collector/package.json
 COPY website/apps/docs/package.json website/apps/docs/package.json

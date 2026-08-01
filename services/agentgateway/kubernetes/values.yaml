@@ -1,0 +1,70 @@
+fullnameOverride: agentgateway-openai
+namespaceOverride: agentos
+replicaCount: 2
+mode: readonly
+image: cr.agentgateway.dev/agentgateway@sha256:efd79355b89094a8225a9db465d9a01dc656b377f0bab458761b935a13231d29
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+commonLabels:
+  app.kubernetes.io/part-of: agentos
+  agentos.akua.dev/credential-domain: fleet-ai-gateway
+podAnnotations:
+  agentos.akua.dev/config-source: readonly
+gateway:
+  service:
+    enabled: true
+    type: ClusterIP
+    ports:
+      - name: openai
+        port: 8788
+        targetPort: 4000
+        protocol: TCP
+monitoring:
+  enabled: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+extraEnv:
+  - name: AGENTOS_AI_GATEWAY_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: agentgateway-ai-gateway-client
+        key: token
+config:
+  config:
+    adminAddr: 127.0.0.1:15000
+    statsAddr: 0.0.0.0:15020
+    readinessAddr: 0.0.0.0:15021
+    tracing:
+      otlpEndpoint: http://otel-collector.agentos.svc.cluster.local:4317
+      otlpProtocol: grpc
+  gateways:
+    openai:
+      port: 4000
+  routes:
+    - gateways:
+        - openai
+      policies:
+        extAuthz:
+          host: agentos-egress-authz.agentos.svc.cluster.local:9001
+          failureMode: deny
+          protocol:
+            grpc: {}
+          includeRequestHeaders:
+            - authorization
+            - x-agentos-profile
+            - x-agentos-assignment-id
+            - :method
+            - :path
+      backends:
+        - host: ai-gateway.agentos.svc.cluster.local:8787
+          policies:
+            backendAuth:
+              key: $AGENTOS_AI_GATEWAY_TOKEN

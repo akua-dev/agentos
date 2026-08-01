@@ -87,6 +87,10 @@
         "@earendil-works/pi-coding-agent": "0.81.1",
       },
     },
+    "services/agentgateway": {
+      "name": "@agentos/agentgateway",
+      "version": "0.0.0",
+    },
     "services/ai-gateway": {
       "name": "@agentos/ai-gateway",
       "version": "0.0.0",
@@ -173,6 +177,8 @@
   },
   "packages": {
     "@acemir/cssom": ["@acemir/cssom@0.9.31", "", {}, "sha512-ZnR3GSaH+/vJ0YlHau21FjfLYjMpYVIzTD8M8vIEQvIGxeOXyXdzCI140rrCY862p/C/BbzWsjc1dgnM9mkoTA=="],
+
+    "@agentos/agentgateway": ["@agentos/agentgateway@workspace:services/agentgateway"],
 
     "@agentos/ai-gateway": ["@agentos/ai-gateway@workspace:services/ai-gateway"],
 
