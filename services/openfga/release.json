@@ -1,0 +1,25 @@
+{
+  "server": {
+    "version": "1.18.1",
+    "tag": "v1.18.1",
+    "releaseDate": "2026-06-29",
+    "commit": "69efbd95b3d44afb2e2567d485dcc792c7d79e3f",
+    "image": "docker.io/openfga/openfga@sha256:efde89d24487da1a8bc37d85b61341f1fb7024943a1ded65f4b7d51a75666688",
+    "imageIndexDigest": "sha256:efde89d24487da1a8bc37d85b61341f1fb7024943a1ded65f4b7d51a75666688"
+  },
+  "predecessor": {
+    "version": "1.17.1",
+    "image": "docker.io/openfga/openfga@sha256:ff96f68d2f03a029e051027415c106295c782084daeef0934479f04a3fdc2d57",
+    "imageIndexDigest": "sha256:ff96f68d2f03a029e051027415c106295c782084daeef0934479f04a3fdc2d57"
+  },
+  "postgresConformance": {
+    "version": "18.4",
+    "image": "docker.io/library/postgres:18.4-bookworm@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296",
+    "imageIndexDigest": "sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296"
+  },
+  "model": {
+    "version": "agentos-access-v1",
+    "artifact": "model/agentos-access-v1.json",
+    "artifactSha256": "521c5a9fa8358beba0842374bb7ff55a5f3436d894293a2ecd08b2c756b43aeb"
+  }
+}

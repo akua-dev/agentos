@@ -125,6 +125,46 @@
       "status": "migrated"
     },
     {
+      "id": "provider-openfga-authorization",
+      "issue": 90,
+      "pattern": "^packages/agentos/src/access/openfga(?:-http)?\\.ts$",
+      "runtime": "shared-bun-http",
+      "package": "@akua-dev/agentos",
+      "io": ["schema", "http", "authorization", "telemetry"],
+      "migrationDependencies": [100, 101, 87, 88],
+      "status": "migrated"
+    },
+    {
+      "id": "openfga-service-core",
+      "issue": 90,
+      "pattern": "^services/openfga/src/kubernetes\\.ts$",
+      "runtime": "bun-kubernetes",
+      "package": "@agentos/openfga",
+      "io": ["schema", "http", "kubernetes"],
+      "migrationDependencies": [100, 101, 87, 88],
+      "status": "migrated"
+    },
+    {
+      "id": "openfga-service-entrypoints",
+      "issue": 90,
+      "pattern": "^services/openfga/src/",
+      "runtime": "bun-kubernetes-postgresql",
+      "package": "@agentos/openfga",
+      "io": ["config", "filesystem", "http", "kubernetes", "process", "telemetry"],
+      "migrationDependencies": [100, 101, 87, 88],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "openfga-generated-tooling",
+      "issue": 90,
+      "pattern": "^services/openfga/scripts/",
+      "runtime": "bun",
+      "package": "@agentos/openfga",
+      "io": ["filesystem", "process"],
+      "migrationDependencies": [100, 101],
+      "status": "planned"
+    },
+    {
       "id": "agent-workload-profile-effect-tests",
       "issue": 124,
       "pattern": "^packages/agentos/src/workloads/tests/profiles\\.effect\\.test\\.ts$",

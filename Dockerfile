@@ -110,6 +110,7 @@ COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/agentgateway/package.json services/agentgateway/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY services/openfga/package.json services/openfga/package.json
 COPY services/otel-collector/package.json services/otel-collector/package.json
 COPY website/apps/docs/package.json website/apps/docs/package.json
 COPY clis/github-app-token/github-app-token.ts clis/github-app-token/github-app-token.ts
@@ -125,6 +126,7 @@ RUN bun install \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
       --filter @agentos/ai-gateway \
+      --filter @agentos/openfga \
   && bun clis/github-app-token/github-app-token.ts --help >/dev/null \
   && bun clis/pg-listen/pg-listen.ts --help >/dev/null
 
@@ -139,6 +141,7 @@ COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
 COPY services/agentgateway/package.json services/agentgateway/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
+COPY services/openfga/package.json services/openfga/package.json
 COPY services/otel-collector/package.json services/otel-collector/package.json
 COPY website/apps/docs/package.json website/apps/docs/package.json
 COPY packages/agentos/tsconfig.build.json packages/agentos/tsconfig.build.json
@@ -165,6 +168,9 @@ COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/ai-gateway/node_modules/ \
   /opt/agentos/services/ai-gateway/node_modules/
 COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/services/openfga/node_modules/ \
+  /opt/agentos/services/openfga/node_modules/
+COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/packages/agentos/node_modules/ \
   /opt/agentos/packages/agentos/node_modules/
 COPY --from=agentos-package-build \
@@ -185,6 +191,8 @@ RUN chmod 0644 \
     /opt/agentos/packages/agentos/runtime/run-mate.ts \
     /opt/agentos/packages/agentos/runtime/health.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \
+    /opt/agentos/services/openfga/src/bootstrap.ts \
+    /opt/agentos/services/openfga/src/readiness.ts \
   && chmod 0755 \
     /opt/agentos/clis/github-app-token/github-app-token.ts \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
@@ -197,6 +205,12 @@ RUN chmod 0644 \
   && ln -s \
     /opt/agentos/services/ai-gateway/src/main.ts \
     /usr/local/bin/ai-gateway \
+  && ln -s \
+    /opt/agentos/services/openfga/src/bootstrap.ts \
+    /usr/local/bin/agentos-openfga-bootstrap \
+  && ln -s \
+    /opt/agentos/services/openfga/src/readiness.ts \
+    /usr/local/bin/agentos-openfga-readiness \
   && git config --system --add safe.directory /opt/agentos \
   && git config --system --add safe.directory /opt/agentos/.git
 

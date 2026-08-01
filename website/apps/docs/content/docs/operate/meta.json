@@ -12,6 +12,7 @@
     "harnesses",
     "authentication",
     "ai-gateway",
+    "openfga",
     "upgrade",
     "diagnose-recover"
   ]

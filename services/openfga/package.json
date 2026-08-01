@@ -1,0 +1,19 @@
+{
+  "name": "@agentos/openfga",
+  "version": "0.0.0",
+  "description": "Pinned OpenFGA runtime, immutable AgentOS authorization model, and operational conformance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "conformance:model": "bun tests/live-model-conformance.ts",
+    "conformance:upgrade": "bun tests/postgres-upgrade-conformance.ts",
+    "model:generate": "bun scripts/generate-model.ts",
+    "model:check": "bun scripts/generate-model.ts --check",
+    "test": "vitest run tests"
+  },
+  "dependencies": {
+    "@akua-dev/agentos": "workspace:*",
+    "@effect/platform-bun": "4.0.0-beta.102",
+    "effect": "4.0.0-beta.102"
+  }
+}
