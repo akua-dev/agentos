@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, it } from "@effect/vitest";
 import type { Message } from "@earendil-works/pi-ai";
+import { Effect } from "effect";
 import {
   isResponseItem,
   messagesToResponseItems,
@@ -22,8 +23,12 @@ const usage = {
 
 function responseItems(value: unknown): ResponseItem[] {
   const parsed = parseResponseItems(value);
-  if (!parsed) throw new Error("Invalid response item fixture.");
-  return parsed;
+  expect(parsed).toBeDefined();
+  return parsed ?? [];
+}
+
+function test(name: string, assertion: () => void) {
+  it.effect(name, () => Effect.sync(assertion));
 }
 
 describe("Responses message conversion", () => {
@@ -370,25 +375,25 @@ describe("Responses message conversion", () => {
     expect(
       normalizeResponseItemsForPrompt(input, { input: ["text"] }),
     ).toEqual([
-      input[0]!,
+      input[0],
       {
         type: "function_call_output",
         call_id: "function-1",
         output: "aborted",
       },
-      input[1]!,
+      input[1],
       {
         type: "local_shell_call_output",
         id: "shell-call-1",
         output: "aborted",
       },
-      input[2]!,
+      input[2],
       {
         type: "custom_tool_call_output",
         call_id: "custom-1",
         output: "aborted",
       },
-      input[3]!,
+      input[3],
       {
         type: "tool_search_output",
         id: "search-1-output",
@@ -397,7 +402,7 @@ describe("Responses message conversion", () => {
         status: "completed",
         tools: [],
       },
-      input[7]!,
+      input[7],
     ]);
   });
 
@@ -465,7 +470,7 @@ describe("Responses message conversion", () => {
           },
         ],
       },
-      input[2]!,
+      input[2],
       {
         type: "function_call_output",
         call_id: "image-call",
