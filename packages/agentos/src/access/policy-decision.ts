@@ -35,6 +35,10 @@ import {
   type ProviderPolicySnapshotUnavailable,
   type ProviderPolicySnapshotV1,
 } from "./postgres-identity.ts";
+import {
+  ProviderBudgetEnforcementError,
+  ProviderBudgetEnforcer,
+} from "./provider-budget.ts";
 
 export const PROVIDER_POLICY_DECISION_MAX_TTL_MILLIS = 15_000;
 
@@ -79,6 +83,23 @@ function mapSnapshotFailure(
     case "ceiling_inactive":
     case "ceiling_not_effective":
     case "operation_unreconciled":
+      return decisionError("policy_stale", true);
+  }
+}
+
+function mapBudgetFailure(
+  error: ProviderBudgetEnforcementError,
+): ProviderPolicyDecisionError {
+  switch (error.outcome) {
+    case "rate_class_disabled":
+    case "rate_limited":
+    case "budget_exhausted":
+      return decisionError(error.outcome, error.retryable);
+    case "database_unavailable":
+      return decisionError("database_unavailable", true);
+    case "invalid_reservation":
+    case "invalid_settlement":
+    case "policy_stale":
       return decisionError("policy_stale", true);
   }
 }
@@ -294,6 +315,7 @@ export function makeProviderPolicyDecisionPointLayer(
       const snapshots = yield* ProviderPolicySnapshotStore;
       const api = yield* OpenFgaAuthorizationApi;
       const decisionReferences = yield* ProviderDecisionReferenceGenerator;
+      const budgets = yield* ProviderBudgetEnforcer;
       return ProviderPolicyDecisionPoint.of({
         decide: Effect.fn("agentos.providerPolicy.decide")(function*(
           request: ProviderPolicyDecisionRequestV1,
@@ -341,6 +363,7 @@ export function makeProviderPolicyDecisionPointLayer(
             now,
           }).pipe(Effect.provideService(OpenFgaAuthorizationApi, api));
           const opaqueId = yield* decisionReferences.next;
+          const decisionRef = `decision_${opaqueId}`;
           const expiresAtMillis = minimumExpiry(
             now,
             maximumDecisionTtlMillis,
@@ -348,16 +371,33 @@ export function makeProviderPolicyDecisionPointLayer(
             profilePermission.expiresAtMillis,
             ceilingPermission.expiresAtMillis,
           );
+          const reservation = yield* budgets.reserve({
+            schemaVersion: 1,
+            decisionRef,
+            correlationId: request.correlationId,
+            bindingId: snapshot.binding.bindingId,
+            subject,
+            provider: request.provider,
+            credentialDomain: request.credentialDomain,
+            capability: request.capability,
+            resource: request.resource,
+            environment: options.environment,
+            rateClass: profilePermission.rateClass,
+            nowMillis: now,
+          }).pipe(Effect.mapError(mapBudgetFailure));
           return yield* Schema.decodeUnknownEffect(
             ProviderPolicyDecisionRefV1Schema,
             { onExcessProperty: "error" },
           )({
             schemaVersion: 1,
             correlationId: request.correlationId,
-            decisionRef: `decision_${opaqueId}`,
+            decisionRef,
             decision: "allow",
             credentialDomain: request.credentialDomain,
-            expiresAtMillis,
+            expiresAtMillis: Math.min(
+              expiresAtMillis,
+              reservation.leaseExpiresAtMillis,
+            ),
             profile: {
               profileId: snapshot.profile.profileId,
               profileVersion: snapshot.profile.profileVersion,
@@ -366,7 +406,7 @@ export function makeProviderPolicyDecisionPointLayer(
               ceilingId: snapshot.ceiling.ceilingId,
               revision: snapshot.ceiling.revision,
             },
-            rateClass: profilePermission.rateClass,
+            rateClass: reservation.effectiveRateClass,
           }).pipe(
             Effect.mapError(() =>
               decisionError("decision_reference_unavailable", true)
