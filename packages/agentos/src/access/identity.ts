@@ -201,6 +201,7 @@ export class WorkloadIdentityDependencyUnavailable extends Schema.TaggedErrorCla
       "unexpected_status",
       "response_too_large",
       "invalid_response",
+      "database_unavailable",
     ])),
     status: Schema.optional(Schema.NullOr(Schema.Number)),
   },
