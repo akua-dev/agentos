@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openfga
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/component: authorization
+    app.kubernetes.io/part-of: agentos
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: openfga
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: agentos
+          podSelector:
+            matchLabels:
+              agentos.akua.dev/openfga-client: "true"
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8081
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: agentos
+          podSelector:
+            matchLabels:
+              agentos.akua.dev/openfga-metrics-client: "true"
+      ports:
+        - protocol: TCP
+          port: 2112

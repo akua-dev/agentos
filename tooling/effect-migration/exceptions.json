@@ -21,6 +21,20 @@
       "match": "Effect.runPromise",
       "maximumOccurrences": 1,
       "reason": "Published Promise and framework APIs retain one reviewed adapter while consumers migrate to typed Effect programs."
+    },
+    {
+      "path": "services/openfga/src/bootstrap.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The OpenFGA bootstrap executable needs one reviewed Bun process entry boundary around its fully typed Effect program."
+    },
+    {
+      "path": "services/openfga/src/readiness.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The OpenFGA readiness executable needs one reviewed Bun process entry boundary around its scoped Effect server lifecycle."
     }
   ]
 }

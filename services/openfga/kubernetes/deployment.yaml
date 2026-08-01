@@ -1,0 +1,188 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openfga
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/component: authorization
+    app.kubernetes.io/part-of: agentos
+    app.kubernetes.io/version: 1.18.1
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openfga
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openfga
+        app.kubernetes.io/component: authorization
+        app.kubernetes.io/part-of: agentos
+        app.kubernetes.io/version: 1.18.1
+    spec:
+      automountServiceAccountToken: false
+      serviceAccountName: openfga
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: openfga
+      containers:
+        - name: openfga
+          image: docker.io/openfga/openfga@sha256:efde89d24487da1a8bc37d85b61341f1fb7024943a1ded65f4b7d51a75666688
+          imagePullPolicy: IfNotPresent
+          args:
+            - run
+          env:
+            - name: OPENFGA_DATASTORE_ENGINE
+              value: postgres
+            - name: OPENFGA_DATASTORE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: openfga-postgres-app
+                  key: uri
+            - name: OPENFGA_AUTHN_METHOD
+              value: preshared
+            - name: OPENFGA_AUTHN_PRESHARED_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: openfga-admin
+                  key: preshared-key
+            - name: OPENFGA_HTTP_ADDR
+              value: 0.0.0.0:8080
+            - name: OPENFGA_GRPC_ADDR
+              value: 0.0.0.0:8081
+            - name: OPENFGA_METRICS_ADDR
+              value: 0.0.0.0:2112
+            - name: OPENFGA_METRICS_ENABLED
+              value: "true"
+            - name: OPENFGA_PLAYGROUND_ENABLED
+              value: "false"
+            - name: OPENFGA_LOG_FORMAT
+              value: json
+            - name: OPENFGA_LOG_LEVEL
+              value: info
+            - name: OPENFGA_DATASTORE_MAX_OPEN_CONNS
+              value: "30"
+            - name: OPENFGA_DATASTORE_MAX_IDLE_CONNS
+              value: "10"
+            - name: OPENFGA_DATASTORE_MIN_OPEN_CONNS
+              value: "2"
+            - name: OPENFGA_DATASTORE_MIN_IDLE_CONNS
+              value: "2"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: grpc
+              containerPort: 8081
+              protocol: TCP
+            - name: metrics
+              containerPort: 2112
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: semantic
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+        - name: semantic-readiness
+          image: agentos:dev
+          imagePullPolicy: Never
+          command:
+            - agentos-openfga-readiness
+          env:
+            - name: OPENFGA_BASE_URL
+              value: http://127.0.0.1:8080
+            - name: OPENFGA_PRESHARED_KEY_FILE
+              value: /var/run/secrets/agentos-openfga/preshared-key
+            - name: OPENFGA_DEPLOYMENT_DIRECTORY
+              value: /var/run/agentos/openfga-deployment
+            - name: OPENFGA_READINESS_PORT
+              value: "8090"
+          ports:
+            - name: semantic
+              containerPort: 8090
+              protocol: TCP
+          volumeMounts:
+            - name: admin
+              mountPath: /var/run/secrets/agentos-openfga
+              readOnly: true
+            - name: deployment
+              mountPath: /var/run/agentos/openfga-deployment
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: semantic
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: admin
+          secret:
+            secretName: openfga-admin
+            defaultMode: 256
+        - name: deployment
+          configMap:
+            name: openfga-deployment
+            optional: true
+            defaultMode: 292

@@ -1,0 +1,1035 @@
+{
+  "schema_version": "1.1",
+  "type_definitions": [
+    {
+      "type": "service"
+    },
+    {
+      "type": "health_probe",
+      "relations": {
+        "ready": {
+          "this": {}
+        }
+      },
+      "metadata": {
+        "relations": {
+          "ready": {
+            "directly_related_user_types": [
+              {
+                "type": "service"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "mate"
+    },
+    {
+      "type": "assignment"
+    },
+    {
+      "type": "domain",
+      "relations": {
+        "member": {
+          "this": {}
+        }
+      },
+      "metadata": {
+        "relations": {
+          "member": {
+            "directly_related_user_types": [
+              {
+                "type": "mate"
+              },
+              {
+                "type": "assignment"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "fleet",
+      "relations": {
+        "direct_member": {
+          "this": {}
+        },
+        "domain": {
+          "this": {}
+        },
+        "member": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "direct_member"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "domain"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "direct_member": {
+            "directly_related_user_types": [
+              {
+                "type": "mate"
+              },
+              {
+                "type": "assignment"
+              }
+            ]
+          },
+          "domain": {
+            "directly_related_user_types": [
+              {
+                "type": "domain"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "access_profile",
+      "relations": {
+        "subject": {
+          "this": {}
+        }
+      },
+      "metadata": {
+        "relations": {
+          "subject": {
+            "directly_related_user_types": [
+              {
+                "type": "mate",
+                "condition": "active_window"
+              },
+              {
+                "type": "assignment",
+                "condition": "active_window"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "access_ceiling",
+      "relations": {
+        "fleet_scope": {
+          "this": {}
+        },
+        "domain_scope": {
+          "this": {}
+        },
+        "subject": {
+          "union": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet_scope"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "domain_scope"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "fleet_scope": {
+            "directly_related_user_types": [
+              {
+                "type": "fleet"
+              }
+            ]
+          },
+          "domain_scope": {
+            "directly_related_user_types": [
+              {
+                "type": "domain"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "authorization_target",
+      "relations": {
+        "fleet": {
+          "this": {}
+        },
+        "profile_github_actions_dispatch": {
+          "this": {}
+        },
+        "ceiling_github_actions_dispatch": {
+          "this": {}
+        },
+        "allow_github_actions_dispatch": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_github_actions_dispatch"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_github_actions_dispatch"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_github_actions_read": {
+          "this": {}
+        },
+        "ceiling_github_actions_read": {
+          "this": {}
+        },
+        "allow_github_actions_read": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_github_actions_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_github_actions_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_github_contents_write": {
+          "this": {}
+        },
+        "ceiling_github_contents_write": {
+          "this": {}
+        },
+        "allow_github_contents_write": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_github_contents_write"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_github_contents_write"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_github_issue_read": {
+          "this": {}
+        },
+        "ceiling_github_issue_read": {
+          "this": {}
+        },
+        "allow_github_issue_read": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_github_issue_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_github_issue_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_github_issue_write": {
+          "this": {}
+        },
+        "ceiling_github_issue_write": {
+          "this": {}
+        },
+        "allow_github_issue_write": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_github_issue_write"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_github_issue_write"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_github_project_read": {
+          "this": {}
+        },
+        "ceiling_github_project_read": {
+          "this": {}
+        },
+        "allow_github_project_read": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_github_project_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_github_project_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_github_project_write": {
+          "this": {}
+        },
+        "ceiling_github_project_write": {
+          "this": {}
+        },
+        "allow_github_project_write": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_github_project_write"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_github_project_write"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_github_pull_request_read": {
+          "this": {}
+        },
+        "ceiling_github_pull_request_read": {
+          "this": {}
+        },
+        "allow_github_pull_request_read": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_github_pull_request_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_github_pull_request_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_github_pull_request_write": {
+          "this": {}
+        },
+        "ceiling_github_pull_request_write": {
+          "this": {}
+        },
+        "allow_github_pull_request_write": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_github_pull_request_write"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_github_pull_request_write"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_github_repository_read": {
+          "this": {}
+        },
+        "ceiling_github_repository_read": {
+          "this": {}
+        },
+        "allow_github_repository_read": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_github_repository_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_github_repository_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_openai_models_read": {
+          "this": {}
+        },
+        "ceiling_openai_models_read": {
+          "this": {}
+        },
+        "allow_openai_models_read": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_openai_models_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_openai_models_read"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_openai_responses_compact": {
+          "this": {}
+        },
+        "ceiling_openai_responses_compact": {
+          "this": {}
+        },
+        "allow_openai_responses_compact": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_openai_responses_compact"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_openai_responses_compact"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_openai_responses_create": {
+          "this": {}
+        },
+        "ceiling_openai_responses_create": {
+          "this": {}
+        },
+        "allow_openai_responses_create": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_openai_responses_create"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_openai_responses_create"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "profile_provider_secret_use": {
+          "this": {}
+        },
+        "ceiling_provider_secret_use": {
+          "this": {}
+        },
+        "allow_provider_secret_use": {
+          "intersection": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "fleet"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "profile_provider_secret_use"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "ceiling_provider_secret_use"
+                  },
+                  "computedUserset": {
+                    "relation": "subject"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "fleet": {
+            "directly_related_user_types": [
+              {
+                "type": "fleet"
+              }
+            ]
+          },
+          "profile_github_actions_dispatch": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_github_actions_dispatch": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_github_actions_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_github_actions_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_github_contents_write": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_github_contents_write": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_github_issue_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_github_issue_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_github_issue_write": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_github_issue_write": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_github_project_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_github_project_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_github_project_write": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_github_project_write": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_github_pull_request_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_github_pull_request_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_github_pull_request_write": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_github_pull_request_write": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_github_repository_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_github_repository_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_openai_models_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_openai_models_read": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_openai_responses_compact": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_openai_responses_compact": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_openai_responses_create": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_openai_responses_create": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "profile_provider_secret_use": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_provider_secret_use": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "conditions": {
+    "active_window": {
+      "name": "active_window",
+      "expression": "current_time >= effective_at && current_time < expires_at",
+      "parameters": {
+        "current_time": {
+          "type_name": "TYPE_NAME_TIMESTAMP"
+        },
+        "effective_at": {
+          "type_name": "TYPE_NAME_TIMESTAMP"
+        },
+        "expires_at": {
+          "type_name": "TYPE_NAME_TIMESTAMP"
+        }
+      }
+    }
+  }
+}

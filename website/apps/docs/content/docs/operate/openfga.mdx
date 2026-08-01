@@ -1,0 +1,37 @@
+---
+title: OpenFGA authorization
+description: Install, verify, upgrade, and recover AgentOS' private authorization decision point.
+---
+
+AgentOS uses a private OpenFGA deployment for provider/API authorization. It does not proxy ordinary Internet traffic and it never stores provider credentials. Each decision intersects the workload's Fleet membership, one immutable access-profile version, and the current Captain ceiling for one exact provider resource and environment.
+
+## What gets deployed
+
+The reviewed Kustomize package creates a dedicated three-instance CloudNativePG database, an explicit OpenFGA migration Job, two OpenFGA replicas, native and semantic probes, a PodDisruptionBudget, a versioned model bootstrap Job, and ingress selection for approved core clients. It creates no Ingress, no egress restriction, and no Secret.
+
+Before installation, provision `Secret/openfga-admin` in `agentos` through the approved secret manager. Only the OpenFGA runtime, its semantic-readiness sidecar, bootstrap, and the core authorizer may receive that key. First Mate, Second Mates, and Crewmates must not mount it.
+
+## Install in observed phases
+
+Install the reviewed CloudNativePG operator first. Apply and wait for `Cluster/openfga-postgres`; apply and wait for the release-named migration Job; apply the Services, Deployment, PDB, RBAC, and NetworkPolicy; then apply and wait for the version-named bootstrap Job. Bootstrap reaches the not-yet-ready server through `Service/openfga-bootstrap`, verifies a canonical authorization tuple with higher consistency, and publishes only store/model IDs to `ConfigMap/openfga-deployment`. The normal Service exposes only ready Pods.
+
+Verify the result:
+
+```bash
+kubectl get -n agentos cluster/openfga-postgres
+kubectl get -n agentos pods -l app.kubernetes.io/name=openfga
+kubectl get -n agentos configmap/openfga-deployment \
+  -o jsonpath='{.data.store-id}{"\n"}{.data.authorization-model-id}{"\n"}{.data.model-version}{"\n"}'
+```
+
+`/healthz` proves that OpenFGA can reach PostgreSQL. `/readyz` additionally loads the pinned IDs and runs the canonical OpenFGA check using `HIGHER_CONSISTENCY`. A Pod stays out of the normal Service when either condition fails.
+
+## Backup, upgrade, and rollback
+
+The database is configured for online CSI volume-snapshot backups from a preferred standby. Verify a compatible `VolumeSnapshotClass`, take a backup before every upgrade, and perform a restore drill into a new cluster. Point-in-time recovery additionally needs WAL archiving through the approved CloudNativePG plugin.
+
+Every upgrade must pass the repository's predecessor→candidate and backup→fresh-restore conformance before its version-named migration Job is applied. Roll runtime Pods only after migration completes. Run model bootstrap last.
+
+Models are immutable. The deployment ConfigMap preserves the prior model ID when it publishes a new one. A model rollback strongly checks that prior ID, then restores the ConfigMap pointer; it does not delete history. A binary/database rollback restores the verified pre-upgrade backup into a fresh cluster because a newer database schema must not be assumed compatible with an older OpenFGA binary.
+
+See the complete commands, failure guide, pinned digests, and evidence in the repository's `services/openfga/README.md`.
