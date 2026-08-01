@@ -911,15 +911,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/extension.ts under issue #98; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/src/openai-server-compaction/messages.ts",
-      "slice": "pi-memory-compaction",
-      "issue": 98,
-      "violationCount": 4,
-      "digest": "391223fe3fe8330553cd8b6a83e726a478e2df6b25a80d0c23638390bf9df926",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/messages.ts under issue #98; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/src/openai-server-compaction/remote.ts",
       "slice": "pi-memory-compaction",
       "issue": 98,
@@ -927,15 +918,6 @@
       "digest": "2c50f28bf93151795cc6db3de57418c259b10f16168f53bb65a4ca58f5cb08ec",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/remote.ts under issue #98; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/openai-server-compaction/schemas.ts",
-      "slice": "pi-memory-compaction",
-      "issue": 98,
-      "violationCount": 7,
-      "digest": "1f743255a1f53a3b0589ddc890e646af80f0f35da693a92284ee1a48f4c3f32e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/schemas.ts under issue #98; never refresh touched debt."
     },
     {
       "path": "packages/agentos/src/openai-server-compaction/tests/extension.test.ts",
@@ -947,15 +929,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/tests/extension.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/src/openai-server-compaction/tests/messages.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 1,
-      "digest": "e14fb5d980ad34556ab46b60d82d734a00238bf0ac8403b82f4ab4c7ce715dfe",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/tests/messages.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/src/openai-server-compaction/tests/remote.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -963,15 +936,6 @@
       "digest": "4032fec964b231dc8b30fcce13c5cc07fdde99c9b1b932f283cf27d7e392e846",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/tests/remote.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/openai-server-compaction/tests/session.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 11,
-      "digest": "fe78d1e8cfaa3bbd158d55f09795ab0db509c2982cc61ef64f14b817730f2700",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/tests/session.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/src/supervision-guard/extension.ts",

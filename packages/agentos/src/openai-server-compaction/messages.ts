@@ -1,7 +1,9 @@
 import type { ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
 import { convertToLlm } from "@earendil-works/pi-coding-agent";
+import { Option, Schema } from "effect";
 import {
   JsonObjectSchema,
+  ResponseContentItemSchema,
   ResponseItemSchema,
   ResponseReasoningItemSchema,
   type CompactionArtifact,
@@ -18,6 +20,7 @@ export type AssistantPhase = "commentary" | "final_answer";
 
 const IMAGE_CONTENT_OMITTED_PLACEHOLDER =
   "image content omitted because you do not support image input";
+const JsonText = Schema.UnknownFromJsonString;
 
 export function isCompactionArtifact(value: unknown): value is CompactionArtifact {
   const parsed = ResponseItemSchema.safeParse(value);
@@ -218,25 +221,45 @@ function stripImagesWhenUnsupported(
       next.type === "message" &&
       Array.isArray(next.content)
     ) {
-      next.content = stripUnsupportedImageContentItems(
-        next.content as ResponseContentItem[],
+      const content = next.content.flatMap((value) => {
+        const parsed = ResponseContentItemSchema.safeParse(value);
+        return parsed.success ? [parsed.data] : [];
+      });
+      return parsedResponseItemOr(
+        next,
+        {
+          ...next,
+          content: stripUnsupportedImageContentItems(content),
+        },
       );
-    } else if (
+    }
+    if (
       (next.type === "function_call_output" ||
         next.type === "custom_tool_call_output") &&
       "output" in next
     ) {
-      next.output = stripUnsupportedOutputImages(next.output) as
-        typeof next.output;
-    } else if (
+      return parsedResponseItemOr(next, {
+        ...next,
+        output: stripUnsupportedOutputImages(next.output),
+      });
+    }
+    if (
       next.type === "image_generation_call" &&
       "result" in next &&
       typeof next.result === "string"
     ) {
-      next.result = "";
+      return parsedResponseItemOr(next, { ...next, result: "" });
     }
     return next;
   });
+}
+
+function parsedResponseItemOr(
+  fallback: ResponseItem,
+  value: unknown,
+): ResponseItem {
+  const parsed = ResponseItemSchema.safeParse(value);
+  return parsed.success ? parsed.data : fallback;
 }
 
 export function normalizeResponseItemsForPrompt(
@@ -297,29 +320,27 @@ function assistantTextMetadata(
   signature: string | undefined,
 ): { id?: string; phase?: AssistantPhase; annotations: JsonValue[] } {
   if (!signature) return { annotations: [] };
-  try {
-    const parsed = JsonObjectSchema.safeParse(JSON.parse(signature));
-    if (!parsed.success) return { annotations: [] };
-    const value = parsed.data;
-    const phase = value.phase === "commentary" || value.phase === "final_answer" ? value.phase : undefined;
-    return {
-      ...(typeof value.id === "string" ? { id: value.id } : {}),
-      ...(phase ? { phase } : {}),
-      annotations: Array.isArray(value.annotations) ? value.annotations : [],
-    };
-  } catch {
-    return { annotations: [] };
-  }
+  const decoded = Schema.decodeUnknownOption(JsonText)(signature);
+  if (Option.isNone(decoded)) return { annotations: [] };
+  const parsed = JsonObjectSchema.safeParse(decoded.value);
+  if (!parsed.success) return { annotations: [] };
+  const value = parsed.data;
+  const phase = value.phase === "commentary" || value.phase === "final_answer"
+    ? value.phase
+    : undefined;
+  return {
+    ...(typeof value.id === "string" ? { id: value.id } : {}),
+    ...(phase ? { phase } : {}),
+    annotations: Array.isArray(value.annotations) ? value.annotations : [],
+  };
 }
 
 function reasoningItem(signature: string | undefined): ResponseItem | undefined {
   if (!signature) return undefined;
-  try {
-    const parsed = ResponseReasoningItemSchema.safeParse(JSON.parse(signature));
-    return parsed.success ? parsed.data : undefined;
-  } catch {
-    return undefined;
-  }
+  const decoded = Schema.decodeUnknownOption(JsonText)(signature);
+  if (Option.isNone(decoded)) return undefined;
+  const parsed = ResponseReasoningItemSchema.safeParse(decoded.value);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function messageToResponseItems(message: Message): ResponseItem[] {

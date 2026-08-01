@@ -1,38 +1,5 @@
-import { createRequire } from "node:module";
-import { join } from "node:path";
 import type * as Zod from "zod";
-
-type ZodNamespace = typeof import("zod");
-
-const ZOD_VERSION = "4.4.3";
-const requireFromSchemas = createRequire(import.meta.url);
-
-function loadZod(): ZodNamespace {
-  const releaseRoot = process.env.AGENTOS_RELEASE_ROOT ?? "/opt/agentos";
-  const candidates = [
-    "zod",
-    join(releaseRoot, "node_modules", "zod"),
-    join(releaseRoot, "services", "ai-gateway", "node_modules", "zod"),
-    ...(process.env.PI_CODING_AGENT_DIR
-      ? [join(process.env.PI_CODING_AGENT_DIR, "npm", "node_modules", "zod")]
-      : []),
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      const manifest: { version?: string } = requireFromSchemas(join(candidate, "package.json"));
-      if (manifest.version !== ZOD_VERSION) continue;
-      const module: ZodNamespace = requireFromSchemas(candidate);
-      return module;
-    } catch {
-      continue;
-    }
-  }
-
-  throw new Error(`AgentOS OpenAI server compaction requires zod@${ZOD_VERSION}.`);
-}
-
-const { z } = loadZod();
+import { z } from "zod";
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
 export type JsonObject = { [key: string]: JsonValue };
