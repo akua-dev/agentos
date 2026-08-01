@@ -2,60 +2,100 @@
   "schemaVersion": 1,
   "exceptions": [
     {
+      "kind": "outer-host-adapter",
       "path": "tooling/effect-migration/check.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",
       "maximumOccurrences": 1,
-      "reason": "The executable policy checker needs one reviewed Bun process entry boundary."
+      "reason": "The executable policy checker needs one reviewed Bun process entry boundary.",
+      "ownerIssue": 103,
+      "test": "tooling/effect-migration/tests/check.test.ts",
+      "removalCondition": "Retain only while the policy checker is a standalone Bun executable.",
+      "expiresOn": null
     },
     {
+      "kind": "temporary-migration-adapter",
       "path": "packages/agentos/src/shared/legacy.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
       "maximumOccurrences": 1,
-      "reason": "Published synchronous APIs retain one reviewed adapter while consumers migrate to typed Effect programs."
+      "reason": "Published synchronous APIs retain one reviewed adapter while consumers migrate to typed Effect programs.",
+      "ownerIssue": 103,
+      "test": "packages/agentos/src/shared/tests/foundation.effect.test.ts",
+      "removalCondition": "Remove after issue #103 migrates every synchronous published consumer to Effect.",
+      "expiresOn": "2026-10-31"
     },
     {
+      "kind": "temporary-migration-adapter",
       "path": "packages/agentos/src/shared/legacy.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runPromise",
       "maximumOccurrences": 1,
-      "reason": "Published Promise and framework APIs retain one reviewed adapter while consumers migrate to typed Effect programs."
+      "reason": "Published Promise and framework APIs retain one reviewed adapter while consumers migrate to typed Effect programs.",
+      "ownerIssue": 103,
+      "test": "packages/agentos/src/shared/tests/foundation.effect.test.ts",
+      "removalCondition": "Remove after issue #103 migrates every Promise and framework consumer to Effect.",
+      "expiresOn": "2026-10-31"
     },
     {
+      "kind": "outer-host-adapter",
       "path": "services/openfga/src/bootstrap.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",
       "maximumOccurrences": 1,
-      "reason": "The OpenFGA bootstrap executable needs one reviewed Bun process entry boundary around its fully typed Effect program."
+      "reason": "The OpenFGA bootstrap executable needs one reviewed Bun process entry boundary around its fully typed Effect program.",
+      "ownerIssue": 103,
+      "test": "services/openfga/tests/release.effect.test.ts",
+      "removalCondition": "Retain only while OpenFGA bootstrap remains a standalone Bun Job entrypoint.",
+      "expiresOn": null
     },
     {
+      "kind": "outer-host-adapter",
       "path": "services/openfga/src/readiness.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",
       "maximumOccurrences": 1,
-      "reason": "The OpenFGA readiness executable needs one reviewed Bun process entry boundary around its scoped Effect server lifecycle."
+      "reason": "The OpenFGA readiness executable needs one reviewed Bun process entry boundary around its scoped Effect server lifecycle.",
+      "ownerIssue": 103,
+      "test": "services/openfga/tests/readiness.effect.test.ts",
+      "removalCondition": "Retain only while OpenFGA readiness remains a standalone Bun sidecar entrypoint.",
+      "expiresOn": null
     },
     {
+      "kind": "outer-host-adapter",
       "path": "packages/agentos/runtime/github-workload-auth-main.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",
       "maximumOccurrences": 1,
-      "reason": "The GitHub workload helper executable needs one reviewed Bun process entry boundary around its fully typed Effect program."
+      "reason": "The GitHub workload helper executable needs one reviewed Bun process entry boundary around its fully typed Effect program.",
+      "ownerIssue": 103,
+      "test": "packages/agentos/runtime/tests/github-workload-auth.effect.test.ts",
+      "removalCondition": "Retain only while the native GitHub helper remains a standalone Bun executable.",
+      "expiresOn": null
     },
     {
+      "kind": "outer-host-adapter",
       "path": "packages/agentos/runtime/github-provider-main.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",
       "maximumOccurrences": 1,
-      "reason": "The GitHub provider reconciler executable needs one reviewed Bun process entry boundary around its fully typed Effect program."
+      "reason": "The GitHub provider reconciler executable needs one reviewed Bun process entry boundary around its fully typed Effect program.",
+      "ownerIssue": 103,
+      "test": "packages/agentos/runtime/tests/github-provider.effect.test.ts",
+      "removalCondition": "Retain only while the provider-home reconciler remains a standalone Bun executable.",
+      "expiresOn": null
     },
     {
+      "kind": "outer-host-adapter",
       "path": "services/github-broker/src/main.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",
       "maximumOccurrences": 1,
-      "reason": "The GitHub broker executable needs one reviewed Bun process entry boundary around its scoped Effect server program."
+      "reason": "The GitHub broker executable needs one reviewed Bun process entry boundary around its scoped Effect server program.",
+      "ownerIssue": 103,
+      "test": "services/github-broker/tests/broker.effect.test.ts",
+      "removalCondition": "Retain only while the GitHub broker remains a standalone Bun service entrypoint.",
+      "expiresOn": null
     }
   ]
 }

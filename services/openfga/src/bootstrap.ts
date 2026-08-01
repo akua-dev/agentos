@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
+import * as BunHttpClient from "@effect/platform-bun/BunHttpClient";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import {
   Config,
@@ -75,8 +76,9 @@ const program = Effect.gen(function*() {
 });
 
 if (import.meta.main) {
-  const platform = Layer.merge(
+  const platform = Layer.mergeAll(
     BunFileSystem.layer,
+    BunHttpClient.layer,
     ConfigProvider.layer(ConfigProvider.fromEnv()),
   );
   const main = program.pipe(

@@ -196,7 +196,7 @@
     },
     {
       "id": "openfga-generated-tooling",
-      "issue": 90,
+      "issue": 97,
       "pattern": "^services/openfga/scripts/",
       "runtime": "bun",
       "package": "@agentos/openfga",
@@ -336,7 +336,7 @@
     },
     {
       "id": "shared-contracts-and-telemetry",
-      "issue": 101,
+      "issue": 104,
       "pattern": "^packages/agentos/src/(?:behaviors|index|instructions|preflight|readiness-state|resources|startup)\\.ts$|^packages/agentos/src/(?:roles|telemetry)/",
       "runtime": "shared-bun",
       "package": "@akua-dev/agentos",

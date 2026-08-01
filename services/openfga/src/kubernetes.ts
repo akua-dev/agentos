@@ -1,4 +1,9 @@
-import { Effect, Redacted, Schema } from "effect";
+import { Effect, Redacted, Schema, Stream } from "effect";
+import {
+  HttpClient,
+  HttpClientRequest,
+  HttpClientResponse,
+} from "effect/unstable/http";
 
 import { AGENTOS_OPENFGA_MODEL_VERSION } from "../../../packages/agentos/src/access/openfga.ts";
 import type { OpenFgaBootstrapResultV1 } from "../../../packages/agentos/src/access/openfga-http.ts";
@@ -33,10 +38,6 @@ export interface OpenFgaKubernetesOptions {
   readonly serviceAccountToken: Redacted.Redacted<string>;
   readonly timeoutMillis: number;
   readonly maximumResponseBytes: number;
-  readonly fetchImpl?: (
-    input: string | URL | Request,
-    init?: RequestInit,
-  ) => Promise<Response>;
 }
 
 const ExistingConfigMapSchema = Schema.Struct({
@@ -179,104 +180,100 @@ function kubernetesRequest(
   options: OpenFgaKubernetesOptions,
   request: KubernetesRequest,
 ) {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const headers = new Headers({
-    accept: "application/json",
-    authorization: `Bearer ${Redacted.value(options.serviceAccountToken)}`,
-  });
-  if (request.body !== undefined) {
-    headers.set("content-type", "application/json");
-  }
-  return Effect.tryPromise({
-    try: (signal) =>
-      fetchImpl(request.url, {
-        method: request.method,
-        headers,
-        body: request.body === undefined
-          ? undefined
-          : JSON.stringify(request.body),
-        signal,
+  return Effect.gen(function*() {
+    const client = HttpClient.withScope(yield* HttpClient.HttpClient);
+    let clientRequest = HttpClientRequest.make(request.method)(request.url).pipe(
+      HttpClientRequest.acceptJson,
+      HttpClientRequest.setHeader(
+        "authorization",
+        `Bearer ${Redacted.value(options.serviceAccountToken)}`,
+      ),
+    );
+    if (request.body !== undefined) {
+      clientRequest = yield* HttpClientRequest.bodyJson(
+        clientRequest,
+        request.body,
+      ).pipe(
+        Effect.mapError(() =>
+          kubernetesError(
+            request.operation,
+            "invalid_configuration",
+            null,
+          )
+        ),
+      );
+    }
+    const response = yield* client.execute(clientRequest).pipe(
+      Effect.mapError(() =>
+        kubernetesError(request.operation, "network_failure", null)
+      ),
+      Effect.timeoutOrElse({
+        duration: options.timeoutMillis,
+        orElse: () =>
+          kubernetesError(request.operation, "timeout", null),
       }),
-    catch: () =>
-      kubernetesError(request.operation, "network_failure", null),
-  }).pipe(
-    Effect.flatMap((response) => {
-      if (!request.acceptedStatuses.includes(response.status)) {
-        void response.body?.cancel().catch(() => undefined);
-        return kubernetesError(
-          request.operation,
-          "unexpected_status",
-          response.status,
-        );
-      }
-      if (response.status !== 200) {
-        void response.body?.cancel().catch(() => undefined);
-        return Effect.succeed({ status: response.status, body: null });
-      }
-      return readBoundedJson(
-        response,
+    );
+    if (!request.acceptedStatuses.includes(response.status)) {
+      return yield* kubernetesError(
         request.operation,
-        options.maximumResponseBytes,
-      ).pipe(Effect.map((body) => ({ status: response.status, body })));
-    }),
-    Effect.timeoutOrElse({
-      duration: options.timeoutMillis,
-      orElse: () =>
-        kubernetesError(request.operation, "timeout", null),
-    }),
+        "unexpected_status",
+        response.status,
+      );
+    }
+    if (response.status !== 200) {
+      return { status: response.status, body: null };
+    }
+    const body = yield* readBoundedJson(
+      response,
+      request.operation,
+      options.maximumResponseBytes,
+    );
+    return { status: response.status, body };
+  }).pipe(
+    Effect.scoped,
   );
 }
 
 function readBoundedJson(
-  response: Response,
+  response: HttpClientResponse.HttpClientResponse,
   operation: typeof KubernetesOperation.Type,
   maximumResponseBytes: number,
 ) {
-  const declaredLength = Number(response.headers.get("content-length"));
+  const declaredLength = Number(response.headers["content-length"]);
   if (
     Number.isFinite(declaredLength) &&
     declaredLength > maximumResponseBytes
   ) {
-    void response.body?.cancel().catch(() => undefined);
     return Effect.fail(
       kubernetesError(operation, "response_too_large", response.status),
     );
   }
-  return Effect.gen(function*() {
-    if (response.body === null) return "";
-    const reader = response.body.getReader();
-    const chunks: Array<Uint8Array> = [];
-    let length = 0;
-    while (true) {
-      const result = yield* Effect.tryPromise({
-        try: () => reader.read(),
-        catch: () =>
-          kubernetesError(operation, "network_failure", response.status),
-      });
-      if (result.done) break;
-      length += result.value.byteLength;
-      if (length > maximumResponseBytes) {
-        yield* Effect.tryPromise({
-          try: () => reader.cancel(),
-          catch: () =>
-            kubernetesError(operation, "network_failure", response.status),
-        }).pipe(Effect.ignore);
-        return yield* kubernetesError(
-          operation,
-          "response_too_large",
-          response.status,
-        );
-      }
-      chunks.push(result.value);
-    }
-    const bytes = new Uint8Array(length);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return new TextDecoder().decode(bytes);
-  }).pipe(
+  return response.stream.pipe(
+    Stream.runFoldEffect(
+      emptyBoundedBody,
+      (state, chunk) => {
+        const length = state.length + chunk.byteLength;
+        if (length > maximumResponseBytes) {
+          return Effect.fail(
+            kubernetesError(
+              operation,
+              "response_too_large",
+              response.status,
+            ),
+          );
+        }
+        return Effect.succeed({
+          chunks: [...state.chunks, chunk],
+          length,
+        });
+      },
+    ),
+    Effect.mapError((error) =>
+      error instanceof OpenFgaKubernetesError
+        ? error
+        : kubernetesError(operation, "network_failure", response.status)
+    ),
+    Effect.map(decodeBoundedBody),
     Effect.flatMap((body) =>
       Schema.decodeUnknownEffect(
         Schema.fromJsonString(Schema.Unknown),
@@ -287,6 +284,25 @@ function readBoundedJson(
       )
     ),
   );
+}
+
+interface BoundedBody {
+  readonly chunks: ReadonlyArray<Uint8Array>;
+  readonly length: number;
+}
+
+function emptyBoundedBody(): BoundedBody {
+  return { chunks: [], length: 0 };
+}
+
+function decodeBoundedBody(body: BoundedBody) {
+  const bytes = new Uint8Array(body.length);
+  let offset = 0;
+  for (const chunk of body.chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 function kubernetesError(

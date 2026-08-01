@@ -12,6 +12,7 @@
   "ignoredDirectories": [
     ".git",
     ".next",
+    ".open-next",
     ".repos",
     ".source",
     ".turbo",

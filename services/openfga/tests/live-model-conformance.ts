@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import * as BunHttpClient from "@effect/platform-bun/BunHttpClient";
 import { Effect, Layer, Redacted } from "effect";
 
 import {
@@ -115,7 +116,7 @@ const transport = makeOpenFgaHttpTransportLayer({
     : Redacted.make(process.env.OPENFGA_TEST_PRESHARED_KEY),
   timeoutMillis: 5_000,
   maximumResponseBytes: 512 * 1_024,
-});
+}).pipe(Layer.provide(BunHttpClient.layer));
 const services = Layer.merge(
   OpenFgaManagementApiHttpLayer.pipe(Layer.provide(transport)),
   OpenFgaAuthorizationApiHttpLayer.pipe(Layer.provide(transport)),

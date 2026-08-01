@@ -1,0 +1,2021 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "path": "benchmarks/profiles/agentos/pi-session-adapter.ts",
+      "slice": "benchmarks",
+      "issue": 97,
+      "violationCount": 30,
+      "digest": "df8b67cac81d318b278c43609ab1f2508e40ad1d7b11fea436a4818e2ecfc1d0",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/profiles/agentos/pi-session-adapter.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "benchmarks/run.ts",
+      "slice": "benchmarks",
+      "issue": 97,
+      "violationCount": 3,
+      "digest": "0fbbb82881452dcb9323d10c714049ccce315806e06e7dda5c822d64931d30fb",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/run.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "benchmarks/runner.ts",
+      "slice": "benchmarks",
+      "issue": 97,
+      "violationCount": 63,
+      "digest": "405fd020f0e7a27fa217c4b7f720b31d054eb6c3626c50edd16b5f2b6204defd",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/runner.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "benchmarks/tests/contracts.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 27,
+      "digest": "4605b2e559d74769d5da26f0ba457895899cdeb5661952d048b74eb1dc44df43",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/tests/contracts.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "benchmarks/tests/pi-session-adapter.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 7,
+      "digest": "d08a007ed33ff47be85145067e5d0c75e8517214f3a98cc751761af264997c6a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/tests/pi-session-adapter.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "benchmarks/tests/runner.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 22,
+      "digest": "a88550329a8c7b615a1ea1b6a26809ad1ed820693a8153ae0fb2c9d2babc8a61",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/tests/runner.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "benchmarks/validate.ts",
+      "slice": "benchmarks",
+      "issue": 97,
+      "violationCount": 23,
+      "digest": "ba0cd0dc9d9d1ec533b2c30f1cd710263e02635db5caca88e10b5a8614989941",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/validate.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "clis/github-app-token/github-app-token.ts",
+      "slice": "database-and-clis",
+      "issue": 97,
+      "violationCount": 32,
+      "digest": "50c394d0ea0e24d72ceccf5b8a2f7e1c63f0d75b7f157d122093645c26697a33",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/github-app-token/github-app-token.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "clis/github-app-token/tests/github-app-token.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 18,
+      "digest": "75adb30c51af09b5a5874ac797a4e4574de1b61b0af5f9d1ffc260f3021201b8",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/github-app-token/tests/github-app-token.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "clis/pg-listen/pg-listen.ts",
+      "slice": "database-and-clis",
+      "issue": 97,
+      "violationCount": 12,
+      "digest": "8535048a6f5d9ac9152375686c56d3dd271e3d64cce08a929b32ac0587db0a0a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/pg-listen/pg-listen.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "clis/pg-listen/tests/pg-listen.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 48,
+      "digest": "a255e0aa969c5a33e6e795b026e26cdd21331b52dd209b26966d57114fba1268",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/pg-listen/tests/pg-listen.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/drizzle.config.ts",
+      "slice": "database-and-clis",
+      "issue": 97,
+      "violationCount": 2,
+      "digest": "309af5ae7092d2c4fdc006150210b0eda3c75be4923d7466d3ff40665595506c",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/drizzle.config.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "database/kubernetes/cloudnative-pg/tests/manifest.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 4,
+      "digest": "f03d66e3199c0a85a0516f5c0bc0999d1a3c621a839836f8f7f2475777d08446",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/kubernetes/cloudnative-pg/tests/manifest.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/runtime/database-credentials.ts",
+      "slice": "database-and-clis",
+      "issue": 97,
+      "violationCount": 16,
+      "digest": "6d61027cf909489ceee0766cdafd83b1d083a11371a1e9f990612d96630c4b65",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/runtime/database-credentials.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "database/runtime/prepare.ts",
+      "slice": "database-and-clis",
+      "issue": 97,
+      "violationCount": 10,
+      "digest": "2d8d3716a97ee6e83c84962eee833219884fa8b72ad5a1740379e7253d7f0f8b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/runtime/prepare.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/access-control-plane.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 20,
+      "digest": "15b09b6458efc468a3391f72536c3319f5081d87323a83919e28792285feb8b3",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/access-control-plane.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/atomic-acceptance-migration.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 4,
+      "digest": "0e3b1b864e4ba3a4b1f55621cbb7ae0b26b9a514e5fb7871e948afc802de0921",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/atomic-acceptance-migration.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/atomic-acceptance.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 18,
+      "digest": "c4c6dfc8f93f80d186e90cec82d4b7618aef5831b462ef355e3a40da9f5a088b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/atomic-acceptance.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/authorization.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 18,
+      "digest": "f0ceedbdf0218fa68f4312f86e3dba28acc01ba2e3af51f7e60d14f0c63c617d",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/authorization.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/captain-table-removal-migration.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 4,
+      "digest": "b6336f6213073fc6b8e566bc1f9f332d4e5bc3f1ba7113971de78b89c433a8f0",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/captain-table-removal-migration.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/coordination-contracts.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 10,
+      "digest": "df8cc834103a49cfbbc6991480bd5dd23097825a82b14443305f22513b832509",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/coordination-contracts.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/current-mate-bearings.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 13,
+      "digest": "6db66b992be261d3231d6db269b20232c6e5421eaa5cd137977d7be978f43cbf",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/current-mate-bearings.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/database-credentials.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 11,
+      "digest": "4f6979da035c1986fdca46c6c60891558cbab6f307f0b7442f9b2f5334f35250",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/database-credentials.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/fleet-initialization.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 15,
+      "digest": "fe1321c1b5deb73d6cf62e5dbb855891dcfdb8aefda7512bfd6540809ee78fb6",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/fleet-initialization.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/inbox-receipt.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 11,
+      "digest": "6307cabc88308004e6c2894858139ee3d6d5ec3d3184a716e3e512702f583a84",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/inbox-receipt.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/inbox-routing.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 11,
+      "digest": "285f33b2302cca611e7a4380991db049aaed056ef9a88527470d0596cb05409e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/inbox-routing.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/inbox-vocabulary.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 8,
+      "digest": "7f844257faeedb25f97f569d3f60396d4a525d8ce74ba8c96e378851365ff7d8",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/inbox-vocabulary.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/migration.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 2,
+      "digest": "0195e14e3d6a5e990cecd99e5719700fd9daa0bb261d30f51b66e56fdc6d7a72",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/migration.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/notifications.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 8,
+      "digest": "104ee23f2e6bb43b862bf619f7b73ff100fa5f1f4d74af3063d5f8b232662809",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/notifications.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/package-unification-migration.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 4,
+      "digest": "835f2b8bd6994cc1144795e0224fc27bf8c853c8985df9f912016267ff3682c4",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/package-unification-migration.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/published-migration-history.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 6,
+      "digest": "7a38f2c2955e0f9956f6f04543aeefc0a1ee797d2e62687ba4aeab9e5cc6d74c",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/published-migration-history.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/runtime-authorization.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 21,
+      "digest": "ceb2430742a04b1d0ecfdad860caa0fcdcf672ec6a0c6d14fe099902043c877b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/runtime-authorization.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/runtime-operation-journal-migration.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 8,
+      "digest": "4996486d8cccbf857c7a2d3d52aed5476f352a3a44116388b22d2a2fc11d1492",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/runtime-operation-journal-migration.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/runtime-operation-journal.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 18,
+      "digest": "7a751dfb5e0d152faaa3cff95c9e25e62b0137e550da542a03a75c7ce515b4d4",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/runtime-operation-journal.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/runtime.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 12,
+      "digest": "5e50ee082e790843dcd1984d8d909274e2336e2b6c5011e2176a7c61798156c4",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/runtime.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "database/tests/targeted-notifications.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 17,
+      "digest": "fc4a433770460e66e4ca03fb3b74b03d76c2fdd4fec85c5f59772948bfc00537",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/targeted-notifications.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "mise.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 17,
+      "digest": "7ea33450bd8338a2af0c2fb24e6ecbdcefb0e8b1ab7dd89e87c5671d44d45372",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in mise.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/build.ts",
+      "slice": "database-and-clis",
+      "issue": 97,
+      "violationCount": 2,
+      "digest": "2b7f1700b6fa13d8c34c81d3872ce201513b9a62853ed5d691c2163a3e3d3f98",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/build.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/resources/crewmates/default/kubernetes/tests/manifest.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 7,
+      "digest": "aa98a00a4d5e4729c361cb564fe7abaf229875e06fa687c53128fce9f8b2f475",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/crewmates/default/kubernetes/tests/manifest.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/resources/roles/firstmate/kubernetes/tests/manifests.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 14,
+      "digest": "6cf54224de6766d34e3f8c0dde786b12bf3e96e800dea9795e4850276cd846f7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/roles/firstmate/kubernetes/tests/manifests.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/resources/roles/secondmate/kubernetes/tests/domain-lifecycle.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 19,
+      "digest": "e26c205f06bc67fb05c4166696b073a8f5f04a12b4fadded0edd625841b8359f",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/roles/secondmate/kubernetes/tests/domain-lifecycle.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/resources/roles/secondmate/kubernetes/tests/manifest.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 13,
+      "digest": "346bb77498d0d67ec5285841538da5c197e3157b50b1572382d6f908b3a2d145",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/roles/secondmate/kubernetes/tests/manifest.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/capacity-preflight-main.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 2,
+      "digest": "ff9c2f627ac1dc70063f3efcb79a6e6f0d3843805160dc65290b8218fa413789",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/capacity-preflight-main.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/codex-otel.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 19,
+      "digest": "ff461794bd8bfc7845a8d8b65ac4437e35a454df79b61b71064b21e22b669089",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/codex-otel.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/codex-provider.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 18,
+      "digest": "42b8e5931d31a7b9b110437118be2919f230d36f23d716ce1cf99e5036c7c4fb",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/codex-provider.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/codex-token.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 2,
+      "digest": "85a9c28435a33563c97953fa21226cf91582f3c8bea0c7d291a4684e4ab06cd3",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/codex-token.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/create-image-seed.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 10,
+      "digest": "c49427ecf168641df3457a799a8958436c7b848f95e248f6fa5240541ec47766",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/create-image-seed.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/crewmate-readiness.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 1,
+      "digest": "32d83b91f1d40753d65eb5c364a22ab9b4cd621f70db6bccda453900f8c491ea",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/crewmate-readiness.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/distribution.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 4,
+      "digest": "e951b158d550fcb0c33af7823e12603e0fb4c0258188c9ec48bb956f5b36708e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/distribution.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/health.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 12,
+      "digest": "53be8f71f0c376c45c0cc864cee84f4156c75e8d22ae4db08d98f08f600062a0",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/health.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/kubernetes/tests/observability-manifests.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 6,
+      "digest": "7c39033b2914c4ee23b000f68ddb8bb0277576af4ace37f019fd31842ee14217",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/kubernetes/tests/observability-manifests.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/kubernetes/tests/secret-lifecycle.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 24,
+      "digest": "98acfd1565ce4f38fcf4b1666dd53d374affd1942be4e03793c60dc1500f66a5",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/kubernetes/tests/secret-lifecycle.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/pi-provider.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 22,
+      "digest": "180b0021f7ee0fcaa9b2bb3d10e34d5497fabfd3d0c37804ac26ab8db20a4706",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/pi-provider.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/pi-session.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 34,
+      "digest": "3b6342c257a51065fe55d6e8ea97959ef20230908b995b7d0a6627e163ee8e2d",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/pi-session.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/prepare-home.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 47,
+      "digest": "754345f03ee6632606c5aa27f70b57fbfb5ca73ca328030fdf15adf5f8a11682",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/prepare-home.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/readiness-state-main.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 11,
+      "digest": "bda4037d21fcc34f02e54d260d08a16b8d8b7442c82f39e4e4d2cc9a39a35885",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/readiness-state-main.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/readiness.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 2,
+      "digest": "2d17a4d6691a14cd2cbf5251bd5588228e3d18d3bc3dfe2059ffd8e602a006eb",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/readiness.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/run-mate.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 34,
+      "digest": "1775fcd5b33de27ebc2f73fde74dcd8650120f1de89bfc41abb69ecfb971a6a2",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/run-mate.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/capacity-preflight.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 19,
+      "digest": "53cf26d0353c622ce16626d9bb5ef9173c1e6adefc1a85660c5abfe7f3240cd7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/capacity-preflight.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/codex-otel.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 19,
+      "digest": "698a501a6a6f2e339319d857effb1c9650d2e1794aea1075cc9d111abe2bc5c4",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/codex-otel.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/codex-provider.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 16,
+      "digest": "76fe574baa9c6ce188a9c286836a3aab73f99de0a8bf6a2aabd3a7ace008bb26",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/codex-provider.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/codex-token.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 7,
+      "digest": "92a6022572c34041b303b22281fdc82b763c46feb4b36c63819e805e24b612f6",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/codex-token.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/crewmate-readiness.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 9,
+      "digest": "d168cef3d2c5a08ac0afe6ebc509490e028b7955d3298e7ccdca3ca3270a8ba8",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/crewmate-readiness.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/distribution-migration.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 14,
+      "digest": "38ab9494e6ec9fe6f6c21a6311911d64ab14732f9fa8c52ec3243894694e692b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/distribution-migration.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/image-seed.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 8,
+      "digest": "909c579c3af76c54f70bb796f9bd3b3aa767fa9a4d3ad35b04a2c805def9bc0f",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/image-seed.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/kubernetes.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 6,
+      "digest": "d8e729362539ee1c46060f579bc4f01369d1cf6d15eaba9d7e4ae2f798e2590a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/kubernetes.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/memory-activity.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 21,
+      "digest": "f561622ae3ab4b4929a2fc495acbac8f771d922e1d51cc882a2f6d626faa112e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/memory-activity.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/memory-store.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 23,
+      "digest": "ec730dbd91cdce049ee31151d060603fb81edc083c9d39700b7f01e8678b2729",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/memory-store.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/pi-provider.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 26,
+      "digest": "f1b9ed6a42ed541e10c275a69b52f79184cbd0d46af959d32d06cc77532a2354",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/pi-provider.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/prepare-home.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 28,
+      "digest": "9dcf79e05670628bf8f632e30e1776488dc3b1d183ebda5ea9bbaeaaf7e7301f",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/prepare-home.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/production-dependencies.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 17,
+      "digest": "ff98cb8ce4597e4106ea1a0fd06394b7015f70aea40e5ba2de51a0b6d7f65362",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/production-dependencies.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/readiness-state.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 21,
+      "digest": "f30cdea5d7f19dfff7a1e71cad359a262797fd13a53219ce84311d9c5c74737d",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/readiness-state.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/readiness.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 11,
+      "digest": "3d91e3c0003468f8746390da0f93dd7c036f4eb0f849b7047e97c31e04754a91",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/readiness.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/runtime/tests/runtime.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 81,
+      "digest": "57d44b2315ada6d68c7fc61fb6c548b97d856d17a1b8f19d88b72c1d6615bf22",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/runtime.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/access/http-authorizer.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 7,
+      "digest": "abab3bad5f1525d56a11bb22819654250a34f6f73829bf5b9ca3a0b4768502a2",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/access/http-authorizer.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/access/pi-workload-identity.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 5,
+      "digest": "96d630203e4087a112f65490f2c3786fa5803e470381825b4dec53da90ae19e5",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/access/pi-workload-identity.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/access/tests/github-routes.effect.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "08b1a84caa20968cde9e3efc966dbc55e3a6fc4df1bffb4bddf9cfde9b443d45",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/access/tests/github-routes.effect.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/access/tests/http-authorizer.effect.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 2,
+      "digest": "2930f1992907e8f681ca0f8f53c3ba456fc5363d8f89306f062a97d715c6748f",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/access/tests/http-authorizer.effect.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/broker.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 19,
+      "digest": "5930440accf13db012d9509d509228772b0c58d8da363e1cc1ebb134e3ba1955",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/broker.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/command.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 11,
+      "digest": "e4a903f7908b3d19d6a6359483275b9a7b1f72fc44b8561f2422bea05e16f644",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/command.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/extension.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 19,
+      "digest": "c741d677957d836dd4c7f9bfd3be16af3e4f71abceba22891764009f3de0c23a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/extension.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/lifecycle.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 1,
+      "digest": "73fcd8f5243bd272c39d060cb1a5f827ff250dd031de8176e59e387ae7e8ffc3",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/lifecycle.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/output.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 6,
+      "digest": "4c68266af7b268b59a680b2bd42cc1b389994077f1be439d24c7ede83d1fd322",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/output.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/subprocess.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 16,
+      "digest": "f5353c38994846ec470d7af23c42e66dd2849993b042aabf4d41e1d2ca5faf7b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/subprocess.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/tests/broker.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 11,
+      "digest": "52415e680ac63ea418fe1e20481d291c18ad31fc84e04b8d302363a6191cbfe7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/tests/broker.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/tests/command.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 8,
+      "digest": "baaa743a21dce1ae8cfd250589106d954ad6209480c661c8064622c7a1316c62",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/tests/command.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/tests/discovery.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 11,
+      "digest": "b254d38fc75a568b35b7815f7335d05ef0d034901925cab983d381700efab5d1",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/tests/discovery.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/tests/extension.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 52,
+      "digest": "7d8e5ee5d853c9c068f5d6cad63e125b90107b18a7dd56775bc8cf90344c51b7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/tests/extension.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/tests/lifecycle.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "1fd2df7c13be8c25f34e49011a0a0cb0f4e62d73ee1c78af0262d2234ab2fb24",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/tests/lifecycle.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/tests/output.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 5,
+      "digest": "17e052b5a83417dd8733d61212dec3f0b9a54b883af6e014271cef8faed60eb4",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/tests/output.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/background-tasks/tests/subprocess.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 11,
+      "digest": "f6493f383c21e1997a5e621f137e5dbea12b342076f199bf9fb939e26dcd27b3",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/background-tasks/tests/subprocess.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/coordination-readiness/extension.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 19,
+      "digest": "8352fdb47379e6bdcbd56f5fbe9d28e5810ce152fd499c0233e245ca9492c23a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/coordination-readiness/extension.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/coordination-readiness/tests/extension.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 20,
+      "digest": "dd1306ee159ea0cfd15bf12e76696cb30dd3653fdc78b11a6fca15d05db36f3b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/coordination-readiness/tests/extension.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/mate-memory/extension.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 31,
+      "digest": "9d7bb0b6813347527b4ca22a1865f705e76bc0c2efbc7013eb513cd54454520e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/extension.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/mate-memory/maintenance.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 44,
+      "digest": "25511e418444daaf42c55a2ff6c6d51ace90bc97ea2e2638fef62e253bfda942",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/maintenance.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/mate-memory/model.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 7,
+      "digest": "f86e1081bfe034c1295e66a4e7899b90b388b4066688603aee3a2d7841203560",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/model.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/mate-memory/tests/extension.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 75,
+      "digest": "61b038768fbf2ec29e2152f9bb29d5fb986415b67bb242d1400dc9309afed7b3",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/tests/extension.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/mate-memory/tests/maintenance.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 66,
+      "digest": "77fa0dae522ec3562ebc9ad60d30edfc40e4cc927186aadca60f0af87cb3ca2e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/tests/maintenance.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/mate-memory/tests/model.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 8,
+      "digest": "914cee9f2bff714ee800319ce27ae6236afab9ad93eebb2609b79c4cdd1ccc67",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/tests/model.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/memory/activity.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 77,
+      "digest": "2443e070e20b6102a792068e3c5ce05c75e2ab4e3b2cbfb518b4d151414286fa",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/memory/activity.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/memory/policy.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 1,
+      "digest": "616be99744e2c71f88515d5faa8b6e9aebb1a545c9b2f1377becdb7aad5d1c65",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/memory/policy.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/memory/schema.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 16,
+      "digest": "bdce90618b2054de0cbda97f8691807db72b65f27a4001e75dac27afe73423b4",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/memory/schema.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/memory/store.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 54,
+      "digest": "92cfcd1d86dc7e98247b577054a60d62e5b7949a90f0e57872f3c3dda17ec0b1",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/memory/store.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/openai-server-compaction/extension.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 13,
+      "digest": "948a07c0d34d35c6ecccfb7c738b77fa9a92cf423984af8a1d72b159ed59a624",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/extension.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/openai-server-compaction/messages.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 4,
+      "digest": "391223fe3fe8330553cd8b6a83e726a478e2df6b25a80d0c23638390bf9df926",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/messages.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/openai-server-compaction/remote.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 48,
+      "digest": "2c50f28bf93151795cc6db3de57418c259b10f16168f53bb65a4ca58f5cb08ec",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/remote.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/openai-server-compaction/schemas.ts",
+      "slice": "pi-memory-compaction",
+      "issue": 98,
+      "violationCount": 7,
+      "digest": "1f743255a1f53a3b0589ddc890e646af80f0f35da693a92284ee1a48f4c3f32e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/schemas.ts under issue #98; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/openai-server-compaction/tests/extension.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 88,
+      "digest": "7ae604532a5d00e60aa7fb4d4e5c13ca5d7db4395d1ae23ba2359b13701ea254",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/tests/extension.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/openai-server-compaction/tests/messages.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "e14fb5d980ad34556ab46b60d82d734a00238bf0ac8403b82f4ab4c7ce715dfe",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/tests/messages.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/openai-server-compaction/tests/remote.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 79,
+      "digest": "4032fec964b231dc8b30fcce13c5cc07fdde99c9b1b932f283cf27d7e392e846",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/tests/remote.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/openai-server-compaction/tests/session.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 11,
+      "digest": "fe78d1e8cfaa3bbd158d55f09795ab0db509c2982cc61ef64f14b817730f2700",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/openai-server-compaction/tests/session.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/supervision-guard/extension.ts",
+      "slice": "agentos-runtime",
+      "issue": 104,
+      "violationCount": 5,
+      "digest": "0ea8f3234bac7e78a24e6d99406dfd847ca027472a8024c969df3598851d23bf",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/supervision-guard/extension.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/supervision-guard/tests/extension.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 22,
+      "digest": "b4847f9e24173e7697478eff463bdae62ee86906dadb6f04b645989673620a2a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/supervision-guard/tests/extension.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/telemetry/auxiliary.ts",
+      "slice": "shared-contracts-and-telemetry",
+      "issue": 104,
+      "violationCount": 1,
+      "digest": "04e35d017f6cfd194051c7edae750044c81ba1bc2e7aa28de53e2e7cb34511b6",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/telemetry/auxiliary.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/telemetry/contract.ts",
+      "slice": "shared-contracts-and-telemetry",
+      "issue": 104,
+      "violationCount": 15,
+      "digest": "a5247c38c23231bb6c382852aac623cebfd0deca8a59b78caa883529f265352a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/telemetry/contract.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/telemetry/pi-extension.ts",
+      "slice": "shared-contracts-and-telemetry",
+      "issue": 104,
+      "violationCount": 3,
+      "digest": "4cd055216ffc1f1ff235bcc8f0deaf31be7f8c39ef87a0e7404326aa704806f6",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/telemetry/pi-extension.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/telemetry/privacy.ts",
+      "slice": "shared-contracts-and-telemetry",
+      "issue": 104,
+      "violationCount": 2,
+      "digest": "60f127e799de4e1be079e61065c06f528403d039bb5d1f57c9654465a0049e50",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/telemetry/privacy.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/telemetry/runtime.ts",
+      "slice": "shared-contracts-and-telemetry",
+      "issue": 104,
+      "violationCount": 9,
+      "digest": "206b3b1ad3bde538b7571739c201ef6db7113b82594c1018e1e4046bb9174f4a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/telemetry/runtime.ts under issue #104; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/telemetry/tests/contract.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "264729ffcb9e298d0633eb6b4147ce33570be5e827b9a179a4b3b906a8a6a7b3",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/telemetry/tests/contract.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/telemetry/tests/fake-telemetry.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 2,
+      "digest": "26c1ab1324f486ea40b3b9f4419c84b6065a6cc15d9e57c98e944162c5bd0cba",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/telemetry/tests/fake-telemetry.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/telemetry/tests/pi-extension.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 6,
+      "digest": "3fdf2a388178880434098af084071fd134d6fa629ef4422626cfd4b322c192af",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/telemetry/tests/pi-extension.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/telemetry/tests/propagation.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 3,
+      "digest": "4625a762bbe4382c4a4876298fa18e95d3f2d3230be66adb5cab52f735782836",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/telemetry/tests/propagation.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/telemetry/tests/runtime.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 4,
+      "digest": "63814b36405e8b737f50c1e8064a418ab10862501bf4c11a7656055667dae105",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/telemetry/tests/runtime.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/src/workloads/tests/compiler-kustomize.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 9,
+      "digest": "63090578ca3bbfac1801ca16d3863d4ef5f6ad12601fbf72ae406a50ef17e326",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/workloads/tests/compiler-kustomize.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/ai-gateway-skill.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 4,
+      "digest": "5f2582fba424ca6aef5d13c2d8a8f86eb72e21d3d4a588238216802e15ca9ed7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/ai-gateway-skill.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/artifact.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 36,
+      "digest": "240b02074dd34a5e9ee74267ccae512949e044a303bcf837115c03c34171e29c",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/artifact.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/discovery.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 11,
+      "digest": "d778e15428fd235475b87b62a839ab6cffb54a4739c32c3076d479abbc2be135",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/discovery.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/ecosystem.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 12,
+      "digest": "63d08287977a9f7c0f03629b88a3d75db472612230a1972145e311701eaad9be",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/ecosystem.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/entrypoint.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 34,
+      "digest": "7acd60bdf0709ec56676289ffff758c2653ce56d8b0d0ddd6b092f0c63f639db",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/entrypoint.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/fake-pi.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 4,
+      "digest": "c68fe3b52ad030f161b53150abfcad3f1e3ed4d4e2f66a0247355cb4cddb1591",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/fake-pi.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/fixtures/additive-package/registration.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "dc64d6b8b44c88288a4fc3cb7ba51fff5f2391d0c7e444fea938a921e94864fc",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/fixtures/additive-package/registration.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/fixtures/external-extension/index.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "491830c15fd29e2bfcf0c6a4594069902b81cf88210adf17054910b2071294b5",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/fixtures/external-extension/index.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/fixtures/replacement-package/registration.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "1a4ab1c21f1da3d3adc417dfd5faf989ac8da25a200c6a1ecf3ce80b991f8ad7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/fixtures/replacement-package/registration.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/instructions.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 5,
+      "digest": "e65d3e319dc5c20ce0ca2f8ea61f8abdb4133c71abf42e1cbbf1d6d8f9331a62",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/instructions.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/lifecycle.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 12,
+      "digest": "6c36eb918568b7be39daec5df107e4a8ede717855dc29e2ac2915c93c9ea3fa0",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/lifecycle.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/load-effects.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 10,
+      "digest": "b0b24c5e1c914cb7ca5828355aa8b69779a0db32263c47b06e0f32b59d09f8a2",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/load-effects.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/manifest.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 4,
+      "digest": "0e7cb05c9ddd6b1336dc567560c4299e23077a7eeb0bee83d88b652e5a265912",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/manifest.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/observability-skill.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 5,
+      "digest": "b34385e5b2be2aa9f4cc769a03c3e99264f6b959621879c166ad13b3e0009a41",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/observability-skill.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/pi-workload-identity.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 3,
+      "digest": "0152cfe390398fb533bfe6ddaf07daeb895bec54b309ef959d0aef780534e670",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/pi-workload-identity.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/preflight.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 6,
+      "digest": "bd230118cf281b269fe10b3989b421bc1055ce2266167fc1c51d14bf876f30c5",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/preflight.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/public-api.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 4,
+      "digest": "8854319e88da590424958004fd7e8c25135a1ac787a4312c83d1f8090a2e8fc0",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/public-api.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/resources.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 5,
+      "digest": "f288dcb8f9abc862976c36a896d646dea4b7554a25274cb8ecf27784febb2d47",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/resources.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/runtime-behaviors.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "c38df1cd56ace10b0020cc2d5081838cd064bd85093648594a38f3441679edc2",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/runtime-behaviors.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "packages/agentos/tests/startup.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 5,
+      "digest": "e40cd704e9701bf9c593d9b81406562236723ba8e8346b683d53b65fa72bc016",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/startup.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "release/kubernetes/render.ts",
+      "slice": "database-and-clis",
+      "issue": 97,
+      "violationCount": 14,
+      "digest": "f468b100011ecf68aa7eeb217e1e47fe1641190124afade6b88742138aef3b8e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in release/kubernetes/render.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "release/kubernetes/tests/release.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 7,
+      "digest": "05abbeffda10c8e7c45044c57ca7fe31ff9c0e7a9c3ec80803653a7b942a723f",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in release/kubernetes/tests/release.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/agentgateway/tests/conformance.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 18,
+      "digest": "41f30abaa301899a7f92b9edd1bbe5e1e65fcfa93afe12e52a1fd1a5b9a8c054",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/agentgateway/tests/conformance.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/kubernetes/tests/manifests.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 5,
+      "digest": "d3d1767539dae174657d2f9da188faee4bb1ef3b56cfa2b3895ed9ccbb7e8ce7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/kubernetes/tests/manifests.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/accounts.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 30,
+      "digest": "c20d9eeb47e43ed8a3f1eb768ee7279f36bedc7d80f5a572ec657e04d2221a0f",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/accounts.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/attribution.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 1,
+      "digest": "26d0ac1a93b9f285dca448ac7c0cdff5c414a1f6397ba9c6e149868b3d9940dc",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/attribution.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/codex-oauth.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 5,
+      "digest": "ed4b288765df6af9554516c13c7a4d7b77c5ad60cb0cf06489c9721f8a01aa2b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/codex-oauth.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/main.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 7,
+      "digest": "42e9a2852b2d59695e2fc126d697abb57998fe61b4c9578476c9394519c1c740",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/main.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/proxy.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 15,
+      "digest": "a0ffe5f03c053cef0be65ccb6a8cefc7d96761d31fc7d0e00eb347b8111e9677",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/proxy.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/routing-state.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 19,
+      "digest": "7ed60e97dbe725bfa9e0d1f62096199d7f40242d51ddd1bfa12c8ec72ddd409b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/routing-state.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/selection.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 1,
+      "digest": "300ecc48477738e04c43469e173f3129cfcfb7575d8a39415be65b7615667816",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/selection.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/service.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 16,
+      "digest": "bb60889860dd1f4300f5b3fd1623625a38f91c23ec85d12afa637cc03ff4a6c0",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/service.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/storage.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 18,
+      "digest": "64f208cd2bd62578746cf5d73de5ee0c66d918dfbfd5a58fca8ae12ee730e5cc",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/storage.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/telemetry.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 2,
+      "digest": "ed1713f434ee1d2a3949d415818f5f5fb2a64fd341ed4fdcdf7fb60d5a252296",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/telemetry.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/src/usage.ts",
+      "slice": "provider-services",
+      "issue": 105,
+      "violationCount": 8,
+      "digest": "3942ac7505ad1a55eeeefd07c764e84955a835a4bb162a086f1a7caef5bb3a3c",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/src/usage.ts under issue #105; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/accounts.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 7,
+      "digest": "51a0bbc7cd7cf27c581dffab061f98d15881ca343cd3fffec4ea9ad988617613",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/accounts.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/codex-oauth.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 7,
+      "digest": "b6d7b1a4069c46b2d51b82c9ca6392f6244bbda67059948142eec7f430d23e98",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/codex-oauth.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/main.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 34,
+      "digest": "b111d77ecc938b0a0f9b1770bae164ef0bf736774756eae4f93fd979d8a0bc4e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/main.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/proxy.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 98,
+      "digest": "d982c4034235559f6660e5bcbdf22bd7a79938a24edf6e09f8fe4eb1052b5cba",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/proxy.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/router-package.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "f83ea44ca404cba64f5d306baecd174d880c29a9950add4bf3e64b379efda279",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/router-package.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/routing-state.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 6,
+      "digest": "f4b1e476f09df780c33055d55ca54ffd9f7b8318953fd8b87c8f62c35974ec7d",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/routing-state.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/service.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 59,
+      "digest": "26be73c951eab3998a85ef1ab6e6160189b7f0fe3ce493d3e2af9ffc1a034214",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/service.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/storage.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 9,
+      "digest": "5391a412692c24f4c0974c4a016c3063f36a96bfc57c3c791524d2a13e29df12",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/storage.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/telemetry.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 5,
+      "digest": "150bc05d236e6c939ff931ee522fad1d6f1c6650e5dbc4b0892799b3d33c42bc",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/telemetry.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/usage.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 2,
+      "digest": "a828e941037fcaae44a4bc535a28546520e838aca21b7cebd01c33bde8843ca1",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/usage.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/ai-gateway/tests/workload-identity.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 12,
+      "digest": "8fc037e7b5d7236d0bc473a625d20081d7c9bb4f134b86402436f760aac305ff",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/ai-gateway/tests/workload-identity.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/openfga/scripts/generate-model.ts",
+      "slice": "openfga-generated-tooling",
+      "issue": 97,
+      "violationCount": 2,
+      "digest": "9b4bbafa971dcabe78316840f59dc8784d7e35ecd9ec5cd06f80502b79922ec7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/scripts/generate-model.ts under issue #97; never refresh touched debt."
+    },
+    {
+      "path": "services/openfga/tests/live-model-conformance.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 8,
+      "digest": "7a738138ece1a8369fcbb0c8686e28a500c1c5d42a8cc51d05bca0387d3ac44f",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/tests/live-model-conformance.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/openfga/tests/manifests.effect.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 9,
+      "digest": "d4a5b23eb7b4effbe7ce99ebbf71204d08bb9eca5d37fa7e3589cd0a446c4261",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/tests/manifests.effect.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/openfga/tests/postgres-upgrade-conformance.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 11,
+      "digest": "c3183726c07a6bd571a182a5580ccf77d25478af9ab421d9b94af2284987d3d9",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/tests/postgres-upgrade-conformance.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/openfga/tests/release.effect.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 2,
+      "digest": "2321f59cbc425ada0db2bd574e4901416b291f4379f1131719e3f8eb6adc4bdc",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/tests/release.effect.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/otel-collector/kubernetes/tests/config.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 12,
+      "digest": "8de4dd601d0635e66daf2cd7773ec2d1a83a27f175919caf0099e7a77921c6c1",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/kubernetes/tests/config.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/otel-collector/kubernetes/tests/manifests.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 10,
+      "digest": "149806f5d1212ac8778ba382fcd59077db0b4c3e70a2c514ad59c897afccd525",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/kubernetes/tests/manifests.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/otel-collector/tests/e2e.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 19,
+      "digest": "791cefd6022930513fa221b2759e66c25cb92af35c75534d5b91b7412ba3b1b8",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/tests/e2e.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "services/otel-collector/tests/otlp-sink.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "5e98a1a9b8e44468e1d7eaf220ec9a6dcfd3a7ebdca145dd1fc07f1e0545ba2b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/tests/otlp-sink.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/app/(home)/learn/[...slug]/page.tsx",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 3,
+      "digest": "13f8990d42b1b55f78667bd0ddc194da5807482c924952bcdec374e74eb72194",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/(home)/learn/[...slug]/page.tsx under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/app/(home)/page.client.tsx",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 1,
+      "digest": "09cb5d6cb8e5af72d93dc4785ff2941faea10708e3ef148fbedcc1500701538a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/(home)/page.client.tsx under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/app/api/search/route.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 2,
+      "digest": "da4f56da57a567e5470b0d4ffb142e3e3e92565a8fb2423cb8fab35560404f83",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/api/search/route.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/app/docs/[[...slug]]/page.tsx",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 5,
+      "digest": "b74003f4dbfeac1fa7b7f33da42b15c226774358dbe93dcf0982c845943d27f9",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/docs/[[...slug]]/page.tsx under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/app/llms-full.txt/route.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 1,
+      "digest": "81643d329444d5c2385bef90acdbaec9fb8d31269ed151720d003e8f765781d3",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/llms-full.txt/route.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/app/llms.mdx/[[...slug]]/route.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 1,
+      "digest": "991f0425da72e4b80df6f8c03ce3cd4aa95d5a841c5f258096f5dc534884f3be",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/llms.mdx/[[...slug]]/route.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/app/sitemap.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 3,
+      "digest": "bd578ce6176b6f03ca0f83175331710932744d27a3c42efcd97ad5198ddd0eb5",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/sitemap.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/components/landing-page.test.tsx",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "ff4e004388adb5c0a7945b4b9b4ac1040863c52b2d6c9ad31c143868fa72186e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/components/landing-page.test.tsx under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/components/layouts/default/index.tsx",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 2,
+      "digest": "70fac546d1ca16b24b06194e05f22e84b304bf782b2ecfc82ac7d499757fac0b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/components/layouts/default/index.tsx under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/components/learn/course-introduction.tsx",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 2,
+      "digest": "60f7c632fd6396e23a2eba159a43a7f9d96926aecaf8902b4753d677d98e7fa8",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/components/learn/course-introduction.tsx under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/components/learn/lesson-progress.test.tsx",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 6,
+      "digest": "6f4113f2b52b7e71e851347f2618e7af95cabe1d0a82954296d191d913798e17",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/components/learn/lesson-progress.test.tsx under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/components/mdx/mermaid.tsx",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 1,
+      "digest": "4e13a882c2f5949e6c403a0e64663f42ea771a6ff07948918b647ede11281f65",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/components/mdx/mermaid.tsx under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/instrumentation-client.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 10,
+      "digest": "38d549f913787fe19dfabb1c531c01400e90f39858df9a563ae704bb1f3012cd",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/instrumentation-client.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/content/canonical-source.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 2,
+      "digest": "74bb8059ff421c52634e316329cbf5237040706648e99560f32d0eeb9595765b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/canonical-source.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/content/canonical-source.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 3,
+      "digest": "9a58dd02f4f0f6bbb70b1af472b382b989296d23ac589984378e88520e415a9e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/canonical-source.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/content/command-reference.bundled.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 2,
+      "digest": "36fa264dc4483998613facd8e4ef58c7db3b5cb2c8c6e8cff4867bb2b9ca082b",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/command-reference.bundled.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/content/command-reference.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "1c0d9be0ed8626ed76d9abc796218d5191e78d38520a3df8f564131d7060508a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/command-reference.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/content/command-reference.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 8,
+      "digest": "837bf5ebb6d13a41b0229c8184a31ea083d9a21de71e60b0bfee14b2a073f510",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/command-reference.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/get-llm-text.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 1,
+      "digest": "427ff9de9390b011aec884b209d370abde9ed006a8c9717ef1bb7e191d5d37d9",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/get-llm-text.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/learn/curriculum.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "c85f9656ba26b66b62e104d94a6018ef043ea8aed1e59ff74dc568d35459d916",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/learn/curriculum.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/learn/curriculum.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 10,
+      "digest": "76a3bfa37c8a4d826fe10075e7fe6e6fb4e94c8e19267fc290724dbb76351045",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/learn/curriculum.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/learn/progress.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 2,
+      "digest": "a8cbd971d019504508d472091af479841d233e90eca306180c8bdbc0eb4f2926",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/learn/progress.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/learn/source.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 2,
+      "digest": "f6fb58dad497068f5b5969689e1ff3f0b8ef9955d648a2a90bc86f817497bb3d",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/learn/source.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/llms-index.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 1,
+      "digest": "679c83d5ed22bf25b274595e7b7d8b509a6618d7d57fb9aefca1311b13a35bba",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/llms-index.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/llms-index.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 1,
+      "digest": "2fd3aa557140f1cdce58f1690adaedee2135be01b992738db19bb77129830de7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/llms-index.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/metadata.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 5,
+      "digest": "ee1ee68fa256aa4ca2f2e605240818473b37cc2a5a8124ed625583f334c9abf9",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/metadata.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/lib/structured-data.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 1,
+      "digest": "74199de1bc2313bc312c447107e1344dfb869102485dfe064b3007d5d2e52b04",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/structured-data.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/next.config.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 7,
+      "digest": "f98f118ad666dd6c48306ed5b33d8f00eaecdc94a4b4c75e981a4d1d3e16ac02",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/next.config.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/brand-assets.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 6,
+      "digest": "74b2f1c5c6949ff87e0d8018c424d2ac1a92979e18bc914519b9318677ba433a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/brand-assets.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/docs-contract.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 3,
+      "digest": "e2d4f0f4a95aaac194e5697df109c706676fc32a3f0e75b51f3afb710b11184f",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/docs-contract.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/finalize-worker-build.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 3,
+      "digest": "43b4284dab1ecd2f900b6b9b8bc336796b5c5de27bb15c7db3e0829db0f8d4bb",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/finalize-worker-build.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/generate-brand-assets.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 4,
+      "digest": "6e4e33c7ad250247515a554f178f0dfb09390893085ce349fcef3e38d2947af7",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/generate-brand-assets.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/learn-contract.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 2,
+      "digest": "e6712b8692056f9f9d250002290cd6613a60b2289ada2ce843159d2978427272",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/learn-contract.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/lint.entry.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 2,
+      "digest": "652e5c0140692ac581254022b27fef4b8c4b3396100dd25b572a6e7c8fdb827c",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/lint.entry.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/lint.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 5,
+      "digest": "1f869953e378c394ee7c1f0e2ff155bba2905a76e9b1a498dcd8084be86288be",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/lint.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/publish-worker.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 6,
+      "digest": "8dcb1e7f8f59fda406f4b09c9a75e6411b0e450d804216f6fdabb6c223aaa579",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/publish-worker.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/publish-worker.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 12,
+      "digest": "a8c23cf854b911f323ab0c4bc4f83e9802866d6ab7fb94578c7829083059caca",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/publish-worker.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/site-contract.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 30,
+      "digest": "6ddcf602955b2d389d7f138b0af1550e219a55b8f6e550963222b97341ee5fae",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/site-contract.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/site-contract.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 6,
+      "digest": "5c65148c0c82a129918fac649acc351cc6116336cb5984fb038c5c315cb5924e",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/site-contract.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/verify-worker-preview.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 6,
+      "digest": "31c9ab91fb62cc8208152566cfbc73df6d83ec3ac4cd93129528181388734fe9",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/verify-worker-preview.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/verify-worker-preview.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 24,
+      "digest": "32a596eaad5660feceff19cae712f891b8b9544f0e2ae7e8092913f3ab4d8a1a",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/verify-worker-preview.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/worker-provenance.test.ts",
+      "slice": "effect-test-conformance",
+      "issue": 102,
+      "violationCount": 2,
+      "digest": "9211f3765587fad7f6656c6fb69933cd31d5d893e814c6dd1ba397efeffc386c",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/worker-provenance.test.ts under issue #102; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/worker-provenance.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 17,
+      "digest": "0fc3c8b12d3db94f1ad4aebdfa35abafebce84abd0098e3f9d4a5c0e9b422260",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/worker-provenance.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/scripts/worker-size.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 5,
+      "digest": "4237161a7175df2711b37bfa3c9a8b4d9440cf1834611575222d98df91aa1bbe",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/worker-size.ts under issue #99; never refresh touched debt."
+    },
+    {
+      "path": "website/apps/docs/source.config.ts",
+      "slice": "website",
+      "issue": 99,
+      "violationCount": 2,
+      "digest": "7a76bd1440eb95be3deb5041a3e502032ad88837b11e0eec6719694e361b1481",
+      "expiresOn": "2026-10-31",
+      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/source.config.ts under issue #99; never refresh touched debt."
+    }
+  ]
+}
