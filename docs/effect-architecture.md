@@ -113,6 +113,13 @@ review summary. Filesystem path canonicalization, file writes and native
 Kubernetes commands stay in the runtime operation layer; the compiler cannot
 apply or observe cluster state.
 
+Workload-profile resolution is a separate pure Effect boundary. It decodes an
+exact immutable profile ID, already-resolved dispatch requirements and optional
+domain defaults, then proves only mechanical eligibility and #77 bounds.
+Profile selection remains Assignment dispatch judgment. Released profiles own
+exact Kustomize base references and definition digests; future profiles remain
+visible for compatibility checks but fail closed at the compiler boundary.
+
 ## Inventory and progressive enforcement
 
 [`inventory.json`](../tooling/effect-migration/inventory.json) assigns every

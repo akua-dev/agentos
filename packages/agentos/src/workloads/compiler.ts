@@ -4,6 +4,12 @@ import { Effect, Schema } from "effect";
 import { stringify } from "yaml";
 
 import {
+  AgentWorkloadProfileIdSchema,
+  agentWorkloadProfileId,
+  getAgentWorkloadProfile,
+  type AgentWorkloadProfileDefinitionV1,
+} from "./profiles.ts";
+import {
   AgentWorkloadSpecError,
   AgentWorkloadSpecV1Schema,
   decodeAgentWorkloadSpec,
@@ -27,6 +33,8 @@ export const AgentWorkloadPlanSummaryV1Schema = Schema.Struct({
   specDigest: Sha256,
   overlayDigest: Sha256,
   profile: AgentWorkloadSpecV1Schema.fields.profile,
+  profileId: AgentWorkloadProfileIdSchema,
+  profileDefinitionDigest: Sha256,
   agentId: Schema.String,
   ownerAgentId: Schema.String,
   taskId: Schema.NullOr(Schema.String),
@@ -81,6 +89,11 @@ export type AgentWorkloadPlanSummaryV1 =
 
 type ContainerResources = AgentWorkloadSpecV1["resources"]["agent"];
 type Toleration = AgentWorkloadSpecV1["scheduling"]["tolerations"][number];
+interface ReleasedWorkloadProfile {
+  readonly definition: AgentWorkloadProfileDefinitionV1;
+  readonly kustomizeBase: string;
+  readonly mainContainerName: string;
+}
 
 const maximumCpuMillis = 4_000;
 const minimumCpuMillis = 25;
@@ -100,6 +113,7 @@ export const compileAgentWorkloadSpec = Effect.fn(
   "agentos.workloadSpec.compile",
 )(function*(input: unknown) {
   const decoded = yield* decodeAgentWorkloadSpec(input);
+  const profile = yield* releasedWorkloadProfile(decoded);
   const normalized = yield* validateAndNormalize(decoded);
   const canonicalSpec = yield* Schema.encodeEffect(
     Schema.fromJsonString(AgentWorkloadSpecV1Schema),
@@ -122,14 +136,14 @@ export const compileAgentWorkloadSpec = Effect.fn(
     );
   }
 
-  const patchDefinitions = workloadPatches(normalized);
+  const patchDefinitions = workloadPatches(normalized, profile);
   const patchFiles = yield* Effect.forEach(
     patchDefinitions,
     ({ path, value }) => yamlFile(path, value),
   );
   const kustomization = yield* yamlFile(
     "kustomization.yaml",
-    workloadKustomization(normalized, patchDefinitions),
+    workloadKustomization(normalized, patchDefinitions, profile),
   );
   const files = [...patchFiles, kustomization].sort((left, right) =>
     left.path.localeCompare(right.path),
@@ -142,6 +156,7 @@ export const compileAgentWorkloadSpec = Effect.fn(
     imageDigest,
     specDigest,
     overlayDigest,
+    profile,
   );
 
   return {
@@ -152,6 +167,30 @@ export const compileAgentWorkloadSpec = Effect.fn(
     files,
     summary,
   } satisfies AgentWorkloadPlanV1;
+});
+
+const releasedWorkloadProfile = Effect.fn(
+  "agentos.workloadSpec.releasedProfile",
+)(function*(spec: AgentWorkloadSpecV1) {
+  const definition = getAgentWorkloadProfile(
+    agentWorkloadProfileId(spec.profile),
+  );
+  if (
+    definition.compilerAvailability !== "released" ||
+    definition.kustomizeBase === null ||
+    definition.mainContainerName === null
+  ) {
+    return yield* workloadSpecError(
+      "unsupported_profile",
+      "$.profile.name",
+      "Agent workload profile has no released compiler base",
+    );
+  }
+  return {
+    definition,
+    kustomizeBase: definition.kustomizeBase,
+    mainContainerName: definition.mainContainerName,
+  } satisfies ReleasedWorkloadProfile;
 });
 
 const validateAndNormalize = Effect.fn(
@@ -507,8 +546,9 @@ interface PatchDefinition {
 
 function workloadPatches(
   spec: AgentWorkloadSpecV1,
+  profile: ReleasedWorkloadProfile,
 ): ReadonlyArray<PatchDefinition> {
-  const persistent = spec.profile.name === "persistent-mate";
+  const persistent = profile.definition.name === "persistent-mate";
   const baseWorkload = persistent ? "agentos-secondmate" : "agentos-crewmate";
   const workloadTarget = {
     group: "apps",
@@ -529,7 +569,7 @@ function workloadPatches(
   const common: ReadonlyArray<PatchDefinition> = [
     {
       path: "workload.patch.yaml",
-      value: workloadPatch(spec, baseWorkload),
+      value: workloadPatch(spec, baseWorkload, profile),
       target: workloadTarget,
     },
     {
@@ -549,7 +589,7 @@ function workloadPatches(
     },
     {
       path: "serviceaccount.patch.yaml",
-      value: serviceAccountPatch(spec, baseWorkload),
+      value: serviceAccountPatch(spec, baseWorkload, profile),
       target: serviceAccountTarget,
     },
     {
@@ -613,10 +653,9 @@ function workloadPatches(
 function workloadKustomization(
   spec: AgentWorkloadSpecV1,
   patches: ReadonlyArray<PatchDefinition>,
+  profile: ReleasedWorkloadProfile,
 ) {
-  const base = spec.profile.name === "persistent-mate"
-    ? `${spec.distributionRoot}/resources/roles/secondmate/kubernetes/domain`
-    : `${spec.distributionRoot}/resources/crewmates/default/kubernetes/base`;
+  const base = `${spec.distributionRoot}/${profile.kustomizeBase}`;
   return {
     apiVersion: "kustomize.config.k8s.io/v1beta1",
     kind: "Kustomization",
@@ -626,10 +665,13 @@ function workloadKustomization(
   };
 }
 
-function workloadPatch(spec: AgentWorkloadSpecV1, baseName: string) {
-  const persistent = spec.profile.name === "persistent-mate";
+function workloadPatch(
+  spec: AgentWorkloadSpecV1,
+  baseName: string,
+  profile: ReleasedWorkloadProfile,
+) {
   const labels = workloadLabels(spec);
-  const annotations = workloadAnnotations(spec);
+  const annotations = workloadAnnotations(spec, profile.definition);
   const environment = workloadEnvironment(spec);
   return {
     apiVersion: "apps/v1",
@@ -648,7 +690,8 @@ function workloadPatch(spec: AgentWorkloadSpecV1, baseName: string) {
       template: {
         metadata: { annotations, labels },
         spec: {
-          automountServiceAccountToken: persistent,
+          automountServiceAccountToken:
+            profile.definition.mechanics.projectedSupervisionIdentity,
           serviceAccountName: spec.names.serviceAccount,
           nodeSelector: spec.scheduling.nodeSelector,
           tolerations: spec.scheduling.tolerations,
@@ -668,7 +711,7 @@ function workloadPatch(spec: AgentWorkloadSpecV1, baseName: string) {
           ],
           containers: [
             containerPatch(
-              persistent ? "agentos" : "crewmate",
+              profile.mainContainerName,
               spec,
               spec.resources.agent,
               environment,
@@ -776,12 +819,15 @@ function workloadLabels(
 
 function workloadAnnotations(
   spec: AgentWorkloadSpecV1,
+  profile: AgentWorkloadProfileDefinitionV1,
 ): Readonly<Record<string, string>> {
   const annotations: Record<string, string> = {
     "agentos.akua.dev/herdr-session": spec.names.herdrSession,
     "agentos.akua.dev/readiness-contract": spec.readiness.contract,
     "agentos.akua.dev/workload-profile":
       `${spec.profile.name}.v${spec.profile.version}`,
+    "agentos.akua.dev/workload-profile-definition":
+      profile.definitionDigest,
   };
   if (spec.providerAccessProfiles.length > 0) {
     annotations["agentos.akua.dev/provider-access-profiles"] =
@@ -816,11 +862,16 @@ function servicePatch(spec: AgentWorkloadSpecV1, baseName: string) {
   };
 }
 
-function serviceAccountPatch(spec: AgentWorkloadSpecV1, baseName: string) {
+function serviceAccountPatch(
+  spec: AgentWorkloadSpecV1,
+  baseName: string,
+  profile: ReleasedWorkloadProfile,
+) {
   return {
     apiVersion: "v1",
     kind: "ServiceAccount",
-    automountServiceAccountToken: spec.profile.name === "persistent-mate",
+    automountServiceAccountToken:
+      profile.definition.mechanics.projectedSupervisionIdentity,
     metadata: {
       name: baseName,
       labels: {
@@ -875,6 +926,7 @@ function workloadSummary(
   imageDigest: string,
   specDigest: string,
   overlayDigest: string,
+  profile: ReleasedWorkloadProfile,
 ): AgentWorkloadPlanSummaryV1 {
   return {
     version: 1,
@@ -882,6 +934,8 @@ function workloadSummary(
     specDigest,
     overlayDigest,
     profile: spec.profile,
+    profileId: profile.definition.id,
+    profileDefinitionDigest: profile.definition.definitionDigest,
     agentId: spec.identity.agentId,
     ownerAgentId: spec.identity.ownerAgentId,
     taskId: spec.identity.taskId,
@@ -903,25 +957,7 @@ function workloadSummary(
     providerAccessProfiles: spec.providerAccessProfiles,
     readinessContract: spec.readiness.contract,
     protocols: spec.protocols,
-    resourceKinds: spec.profile.name === "persistent-mate"
-      ? [
-          "LimitRange",
-          "Namespace",
-          "NetworkPolicy",
-          "PersistentVolumeClaim",
-          "ResourceQuota",
-          "Role",
-          "RoleBinding",
-          "Service",
-          "ServiceAccount",
-          "StatefulSet",
-        ]
-      : [
-          "PersistentVolumeClaim",
-          "Service",
-          "ServiceAccount",
-          "StatefulSet",
-        ],
+    resourceKinds: profile.definition.resourceKinds,
   };
 }
 

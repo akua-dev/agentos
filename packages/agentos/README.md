@@ -29,6 +29,17 @@ credential-free review summary. It performs no filesystem, Kubernetes or
 database operation; the runtime operation boundary owns canonical path
 resolution, exact file writes and native `kubectl` dry-run/diff/apply/verify.
 
+`agentWorkloadProfilesV1` and `resolveAgentWorkloadProfile` publish the finite
+versioned mechanics used before compilation. The resolver accepts an exact
+profile ID, explicit resolved dispatch requirements and optional domain
+defaults. It proves lifecycle compatibility and that defaults only tighten the
+profile baseline inside the global admission bounds; it never selects a
+profile. Persistent and interactive v1 profiles resolve their released native
+bases. `stateless-job@v1` exposes fail-closed eligibility now but remains marked
+`future` and cannot compile until AgentOS owns and tests a native Job base.
+Every resolution records `assignment-dispatch` as the selection authority and
+includes the immutable profile-definition digest for review provenance.
+
 Operational instructions, role-specific Skills, Mise files, Kubernetes
 overlays and Crewmate assets are normal package resources. Loading the package
 into Pi activates only Pi behavior and resources; it does not apply native

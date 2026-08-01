@@ -137,7 +137,10 @@ async function render(profile: "persistent-mate" | "interactive-crewmate") {
     new Response(child.stdout).text(),
   ]);
   expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
-  return parseAllDocuments(stdout).map((document) => document.toJSON());
+  return {
+    plan,
+    resources: parseAllDocuments(stdout).map((document) => document.toJSON()),
+  };
 }
 
 function resourceIdentity(resource: unknown): string {
@@ -159,7 +162,7 @@ function resourceIdentity(resource: unknown): string {
 
 describe("AgentWorkloadSpec native Kustomize output", () => {
   test("renders one isolated interactive Crewmate from ordinary native resources", async () => {
-    const resources = await render("interactive-crewmate");
+    const { plan, resources } = await render("interactive-crewmate");
     expect(resources.map(resourceIdentity).sort()).toEqual([
       "Service/agentos-crewmate-api",
       "ServiceAccount/agentos-crewmate-api",
@@ -173,6 +176,12 @@ describe("AgentWorkloadSpec native Kustomize output", () => {
       spec: {
         replicas: 1,
         template: {
+          metadata: {
+            annotations: {
+              "agentos.akua.dev/workload-profile-definition":
+                plan.summary.profileDefinitionDigest,
+            },
+          },
           spec: {
             automountServiceAccountToken: false,
             containers: [{
@@ -196,7 +205,7 @@ describe("AgentWorkloadSpec native Kustomize output", () => {
   });
 
   test("renders the persistent Mate and exact released domain controls", async () => {
-    const resources = await render("persistent-mate");
+    const { plan, resources } = await render("persistent-mate");
     expect(resources.map(resourceIdentity).sort()).toEqual([
       "LimitRange/agentos-domain-workload-limits",
       "Namespace/agentos-domain-platform",
@@ -218,6 +227,12 @@ describe("AgentWorkloadSpec native Kustomize output", () => {
       spec: {
         replicas: 1,
         template: {
+          metadata: {
+            annotations: {
+              "agentos.akua.dev/workload-profile-definition":
+                plan.summary.profileDefinitionDigest,
+            },
+          },
           spec: {
             automountServiceAccountToken: true,
             containers: [{

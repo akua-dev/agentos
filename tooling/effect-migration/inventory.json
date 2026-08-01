@@ -85,6 +85,16 @@
       "status": "migrated"
     },
     {
+      "id": "agent-workload-profile-effect-tests",
+      "issue": 124,
+      "pattern": "^packages/agentos/src/workloads/tests/profiles\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "schema", "kubernetes-manifest"],
+      "migrationDependencies": [100, 101, 123],
+      "status": "migrated"
+    },
+    {
       "id": "agent-workload-compiler-effect-tests",
       "issue": 123,
       "pattern": "^packages/agentos/src/workloads/tests/.*\\.effect\\.test\\.ts$",
@@ -103,6 +113,16 @@
       "io": ["test", "filesystem", "process", "http", "database", "kubernetes"],
       "migrationDependencies": [100, 101, 97, 98, 99, 104, 105],
       "status": "planned"
+    },
+    {
+      "id": "agent-workload-profiles",
+      "issue": 124,
+      "pattern": "^packages/agentos/src/workloads/profiles\\.ts$",
+      "runtime": "shared-bun-kubernetes-manifest",
+      "package": "@akua-dev/agentos",
+      "io": ["schema", "kubernetes-manifest"],
+      "migrationDependencies": [100, 101, 123],
+      "status": "migrated"
     },
     {
       "id": "agent-workload-compiler",
