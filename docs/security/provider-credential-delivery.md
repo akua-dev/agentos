@@ -30,10 +30,12 @@ PDP failures use one content-free tagged contract. Invalid route, rejected
 identity, unavailable PostgreSQL, stale policy, profile denial, ceiling denial,
 effective-policy denial, disabled/exceeded rate class, rate limiting, budget
 exhaustion, unavailable OpenFGA, and reference-generation failure remain
-distinct. Rate-limit and budget consumers compose in the later enforcement
-slice; their outcomes are reserved here and are not claimed as active quota
-enforcement yet. Any failure stops composition before provider forwarding or a
-credential volume is reachable.
+distinct. Durable request/concurrency reservation and surgical effective-zero
+overrides are now active in the production authorizer; token/spend settlement
+is shipped as a narrow PostgreSQL and Effect service contract and still needs
+each provider forwarder to report its terminal usage before #107 closes. Any
+failure stops composition before provider forwarding or a credential volume is
+reachable. See [provider budget enforcement](./provider-budget-enforcement.md).
 
 The production HTTP boundary is
 [`services/egress-authz`](../../services/egress-authz/README.md). It is an

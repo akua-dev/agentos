@@ -307,4 +307,32 @@ describe("AgentGateway HTTP authorization contract", () => {
         })),
       })),
     ));
+
+  it.effect("returns stable AgentOS envelopes for rate and budget exhaustion", () =>
+    Effect.gen(function*() {
+      const outcomes: ReadonlyArray<"rate_limited" | "budget_exhausted"> = [
+        "rate_limited",
+        "budget_exhausted",
+      ];
+      for (const outcome of outcomes) {
+        const handler = yield* createProviderAuthorizationHttpHandler({
+          clock: Effect.succeed(now),
+          id: Effect.succeed("44444444444444444444444444444444"),
+        }).pipe(Effect.provide(services({
+          decide: () => Effect.fail(ProviderPolicyDecisionError.make({
+            outcome,
+            retryable: true,
+          })),
+        })));
+        const response = yield* handler(request());
+        assert.strictEqual(response.status, 429);
+        assert.strictEqual(
+          response.headers.get("x-agentos-denial-reason"),
+          outcome,
+        );
+        assert.deepStrictEqual(yield* Effect.promise(() => response.json()), {
+          error: outcome,
+        });
+      }
+    }));
 });

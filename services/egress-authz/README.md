@@ -15,7 +15,10 @@ For every `/authorize` request the service:
    PostgreSQL;
 4. performs the profile, ceiling and effective-subject checks against the
    pinned OpenFGA store/model with higher consistency;
-5. returns only a closed grant with a maximum 15-second lifetime.
+5. atomically reserves the subject/route's durable request and concurrency
+   capacity in PostgreSQL; and
+6. returns only a closed grant with a maximum 15-second lifetime and a lease
+   bounded by that reservation.
 
 It never receives a provider credential and never forwards provider traffic.
 Tokens, authorization values, prompts, request bodies, policy documents and
@@ -29,6 +32,14 @@ fails closed while either dependency is unavailable. There is no independent
 policy-decision cache: each authorization observes current PostgreSQL and
 OpenFGA state. The workload-identity cache remains bounded by the shorter of
 the projected-token expiry and 15 seconds.
+
+Rate limits, exhausted token/spend budgets and binding-local effective-zero
+kill switches are enforced by one atomic reservation function that revalidates
+the current PostgreSQL policy. They survive Pod and process restarts and do not
+depend on telemetry. Stable `429` denial envelopes keep `rate_limited` and
+`budget_exhausted` distinct from policy, dependency and upstream-provider
+failures. See the
+[provider-budget design](../../docs/security/provider-budget-enforcement.md).
 
 ## Deployment
 
@@ -62,7 +73,8 @@ tagged failure.
 ## Verification
 
 ```sh
-bunx vitest run services/egress-authz/tests
+bunx vitest run services/egress-authz/tests \
+  database/tests/provider-budget-enforcement.effect.test.ts
 bun run effect:check
 bun run typecheck
 kubectl kustomize services/egress-authz/kubernetes

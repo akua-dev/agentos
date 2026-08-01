@@ -81,4 +81,6 @@ Ceiling, profile, binding, decision, and audit schemas have closed fields. They 
 - #90 implements these exact subjects, resources, and capabilities in the immutable `agentos-access-v1` OpenFGA model and its tuple compiler.
 - #89 implements profile mutation, optimistic concurrency, current-ceiling validation, audit persistence, cache invalidation, and repair-forward reconciliation.
 - #95 owns provider-scoped credential delivery; policy records never become a secret store.
-- #107 defines rate-class budgets and kill-switch behavior without widening the v1 capability language.
+- #107 implements durable rate-class budgets and surgical kill-switch behavior
+  without widening the v1 capability language; see
+  [provider budget enforcement](./provider-budget-enforcement.md).
