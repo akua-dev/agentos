@@ -244,3 +244,28 @@ The journal deliberately stores no Kubernetes YAML or status, Herdr output,
 logs, transcripts, credentials or heartbeats. Registered Agents retain the
 Fleet-wide read view; only First and Second Mates receive the hierarchy-checked
 Functions, and no runtime controller or database wrapper service is added.
+
+`0018_access_control_plane.sql` adds the durable half of the narrow First-Mate
+provider-access control API. Captain ceilings and reusable profile versions are
+immutable and contiguous; profile publication locks the current head and
+rejects a stale expected version, any unknown capability/resource/environment,
+an excessive rate class, or an expiry beyond the current ceiling. Exact
+operation-ID and request-digest retries return the one committed version.
+
+Mate and active Assignment bindings use a separate repair-forward journal.
+A create remains `pending` and a revoke remains `active` until the Effect core
+executor has applied the one or two closed OpenFGA tuple/check stages, checked
+every affected decision with higher consistency, and durably advanced each
+stage. Condition replacement deletes and verifies deny before rewriting, so it
+fails closed. Only the final short transaction activates or revokes the binding
+and appends audit. A ceiling revision with live bindings remains `pending` until
+one complete-subject reconciliation is verified; completion atomically
+supersedes the old ceiling and activates the new one.
+The journal records actor and ServiceAccount identity, target, old/new version,
+finite reason, decision and correlation ID; tuple/check plans have closed
+fields and cannot carry credentials or provider payloads. Profiles, phase
+events, completed operation identity and audit are immutable. Registered Agents
+can inspect the Fleet-wide rows, but only First Mate receives the mutation
+Functions. `tests/access-control-plane.test.ts` exercises bounds, concurrency,
+retry, grants, staged ceiling shrink, Assignment binding, Grants/RLS, privacy and
+immutability against the full migration chain.

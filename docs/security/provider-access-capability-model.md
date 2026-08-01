@@ -4,7 +4,7 @@ Status: released v1 contract for AgentOS issue #88.
 
 ## Authority and evaluation
 
-Captain/platform owns the finite capability registry and publishes immutable, contiguous ceiling revisions for one exact Fleet or Second-Mate domain. First Mate may publish immutable profile versions and bind one exact version to one Mate or Assignment only through the later control-plane implementation. First Mate cannot add a capability, reinterpret an action, change a resource kind, or widen the supplied Captain ceiling.
+Captain/platform owns the finite capability registry and publishes immutable, contiguous ceiling revisions for one exact Fleet or Second-Mate domain. First Mate publishes immutable profile versions and binds one exact version to one Mate or Assignment through the [released control plane](./first-mate-access-control.md). First Mate cannot add a capability, reinterpret an action, change a resource kind, or widen the supplied Captain ceiling.
 
 Every request-time decision uses the current Captain ceiling. The ceiling revision recorded on a binding is provenance, not continuing authority. If revision 2 removes or tightens a permission issued under revision 1, the old profile and binding immediately evaluate as denied. Expiry and rate-class limits also compose by taking the stricter current value.
 
@@ -77,6 +77,6 @@ Ceiling, profile, binding, decision, and audit schemas have closed fields. They 
 
 - #87 derives and validates workload identity.
 - #90 implements these exact subjects, resources, and capabilities in the immutable `agentos-access-v1` OpenFGA model and its tuple compiler.
-- #89 owns profile mutation, optimistic concurrency, current-ceiling validation, audit persistence, cache invalidation, and reconciliation.
+- #89 implements profile mutation, optimistic concurrency, current-ceiling validation, audit persistence, cache invalidation, and repair-forward reconciliation.
 - #95 owns provider-scoped credential delivery; policy records never become a secret store.
 - #107 defines rate-class budgets and kill-switch behavior without widening the v1 capability language.

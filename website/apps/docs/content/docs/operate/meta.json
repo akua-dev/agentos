@@ -13,6 +13,7 @@
     "authentication",
     "ai-gateway",
     "openfga",
+    "access-profiles",
     "upgrade",
     "diagnose-recover"
   ]
