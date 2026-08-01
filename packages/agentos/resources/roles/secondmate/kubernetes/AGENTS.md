@@ -20,6 +20,11 @@ and its reviewed managed-domain composition.
   Namespace, Secret, RBAC, quota, LimitRange, NetworkPolicy and cluster-scoped
   mutation. First Mate owns those controls and is bound into the domain for
   supervision and repair.
+- Keep the cluster-scoped CEL policies and bindings in `admission/`, separate
+  from each namespaced `domain/` render. First Mate or the platform installs
+  that bundle once; its binding selects only Namespaces carrying the reviewed
+  Crewmate-admission label. Each domain owns its LimitRange, CPU/memory/object/
+  retained-storage quota and that immutable selector label.
 - Treat every Secret in a domain namespace as visible to its Second Mate because
   workload-create authority can mount it. Keep Fleet-root credentials in the
   core namespace.

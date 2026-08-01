@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
 type Resource = {
+  automountServiceAccountToken?: boolean;
   kind: string;
   metadata: {
     annotations?: Record<string, string>;
@@ -81,12 +82,23 @@ describe("Crewmate Kubernetes base", () => {
       },
       labels: {
         "agentos.akua.dev/agent": "crewmate",
+        "agentos.akua.dev/agent-id":
+          "00000000-0000-4000-8000-000000000003",
+        "agentos.akua.dev/assignment-id":
+          "00000000-0000-4000-8000-000000000005",
         "agentos.akua.dev/otel-client": "true",
+        "agentos.akua.dev/owner-agent-id":
+          "00000000-0000-4000-8000-000000000002",
+        "agentos.akua.dev/task-id":
+          "00000000-0000-4000-8000-000000000004",
         "app.kubernetes.io/name": "agentos-crewmate",
         "app.kubernetes.io/part-of": "agentos",
       },
     });
+    const serviceAccount = resource(resources, "ServiceAccount");
+    expect(serviceAccount.automountServiceAccountToken).toBe(false);
     expect(pod.serviceAccountName).toBe("agentos-crewmate");
+    expect(pod.automountServiceAccountToken).toBe(false);
     expect(pod.securityContext).toEqual({
       fsGroup: 1000,
       fsGroupChangePolicy: "OnRootMismatch",
@@ -105,6 +117,24 @@ describe("Crewmate Kubernetes base", () => {
         ({ image }: { image: string }) => image,
       ),
     ).toEqual(["agentos:dev", "agentos:dev", "agentos:dev"]);
+    expect(
+      [...pod.initContainers, container].map(
+        ({ resources }: { resources: Record<string, unknown> }) => resources,
+      ),
+    ).toEqual([
+      {
+        limits: { cpu: "2", memory: "2Gi" },
+        requests: { cpu: "250m", memory: "512Mi" },
+      },
+      {
+        limits: { cpu: "2", memory: "2Gi" },
+        requests: { cpu: "250m", memory: "512Mi" },
+      },
+      {
+        limits: { cpu: "2", memory: "4Gi" },
+        requests: { cpu: "250m", memory: "512Mi" },
+      },
+    ]);
     expect(
       [install, prepare, container].map(
         ({ workingDir }: { workingDir: string }) => workingDir,

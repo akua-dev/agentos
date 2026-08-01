@@ -9,4 +9,5 @@ resources:
   - firstmate-role.yaml
   - firstmate-rolebinding.yaml
   - resourcequota.yaml
+  - limitrange.yaml
   - networkpolicy.yaml

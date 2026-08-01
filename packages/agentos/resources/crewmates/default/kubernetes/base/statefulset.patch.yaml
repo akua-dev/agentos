@@ -3,6 +3,11 @@ kind: StatefulSet
 metadata:
   name: agentos-crewmate
   labels:
+    agentos.akua.dev/agent: crewmate
+    agentos.akua.dev/agent-id: 00000000-0000-4000-8000-000000000003
+    agentos.akua.dev/assignment-id: 00000000-0000-4000-8000-000000000005
+    agentos.akua.dev/owner-agent-id: 00000000-0000-4000-8000-000000000002
+    agentos.akua.dev/task-id: 00000000-0000-4000-8000-000000000004
     app.kubernetes.io/name: agentos-crewmate
 spec:
   serviceName: agentos-crewmate
@@ -16,8 +21,13 @@ spec:
         agentos.akua.dev/herdr-session: agentos-crewmate
       labels:
         agentos.akua.dev/agent: crewmate
+        agentos.akua.dev/agent-id: 00000000-0000-4000-8000-000000000003
+        agentos.akua.dev/assignment-id: 00000000-0000-4000-8000-000000000005
+        agentos.akua.dev/owner-agent-id: 00000000-0000-4000-8000-000000000002
+        agentos.akua.dev/task-id: 00000000-0000-4000-8000-000000000004
         app.kubernetes.io/name: agentos-crewmate
     spec:
+      automountServiceAccountToken: false
       serviceAccountName: agentos-crewmate
       initContainers:
         - name: install-tools
@@ -80,6 +90,13 @@ spec:
               value: /home/agent/.pgpass
             - name: PATH
               value: /home/agent/.local/share/mise/shims:/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
         - name: prepare-home
           image: agentos:dev
           imagePullPolicy: Never
@@ -96,6 +113,13 @@ spec:
             capabilities:
               drop:
                 - ALL
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
           volumeMounts:
             - name: home
               mountPath: /home/agent
@@ -128,6 +152,13 @@ spec:
                 - --json
                 - --session
                 - agentos-crewmate
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
       volumes:
         - name: database-credentials
           secret:

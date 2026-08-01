@@ -153,7 +153,15 @@ Use released PostgreSQL schema for durable coordination and native tools against
    namespace carries its owner-Agent label and installed workload-manager Role;
    the child overlay may not contain Namespace, Secret, RBAC, NetworkPolicy,
    quota, LimitRange or cluster-scoped resources. First Mate owns those domain
-   controls. Then start the
+   controls. Run the `$agentos-runtime` capacity preflight before server-side
+   dry-run. Treat
+   `provably_blocked` as a dispatch blocker. Treat `inconclusive` as an explicit
+   owning-Mate judgment: obtain the missing cluster-scoped observation from
+   First Mate for retained/node-local or unusually large workloads, while an
+   ordinary portable workload may proceed only with the uncertainty recorded
+   and the same identity preserved through scheduler reconciliation. A
+   preflight is never a reservation and never justifies creating a second Agent
+   after an apply or scheduling race. Then start the
    selected harness through the pod-local Herdr CLI only after the complete
    rendered brief and required runtime inputs have reached the child home.
    Confirm the selected Crewmate setup's native Skill catalog and required

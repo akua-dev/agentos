@@ -3,6 +3,7 @@ kind: Namespace
 metadata:
   name: agentos-secondmate-domain
   labels:
+    agentos.akua.dev/crewmate-admission: v1
     agentos.akua.dev/fleet: default
     agentos.akua.dev/managed-by: agentos-firstmate
     agentos.akua.dev/owner-agent-id: 00000000-0000-4000-8000-000000000002

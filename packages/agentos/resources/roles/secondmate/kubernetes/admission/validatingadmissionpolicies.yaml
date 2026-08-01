@@ -1,0 +1,156 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: agentos-crewmate-statefulsets
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - apps
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        resources:
+          - statefulsets
+  variables:
+    - name: workload
+      expression: >-
+        request.operation == 'DELETE' ? oldObject : object
+    - name: persistentMate
+      expression: >-
+        variables.workload.metadata.name == 'agentos-secondmate'
+    - name: crewmate
+      expression: >-
+        has(variables.workload.metadata.labels) && 'agentos.akua.dev/agent' in variables.workload.metadata.labels && variables.workload.metadata.labels['agentos.akua.dev/agent'] == 'crewmate'
+    - name: podSpec
+      expression: >-
+        variables.workload.spec.template.spec
+    - name: containers
+      expression: >-
+        variables.podSpec.containers + (has(variables.podSpec.initContainers) ? variables.podSpec.initContainers : [])
+    - name: identityKeys
+      expression: >-
+        ['agentos.akua.dev/agent-id', 'agentos.akua.dev/owner-agent-id', 'agentos.akua.dev/task-id', 'agentos.akua.dev/assignment-id']
+  validations:
+    - expression: >-
+        !variables.persistentMate || request.userInfo.username != 'system:serviceaccount:' + request.namespace + ':agentos-secondmate'
+      message: A Second Mate cannot create, update, or delete its persistent Mate workload.
+      reason: Forbidden
+    - expression: >-
+        request.operation == 'DELETE' || variables.persistentMate || variables.crewmate
+      message: Every domain StatefulSet other than the persistent Second Mate must identify as a Crewmate.
+      reason: Invalid
+    - expression: >-
+        request.operation == 'DELETE' || variables.persistentMate || (has(object.metadata.labels) && has(object.spec.template.metadata.labels) && variables.identityKeys.all(key, key in object.metadata.labels && key in object.spec.template.metadata.labels && object.metadata.labels[key] == object.spec.template.metadata.labels[key] && object.metadata.labels[key].matches('^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')))
+      message: Crewmates require matching UUID Agent, owner, Task, and Assignment labels on the StatefulSet and Pod template.
+      reason: Invalid
+    - expression: >-
+        request.operation == 'DELETE' || variables.persistentMate || (object.spec.replicas == 1 && object.spec.serviceName == object.metadata.name && variables.podSpec.serviceAccountName == object.metadata.name && has(variables.podSpec.automountServiceAccountToken) && variables.podSpec.automountServiceAccountToken == false)
+      message: A Crewmate must be a one-replica workload with matching dedicated Service and ServiceAccount names and disabled token automount.
+      reason: Invalid
+    - expression: >-
+        request.operation == 'DELETE' || variables.persistentMate || (has(object.spec.persistentVolumeClaimRetentionPolicy) && object.spec.persistentVolumeClaimRetentionPolicy.whenDeleted == 'Retain' && object.spec.persistentVolumeClaimRetentionPolicy.whenScaled == 'Retain' && has(object.spec.volumeClaimTemplates) && size(object.spec.volumeClaimTemplates) == 1 && size(object.spec.volumeClaimTemplates[0].spec.accessModes) == 1 && object.spec.volumeClaimTemplates[0].spec.accessModes[0] in ['ReadWriteOnce', 'ReadWriteOncePod'])
+      message: A Crewmate requires exactly one retained, one-writer home claim.
+      reason: Invalid
+    - expression: >-
+        request.operation == 'DELETE' || variables.persistentMate || variables.containers.all(container, container.image.matches('^[^ ]+/[^ ]+@sha256:[0-9a-f]{64}$'))
+      message: Every Crewmate image must be a remote image pinned by sha256 digest.
+      reason: Invalid
+    - expression: >-
+        request.operation == 'DELETE' || variables.persistentMate || variables.containers.all(container, has(container.resources) && has(container.resources.requests) && has(container.resources.limits) && has(container.resources.requests.cpu) && has(container.resources.requests.memory) && has(container.resources.limits.cpu) && has(container.resources.limits.memory) && isQuantity(container.resources.requests.cpu) && isQuantity(container.resources.requests.memory) && isQuantity(container.resources.limits.cpu) && isQuantity(container.resources.limits.memory) && !quantity(container.resources.requests.cpu).isGreaterThan(quantity('4')) && !quantity(container.resources.limits.cpu).isGreaterThan(quantity('4')) && !quantity(container.resources.requests.memory).isGreaterThan(quantity('8Gi')) && !quantity(container.resources.limits.memory).isGreaterThan(quantity('8Gi')))
+      message: Every Crewmate container requires CPU and memory requests and limits within the domain ceiling.
+      reason: Invalid
+    - expression: >-
+        request.operation == 'DELETE' || variables.persistentMate || ((has(variables.podSpec.hostNetwork) ? variables.podSpec.hostNetwork == false : true) && (has(variables.podSpec.hostPID) ? variables.podSpec.hostPID == false : true) && (has(variables.podSpec.hostIPC) ? variables.podSpec.hostIPC == false : true) && (!has(variables.podSpec.volumes) || variables.podSpec.volumes.all(volume, !has(volume.hostPath) && (!has(volume.projected) || !has(volume.projected.sources) || volume.projected.sources.all(source, !has(source.serviceAccountToken))))))
+      message: Crewmates cannot use host namespaces, hostPath, or projected ServiceAccount tokens.
+      reason: Forbidden
+    - expression: >-
+        request.operation == 'DELETE' || variables.persistentMate || (has(variables.podSpec.securityContext) && variables.podSpec.securityContext.runAsNonRoot == true && has(variables.podSpec.securityContext.seccompProfile) && variables.podSpec.securityContext.seccompProfile.type in ['RuntimeDefault', 'Localhost'] && variables.containers.all(container, has(container.securityContext) && (!has(container.securityContext.privileged) || container.securityContext.privileged == false) && container.securityContext.allowPrivilegeEscalation == false && has(container.securityContext.capabilities) && 'ALL' in container.securityContext.capabilities.drop && (!has(container.ports) || container.ports.all(port, !has(port.hostPort) || port.hostPort == 0))))
+      message: Crewmates require restricted Pod and container security without host ports.
+      reason: Forbidden
+    - expression: >-
+        request.operation == 'DELETE' || variables.persistentMate || variables.containers.all(container, !has(container.env) || container.env.all(variable, !(variable.name in ['ANTHROPIC_API_KEY', 'GH_TOKEN', 'GITHUB_TOKEN', 'GOOGLE_API_KEY', 'OPENAI_API_KEY'])))
+      message: Direct provider-root credential environment variables are not permitted in ordinary Crewmate workloads.
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: agentos-crewmate-statefulsets
+spec:
+  policyName: agentos-crewmate-statefulsets
+  validationActions:
+    - Deny
+    - Audit
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        agentos.akua.dev/crewmate-admission: v1
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: agentos-crewmate-pods
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - pods
+  variables:
+    - name: crewmate
+      expression: >-
+        has(object.metadata.labels) && 'agentos.akua.dev/agent' in object.metadata.labels && object.metadata.labels['agentos.akua.dev/agent'] == 'crewmate'
+    - name: containers
+      expression: >-
+        object.spec.containers + (has(object.spec.initContainers) ? object.spec.initContainers : [])
+    - name: identityKeys
+      expression: >-
+        ['agentos.akua.dev/agent-id', 'agentos.akua.dev/owner-agent-id', 'agentos.akua.dev/task-id', 'agentos.akua.dev/assignment-id']
+  validations:
+    - expression: '!variables.crewmate || (variables.identityKeys.all(key, key in object.metadata.labels && object.metadata.labels[key].matches(''^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'')))'
+      message: Crewmate Pods require UUID Agent, owner, Task, and Assignment labels.
+      reason: Invalid
+    - expression: '!variables.crewmate || (has(object.spec.automountServiceAccountToken) && object.spec.automountServiceAccountToken == false && object.spec.serviceAccountName != ''default'')'
+      message: Crewmate Pods require a dedicated ServiceAccount with token automount disabled.
+      reason: Invalid
+    - expression: '!variables.crewmate || variables.containers.all(container, container.image.matches(''^[^ ]+/[^ ]+@sha256:[0-9a-f]{64}$''))'
+      message: Every Crewmate Pod image must be a remote image pinned by sha256 digest.
+      reason: Invalid
+    - expression: '!variables.crewmate || variables.containers.all(container, has(container.resources) && has(container.resources.requests) && has(container.resources.limits) && has(container.resources.requests.cpu) && has(container.resources.requests.memory) && has(container.resources.limits.cpu) && has(container.resources.limits.memory) && isQuantity(container.resources.requests.cpu) && isQuantity(container.resources.requests.memory) && isQuantity(container.resources.limits.cpu) && isQuantity(container.resources.limits.memory) && !quantity(container.resources.requests.cpu).isGreaterThan(quantity(''4'')) && !quantity(container.resources.limits.cpu).isGreaterThan(quantity(''4'')) && !quantity(container.resources.requests.memory).isGreaterThan(quantity(''8Gi'')) && !quantity(container.resources.limits.memory).isGreaterThan(quantity(''8Gi'')))'
+      message: Every Crewmate Pod container requires CPU and memory requests and limits within the domain ceiling.
+      reason: Invalid
+    - expression: '!variables.crewmate || ((has(object.spec.hostNetwork) ? object.spec.hostNetwork == false : true) && (has(object.spec.hostPID) ? object.spec.hostPID == false : true) && (has(object.spec.hostIPC) ? object.spec.hostIPC == false : true) && (!has(object.spec.volumes) || object.spec.volumes.all(volume, !has(volume.hostPath) && (!has(volume.projected) || !has(volume.projected.sources) || volume.projected.sources.all(source, !has(source.serviceAccountToken))))))'
+      message: Crewmate Pods cannot use host namespaces, hostPath, or projected ServiceAccount tokens.
+      reason: Forbidden
+    - expression: '!variables.crewmate || (has(object.spec.securityContext) && object.spec.securityContext.runAsNonRoot == true && has(object.spec.securityContext.seccompProfile) && object.spec.securityContext.seccompProfile.type in [''RuntimeDefault'', ''Localhost''] && variables.containers.all(container, has(container.securityContext) && (!has(container.securityContext.privileged) || container.securityContext.privileged == false) && container.securityContext.allowPrivilegeEscalation == false && has(container.securityContext.capabilities) && ''ALL'' in container.securityContext.capabilities.drop && (!has(container.ports) || container.ports.all(port, !has(port.hostPort) || port.hostPort == 0))))'
+      message: Crewmate Pods require restricted Pod and container security without host ports.
+      reason: Forbidden
+    - expression: '!variables.crewmate || variables.containers.all(container, !has(container.env) || container.env.all(variable, !(variable.name in [''ANTHROPIC_API_KEY'', ''GH_TOKEN'', ''GITHUB_TOKEN'', ''GOOGLE_API_KEY'', ''OPENAI_API_KEY''])))'
+      message: Direct provider-root credential environment variables are not permitted in ordinary Crewmate Pods.
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: agentos-crewmate-pods
+spec:
+  policyName: agentos-crewmate-pods
+  validationActions:
+    - Deny
+    - Audit
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        agentos.akua.dev/crewmate-admission: v1

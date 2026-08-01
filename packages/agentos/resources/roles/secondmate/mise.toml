@@ -9,3 +9,7 @@ file = "../../../runtime/run-mate.ts"
 [tasks."secondmate:health"]
 description = "Check Second Mate liveness or readiness"
 file = "../../../runtime/health.ts"
+
+[tasks."secondmate:capacity-preflight"]
+description = "Classify a Crewmate capacity snapshot from standard input"
+file = "../../../runtime/capacity-preflight-main.ts"

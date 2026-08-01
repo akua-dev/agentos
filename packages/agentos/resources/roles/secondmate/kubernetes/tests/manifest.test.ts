@@ -262,6 +262,7 @@ describe("Second Mate Kubernetes base", () => {
           .map(({ kind, metadata }) => `${kind}/${metadata.name}`)
           .sort(),
       ).toEqual([
+        "LimitRange/agentos-domain-workload-limits",
         "Namespace/" + fixture.namespace,
         "NetworkPolicy/agentos-domain-ingress",
         "ResourceQuota/agentos-domain-capacity",
@@ -287,6 +288,7 @@ describe("Second Mate Kubernetes base", () => {
         fixture.namespace,
       );
       expect(namespace.metadata.labels).toEqual({
+        "agentos.akua.dev/crewmate-admission": "v1",
         "agentos.akua.dev/fleet": "default",
         "agentos.akua.dev/managed-by": "agentos-firstmate",
         "agentos.akua.dev/owner-agent-id": fixture.ownerAgentId,
@@ -435,9 +437,35 @@ describe("Second Mate Kubernetes base", () => {
         "count/services.loadbalancers": "0",
         "count/services.nodeports": "0",
         "count/statefulsets.apps": "16",
+        "limits.cpu": "32",
+        "limits.memory": "64Gi",
+        "requests.cpu": "16",
+        "requests.memory": "32Gi",
         "requests.storage": "320Gi",
       },
     });
+    const limits = namedResource(
+      resources,
+      "LimitRange",
+      "agentos-domain-workload-limits",
+    );
+    expect(limits.spec).toEqual({
+      limits: [
+        {
+          default: { cpu: "2", memory: "4Gi" },
+          defaultRequest: { cpu: "250m", memory: "512Mi" },
+          max: { cpu: "4", memory: "8Gi" },
+          min: { cpu: "25m", memory: "64Mi" },
+          type: "Container",
+        },
+        {
+          max: { storage: "40Gi" },
+          min: { storage: "1Gi" },
+          type: "PersistentVolumeClaim",
+        },
+      ],
+    });
+    expect(resources.filter(({ kind }) => kind === "Secret")).toEqual([]);
     const ingress = namedResource(
       resources,
       "NetworkPolicy",
@@ -448,5 +476,49 @@ describe("Second Mate Kubernetes base", () => {
       podSelector: {},
       policyTypes: ["Ingress"],
     });
+  });
+
+  test("renders cluster admission selected only by managed domain labels", async () => {
+    const resources = await render(join(kubernetes, "admission"));
+    expect(
+      resources.map(({ kind, metadata }) => `${kind}/${metadata.name}`).sort(),
+    ).toEqual([
+      "ValidatingAdmissionPolicy/agentos-crewmate-pods",
+      "ValidatingAdmissionPolicy/agentos-crewmate-statefulsets",
+      "ValidatingAdmissionPolicyBinding/agentos-crewmate-pods",
+      "ValidatingAdmissionPolicyBinding/agentos-crewmate-statefulsets",
+    ]);
+    expect(
+      resources.every(({ metadata }) => metadata.namespace === undefined),
+    ).toBe(true);
+
+    for (const policyName of [
+      "agentos-crewmate-statefulsets",
+      "agentos-crewmate-pods",
+    ]) {
+      const policy = namedResource(
+        resources,
+        "ValidatingAdmissionPolicy",
+        policyName,
+      );
+      expect(policy.spec?.failurePolicy).toBe("Fail");
+      expect(policy.spec?.validations.length).toBeGreaterThan(0);
+      const binding = namedResource(
+        resources,
+        "ValidatingAdmissionPolicyBinding",
+        policyName,
+      );
+      expect(binding.spec).toEqual({
+        matchResources: {
+          namespaceSelector: {
+            matchLabels: {
+              "agentos.akua.dev/crewmate-admission": "v1",
+            },
+          },
+        },
+        policyName,
+        validationActions: ["Deny", "Audit"],
+      });
+    }
   });
 });

@@ -10,4 +10,8 @@ spec:
     count/services.loadbalancers: "0"
     count/services.nodeports: "0"
     count/statefulsets.apps: "16"
+    limits.cpu: "32"
+    limits.memory: 64Gi
+    requests.cpu: "16"
+    requests.memory: 32Gi
     requests.storage: 320Gi

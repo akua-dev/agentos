@@ -22,12 +22,24 @@ type CommandResult = {
   stdout: string;
 };
 
-async function kubectl(args: string[]): Promise<CommandResult> {
+async function kubectl(
+  args: string[],
+  input?: string,
+): Promise<CommandResult> {
   if (!context) throw new Error("Missing disposable Kubernetes context");
   const child = Bun.spawn(["kubectl", "--context", context, ...args], {
     stderr: "pipe",
+    stdin: input === undefined ? "ignore" : "pipe",
     stdout: "pipe",
   });
+  if (input !== undefined) {
+    const standardInput = child.stdin;
+    if (standardInput === undefined) {
+      throw new Error("kubectl stdin was not opened");
+    }
+    standardInput.write(input);
+    standardInput.end();
+  }
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited,
     new Response(child.stdout).text(),
@@ -43,6 +55,84 @@ async function requireKubectl(args: string[]): Promise<string> {
     stderr: "",
   });
   return result.stdout.trim();
+}
+
+async function requireAdmissionDenial(
+  namespace: string,
+  identity: string,
+  manifest: unknown,
+  message: string,
+): Promise<void> {
+  const result = await kubectl(
+    [
+      "--namespace",
+      namespace,
+      "--as",
+      identity,
+      "create",
+      "--dry-run=server",
+      "--filename=-",
+    ],
+    JSON.stringify(manifest),
+  );
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr).toContain(message);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requireRecord(value: unknown, path: string): Record<string, unknown> {
+  if (!isRecord(value)) {
+    throw new Error(`${path} must be an object`);
+  }
+  return value;
+}
+
+function requireArray(value: unknown, path: string): unknown[] {
+  if (!Array.isArray(value)) throw new Error(`${path} must be an array`);
+  return value;
+}
+
+function workloadParts(workload: unknown) {
+  const root = requireRecord(workload, "workload");
+  const metadata = requireRecord(root.metadata, "workload.metadata");
+  const specification = requireRecord(root.spec, "workload.spec");
+  const template = requireRecord(
+    specification.template,
+    "workload.spec.template",
+  );
+  const templateMetadata = requireRecord(
+    template.metadata,
+    "workload.spec.template.metadata",
+  );
+  const pod = requireRecord(template.spec, "workload.spec.template.spec");
+  const containers = requireArray(
+    pod.containers,
+    "workload.spec.template.spec.containers",
+  );
+  return {
+    container: requireRecord(
+      containers[0],
+      "workload.spec.template.spec.containers[0]",
+    ),
+    labels: requireRecord(metadata.labels, "workload.metadata.labels"),
+    pod,
+    templateLabels: requireRecord(
+      templateMetadata.labels,
+      "workload.spec.template.metadata.labels",
+    ),
+  };
+}
+
+function hasNoTypeCheckingWarnings(status: unknown): boolean {
+  if (!isRecord(status)) return false;
+  const typeChecking = status.typeChecking;
+  if (typeChecking === undefined) return true;
+  if (!isRecord(typeChecking)) return false;
+  const warnings = typeChecking.expressionWarnings;
+  return warnings === undefined || (Array.isArray(warnings) && warnings.length === 0);
 }
 
 async function canI(
@@ -102,6 +192,7 @@ lifecycleTest(
   async () => {
     const alphaFixture = join(kubernetes, "tests", "fixtures", "domain-alpha");
     const betaFixture = join(kubernetes, "tests", "fixtures", "domain-beta");
+    const admission = join(kubernetes, "admission");
     const childFixture = join(
       kubernetes,
       "tests",
@@ -124,6 +215,33 @@ lifecycleTest(
         "serviceaccount",
         "agentos-firstmate",
       ]);
+      await requireKubectl([
+        "apply",
+        "--server-side",
+        "--kustomize",
+        admission,
+      ]);
+      const admissionPolicies = JSON.parse(
+        await requireKubectl([
+          "get",
+          "validatingadmissionpolicies.admissionregistration.k8s.io",
+          "--output=json",
+        ]),
+      );
+      expect(
+        admissionPolicies.items.map(
+          ({ metadata }: { metadata: { name: string } }) => metadata.name,
+        ).sort(),
+      ).toEqual([
+        "agentos-crewmate-pods",
+        "agentos-crewmate-statefulsets",
+      ]);
+      expect(
+        admissionPolicies.items.every(
+          ({ status }: { status: unknown }) =>
+            hasNoTypeCheckingWarnings(status),
+        ),
+      ).toBe(true);
       await requireKubectl([
         "apply",
         "--server-side",
@@ -177,6 +295,105 @@ lifecycleTest(
           "postgresql://runtime_secondmate@agentos-postgres-rw.agentos.svc.cluster.local:5432/agentos?sslmode=require",
         HERDR_SESSION: "agentos-secondmate",
       });
+
+      const renderedChild = Bun.YAML.parse(
+        await requireKubectl([
+          "kustomize",
+          "--load-restrictor",
+          "LoadRestrictionsNone",
+          childFixture,
+        ]),
+      );
+      const renderedResources = requireArray(renderedChild, "rendered child");
+      const validChild = renderedResources.find((resource) => {
+        const candidate = requireRecord(resource, "rendered child resource");
+        return candidate.kind === "StatefulSet";
+      });
+      if (validChild === undefined) {
+        throw new Error("Rendered child is missing its StatefulSet");
+      }
+
+      const mutableImage = structuredClone(validChild);
+      workloadParts(mutableImage).container.image =
+        "registry.k8s.io/pause:3.10.1";
+      await requireAdmissionDenial(
+        alpha,
+        secondmateIdentity,
+        mutableImage,
+        "Every Crewmate image must be a remote image pinned by sha256 digest",
+      );
+
+      const missingLabels = structuredClone(validChild);
+      const missingLabelParts = workloadParts(missingLabels);
+      delete missingLabelParts.labels["agentos.akua.dev/task-id"];
+      delete missingLabelParts.templateLabels["agentos.akua.dev/task-id"];
+      await requireAdmissionDenial(
+        alpha,
+        secondmateIdentity,
+        missingLabels,
+        "Crewmates require matching UUID Agent, owner, Task, and Assignment labels",
+      );
+
+      const unexpectedToken = structuredClone(validChild);
+      workloadParts(unexpectedToken).pod.automountServiceAccountToken = true;
+      await requireAdmissionDenial(
+        alpha,
+        secondmateIdentity,
+        unexpectedToken,
+        "disabled token automount",
+      );
+
+      const hostAccess = structuredClone(validChild);
+      workloadParts(hostAccess).pod.hostNetwork = true;
+      await requireAdmissionDenial(
+        alpha,
+        secondmateIdentity,
+        hostAccess,
+        "cannot use host namespaces",
+      );
+
+      const excessiveResources = structuredClone(validChild);
+      const excessiveContainer = workloadParts(excessiveResources).container;
+      const excessiveResourcesValue = requireRecord(
+        excessiveContainer.resources,
+        "container.resources",
+      );
+      requireRecord(excessiveResourcesValue.limits, "container.resources.limits")
+        .cpu = "8";
+      await requireAdmissionDenial(
+        alpha,
+        secondmateIdentity,
+        excessiveResources,
+        "within the domain ceiling",
+      );
+
+      const providerRootCredential = structuredClone(validChild);
+      workloadParts(providerRootCredential).container.env = [
+        { name: "OPENAI_API_KEY", value: "not-a-real-secret" },
+      ];
+      await requireAdmissionDenial(
+        alpha,
+        secondmateIdentity,
+        providerRootCredential,
+        "Direct provider-root credential environment variables are not permitted",
+      );
+
+      const selfMutation = await kubectl([
+        "--namespace",
+        alpha,
+        "--as",
+        secondmateIdentity,
+        "patch",
+        "statefulset/agentos-secondmate",
+        "--dry-run=server",
+        "--type=merge",
+        "--patch",
+        '{"metadata":{"annotations":{"agentos.akua.dev/test":"denied"}}}',
+      ]);
+      expect(selfMutation.exitCode).toBe(1);
+      expect(selfMutation.stderr).toContain(
+        "A Second Mate cannot create, update, or delete its persistent Mate workload",
+      );
 
       for (const [verb, resource] of [
         ["create", "statefulsets.apps"],
@@ -370,6 +587,13 @@ lifecycleTest(
         alpha,
         beta,
         core,
+        "--ignore-not-found=true",
+        "--wait=true",
+      ]);
+      await kubectl([
+        "delete",
+        "--kustomize",
+        admission,
         "--ignore-not-found=true",
         "--wait=true",
       ]);
