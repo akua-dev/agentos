@@ -1,4 +1,8 @@
-import type { AgentOSRegistrationV1 } from "@akua-dev/agentos";
+import {
+  defineAgentOSPiCommandHandler,
+  type AgentOSRegistrationV1,
+} from "@akua-dev/agentos";
+import { Effect } from "effect";
 
 export const replacementRegistration: AgentOSRegistrationV1 = {
   version: 1,
@@ -10,9 +14,8 @@ export const replacementRegistration: AgentOSRegistrationV1 = {
   register(pi) {
     pi.registerCommand("example-ecosystem-status", {
       description: "Inspect the replacement example",
-      async handler(_arguments, context) {
-        context.ui.notify("replacement example active", "info");
-      },
+      handler: defineAgentOSPiCommandHandler((_arguments, context) =>
+        Effect.sync(() => context.ui.notify("replacement example active", "info"))),
     });
   },
 };

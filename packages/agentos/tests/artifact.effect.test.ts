@@ -210,6 +210,7 @@ describe("publishable AgentOS Pi artifacts", () => {
         peerDependencies: {
           "@earendil-works/pi-ai": "0.81.1",
           "@earendil-works/pi-coding-agent": "0.81.1",
+          effect: "4.0.0-beta.102",
         },
       });
       yield* fileSystem.writeFileString(
@@ -226,6 +227,7 @@ describe("publishable AgentOS Pi artifacts", () => {
           "@akua-dev/agentos": `file:${agentosTarball}`,
           "@earendil-works/pi-ai": "0.81.1",
           "@earendil-works/pi-coding-agent": "0.81.1",
+          effect: "4.0.0-beta.102",
         },
         overrides: {
           "@akua-dev/agentos": `file:${agentosTarball}`,

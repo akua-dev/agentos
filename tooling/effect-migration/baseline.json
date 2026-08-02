@@ -56,33 +56,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/workloads/tests/compiler-kustomize.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/fixtures/additive-package/registration.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 1,
-      "digest": "dc64d6b8b44c88288a4fc3cb7ba51fff5f2391d0c7e444fea938a921e94864fc",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/fixtures/additive-package/registration.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/tests/fixtures/external-extension/index.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 1,
-      "digest": "491830c15fd29e2bfcf0c6a4594069902b81cf88210adf17054910b2071294b5",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/fixtures/external-extension/index.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/tests/fixtures/replacement-package/registration.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 1,
-      "digest": "1a4ab1c21f1da3d3adc417dfd5faf989ac8da25a200c6a1ecf3ce80b991f8ad7",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/fixtures/replacement-package/registration.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/agentgateway/tests/conformance.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,

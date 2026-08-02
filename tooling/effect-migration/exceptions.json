@@ -15,6 +15,18 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "packages/agentos/src/pi-host-adapter.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runPromise",
+      "maximumOccurrences": 1,
+      "reason": "Pi's command registration ABI requires Promise-returning handlers, so this domain-free adapter is the sole one-way boundary from Effect command programs into Pi.",
+      "ownerIssue": 103,
+      "test": "packages/agentos/tests/pi-host-adapter.effect.test.ts",
+      "removalCondition": "Remove when Pi accepts Effect command programs directly.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "website/apps/docs/lib/effect/browser-runtime.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
