@@ -393,7 +393,7 @@
       "maximumOccurrences": 1,
       "reason": "The retained-home preparation executable needs one reviewed Bun process boundary around its typed Effect configuration, filesystem, provider, and subprocess program.",
       "ownerIssue": 104,
-      "test": "packages/agentos/runtime/tests/prepare-home.test.ts",
+      "test": "packages/agentos/runtime/tests/prepare-home.effect.test.ts",
       "removalCondition": "Retain only while Kubernetes invokes Mate home preparation as a standalone init-container executable.",
       "expiresOn": null
     },
