@@ -668,33 +668,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/canonical-source.ts under issue #99; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/lib/content/command-reference.bundled.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 2,
-      "digest": "36fa264dc4483998613facd8e4ef58c7db3b5cb2c8c6e8cff4867bb2b9ca082b",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/command-reference.bundled.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/lib/content/command-reference.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 1,
-      "digest": "1c0d9be0ed8626ed76d9abc796218d5191e78d38520a3df8f564131d7060508a",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/command-reference.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/lib/content/command-reference.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 8,
-      "digest": "837bf5ebb6d13a41b0229c8184a31ea083d9a21de71e60b0bfee14b2a073f510",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/command-reference.ts under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/lib/get-llm-text.ts",
       "slice": "website",
       "issue": 99,
