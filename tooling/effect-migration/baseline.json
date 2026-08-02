@@ -560,24 +560,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/llms-index.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/scripts/lint.entry.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 2,
-      "digest": "652e5c0140692ac581254022b27fef4b8c4b3396100dd25b572a6e7c8fdb827c",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/lint.entry.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/lint.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 5,
-      "digest": "1f869953e378c394ee7c1f0e2ff155bba2905a76e9b1a498dcd8084be86288be",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/lint.ts under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/scripts/site-contract.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
