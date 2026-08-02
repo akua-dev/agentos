@@ -30,6 +30,7 @@ const event = (phase: ResilienceObservationV1["phase"]): ResilienceObservationV1
   evidence: "observed",
   outcome: phase === "outcome" ? "recovered" : "degraded",
   cause: phase === "protocol" ? "protocol_adapter" : "reconciliation",
+  failureClass: null,
   recovery: phase === "protocol" ? "postgresql_listener_then_herdr_wake" : "repair_forward",
   attempt: 1,
   topologyAction: null,

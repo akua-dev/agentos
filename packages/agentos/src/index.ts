@@ -479,6 +479,7 @@ export {
 export {
   AGENTOS_RESILIENCE_TELEMETRY_CONTRACT_VERSION,
   RESILIENCE_CAUSES,
+  RESILIENCE_FAILURE_CLASSES,
   RESILIENCE_OUTCOMES,
   RESILIENCE_PHASES,
   RESILIENCE_RECOVERY_CLASSES,
@@ -491,6 +492,7 @@ export {
   resilienceMetricAttributes,
   resilienceProtectedAttributes,
   type ResilienceCause,
+  type ResilienceFailureClass,
   type ResilienceObservationV1,
   type ResilienceOutcome,
   type ResiliencePhase,
@@ -506,6 +508,7 @@ export {
   SemanticReadinessDiagnosticProjectionV1Schema,
   SemanticReadinessTelemetryInputV1Schema,
   projectAgentWorkloadPlan,
+  projectAssignmentExecutionObservation,
   projectNativeSessionObservation,
   projectProtocolResilienceObservation,
   projectRuntimeJournalObservation,
@@ -516,6 +519,16 @@ export {
   type SemanticReadinessDiagnosticProjectionV1,
   type SemanticReadinessTelemetryInputV1,
 } from "./telemetry/resilience-projections.ts";
+export {
+  ASSIGNMENT_EXECUTION_FAILURE_CLASSES,
+  ASSIGNMENT_EXECUTION_RECOVERY_ACTIONS,
+  ASSIGNMENT_EXECUTION_STATES,
+  AssignmentExecutionEpochObservationV1Schema,
+  AssignmentExecutionRecoveryError,
+  decodeAssignmentExecutionEpochObservation,
+  type AssignmentExecutionEpochObservationV1,
+  type AssignmentExecutionFailureClass,
+} from "./supervision/retry-recovery.ts";
 export {
   AGENTOS_RESILIENCE_METRICS,
   createAgentOSResilienceMetricViews,

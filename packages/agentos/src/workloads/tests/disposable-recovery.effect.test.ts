@@ -17,6 +17,13 @@ import { TestClock } from "effect/testing";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 
 import {
+  PGliteTestDatabase,
+  asLogin,
+  firstRow,
+  makePGliteTestLayer,
+  withDatabaseLogin,
+} from "../../../../../database/tests/pglite-test.ts";
+import {
   kubernetesResourceListJson,
   renderCompiledWorkloadSpec,
   type RenderedWorkloadPlan,
@@ -32,13 +39,105 @@ const busyboxImage =
 const ids = {
   assignment: "59000000-0000-4000-8000-000000000001",
   crew: "29000000-0000-4000-8000-000000000003",
+  epochAuthentication: "69000000-0000-4000-8000-000000000003",
+  epochAuthenticationSuccessor: "69000000-0000-4000-8000-000000000004",
+  epochCapacity: "69000000-0000-4000-8000-000000000005",
+  epochCapacitySuccessor: "69000000-0000-4000-8000-000000000006",
+  epochTransient: "69000000-0000-4000-8000-000000000001",
+  epochTransientSuccessor: "69000000-0000-4000-8000-000000000002",
   firstMate: "29000000-0000-4000-8000-000000000001",
+  operation: "79000000-0000-4000-8000-000000000001",
+  project: "39000000-0000-4000-8000-000000000001",
   secondMate: "29000000-0000-4000-8000-000000000002",
   task: "49000000-0000-4000-8000-000000000001",
 };
 const briefDigest = "b".repeat(64);
+const renderDigest = "c".repeat(64);
+const nativeSessionRef = "codex:agentos-workload-crew";
+const worktreeRef = "worktree:agentos-workload-crew";
 
-const platform = Layer.merge(
+const disposableRecoveryDatabaseLayer = (
+  namespace = "agentos-workload-disposable",
+) => makePGliteTestLayer({
+  migrations: "all",
+  setup: (database) => Effect.gen(function*() {
+    const roots = yield* database.query<{ readonly id: string }>(`
+      SELECT id::text AS id FROM agentos.agents WHERE role = 'first_mate'
+    `);
+    const firstMateId = (yield* firstRow(
+      roots,
+      "disposable Fleet has no First Mate",
+    )).id;
+    yield* database.exec(`
+      CREATE ROLE disposable_recovery_second LOGIN;
+      CREATE ROLE disposable_recovery_crew LOGIN;
+
+      INSERT INTO agentos.projects (
+        id, name, scope_text, status, status_text
+      ) VALUES (
+        '${ids.project}', 'disposable-retry-recovery',
+        'Join retry recovery to native disposable workload evidence',
+        'active', 'Disposable recovery fixture ready'
+      );
+      INSERT INTO agentos.agents (
+        id, handle, role, parent_agent_id, harness, lifecycle_status,
+        status_text, kubernetes_namespace, kubernetes_pod,
+        persistent_volume_claim, herdr_locator
+      ) VALUES
+        (
+          '${ids.secondMate}', 'disposable-recovery-second', 'second_mate',
+          '${firstMateId}', 'pi', 'active', 'Supervises recovery proof',
+          '${namespace}', 'agentos-workload-mate-0',
+          'home-agentos-workload-mate-0',
+          'herdr://agentos-workload-mate'
+        ),
+        (
+          '${ids.crew}', 'disposable-recovery-crew', 'crewmate',
+          '${ids.secondMate}', 'codex', 'active', 'Owns recovery proof',
+          '${namespace}', 'agentos-workload-crew-0',
+          'home-agentos-workload-crew-0',
+          'herdr://agentos-workload-crew'
+        );
+      SELECT agentos.register_agent_principal(
+        '${ids.secondMate}', 'disposable_recovery_second'
+      );
+      SELECT agentos.register_agent_principal(
+        '${ids.crew}', 'disposable_recovery_crew'
+      );
+      INSERT INTO agentos.tasks (
+        id, project_id, created_by_agent_id, title, status, status_text
+      ) VALUES (
+        '${ids.task}', '${ids.project}', '${ids.secondMate}',
+        'Prove native retry recovery', 'active', 'Recovery work is active'
+      );
+      INSERT INTO agentos.task_assignments (
+        id, task_id, agent_id, assigned_by_agent_id, assignment_role,
+        status, status_text, brief
+      ) VALUES (
+        '${ids.assignment}', '${ids.task}', '${ids.crew}',
+        '${ids.secondMate}', 'worker', 'active', 'Recovery execution active',
+        '# Prove native retry recovery'
+      );
+    `);
+    yield* withDatabaseLogin(
+      database,
+      "disposable_recovery_second",
+      database.query(`
+        SELECT agentos.begin_runtime_operation(
+          '${ids.operation}', '${ids.crew}', '${ids.assignment}',
+          '${namespace}', 'agentos-workload-crew', 'recover',
+          '${renderDigest}',
+          '[
+            {"kind":"persistent_volume_claim","name":"home-agentos-workload-crew-0","disposition":"retain"},
+            {"kind":"worktree","name":"agentos-workload-crew","disposition":"retain"}
+          ]'::jsonb
+        )
+      `),
+    );
+  }),
+});
+
+const platform = Layer.mergeAll(
   BunServices.layer,
   ConfigProvider.layer(ConfigProvider.fromEnv()),
 );
@@ -52,7 +151,7 @@ const OptionsSchema = Schema.Struct({
   context: Schema.String.pipe(
     Schema.check(
       Schema.isMaxLength(128),
-      Schema.isPattern(/^kind-agentos-workload-[a-z0-9-]+$/),
+      Schema.isPattern(/^kind-agentos-(?:workload|resilience)-[a-z0-9-]+$/),
     ),
   ),
   approval: Schema.String.pipe(
@@ -438,7 +537,166 @@ function invalidImageStatefulSet(
 const encodeJson = (value: unknown) =>
   Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(value);
 
+const durableIdentityCounts = Effect.fn(
+  "test.workloadDisposable.durableIdentityCounts",
+)(function*() {
+  const database = yield* PGliteTestDatabase;
+  const rows = yield* database.query<{
+    readonly agents: number;
+    readonly assignments: number;
+    readonly tasks: number;
+  }>(`
+    SELECT
+      (SELECT count(*)::int FROM agentos.agents) AS agents,
+      (SELECT count(*)::int FROM agentos.task_assignments) AS assignments,
+      (SELECT count(*)::int FROM agentos.tasks) AS tasks
+  `);
+  return yield* firstRow(rows, "disposable identity counts missing");
+});
+
+const proveAssignmentRetryRecovery = Effect.fn(
+  "test.workloadDisposable.assignmentRetryRecovery",
+)(function*() {
+  const database = yield* PGliteTestDatabase;
+  const countsBefore = yield* durableIdentityCounts();
+
+  yield* asLogin("disposable_recovery_crew", Effect.gen(function*() {
+    yield* database.query(`
+      SELECT agentos.begin_assignment_execution_epoch(
+        '${ids.epochTransient}', '${ids.assignment}', '${ids.operation}',
+        '${nativeSessionRef}'
+      )
+    `);
+    yield* database.query(`
+      SELECT agentos.exhaust_assignment_execution_epoch(
+        '${ids.epochTransient}', 'overload', 5
+      )
+    `);
+  }));
+  assert.deepStrictEqual(
+    yield* asLogin(
+      "disposable_recovery_second",
+      database.query<{ readonly id: string }>(`
+        SELECT agentos.resume_assignment_execution_epoch(
+          '${ids.epochTransient}', '${ids.epochTransientSuccessor}', NULL,
+          'boundary:provider-overload-cleared'
+        )::text AS id
+      `),
+    ),
+    [{ id: ids.epochTransientSuccessor }],
+  );
+  yield* asLogin("disposable_recovery_crew", Effect.gen(function*() {
+    yield* database.query(`
+      SELECT agentos.complete_assignment_execution_epoch(
+        '${ids.epochTransientSuccessor}'
+      )
+    `);
+    yield* database.query(`
+      SELECT agentos.begin_assignment_execution_epoch(
+        '${ids.epochAuthentication}', '${ids.assignment}', '${ids.operation}',
+        '${nativeSessionRef}'
+      )
+    `);
+    yield* database.query(`
+      SELECT agentos.exhaust_assignment_execution_epoch(
+        '${ids.epochAuthentication}', 'authentication', 1
+      )
+    `);
+  }));
+  const authenticationDenied = yield* Effect.flip(asLogin(
+    "disposable_recovery_second",
+    database.query(`
+      SELECT agentos.resume_assignment_execution_epoch(
+        '${ids.epochAuthentication}', '${ids.epochAuthenticationSuccessor}',
+        NULL, 'boundary:credential-unchanged'
+      )
+    `),
+  ));
+  assert.include(authenticationDenied.detail, "authority-granted");
+  yield* asLogin("disposable_recovery_second", database.query(`
+    SELECT agentos.resume_assignment_execution_epoch(
+      '${ids.epochAuthentication}', '${ids.epochAuthenticationSuccessor}',
+      NULL, 'authority:approved-credential-rotated'
+    )
+  `));
+  yield* asLogin("disposable_recovery_crew", Effect.gen(function*() {
+    yield* database.query(`
+      SELECT agentos.complete_assignment_execution_epoch(
+        '${ids.epochAuthenticationSuccessor}'
+      )
+    `);
+    yield* database.query(`
+      SELECT agentos.begin_assignment_execution_epoch(
+        '${ids.epochCapacity}', '${ids.assignment}', '${ids.operation}',
+        '${nativeSessionRef}'
+      )
+    `);
+    yield* database.query(`
+      SELECT agentos.exhaust_assignment_execution_epoch(
+        '${ids.epochCapacity}', 'capacity', 1
+      )
+    `);
+  }));
+  const capacityDenied = yield* Effect.flip(asLogin(
+    "disposable_recovery_second",
+    database.query(`
+      SELECT agentos.resume_assignment_execution_epoch(
+        '${ids.epochCapacity}', '${ids.epochCapacitySuccessor}',
+        '${ids.operation}', 'boundary:capacity-unchanged'
+      )
+    `),
+  ));
+  assert.include(capacityDenied.detail, "distinct verified runtime operation");
+
+  assert.deepStrictEqual(yield* durableIdentityCounts(), countsBefore);
+  const rows = yield* database.query<{
+    readonly agent_id: string;
+    readonly assignment_id: string;
+    readonly native_session_ref: string;
+    readonly retained_resources: unknown;
+    readonly runtime_operation_id: string;
+    readonly state: string;
+  }>(`
+    SELECT execution.agent_id::text, execution.assignment_id::text,
+           execution.runtime_operation_id::text,
+           execution.native_session_ref, execution.state,
+           operation.retained_resources
+      FROM agentos.assignment_execution_epochs AS execution
+      JOIN agentos.runtime_operations AS operation
+        ON operation.id = execution.runtime_operation_id
+     WHERE execution.id = '${ids.epochTransientSuccessor}'
+  `);
+  const resumed = yield* firstRow(rows, "resumed execution proof missing");
+  assert.deepInclude(resumed, {
+    agent_id: ids.crew,
+    assignment_id: ids.assignment,
+    native_session_ref: nativeSessionRef,
+    runtime_operation_id: ids.operation,
+    state: "completed",
+  });
+  assert.include(JSON.stringify(resumed.retained_resources), "agentos-workload-crew");
+  return {
+    authenticationHeldOutDenied: true,
+    capacityHeldOutDenied: true,
+    durableIdentityStable: true,
+    nativeSessionRef: resumed.native_session_ref,
+    operationId: resumed.runtime_operation_id,
+    transientResumeCompleted: true,
+  };
+});
+
 layer(platform)("disposable typed workload recovery", (it) => {
+  it.effect("proves transient resume plus held-out authority and capacity denial in PostgreSQL", () =>
+    proveAssignmentRetryRecovery().pipe(
+      Effect.tap((evidence) => Effect.sync(() => {
+        assert.isTrue(evidence.transientResumeCompleted);
+        assert.isTrue(evidence.authenticationHeldOutDenied);
+        assert.isTrue(evidence.capacityHeldOutDenied);
+        assert.isTrue(evidence.durableIdentityStable);
+      })),
+      Effect.provide(disposableRecoveryDatabaseLayer()),
+    ));
+
   it.effect("renders exact persistent and interactive plans from native structured resources", () =>
     Effect.gen(function*() {
       const plans = yield* renderPlans(
@@ -756,6 +1014,69 @@ layer(platform)("disposable typed workload recovery", (it) => {
           ]),
           "agentos-workload-crew",
         );
+        yield* requireKubectl(options.context, [
+          "--namespace",
+          alpha,
+          "exec",
+          `pod/${pod}`,
+          "--container=crewmate",
+          "--",
+          "sh",
+          "-c",
+          `test -f /home/agent/worktree-id || printf '%s' '${worktreeRef}' > /home/agent/worktree-id`,
+        ]);
+        const recoveryEvidence = yield* proveAssignmentRetryRecovery().pipe(
+          Effect.provide(disposableRecoveryDatabaseLayer(alpha)),
+        );
+        assert.isTrue(recoveryEvidence.transientResumeCompleted);
+        assert.isTrue(recoveryEvidence.authenticationHeldOutDenied);
+        assert.isTrue(recoveryEvidence.capacityHeldOutDenied);
+        assert.isTrue(recoveryEvidence.durableIdentityStable);
+        assert.strictEqual(recoveryEvidence.nativeSessionRef, nativeSessionRef);
+        assert.strictEqual(recoveryEvidence.operationId, ids.operation);
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "get",
+            `pod/${pod}`,
+            "--output=jsonpath={.metadata.uid}",
+          ]),
+          podUid,
+        );
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "get",
+            `persistentvolumeclaim/${pvc}`,
+            "--output=jsonpath={.metadata.uid}",
+          ]),
+          pvcUid,
+        );
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${pod}`,
+            "--container=crewmate",
+            "--",
+            "cat",
+            "/home/agent/worktree-id",
+          ]),
+          worktreeRef,
+        );
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "get",
+            "statefulset/agentos-workload-crew",
+            "--output=jsonpath={.status.currentReplicas}{'|'}{.status.readyReplicas}",
+          ]),
+          "1|1",
+        );
 
         const brokenReadiness = yield* encodeJson({
           spec: {
@@ -876,6 +1197,19 @@ layer(platform)("disposable typed workload recovery", (it) => {
           ]),
           "agentos-workload-crew",
         );
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${pod}`,
+            "--container=crewmate",
+            "--",
+            "cat",
+            "/home/agent/worktree-id",
+          ]),
+          worktreeRef,
+        );
 
         yield* requireKubectl(options.context, [
           "--namespace",
@@ -920,6 +1254,14 @@ layer(platform)("disposable typed workload recovery", (it) => {
           interactiveRenderDigest: plans.interactive.renderDigest,
           podReplaced: true,
           pvcRetained: true,
+          retryExhaustionResumed: recoveryEvidence.transientResumeCompleted,
+          authenticationHeldOutDenied:
+            recoveryEvidence.authenticationHeldOutDenied,
+          capacityHeldOutDenied: recoveryEvidence.capacityHeldOutDenied,
+          durableIdentityStable: recoveryEvidence.durableIdentityStable,
+          nativeSessionRef: recoveryEvidence.nativeSessionRef,
+          runtimeOperationId: recoveryEvidence.operationId,
+          worktreeRetained: true,
           namespacesDeleted: true,
           productionEndpointContacted: false,
         });
