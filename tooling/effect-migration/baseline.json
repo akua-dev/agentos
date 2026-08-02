@@ -29,15 +29,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/kubernetes/tests/secret-lifecycle.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/tests/kubernetes.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 6,
-      "digest": "d8e729362539ee1c46060f579bc4f01369d1cf6d15eaba9d7e4ae2f798e2590a",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/kubernetes.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/tests/prepare-home.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
