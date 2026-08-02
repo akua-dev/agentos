@@ -779,15 +779,7 @@ function defaultComplete(
 }
 
 function startTelemetry(request: MaintenanceRunRequest, model: Model<Api>) {
-  return Effect.tryPromise({
-    try: () => startAgentOSAuxiliaryOperation(model, request.telemetry, "resumed"),
-    catch: (cause) =>
-      maintenanceError(
-        "telemetry_unavailable",
-        "Maintenance telemetry could not be started.",
-        cause,
-      ),
-  });
+  return startAgentOSAuxiliaryOperation(model, request.telemetry, "resumed");
 }
 
 export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = (request) =>
@@ -848,14 +840,12 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = (request) =>
     ];
     const run = Effect.gen(function*() {
       for (let step = 0; step < MAX_MAINTENANCE_STEPS; step += 1) {
-        currentAttempt = yield* Effect.sync(() =>
-          operation.startProviderAttempt({
-            requestKind,
-            streamMode: "non_streaming",
-          })
-        );
+        currentAttempt = yield* operation.startProviderAttempt({
+          requestKind,
+          streamMode: "non_streaming",
+        });
         const headers = { ...auth.headers };
-        yield* Effect.sync(() => currentAttempt?.inject(headers));
+        yield* currentAttempt.inject(headers);
         const timestamp = yield* Clock.currentTimeMillis;
         const response = yield* (request.completeImpl ?? defaultComplete)(
           model,
@@ -888,8 +878,7 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = (request) =>
         );
         const failure = safeAssistantFailure(response.stopReason);
         if (failure !== undefined) {
-          yield* Effect.sync(() =>
-            currentAttempt?.end({
+          yield* currentAttempt.end({
               status: 200,
               error: failure,
               streamOutcome: response.stopReason === "aborted"
@@ -897,8 +886,7 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = (request) =>
                 : "upstream_error",
               inputTokens: safeTokenCount(response.usage.input),
               outputTokens: safeTokenCount(response.usage.output),
-            })
-          );
+            });
           currentAttempt = undefined;
           return yield* maintenanceError(
             "provider_failed",
@@ -911,17 +899,15 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = (request) =>
           .join("")
           .trim();
         const action = yield* parseMaintenanceAction(text);
-        yield* Effect.sync(() =>
-          currentAttempt?.end({
+        yield* currentAttempt.end({
             status: 200,
             streamOutcome: "completed",
             inputTokens: safeTokenCount(response.usage.input),
             outputTokens: safeTokenCount(response.usage.output),
-          })
-        );
+          });
         currentAttempt = undefined;
         if (action.action === "done") {
-          yield* Effect.sync(() => operation.end({ status: 200 }));
+          yield* operation.end({ status: 200 });
           return { summary: "maintenance completed", touchedPaths: [] };
         }
         const tool = request.tools.find(({ name }) => name === action.tool);
@@ -943,10 +929,12 @@ export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = (request) =>
     });
     return yield* run.pipe(
       Effect.tapError((error) =>
-        Effect.sync(() => {
-          currentAttempt?.end({ error, streamOutcome: "upstream_error" });
-          operation.end({ error });
-        })
+        Effect.all([
+          currentAttempt === undefined
+            ? Effect.void
+            : currentAttempt.end({ error, streamOutcome: "upstream_error" }),
+          operation.end({ error }),
+        ], { discard: true })
       ),
     );
   });

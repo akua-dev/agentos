@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, it } from "@effect/vitest";
+import { Effect, Option } from "effect";
 import {
   AGENTOS_AI_COMPACTION_PATHS,
   AGENTOS_AI_ERROR_CLASSES,
@@ -16,7 +17,7 @@ import {
 } from "../privacy.ts";
 
 describe("AgentOS AI telemetry contract v1", () => {
-  test("publishes the complete bounded vocabulary", () => {
+  it.effect("publishes the complete bounded vocabulary", () => Effect.sync(() => {
     expect(AGENTOS_AI_TELEMETRY_CONTRACT_VERSION).toBe(1);
     expect(AGENTOS_AI_RUNTIMES).toEqual(["pi", "codex"]);
     expect(AGENTOS_AI_ROUTES).toEqual(["direct", "ai_gateway"]);
@@ -58,9 +59,9 @@ describe("AgentOS AI telemetry contract v1", () => {
       "aborted",
       "upstream_error",
     ]);
-  });
+  }));
 
-  test("classifies provider and transport failures without serializing error text", () => {
+  it.effect("classifies provider and transport failures without serializing error text", () => Effect.sync(() => {
     expect(classifyAIError(undefined, 401)).toBe("authentication");
     expect(classifyAIError(undefined, 403)).toBe("authentication");
     expect(classifyAIError(undefined, 429)).toBe("rate_limit");
@@ -75,7 +76,7 @@ describe("AgentOS AI telemetry contract v1", () => {
       classifyAIError(
         Object.defineProperty({}, "name", {
           get() {
-            throw new Error("private throwing getter");
+            return Option.getOrThrow(Option.none());
           },
         }),
       ),
@@ -84,9 +85,9 @@ describe("AgentOS AI telemetry contract v1", () => {
       classifyAIError(new Error("seeded prompt and provider-private error body")),
     ).toBe("unknown");
     expect(classifyAIStatus(200, { name: "ProviderError" })).toBe("error");
-  });
+  }));
 
-  test("keeps only allowlisted, bounded attributes for each signal", () => {
+  it.effect("keeps only allowlisted, bounded attributes for each signal", () => Effect.sync(() => {
     const seededPrompt = "SEED_PROMPT: explain the private launch";
     const seededToken = "sk-seeded-secret";
     const seededProviderIdentity = "provider-account@example.test";
@@ -144,9 +145,9 @@ describe("AgentOS AI telemetry contract v1", () => {
     expect(serialized).not.toContain(seededPrompt);
     expect(serialized).not.toContain(seededToken);
     expect(serialized).not.toContain(seededProviderIdentity);
-  });
+  }));
 
-  test("rejects invalid values even when their keys are allowlisted", () => {
+  it.effect("rejects invalid values even when their keys are allowlisted", () => Effect.sync(() => {
     expect(
       safeTelemetryAttributes(
         {
@@ -161,9 +162,9 @@ describe("AgentOS AI telemetry contract v1", () => {
         "span",
       ),
     ).toEqual({});
-  });
+  }));
 
-  test("keeps canonical workload attribution correlated but out of metric labels", () => {
+  it.effect("keeps canonical workload attribution correlated but out of metric labels", () => Effect.sync(() => {
     const input = {
       "agentos.identity.agent_id":
         "10000000-0000-4000-8000-000000000001",
@@ -178,5 +179,5 @@ describe("AgentOS AI telemetry contract v1", () => {
     expect(safeTelemetryAttributes(input, "span")).toEqual(input);
     expect(safeTelemetryAttributes(input, "log")).toEqual(input);
     expect(safeTelemetryAttributes(input, "metric")).toEqual({});
-  });
+  }));
 });

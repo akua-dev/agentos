@@ -1,39 +1,44 @@
-export const AGENTOS_AI_TELEMETRY_CONTRACT_VERSION = 1 as const;
+const values = <const Values extends ReadonlyArray<string | number>>(
+  ...entries: Values
+) => entries;
 
-export const AGENTOS_AI_RUNTIMES = ["pi", "codex"] as const;
+const constant = <const Value extends Readonly<Record<string, string>>>(
+  value: Value,
+) => Object.freeze(value);
+
+export const AGENTOS_AI_TELEMETRY_CONTRACT_VERSION = 1;
+
+export const AGENTOS_AI_RUNTIMES = values("pi", "codex");
 export type AgentOSAIRuntime = (typeof AGENTOS_AI_RUNTIMES)[number];
 
-export const AGENTOS_AI_ROUTES = ["direct", "ai_gateway"] as const;
+export const AGENTOS_AI_ROUTES = values("direct", "ai_gateway");
 export type AgentOSAIRoute = (typeof AGENTOS_AI_ROUTES)[number];
 
-export const AGENTOS_AI_REQUEST_KINDS = [
+export const AGENTOS_AI_REQUEST_KINDS = values(
   "main",
   "compaction",
   "memory_extract",
   "memory_consolidate",
   "extension",
-] as const;
-export type AgentOSAIRequestKind =
-  (typeof AGENTOS_AI_REQUEST_KINDS)[number];
+);
+export type AgentOSAIRequestKind = (typeof AGENTOS_AI_REQUEST_KINDS)[number];
 
-export const AGENTOS_AI_COMPACTION_PATHS = [
+export const AGENTOS_AI_COMPACTION_PATHS = values(
   "portable_summary",
   "native_server",
-] as const;
-export type AgentOSAICompactionPath =
-  (typeof AGENTOS_AI_COMPACTION_PATHS)[number];
+);
+export type AgentOSAICompactionPath = (typeof AGENTOS_AI_COMPACTION_PATHS)[number];
 
-export const AGENTOS_AI_STATUS_CLASSES = [
+export const AGENTOS_AI_STATUS_CLASSES = values(
   "success",
   "client_error",
   "server_error",
   "cancelled",
   "error",
-] as const;
-export type AgentOSAIStatusClass =
-  (typeof AGENTOS_AI_STATUS_CLASSES)[number];
+);
+export type AgentOSAIStatusClass = (typeof AGENTOS_AI_STATUS_CLASSES)[number];
 
-export const AGENTOS_AI_ERROR_CLASSES = [
+export const AGENTOS_AI_ERROR_CLASSES = values(
   "none",
   "authentication",
   "rate_limit",
@@ -45,42 +50,36 @@ export const AGENTOS_AI_ERROR_CLASSES = [
   "decode",
   "unavailable",
   "unknown",
-] as const;
-export type AgentOSAIErrorClass =
-  (typeof AGENTOS_AI_ERROR_CLASSES)[number];
+);
+export type AgentOSAIErrorClass = (typeof AGENTOS_AI_ERROR_CLASSES)[number];
 
-export const AGENTOS_AI_STREAM_OUTCOMES = [
+export const AGENTOS_AI_STREAM_OUTCOMES = values(
   "not_streamed",
   "completed",
   "client_disconnect",
   "aborted",
   "upstream_error",
-] as const;
-export type AgentOSAIStreamOutcome =
-  (typeof AGENTOS_AI_STREAM_OUTCOMES)[number];
+);
+export type AgentOSAIStreamOutcome = (typeof AGENTOS_AI_STREAM_OUTCOMES)[number];
 
-export const AGENTOS_AI_MODEL_FAMILIES = [
+export const AGENTOS_AI_MODEL_FAMILIES = values(
   "gpt-5",
   "gpt-4.1",
   "o-series",
   "other",
-] as const;
-export type AgentOSAIModelFamily =
-  (typeof AGENTOS_AI_MODEL_FAMILIES)[number];
+);
+export type AgentOSAIModelFamily = (typeof AGENTOS_AI_MODEL_FAMILIES)[number];
 
-export const AGENTOS_AI_PROVIDER_FAMILIES = ["openai", "other"] as const;
-export type AgentOSAIProviderFamily =
-  (typeof AGENTOS_AI_PROVIDER_FAMILIES)[number];
+export const AGENTOS_AI_PROVIDER_FAMILIES = values("openai", "other");
+export type AgentOSAIProviderFamily = (typeof AGENTOS_AI_PROVIDER_FAMILIES)[number];
 
-export const AGENTOS_AI_SESSION_STATES = ["fresh", "resumed"] as const;
-export type AgentOSAISessionState =
-  (typeof AGENTOS_AI_SESSION_STATES)[number];
+export const AGENTOS_AI_SESSION_STATES = values("fresh", "resumed");
+export type AgentOSAISessionState = (typeof AGENTOS_AI_SESSION_STATES)[number];
 
-export const AGENTOS_AI_STREAM_MODES = ["streaming", "non_streaming"] as const;
-export type AgentOSAIStreamMode =
-  (typeof AGENTOS_AI_STREAM_MODES)[number];
+export const AGENTOS_AI_STREAM_MODES = values("streaming", "non_streaming");
+export type AgentOSAIStreamMode = (typeof AGENTOS_AI_STREAM_MODES)[number];
 
-export const AGENTOS_AI_METRICS = Object.freeze({
+export const AGENTOS_AI_METRICS = constant({
   operations: "agentos.ai.operations",
   providerAttempts: "agentos.ai.provider.attempts",
   operationDuration: "agentos.ai.operation.duration",
@@ -93,9 +92,9 @@ export const AGENTOS_AI_METRICS = Object.freeze({
   streamBytes: "agentos.ai.stream.bytes",
   routeAcquisitionDuration: "agentos.ai.route.acquire.duration",
   quotaObservationAge: "agentos.ai.quota.observation.age",
-} as const);
+});
 
-export const AGENTOS_AI_DURATION_BUCKETS_SECONDS = Object.freeze([
+export const AGENTOS_AI_DURATION_BUCKETS_SECONDS = Object.freeze(values(
   0.005,
   0.01,
   0.025,
@@ -111,6 +110,6 @@ export const AGENTOS_AI_DURATION_BUCKETS_SECONDS = Object.freeze([
   60,
   120,
   300,
-] as const);
+));
 
-export const AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS = 86_400 as const;
+export const AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS = 86_400;

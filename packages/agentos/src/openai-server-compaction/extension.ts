@@ -88,7 +88,7 @@ export type LocalCompactionRequest = {
 
 export type LocalCompactionTelemetry = {
   currentAttempt(): AgentOSProviderAttempt;
-  startFallbackAttempt(): void;
+  startFallbackAttempt(): Effect.Effect<void>;
 };
 
 export type LocalSummaryImplementations = {
@@ -334,8 +334,8 @@ export function generateBestEffortLocalSummary(
   return portable.pipe(
     Effect.catch((failure) =>
       Effect.gen(function*() {
-        yield* Effect.sync(() => {
-          request.telemetry?.currentAttempt().end({
+        if (request.telemetry !== undefined) {
+          yield* request.telemetry.currentAttempt().end({
             ...(failure.status === undefined ? {} : { status: failure.status }),
             error: failure.cause,
             streamOutcome: failure.streamOutcome,
@@ -346,8 +346,8 @@ export function generateBestEffortLocalSummary(
               ? {}
               : { outputTokens: failure.outputTokens }),
           });
-          request.telemetry?.startFallbackAttempt();
-        });
+          yield* request.telemetry.startFallbackAttempt();
+        }
         return yield* implementations.compact(
           request.event.preparation,
           request.model,
@@ -449,14 +449,7 @@ function startTelemetryOperation(
   model: OpenAICompactionModel,
   telemetry: AgentOSTelemetrySource | undefined,
 ) {
-  return Effect.tryPromise({
-    try: () => startAgentOSAuxiliaryOperation(model, telemetry, "resumed"),
-    catch: (cause) =>
-      OpenAIServerCompactionExtensionError.make({
-        cause,
-        code: "telemetry_unavailable",
-      }),
-  });
+  return startAgentOSAuxiliaryOperation(model, telemetry, "resumed");
 }
 
 function resolveModelAuth(
@@ -512,8 +505,8 @@ function handleCompaction(
         requestKind: "compaction",
         streamMode: "non_streaming",
       });
-    let localAttempt = startPortableAttempt();
-    const remoteAttempt = telemetryOperation.startProviderAttempt({
+    let localAttempt = yield* startPortableAttempt();
+    const remoteAttempt = yield* telemetryOperation.startProviderAttempt({
       compactionPath: "native_server",
       requestKind: "compaction",
       streamMode: model.provider === "openai-codex"
@@ -529,8 +522,10 @@ function handleCompaction(
     }
     const localHeaders = { ...baseHeaders };
     const remoteHeaders = { ...baseHeaders };
-    localAttempt.inject(localHeaders);
-    remoteAttempt.inject(remoteHeaders);
+    yield* Effect.all([
+      localAttempt.inject(localHeaders),
+      remoteAttempt.inject(remoteHeaders),
+    ], { discard: true });
     const localRequest: LocalCompactionRequest = {
       event,
       model,
@@ -542,10 +537,10 @@ function handleCompaction(
       thinkingLevel,
       telemetry: {
         currentAttempt: () => localAttempt,
-        startFallbackAttempt: () => {
-          localAttempt = startPortableAttempt();
-          localAttempt.inject(localHeaders);
-        },
+        startFallbackAttempt: () => Effect.gen(function*() {
+          localAttempt = yield* startPortableAttempt();
+          yield* localAttempt.inject(localHeaders);
+        }),
       },
     };
     const shapeKey = requestShapeKey(ctx);
@@ -598,10 +593,10 @@ function handleCompaction(
     ], { concurrency: "unbounded" });
 
     if (Result.isFailure(local)) {
-      telemetryOperation.end({ error: local.failure });
+      yield* telemetryOperation.end({ error: local.failure });
       return undefined;
     }
-    telemetryOperation.end({ status: 200 });
+    yield* telemetryOperation.end({ status: 200 });
     if (Result.isFailure(remote)) {
       if (!event.signal.aborted && ctx.hasUI) {
         yield* Effect.sync(() =>
@@ -646,24 +641,20 @@ function observeCompactionAttempt<T, E>(
 ) {
   return run.pipe(
     Effect.tap((result) =>
-      Effect.sync(() =>
-        resolveAttempt(attempt).end({
+      resolveAttempt(attempt).end({
           status: 200,
           streamOutcome: "completed",
           ...counts(result),
         })
-      )
     ),
     Effect.tapError((error) =>
-      Effect.sync(() =>
-        resolveAttempt(attempt).end({
+      resolveAttempt(attempt).end({
           ...(error instanceof OpenAICompactionHttpError
             ? { status: error.status }
             : {}),
           error,
           streamOutcome: "upstream_error",
         })
-      )
     ),
   );
 }
