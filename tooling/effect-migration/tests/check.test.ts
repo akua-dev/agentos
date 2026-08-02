@@ -2,8 +2,7 @@ import * as BunFileSystem from "@effect/platform-bun/BunFileSystem"
 import * as BunPath from "@effect/platform-bun/BunPath"
 import { assert, layer } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Path } from "effect"
-import { TestClock } from "effect/testing"
-import { auditRepository, legacyViolationDigest } from "../check.ts"
+import { auditRepository } from "../check.ts"
 
 const effectVersion = "4.0.0-beta.102"
 
@@ -15,7 +14,7 @@ interface FixtureOptions {
   readonly inventoryPattern?: string
   readonly addUnassignedFile?: boolean
   readonly exceptions?: ReadonlyArray<{
-    readonly kind: "outer-host-adapter" | "temporary-migration-adapter"
+    readonly kind: string
     readonly path: string
     readonly rule: string
     readonly match: string
@@ -89,16 +88,12 @@ const makeFixture = Effect.fn("test.makeEffectMigrationFixture")(function*(optio
       package: "fixture",
       io: ["filesystem"],
       migrationDependencies: [],
-      status: options.status ?? "planned"
+      status: options.status ?? "migrated"
     }]
   })
   yield* writeJson(path.join(root, "tooling/effect-migration/exceptions.json"), {
     schemaVersion: 1,
     exceptions: options.exceptions ?? []
-  })
-  yield* writeJson(path.join(root, "tooling/effect-migration/baseline.json"), {
-    schemaVersion: 1,
-    entries: []
   })
   yield* fs.writeFileString(path.join(root, "src/example.ts"), options.source ?? "export const answer = 42\n")
   if (options.addUnassignedFile === true) {
@@ -130,39 +125,13 @@ const makeFixture = Effect.fn("test.makeEffectMigrationFixture")(function*(optio
   return root
 })
 
-const writeFixtureBaseline = Effect.fn("test.writeFixtureBaseline")(
-  function*(
-    root: string,
-    violations: ReadonlyArray<{
-      readonly rule: string
-      readonly path: string
-      readonly line?: number
-      readonly message: string
-    }>,
-    expiresOn = "2099-12-31"
-  ) {
-    const path = yield* Path.Path
-    yield* writeJson(path.join(root, "tooling/effect-migration/baseline.json"), {
-      schemaVersion: 1,
-      entries: [{
-        path: "src/example.ts",
-        slice: "fixture",
-        issue: 100,
-        violationCount: violations.length,
-        digest: legacyViolationDigest(violations),
-        expiresOn,
-        removalCondition: "Remove this entry when issue #100 migrates the complete fixture slice."
-      }]
-    })
-  }
-)
-
 layer(Layer.merge(BunFileSystem.layer, BunPath.layer))("Effect migration policy", (it) => {
-  it.effect("rejects new Effect escapes in planned code", () =>
+  it.effect("rejects planned inventory after final migration", () =>
     Effect.gen(function*() {
-      const root = yield* makeFixture({ source: "export async function legacy() { return 1 }\n" })
-      const report = yield* auditRepository(root)
-      assert.include(report.violations.map((violation) => violation.rule), "no-async-function")
+      const root = yield* makeFixture({ status: "planned" })
+      const error = yield* Effect.flip(auditRepository(root))
+      assert.strictEqual(error._tag, "MigrationPolicyReadError")
+      assert.strictEqual(error.path, "tooling/effect-migration/inventory.json")
     }))
 
   it.effect("rejects legacy async in a migrated slice", () =>
@@ -173,60 +142,6 @@ layer(Layer.merge(BunFileSystem.layer, BunPath.layer))("Effect migration policy"
       })
       const report = yield* auditRepository(root)
       assert.include(report.violations.map((violation) => violation.rule), "no-async-function")
-    }))
-
-  it.effect("accepts only an exact unexpired planned-slice baseline", () =>
-    Effect.gen(function*() {
-      yield* TestClock.setTime(Date.UTC(2026, 7, 1))
-      const root = yield* makeFixture({
-        source: "export async function legacy() { return 1 }\n"
-      })
-      const initial = yield* auditRepository(root)
-      yield* writeFixtureBaseline(root, initial.violations)
-      const report = yield* auditRepository(root)
-      assert.isEmpty(report.violations)
-    }))
-
-  it.effect("rejects changed, stale, and expired planned-slice baselines", () =>
-    Effect.gen(function*() {
-      yield* TestClock.setTime(Date.UTC(2026, 7, 1))
-      const fs = yield* FileSystem.FileSystem
-      const path = yield* Path.Path
-      const root = yield* makeFixture({
-        source: "export async function legacy() { return 1 }\n"
-      })
-      const initial = yield* auditRepository(root)
-      yield* writeFixtureBaseline(root, initial.violations)
-      yield* fs.writeFileString(
-        path.join(root, "src/example.ts"),
-        "export async function changed() { return 1 }\n"
-      )
-      const changed = yield* auditRepository(root)
-      assert.include(
-        changed.violations.map((violation) => violation.rule),
-        "legacy-baseline-mismatch"
-      )
-
-      yield* fs.writeFileString(
-        path.join(root, "src/example.ts"),
-        "export const migrated = 1\n"
-      )
-      const stale = yield* auditRepository(root)
-      assert.include(
-        stale.violations.map((violation) => violation.rule),
-        "legacy-baseline-stale"
-      )
-
-      yield* fs.writeFileString(
-        path.join(root, "src/example.ts"),
-        "export async function legacy() { return 1 }\n"
-      )
-      yield* writeFixtureBaseline(root, initial.violations, "2026-07-31")
-      const expired = yield* auditRepository(root)
-      assert.include(
-        expired.violations.map((violation) => violation.rule),
-        "legacy-baseline-expired"
-      )
     }))
 
   it.effect("enforces every strict AST boundary in migrated code", () =>
@@ -294,21 +209,43 @@ layer(Layer.merge(BunFileSystem.layer, BunPath.layer))("Effect migration policy"
       assert.include(report.violations.map((violation) => violation.rule), "pure-code-effect-dependency")
     }))
 
-  it.effect("rejects stale exceptions that no longer match a violation", () =>
+  it.effect("rejects temporary migration exceptions after final migration", () =>
     Effect.gen(function*() {
       const root = yield* makeFixture({
-        status: "migrated",
+        source: "export function fail() { throw new Error(\"legacy\") }\n",
         exceptions: [{
           kind: "temporary-migration-adapter",
           path: "src/example.ts",
           rule: "no-throw",
           match: "throw new Error",
           maximumOccurrences: 1,
+          reason: "This obsolete fixture attempts to restore migration debt.",
+          ownerIssue: 100,
+          test: "src/example.ts",
+          removalCondition: "Temporary exceptions are forbidden after the final migration.",
+          expiresOn: "2099-12-31"
+        }]
+      })
+      const error = yield* Effect.flip(auditRepository(root))
+      assert.strictEqual(error._tag, "MigrationPolicyReadError")
+      assert.strictEqual(error.path, "tooling/effect-migration/exceptions.json")
+    }))
+
+  it.effect("rejects stale exceptions that no longer match a violation", () =>
+    Effect.gen(function*() {
+      const root = yield* makeFixture({
+        status: "migrated",
+        exceptions: [{
+          kind: "outer-host-adapter",
+          path: "src/example.ts",
+          rule: "no-runtime-execution",
+          match: "BunRuntime.runMain",
+          maximumOccurrences: 1,
           reason: "Fixture exception that should become stale.",
           ownerIssue: 100,
           test: "src/example.ts",
           removalCondition: "Remove when issue #100 migrates this fixture adapter.",
-          expiresOn: "2099-12-31"
+          expiresOn: null
         }]
       })
       const report = yield* auditRepository(root)
@@ -371,20 +308,22 @@ layer(Layer.merge(BunFileSystem.layer, BunPath.layer))("Effect migration policy"
       const root = yield* makeFixture({
         status: "migrated",
         source: [
-          "export function first() { throw new Error(\"one\") }",
-          "export function second() { throw new Error(\"two\") }"
+          "import * as BunRuntime from \"@effect/platform-bun/BunRuntime\"",
+          "import { Effect } from \"effect\"",
+          "BunRuntime.runMain(Effect.void)",
+          "BunRuntime.runMain(Effect.void)"
         ].join("\n"),
         exceptions: [{
-          kind: "temporary-migration-adapter",
+          kind: "outer-host-adapter",
           path: "src/example.ts",
-          rule: "no-throw",
-          match: "throw new Error",
+          rule: "no-runtime-execution",
+          match: "BunRuntime.runMain",
           maximumOccurrences: 1,
           reason: "The fixture ceiling intentionally permits only one occurrence.",
           ownerIssue: 100,
           test: "src/example.ts",
           removalCondition: "Remove when issue #100 migrates the temporary fixture path.",
-          expiresOn: "2099-12-31"
+          expiresOn: null
         }]
       })
       const report = yield* auditRepository(root)

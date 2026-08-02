@@ -142,26 +142,29 @@ same review as the inventory because ignored source cannot be migrated.
 
 Each slice has one status:
 
-- `planned`: inventoried legacy removal work; strict rules are pending only so
-  the repository stays buildable while that finite slice is migrated.
 - `migrated`: effectful code whose strict rules and conformance tests apply.
 - `pure`: reviewed code with no runtime effect; keep it free of unnecessary
   Effect wrapping and reclassify it if I/O is introduced.
 - `runtime-boundary`: a deliberately narrow framework/executable adapter. It
   is enforced like migrated code, with exact exceptions for required escapes.
 
+The completed migration deliberately has no `planned` status or legacy
+baseline registry. Adding either is a policy-schema error: new AgentOS-owned
+TypeScript must be Effect-native or reviewed as pure before it lands.
+
 The Oxc AST gate rejects these patterns in enforced paths: async
 functions, constructed Promises, thrown failures, ambient environment reads,
 unreviewed Effect runtime execution, raw HTTP/filesystem/process calls, unsafe
 type assertions, untyped JSON parsing and native timers. Enforcement rolls out
-in finite slices so untouched legacy remains buildable; the required end state
-is zero legacy effectful TypeScript, and completed paths cannot regress.
+across every inventoried TypeScript path; the repository has no legacy
+effectful TypeScript baseline, and completed paths cannot regress.
 
 [`exceptions.json`](../tooling/effect-migration/exceptions.json) is the only
-escape registry. Each record names one file, one rule, an exact source match,
-a positive occurrence ceiling and a substantive reason. The checker rejects
-stale, over-limit or non-enforced exceptions. Pure code is represented by
-inventory status rather than by suppressing rules.
+escape registry and accepts only unavoidable outer host adapters. Each record
+names one file, one runtime-execution rule, an exact source match, a positive
+occurrence ceiling and a substantive reason. Temporary migration exceptions
+are invalid. The checker rejects stale, over-limit or non-enforced exceptions.
+Pure code is represented by inventory status rather than by suppressing rules.
 
 ## Migrating a slice
 
@@ -172,8 +175,9 @@ inventory status rather than by suppressing rules.
    `@effect/vitest`; leave truly pure tests simple.
 4. Move runtime I/O behind scoped platform/provider Layers, compose them at the
    edge, and preserve native authority boundaries.
-5. Change the narrow inventory rule from `planned` to `migrated` and resolve
-   every gate finding without broad suppression.
+5. Add the narrow inventory rule as `migrated`, `pure`, or
+   `runtime-boundary`, and resolve every gate finding without broad
+   suppression.
 6. Run the slice conformance suite, `bun run effect:check`, `bun run
    effect:test`, build/typecheck and the full repository check. Use disposable
    Kubernetes and provider fixtures when the slice changes those boundaries.
