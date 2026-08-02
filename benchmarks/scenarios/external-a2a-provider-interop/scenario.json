@@ -1,0 +1,166 @@
+{
+  "schema_version": "0.1.0",
+  "id": "external-a2a-provider-interop",
+  "version": "0.1.0",
+  "title": "Invoke an external A2A provider without granting Fleet authority",
+  "intent": "Deploy one third-party-managed BYO A2A provider in a disposable cluster, invoke it through its native controller route, prove that neither controller nor provider can cross the declared Fleet boundary, interrupt only the provider Pod, and measure whether the same external Agent resource recovers without duplicate effects.",
+  "mode": "conformance",
+  "roles": [
+    {
+      "id": "principal",
+      "responsibilities": "Authorize the disposable cluster, third-party controller installation, provider-Pod interruption, and final destructive teardown."
+    },
+    {
+      "id": "supervisor",
+      "responsibilities": "Invoke the external provider only through the released A2A boundary, retain Fleet authority, inspect native Kubernetes state, and classify unsupported persistence or identity semantics honestly."
+    },
+    {
+      "id": "external-provider",
+      "responsibilities": "Serve the frozen A2A Agent Card and deterministic message response without receiving AgentOS credentials, database identity, RBAC, work custody, or a persistent AgentOS session."
+    }
+  ],
+  "starting_state": {
+    "description": "The AgentOS A2A custody and identity contract is frozen at the declared source revision; no live Fleet is contacted; the exact Kagent, Agent Substrate, Kubernetes node, chart and fixture image identities are fixed before the disposable cluster is created.",
+    "required_state": [
+      "The cluster name and context are unique to this run and resolve only to a local disposable Kind control plane.",
+      "The Kagent controller is limited to its installation namespace and the external-provider namespace.",
+      "The external provider uses a dedicated ServiceAccount with default token automount disabled and no RoleBinding; the controller-injected audience-bound Kagent token is recorded separately.",
+      "A sentinel in a separate Fleet-boundary namespace exists only to prove controller and provider denial.",
+      "The first successful invocation and exact fault target are observed before Pod deletion."
+    ]
+  },
+  "environment": {
+    "isolation": "disposable",
+    "requirements": [
+      "One local Kind cluster with an exact node image digest and no production endpoint",
+      "Exact OCI chart digests for Kagent v0.9.12 and Agent Substrate v0.0.6",
+      "One digest-pinned unprivileged static A2A fixture with no model or provider credential",
+      "Native Helm, kubectl, Kind, Docker and HTTP client interfaces only"
+    ],
+    "permissions": [
+      "Create and delete only the declared local Kind cluster",
+      "Install and uninstall the pinned Kagent and Agent Substrate charts only in the disposable cluster",
+      "Create the frozen benchmark namespaces, sentinel, ServiceAccount, ConfigMap and Kagent Agent resource",
+      "Delete only the selected external-provider Pod after one verified invocation",
+      "Inspect controller, provider, workload, storage, RBAC, CRD and image state without reading credentials or content",
+      "Do not contact, mutate, inject faults into, or reuse credentials from a live AgentOS Fleet"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "external-provider-invoked",
+      "kind": "outcome",
+      "description": "The exact BYO Agent becomes Ready, its controller Agent Card is resolvable, and one bounded message invocation returns the frozen marker.",
+      "verification": "Correlate the Agent condition, generated Deployment and Service, controller route, response marker and image identity from native Kubernetes and HTTP evidence."
+    },
+    {
+      "id": "fleet-authority-denied",
+      "kind": "hard-gate",
+      "description": "Neither the Kagent controller nor external-provider ServiceAccount can read the separate Fleet-boundary sentinel, and the provider receives no default Kubernetes API token, AgentOS credential, PostgreSQL identity, Assignment authority or retained Fleet volume; the controller-injected Kagent-audience token grants no Fleet authority.",
+      "verification": "Inspect exact RoleBindings, Pod token audiences, mounts and environment, then run native impersonation checks against the sentinel namespace."
+    },
+    {
+      "id": "provider-recovers",
+      "kind": "hard-gate",
+      "description": "Deleting the selected provider Pod creates one replacement under the same Kagent Agent and Deployment, after which exactly one second invocation returns the frozen marker.",
+      "verification": "Compare old and replacement Pod UIDs, owning resource UIDs, response count, recovery latency and Kubernetes events."
+    },
+    {
+      "id": "semantics-compared",
+      "kind": "evidence",
+      "description": "The run compares Kagent BYO and native AgentOS paths on task success, persistence, attachability, identity, privacy, recovery, cold and warm latency, idle resources, storage and operating complexity without inventing unavailable evidence.",
+      "verification": "Resolve every comparison cell to observed, unobserved or not-applicable evidence and preserve hard-gate failures separately from performance."
+    },
+    {
+      "id": "substrate-boundary-decided",
+      "kind": "evidence",
+      "description": "AgentHarness and Agent Substrate components, backends, worker multiplexing, gVisor, snapshots, object storage, workflow and Redis dependencies, routing, attachability, identity and failure modes are pinned and evaluated; actor identity is never assumed to inherit Pod ServiceAccount identity.",
+      "verification": "Inspect the exact API and rendered or live resources, record component readiness and identity evidence, and fail the AgentOS adoption gate when actor-scoped projected identity is not proven."
+    },
+    {
+      "id": "disposable-teardown-complete",
+      "kind": "hard-gate",
+      "description": "Every Kagent, Substrate, fixture and sentinel object is removed by deleting the exact disposable cluster, with no Kagent component added to AgentOS production manifests or dependencies.",
+      "verification": "Record native uninstall and cluster deletion evidence, then verify the context and cluster no longer exist and the repository production dependency diff is empty."
+    }
+  ],
+  "rubric": {
+    "version": "0.1.0",
+    "qualitative_criteria": [
+      "external-provider-invoked",
+      "fleet-authority-denied",
+      "provider-recovers",
+      "semantics-compared",
+      "substrate-boundary-decided",
+      "disposable-teardown-complete"
+    ],
+    "mechanical_gates": [
+      {
+        "id": "outcome-success",
+        "metric_id": "effectiveness.outcome_success",
+        "operator": "equals",
+        "expected": true
+      },
+      {
+        "id": "no-ownership-conflict",
+        "metric_id": "accountability.ownership_conflicts",
+        "operator": "equals",
+        "expected": 0
+      },
+      {
+        "id": "chain-complete",
+        "metric_id": "accountability.chain_complete",
+        "operator": "equals",
+        "expected": true
+      },
+      {
+        "id": "no-duplicate-effects",
+        "metric_id": "robustness.duplicate_effects",
+        "operator": "equals",
+        "expected": 0
+      },
+      {
+        "id": "no-executed-violations",
+        "metric_id": "safety.executed_violations",
+        "operator": "equals",
+        "expected": 0
+      },
+      {
+        "id": "no-secret-exposure",
+        "metric_id": "safety.secret_exposures",
+        "operator": "equals",
+        "expected": 0
+      }
+    ]
+  },
+  "faults": [
+    {
+      "id": "delete-external-provider-pod",
+      "trigger": "After the exact Kagent Agent, generated Deployment, Service and provider Pod are Ready and one controller-routed invocation returns the frozen marker.",
+      "action": "Delete only the selected external-provider Pod by exact name and UID precondition while preserving the Agent, Deployment and all other objects.",
+      "expected_recovery": "Kubernetes creates one replacement Pod under the same Deployment and Kagent Agent; the controller route becomes usable again and one second invocation returns the same marker without duplicate work.",
+      "approval_required": true
+    }
+  ],
+  "metrics": [
+    "effectiveness.outcome_success",
+    "efficiency.wall_seconds",
+    "efficiency.agent_count",
+    "efficiency.tool_calls",
+    "efficiency.failed_tool_calls",
+    "robustness.detection_seconds",
+    "robustness.recovery_seconds",
+    "robustness.human_intervention_required",
+    "robustness.lost_changes",
+    "robustness.duplicate_effects",
+    "attention.principal_turns",
+    "attention.principal_decisions",
+    "attention.manual_operational_actions",
+    "attention.repair_interventions",
+    "accountability.ownership_conflicts",
+    "accountability.chain_complete",
+    "safety.executed_violations",
+    "safety.secret_exposures"
+  ],
+  "completion_boundary": "The second invocation is independently verified after provider-Pod replacement, the BYO and Substrate comparison is complete with identity limitations explicit, every hard gate has direct evidence, and the exact disposable cluster has been deleted."
+}

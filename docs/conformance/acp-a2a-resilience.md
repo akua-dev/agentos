@@ -68,7 +68,7 @@ Effect process service. It contains no async function, ambient environment
 read, native timer, thrown failure, type assertion, untyped JSON or nested
 runtime.
 
-On 2026-08-01 it passed twice on:
+On 2026-08-02 it passed twice on:
 
 - Kind `v0.32.0`;
 - Kubernetes node `kindest/node:v1.36.1` at

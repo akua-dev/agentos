@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fleet-authority-sentinel
+  namespace: agentos-boundary
+  labels:
+    app.kubernetes.io/part-of: agentos-kagent-interop
+data:
+  authority: denied-to-external-provider
