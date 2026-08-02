@@ -1,10 +1,18 @@
-import { readFile } from "node:fs/promises";
-
+import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Effect } from "effect";
+import {
+  Config,
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+} from "effect";
 
 import { AGENTOS_EGRESS_TOKEN_PATH } from "./identity.ts";
-import { runPromiseLegacy } from "../shared/legacy.ts";
+import {
+  legacyEnvironmentConfigLayer,
+  runPromiseLegacy,
+} from "../shared/legacy.ts";
 
 export const AGENTOS_EGRESS_TOKEN_FILE_ENV = "AGENTOS_EGRESS_TOKEN_FILE";
 
@@ -30,39 +38,37 @@ export interface PiGatewayModel {
   readonly baseUrl?: string;
 }
 
+const PiWorkloadIdentityEnvironment = Config.all({
+  assignmentId: Config.option(Config.string("AGENTOS_ASSIGNMENT_ID")),
+  gatewayUrl: Config.option(Config.string("AI_GATEWAY_URL")),
+  mode: Config.option(Config.string("AGENTOS_PI_PROVIDER_MODE")),
+  tokenFile: Config.option(Config.string(AGENTOS_EGRESS_TOKEN_FILE_ENV)),
+}).pipe(Effect.map(({ assignmentId, gatewayUrl, mode, tokenFile }) => ({
+  AGENTOS_ASSIGNMENT_ID: Option.getOrUndefined(assignmentId),
+  AI_GATEWAY_URL: Option.getOrUndefined(gatewayUrl),
+  AGENTOS_PI_PROVIDER_MODE: Option.getOrUndefined(mode),
+  [AGENTOS_EGRESS_TOKEN_FILE_ENV]: Option.getOrUndefined(tokenFile),
+})));
+
+const piWorkloadIdentityPlatform = Layer.merge(
+  BunFileSystem.layer,
+  legacyEnvironmentConfigLayer(),
+);
+
 export function registerPiWorkloadIdentity(
   pi: ExtensionAPI,
   options: PiWorkloadIdentityOptions = {},
 ) {
-  const environment = options.environment ?? process.env;
-  const gatewayUrl = normalizeUrl(environment.AI_GATEWAY_URL);
-  const tokenFile =
-    options.tokenFile ??
-    environment[AGENTOS_EGRESS_TOKEN_FILE_ENV] ??
-    AGENTOS_EGRESS_TOKEN_PATH;
-
-  pi.on("before_provider_headers", async (event, context) => {
-    if (!usesAgentOSGateway(context.model, environment, gatewayUrl)) return;
-
-    // Clear both supported legacy credentials before any fallible work. Pi
-    // intentionally swallows extension errors, so retaining either value here
-    // would turn a projected-token failure into an authentication bypass.
-    for (const name of Object.keys(event.headers)) {
-      if (isGatewaySecurityHeader(name)) event.headers[name] = null;
-    }
-
-    const resolution = await runPromiseLegacy(
-      resolvePiWorkloadIdentity(context.model, {
-        environment,
-        tokenFile,
-      }),
-    );
-    if (!resolution.active || resolution.headers === undefined) return;
-
-    for (const [name, value] of Object.entries(resolution.headers)) {
-      event.headers[name] = value;
-    }
-  });
+  pi.on("before_provider_headers", (event, context) =>
+    runPromiseLegacy(
+      resolvePiWorkloadIdentity(context.model, options).pipe(
+        Effect.tap((resolution) =>
+          Effect.sync(() => applyResolution(event.headers, resolution))
+        ),
+        Effect.asVoid,
+        Effect.provide(piWorkloadIdentityPlatform),
+      ),
+    ));
 }
 
 function usesAgentOSGateway(
@@ -81,36 +87,38 @@ function usesAgentOSGateway(
 export function resolvePiWorkloadIdentity(
   model: PiGatewayModel | undefined,
   options: PiWorkloadIdentityOptions = {},
-): Effect.Effect<PiWorkloadIdentityResolution> {
-  const environment = options.environment ?? process.env;
-  const gatewayUrl = normalizeUrl(environment.AI_GATEWAY_URL);
-  if (!usesAgentOSGateway(model, environment, gatewayUrl)) {
-    return Effect.succeed({ active: false });
-  }
+) {
+  return Effect.gen(function*() {
+    const environment = options.environment ??
+      (yield* PiWorkloadIdentityEnvironment);
+    const gatewayUrl = normalizeUrl(environment.AI_GATEWAY_URL);
+    if (!usesAgentOSGateway(model, environment, gatewayUrl)) {
+      return { active: false } satisfies PiWorkloadIdentityResolution;
+    }
 
-  const assignmentId = environment.AGENTOS_ASSIGNMENT_ID;
-  if (assignmentId !== undefined && !ASSIGNMENT_ID.test(assignmentId)) {
-    return Effect.succeed({ active: true });
-  }
+    const assignmentId = environment.AGENTOS_ASSIGNMENT_ID;
+    if (assignmentId !== undefined && !ASSIGNMENT_ID.test(assignmentId)) {
+      return { active: true } satisfies PiWorkloadIdentityResolution;
+    }
 
-  const tokenFile =
-    options.tokenFile ??
-    environment[AGENTOS_EGRESS_TOKEN_FILE_ENV] ??
-    AGENTOS_EGRESS_TOKEN_PATH;
-  return readProjectedToken(tokenFile).pipe(
-    Effect.map((token): PiWorkloadIdentityResolution => {
-      if (token === undefined) return { active: true };
-      return {
-        active: true,
-        headers: {
-          authorization: `Bearer ${token}`,
-          ...(assignmentId === undefined
-            ? {}
-            : { "x-agentos-assignment-id": assignmentId }),
-        },
-      };
-    }),
-  );
+    const tokenFile =
+      options.tokenFile ??
+      environment[AGENTOS_EGRESS_TOKEN_FILE_ENV] ??
+      AGENTOS_EGRESS_TOKEN_PATH;
+    const token = yield* readProjectedToken(tokenFile);
+    if (token === undefined) {
+      return { active: true } satisfies PiWorkloadIdentityResolution;
+    }
+    return {
+      active: true,
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(assignmentId === undefined
+          ? {}
+          : { "x-agentos-assignment-id": assignmentId }),
+      },
+    } satisfies PiWorkloadIdentityResolution;
+  });
 }
 
 export function isGatewaySecurityHeader(name: string): boolean {
@@ -123,27 +131,36 @@ export function isGatewaySecurityHeader(name: string): boolean {
   );
 }
 
-function readProjectedToken(path: string): Effect.Effect<string | undefined> {
-  return Effect.promise(async () => {
-    try {
-      return await readFile(path, "utf8");
-    } catch {
+function readProjectedToken(path: string) {
+  return Effect.gen(function*() {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const contents = Option.getOrUndefined(
+      yield* fileSystem.readFileString(path).pipe(Effect.option),
+    );
+    if (
+      contents === undefined ||
+      contents.length === 0 ||
+      contents.length > MAX_PROJECTED_TOKEN_BYTES ||
+      contents.trim() !== contents ||
+      !JWT_LIKE.test(contents)
+    ) {
       return undefined;
     }
-  }).pipe(
-    Effect.map((contents) => {
-      if (
-        contents === undefined ||
-        contents.length === 0 ||
-        contents.length > MAX_PROJECTED_TOKEN_BYTES ||
-        contents.trim() !== contents ||
-        !JWT_LIKE.test(contents)
-      ) {
-        return undefined;
-      }
-      return contents;
-    }),
-  );
+    return contents;
+  });
+}
+
+function applyResolution(
+  headers: Record<string, string | null | undefined>,
+  resolution: PiWorkloadIdentityResolution,
+) {
+  if (!resolution.active) return;
+  for (const name of Object.keys(headers)) {
+    if (isGatewaySecurityHeader(name)) headers[name] = null;
+  }
+  for (const [name, value] of Object.entries(resolution.headers ?? {})) {
+    headers[name] = value;
+  }
 }
 
 function normalizeUrl(value: string | undefined): string | undefined {

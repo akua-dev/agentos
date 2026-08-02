@@ -641,15 +641,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/runtime.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/src/access/pi-workload-identity.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 5,
-      "digest": "96d630203e4087a112f65490f2c3786fa5803e470381825b4dec53da90ae19e5",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/access/pi-workload-identity.ts under issue #104; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/src/access/tests/github-routes.effect.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -792,24 +783,6 @@
       "digest": "dd1306ee159ea0cfd15bf12e76696cb30dd3653fdc78b11a6fca15d05db36f3b",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/coordination-readiness/tests/extension.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/supervision-guard/extension.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 5,
-      "digest": "0ea8f3234bac7e78a24e6d99406dfd847ca027472a8024c969df3598851d23bf",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/supervision-guard/extension.ts under issue #104; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/supervision-guard/tests/extension.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 22,
-      "digest": "b4847f9e24173e7697478eff463bdae62ee86906dadb6f04b645989673620a2a",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/supervision-guard/tests/extension.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/src/telemetry/auxiliary.ts",
@@ -1035,15 +1008,6 @@
       "digest": "b34385e5b2be2aa9f4cc769a03c3e99264f6b959621879c166ad13b3e0009a41",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/observability-skill.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/tests/pi-workload-identity.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 3,
-      "digest": "0152cfe390398fb533bfe6ddaf07daeb895bec54b309ef959d0aef780534e670",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/pi-workload-identity.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/tests/preflight.test.ts",

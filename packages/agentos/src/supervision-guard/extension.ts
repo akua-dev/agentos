@@ -2,6 +2,13 @@ import type {
   ExtensionAPI,
   ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
+import { Config, Effect, Result, Schema } from "effect";
+
+import {
+  legacyEnvironmentConfigLayer,
+  runPromiseLegacy,
+  runSyncLegacy,
+} from "../shared/legacy.ts";
 
 const MESSAGE_TYPE = "agentos-supervision-guard";
 const RECOVERY_MESSAGE_TYPE = "agentos-supervision-recovery";
@@ -20,39 +27,46 @@ const RECOVERY = [
 ].join("\n");
 
 export type AgentOSSupervisionGuardOptions = {
-  startupRecovery?: boolean;
+  readonly environment?: Readonly<Record<string, string | undefined>>;
+  readonly startupRecovery?: boolean;
 };
+
+export class AgentOSSupervisionGuardError extends Schema.TaggedErrorClass<AgentOSSupervisionGuardError>()(
+  "AgentOSSupervisionGuardError",
+  { code: Schema.Literal("message_delivery_failed") },
+) {}
 
 export function registerAgentosSupervisionGuard(
   pi: ExtensionAPI,
   options: AgentOSSupervisionGuardOptions = {},
 ) {
-  if (supervisionGuardDisabled()) return;
+  const disabledValue = options.environment === undefined
+    ? runSyncLegacy(
+        Config.string("AGENTOS_DISABLE_SUPERVISION_GUARD").pipe(
+          Config.withDefault(""),
+          Effect.provide(legacyEnvironmentConfigLayer()),
+        ),
+      )
+    : options.environment.AGENTOS_DISABLE_SUPERVISION_GUARD;
+  if (supervisionGuardDisabled(disabledValue)) return;
 
   const taggedRunningTaskIds = new Set<string>();
   let reminderFollowUpActive = false;
   let sessionStartChecked = false;
 
   if (options.startupRecovery !== false) {
-    pi.on("session_start", async (_event, context) => {
-      if (sessionStartChecked) return;
-      sessionStartChecked = true;
-      if (!context.isIdle()) return;
-
-      try {
-        await pi.sendMessage(
-          {
-            customType: RECOVERY_MESSAGE_TYPE,
-            content: RECOVERY,
-            display: true,
-            details: {},
-          },
-          { deliverAs: "followUp", triggerTurn: true },
-        );
-      } catch {
-        sessionStartChecked = false;
-      }
-    });
+    pi.on("session_start", (_event, context) =>
+      runPromiseLegacy(Effect.gen(function*() {
+        if (sessionStartChecked) return;
+        sessionStartChecked = true;
+        if (!context.isIdle()) return;
+        const delivered = yield* Effect.result(sendMessage(
+          pi,
+          RECOVERY_MESSAGE_TYPE,
+          RECOVERY,
+        ));
+        if (Result.isFailure(delivered)) sessionStartChecked = false;
+      })));
   }
 
   pi.on("tool_result", (event) => {
@@ -83,29 +97,23 @@ export function registerAgentosSupervisionGuard(
     }
   });
 
-  pi.on("agent_settled", async (_event, context) => {
-    if (reminderFollowUpActive) {
-      reminderFollowUpActive = false;
-      return;
-    }
-    if (!context.isIdle()) return;
-    if (taggedRunningTaskIds.size > 0) return;
+  pi.on("agent_settled", (_event, context) =>
+    runPromiseLegacy(Effect.gen(function*() {
+      if (reminderFollowUpActive) {
+        reminderFollowUpActive = false;
+        return;
+      }
+      if (!context.isIdle()) return;
+      if (taggedRunningTaskIds.size > 0) return;
 
-    reminderFollowUpActive = true;
-    try {
-      await pi.sendMessage(
-        {
-          customType: MESSAGE_TYPE,
-          content: REMINDER,
-          display: true,
-          details: {},
-        },
-        { deliverAs: "followUp", triggerTurn: true },
-      );
-    } catch {
-      reminderFollowUpActive = false;
-    }
-  });
+      reminderFollowUpActive = true;
+      const delivered = yield* Effect.result(sendMessage(
+        pi,
+        MESSAGE_TYPE,
+        REMINDER,
+      ));
+      if (Result.isFailure(delivered)) reminderFollowUpActive = false;
+    })));
 }
 
 export default registerAgentosSupervisionGuard;
@@ -171,6 +179,27 @@ function completionTaskIds(value: unknown): string[] {
   );
 }
 
-function supervisionGuardDisabled(): boolean {
-  return process.env.AGENTOS_DISABLE_SUPERVISION_GUARD?.toLowerCase() === "true";
+function supervisionGuardDisabled(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
+}
+
+function sendMessage(
+  pi: ExtensionAPI,
+  customType: string,
+  content: string,
+) {
+  return Effect.try({
+    try: () => pi.sendMessage(
+      {
+        customType,
+        content,
+        display: true,
+        details: {},
+      },
+      { deliverAs: "followUp", triggerTurn: true },
+    ),
+    catch: () => AgentOSSupervisionGuardError.make({
+      code: "message_delivery_failed",
+    }),
+  });
 }
