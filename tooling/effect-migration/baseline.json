@@ -560,24 +560,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/llms-index.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/scripts/brand-assets.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 6,
-      "digest": "74b2f1c5c6949ff87e0d8018c424d2ac1a92979e18bc914519b9318677ba433a",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/brand-assets.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/generate-brand-assets.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 4,
-      "digest": "6e4e33c7ad250247515a554f178f0dfb09390893085ce349fcef3e38d2947af7",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/generate-brand-assets.ts under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/scripts/lint.entry.ts",
       "slice": "website",
       "issue": 99,
