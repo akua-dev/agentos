@@ -558,24 +558,6 @@
       "digest": "679c83d5ed22bf25b274595e7b7d8b509a6618d7d57fb9aefca1311b13a35bba",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/llms-index.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/site-contract.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 30,
-      "digest": "6ddcf602955b2d389d7f138b0af1550e219a55b8f6e550963222b97341ee5fae",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/site-contract.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/site-contract.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 6,
-      "digest": "5c65148c0c82a129918fac649acc351cc6116336cb5984fb038c5c315cb5924e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/site-contract.ts under issue #99; never refresh touched debt."
     }
   ]
 }
