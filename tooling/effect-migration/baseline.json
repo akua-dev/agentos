@@ -11,15 +11,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in mise.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/resources/crewmates/default/kubernetes/tests/manifest.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 7,
-      "digest": "aa98a00a4d5e4729c361cb564fe7abaf229875e06fa687c53128fce9f8b2f475",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/crewmates/default/kubernetes/tests/manifest.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/resources/roles/firstmate/kubernetes/tests/manifests.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
