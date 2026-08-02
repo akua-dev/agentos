@@ -1,17 +1,14 @@
-import { complete } from "@earendil-works/pi-ai/compat";
+import type { Api, Model, TSchema } from "@earendil-works/pi-ai";
 import { Type } from "@earendil-works/pi-ai";
-import type { Model } from "@earendil-works/pi-ai";
-import type {
-  ModelRegistry,
-  ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
+import { complete } from "@earendil-works/pi-ai/compat";
+import { Clock, Effect, Fiber, Schema } from "effect";
 
-import type { MateMemoryStore } from "../memory/store.ts";
 import {
   shouldDream,
   type MemoryActivityStore,
 } from "../memory/activity.ts";
-import { formatTopic, redactAuxiliaryInput } from "./prompts.ts";
+import type { MateMemoryStore } from "../memory/store.ts";
+import type { TopicType } from "../memory/schema.ts";
 import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
 import {
   safeAssistantFailure,
@@ -19,60 +16,103 @@ import {
   startAgentOSAuxiliaryOperation,
 } from "../telemetry/auxiliary.ts";
 import type { AgentOSProviderAttempt } from "../telemetry/runtime.ts";
+import type { RelevantSelectionAuth } from "./model.ts";
+import { formatTopic, redactAuxiliaryInput } from "./prompts.ts";
+
+type CompleteResult = Awaited<ReturnType<typeof complete>>;
 
 export type HumanInputSource = "interactive" | "rpc" | "extension";
 
 export interface MaintenanceRunContext {
-  agentDir: string;
-  cwd: string;
-  model: Model<any> | undefined;
-  modelRegistry: ModelRegistry | undefined;
-  signal?: AbortSignal;
-  telemetry?: AgentOSTelemetrySource;
+  readonly agentDir: string;
+  readonly cwd: string;
+  readonly model: Model<Api> | undefined;
+  readonly resolveAuth?: Effect.Effect<RelevantSelectionAuth, unknown>;
+  readonly signal?: AbortSignal;
+  readonly telemetry?: AgentOSTelemetrySource;
 }
 
 export interface MaintenanceRunRequest extends MaintenanceRunContext {
-  kind: "extraction" | "dream";
-  pauseGeneration: number;
-  mutationEpoch: number;
-  systemPrompt: string;
-  prompt: string;
-  tools: ToolDefinition[];
-  completeImpl?: typeof complete;
+  readonly kind: "extraction" | "dream";
+  readonly pauseGeneration: number;
+  readonly mutationEpoch: number;
+  readonly systemPrompt: string;
+  readonly prompt: string;
+  readonly tools: ReadonlyArray<MaintenanceTool>;
+  readonly completeImpl?: (
+    ...args: Parameters<typeof complete>
+  ) => Effect.Effect<CompleteResult, unknown>;
 }
 
 export interface MaintenanceRunResult {
-  summary: string;
-  touchedPaths: string[];
+  readonly summary: string;
+  readonly touchedPaths: ReadonlyArray<string>;
 }
 
 export type MaintenanceAgentRunner = (
   request: MaintenanceRunRequest,
-) => Promise<MaintenanceRunResult>;
+) => Effect.Effect<MaintenanceRunResult, MateMemoryMaintenanceError>;
 
 export interface MaintenanceEvent {
-  status: "succeeded" | "failed";
-  summary: string;
+  readonly status: "succeeded" | "failed";
+  readonly summary: string;
 }
 
 export interface MateMemoryMaintenanceOptions {
-  store: MateMemoryStore;
-  runner?: MaintenanceAgentRunner;
-  isPaused: () => boolean;
-  getPauseGeneration?: () => number;
-  onEvent?: (event: MaintenanceEvent) => void;
-  now?: () => Date;
-  maxInputCharacters?: number;
+  readonly store: MateMemoryStore;
+  readonly runner?: MaintenanceAgentRunner;
+  readonly isPaused: () => boolean;
+  readonly getPauseGeneration?: () => number;
+  readonly onEvent?: (event: MaintenanceEvent) => void;
+  readonly now?: Effect.Effect<Date>;
+  readonly maxInputCharacters?: number;
 }
 
 export interface MaintenanceToolOptions {
-  now?: () => Date;
-  onMutation?: (relativePath: string) => void;
-  isPaused?: () => boolean;
-  isActive?: () => boolean;
-  mutationEpoch?: number;
-  getMutationEpoch?: () => number;
+  readonly now?: Effect.Effect<Date>;
+  readonly onMutation?: (relativePath: string) => void;
+  readonly isPaused?: () => boolean;
+  readonly isActive?: () => boolean;
+  readonly mutationEpoch?: number;
+  readonly getMutationEpoch?: () => number;
 }
+
+export interface MaintenanceToolResult {
+  readonly content: ReadonlyArray<{ readonly type: "text"; readonly text: string }>;
+  readonly details: Readonly<Record<string, unknown>>;
+}
+
+export interface MaintenanceTool {
+  readonly name: string;
+  readonly label: string;
+  readonly description: string;
+  readonly parameters: TSchema;
+  execute(
+    input: Readonly<Record<string, unknown>>,
+  ): Effect.Effect<MaintenanceToolResult, MateMemoryMaintenanceError>;
+}
+
+const MaintenanceErrorCode = Schema.Literals([
+  "authentication_unavailable",
+  "drain_timeout",
+  "inactive",
+  "invalid_action",
+  "operation_limit",
+  "provider_failed",
+  "request_failed",
+  "telemetry_unavailable",
+  "tool_failed",
+  "tool_unavailable",
+]);
+
+export class MateMemoryMaintenanceError extends Schema.TaggedErrorClass<MateMemoryMaintenanceError>()(
+  "MateMemoryMaintenanceError",
+  {
+    cause: Schema.Unknown,
+    code: MaintenanceErrorCode,
+    message: Schema.String,
+  },
+) {}
 
 const EXTRACTION_SYSTEM_PROMPT = [
   "# Memory extraction",
@@ -94,6 +134,48 @@ const DREAM_SYSTEM_PROMPT = [
 ].join("\n");
 
 const DEFAULT_INPUT_CHARACTERS = 8_192;
+const MAX_MAINTENANCE_STEPS = 16;
+const MAX_TOOL_RESULT_CHARACTERS = 32_768;
+const MaintenanceCallSchema = Schema.Struct({
+  action: Schema.Literal("call"),
+  tool: Schema.String,
+  arguments: Schema.Record(Schema.String, Schema.Unknown),
+});
+const MaintenanceDoneSchema = Schema.Struct({ action: Schema.Literal("done") });
+const MaintenanceActionJson = Schema.fromJsonString(
+  Schema.Union([MaintenanceCallSchema, MaintenanceDoneSchema]),
+);
+const UnknownJson = Schema.fromJsonString(Schema.Unknown);
+
+function maintenanceError(
+  code: MateMemoryMaintenanceError["code"],
+  message: string,
+  cause: unknown = message,
+) {
+  return MateMemoryMaintenanceError.make({ cause, code, message });
+}
+
+function defaultNow() {
+  return Clock.currentTimeMillis.pipe(Effect.map((millis) => new Date(millis)));
+}
+
+function eventEffect(
+  emit: ((event: MaintenanceEvent) => void) | undefined,
+  event: MaintenanceEvent,
+) {
+  return Effect.sync(() => emit?.(event));
+}
+
+function assertEffect(
+  condition: () => boolean,
+  message: string,
+): Effect.Effect<void, MateMemoryMaintenanceError> {
+  return Effect.suspend(() =>
+    condition()
+      ? Effect.void
+      : Effect.fail(maintenanceError("inactive", message))
+  );
+}
 
 export class MateMemoryMaintenance {
   readonly store: MateMemoryStore;
@@ -101,14 +183,14 @@ export class MateMemoryMaintenance {
   private readonly isPaused: () => boolean;
   private readonly getPauseGeneration: () => number;
   private readonly onEvent?: (event: MaintenanceEvent) => void;
-  private readonly now: () => Date;
+  private readonly now: Effect.Effect<Date>;
   private readonly maxInputCharacters: number;
   private pendingInput: string | undefined;
-  private active: Promise<void> | undefined;
+  private active: Fiber.Fiber<void, never> | undefined;
   private lastContext: MaintenanceRunContext | undefined;
   private suppressNext = false;
   private mutationEpoch = 0;
-  private dreamDiscovery: Promise<void> | undefined;
+  private dreamDiscovery: Fiber.Fiber<void, never> | undefined;
   private eligibleInputs = 0;
 
   constructor(options: MateMemoryMaintenanceOptions) {
@@ -117,32 +199,24 @@ export class MateMemoryMaintenance {
     this.isPaused = options.isPaused;
     this.getPauseGeneration = options.getPauseGeneration ?? (() => 0);
     this.onEvent = options.onEvent;
-    this.now = options.now ?? (() => new Date());
-    this.maxInputCharacters =
-      options.maxInputCharacters ?? DEFAULT_INPUT_CHARACTERS;
+    this.now = options.now ?? defaultNow();
+    this.maxInputCharacters = options.maxInputCharacters ?? DEFAULT_INPUT_CHARACTERS;
   }
 
-  captureHumanInput(text: string, source: HumanInputSource) {
-    if (this.isPaused()) return;
-    if (!isEligibleHumanInput(text, source)) return;
+  captureHumanInput(text: string, source: HumanInputSource): void {
+    if (this.isPaused() || !isEligibleHumanInput(text, source)) return;
     this.eligibleInputs += 1;
-    const stride = Math.max(
-      1,
-      Math.floor(this.store.policy.extractionStride),
-    );
+    const stride = Math.max(1, Math.floor(this.store.policy.extractionStride));
     if (this.eligibleInputs % stride !== 0) return;
-    this.pendingInput = redactAuxiliaryInput(
-      text.trim(),
-      this.maxInputCharacters,
-    );
+    this.pendingInput = redactAuxiliaryInput(text.trim(), this.maxInputCharacters);
   }
 
-  noteDirectMemoryWrite() {
+  noteDirectMemoryWrite(): void {
     this.beginDirectMemoryWrite();
     this.suppressNext = true;
   }
 
-  beginDirectMemoryWrite() {
+  beginDirectMemoryWrite(): void {
     this.mutationEpoch += 1;
     this.suppressNext = true;
   }
@@ -152,107 +226,106 @@ export class MateMemoryMaintenance {
     if (this.suppressNext) {
       this.suppressNext = false;
       this.pendingInput = undefined;
-      return;
+      return Effect.void;
     }
     if (this.isPaused() || !this.store.policy.extractionEnabled) {
       this.pendingInput = undefined;
-      return;
+      return Effect.void;
     }
-    this.startNext();
+    return this.startNext();
   }
 
-  async drain(timeoutMs = 60_000): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
-    while (this.active) {
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) {
-        throw new Error(
-          `Mate memory maintenance did not drain within ${timeoutMs}ms`,
-        );
-      }
-      await Promise.race([
-        this.active,
-        new Promise<void>((_, reject) => {
-          const timer = setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `Mate memory maintenance did not drain within ${timeoutMs}ms`,
-                ),
-              ),
-            remaining,
-          );
-          timer.unref?.();
-        }),
-      ]);
-    }
+  drain(timeoutMs = 60_000): Effect.Effect<void, MateMemoryMaintenanceError> {
+    const wait = Effect.suspend(() => {
+      const active = this.active;
+      return active === undefined
+        ? Effect.void
+        : Fiber.await(active).pipe(Effect.andThen(this.drain(timeoutMs)));
+    });
+    return wait.pipe(
+      Effect.timeoutOrElse({
+        duration: Math.max(0, timeoutMs),
+        orElse: () =>
+          Effect.fail(
+            maintenanceError(
+              "drain_timeout",
+              `Mate memory maintenance did not drain within ${timeoutMs}ms`,
+            ),
+          ),
+      }),
+    );
   }
 
-  async maybeDream(
+  maybeDream(
     context: MaintenanceRunContext,
     activity: MemoryActivityStore,
     currentSessionId: string,
-  ): Promise<void> {
-    if (
-      this.isPaused() ||
-      !this.store.policy.dreamEnabled
-    ) {
-      return;
-    }
-    if (this.dreamDiscovery) return this.dreamDiscovery;
+  ) {
+    if (this.isPaused() || !this.store.policy.dreamEnabled) return Effect.void;
+    const existing = this.dreamDiscovery;
+    if (existing !== undefined) return Fiber.join(existing);
     const pauseGeneration = this.getPauseGeneration();
-    this.dreamDiscovery = this.runDreamDiscovery(
+    const task = this.runDreamDiscovery(
       context,
       activity,
       currentSessionId,
       pauseGeneration,
-    )
-      .catch((error) => {
-        this.onEvent?.({
+    ).pipe(
+      Effect.catch((error) =>
+        eventEffect(this.onEvent, {
           status: "failed",
           summary: "Dream discovery failed",
-        });
-      })
-      .finally(() => {
-        this.dreamDiscovery = undefined;
-      });
-    return this.dreamDiscovery;
-  }
-
-  async shutdown(timeoutMs = 60_000): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
-    await this.drain(timeoutMs);
-    if (!this.dreamDiscovery) return;
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) {
-      throw new Error(
-        `Mate memory maintenance did not drain within ${timeoutMs}ms`,
+        }).pipe(Effect.asVoid)
+      ),
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.dreamDiscovery = undefined;
+        }),
+      ),
+    );
+    const self = this;
+    return Effect.gen(function*() {
+      const fiber = yield* Effect.forkDetach(
+        Effect.yieldNow.pipe(Effect.andThen(task)),
       );
-    }
-    await Promise.race([
-      this.dreamDiscovery,
-      new Promise<void>((_, reject) => {
-        const timer = setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Mate memory maintenance did not drain within ${timeoutMs}ms`,
-              ),
-            ),
-          remaining,
-        );
-        timer.unref?.();
-      }),
-    ]);
+      self.dreamDiscovery = fiber;
+      yield* Fiber.join(fiber);
+    });
   }
 
-  private startNext() {
-    if (this.active || !this.pendingInput || !this.lastContext) return;
+  shutdown(timeoutMs = 60_000): Effect.Effect<void, MateMemoryMaintenanceError> {
+    return this.drain(timeoutMs).pipe(
+      Effect.andThen(
+        Effect.suspend(() => {
+          const dream = this.dreamDiscovery;
+          return dream === undefined ? Effect.void : Fiber.join(dream);
+        }),
+      ),
+      Effect.timeoutOrElse({
+        duration: Math.max(0, timeoutMs),
+        orElse: () =>
+          Effect.fail(
+            maintenanceError(
+              "drain_timeout",
+              `Mate memory maintenance did not drain within ${timeoutMs}ms`,
+            ),
+          ),
+      }),
+    );
+  }
+
+  private startNext(): Effect.Effect<void> {
+    if (
+      this.active !== undefined ||
+      this.pendingInput === undefined ||
+      this.lastContext === undefined
+    ) return Effect.void;
     if (this.isPaused()) {
       this.pendingInput = undefined;
-      return;
+      return Effect.void;
     }
     const prompt = this.pendingInput;
+    const context = this.lastContext;
     this.pendingInput = undefined;
     const pauseGeneration = this.getPauseGeneration();
     const mutationEpoch = this.mutationEpoch;
@@ -261,7 +334,7 @@ export class MateMemoryMaintenance {
     const isCurrentMutation = () =>
       isActive() && this.mutationEpoch === mutationEpoch;
     const request: MaintenanceRunRequest = {
-      ...this.lastContext,
+      ...context,
       kind: "extraction",
       pauseGeneration,
       mutationEpoch,
@@ -279,115 +352,129 @@ export class MateMemoryMaintenance {
         getMutationEpoch: () => this.mutationEpoch,
       }),
     };
-    this.active = this.runner(request)
-      .then(() => {
-        if (!isCurrentMutation()) return;
-        this.onEvent?.({
-          status: "succeeded",
-          summary: "automatic extraction completed",
-        });
-      })
-      .catch((error) => {
-        this.onEvent?.({
-          status: "failed",
-          summary: "automatic extraction failed",
-        });
-      })
-      .finally(() => {
-        this.active = undefined;
-        this.startNext();
-      });
+    const task = this.runner(request).pipe(
+      Effect.matchEffect({
+        onSuccess: () =>
+          isCurrentMutation()
+            ? eventEffect(this.onEvent, {
+              status: "succeeded",
+              summary: "automatic extraction completed",
+            })
+            : Effect.void,
+        onFailure: () =>
+          eventEffect(this.onEvent, {
+            status: "failed",
+            summary: "automatic extraction failed",
+          }),
+      }),
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.active = undefined;
+        }).pipe(Effect.andThen(Effect.suspend(() => this.startNext()))),
+      ),
+    );
+    const self = this;
+    return Effect.gen(function*() {
+      const fiber = yield* Effect.forkDetach(
+        Effect.yieldNow.pipe(Effect.andThen(task)),
+      );
+      self.active = fiber;
+    });
   }
 
-  private async runDreamDiscovery(
+  private runDreamDiscovery(
     context: MaintenanceRunContext,
     activity: MemoryActivityStore,
     currentSessionId: string,
     pauseGeneration: number,
-  ) {
+  ): Effect.Effect<void, MateMemoryMaintenanceError> {
     const mutationEpoch = this.mutationEpoch;
     const isActive = () =>
       !this.isPaused() && this.getPauseGeneration() === pauseGeneration;
     const isCurrentMutation = () =>
       isActive() && this.mutationEpoch === mutationEpoch;
-    const assertCurrentMutation = () => {
-      if (!isCurrentMutation()) {
-        throw new Error("Mate memory maintenance run is no longer active");
-      }
-    };
-    await this.drain(60_000);
-    if (!isCurrentMutation()) return;
-    const current = this.now();
-    const state = await activity.ensureState(current);
-    if (!isCurrentMutation()) return;
-    if (
-      state.lastDreamDiscoveryAt &&
-      current.getTime() -
-        new Date(state.lastDreamDiscoveryAt).getTime() <
-        10 * 60 * 1_000
-    ) {
-      return;
-    }
-    if (!isCurrentMutation()) return;
-    await activity.markDreamDiscovery(current, {
-      beforeCommit: assertCurrentMutation,
+    const assertCurrentMutation = () =>
+      assertEffect(
+        isCurrentMutation,
+        "Mate memory maintenance run is no longer active",
+      );
+    const self = this;
+    return Effect.gen(function*() {
+      yield* self.drain(60_000);
+      if (!isCurrentMutation()) return;
+      const current = yield* self.now;
+      const state = yield* activity.ensureState(current).pipe(
+        Effect.mapError((cause) =>
+          maintenanceError("tool_failed", cause.message, cause)
+        ),
+      );
+      if (!isCurrentMutation()) return;
+      if (
+        state.lastDreamDiscoveryAt !== undefined &&
+        current.getTime() - new Date(state.lastDreamDiscoveryAt).getTime() <
+          10 * 60 * 1_000
+      ) return;
+      yield* activity.markDreamDiscovery(current, {
+        beforeCommit: assertCurrentMutation(),
+      }).pipe(
+        Effect.mapError((cause) => maintenanceError("tool_failed", cause.message, cause)),
+      );
+      if (!isCurrentMutation()) return;
+      if (
+        !shouldDream(state, {
+          currentSessionId,
+          now: current,
+          minHours: self.store.policy.dreamMinHours,
+          minPriorSessions: self.store.policy.dreamMinPriorSessions,
+        })
+      ) return;
+      const claim = yield* activity.claimDreamLock(currentSessionId).pipe(
+        Effect.mapError((cause) => maintenanceError("tool_failed", cause.message, cause)),
+      );
+      if (!claim.acquired) return;
+      const dream = Effect.gen(function*() {
+        if (!isCurrentMutation()) return;
+        yield* self.runner({
+          ...context,
+          kind: "dream",
+          pauseGeneration,
+          mutationEpoch,
+          systemPrompt: DREAM_SYSTEM_PROMPT,
+          prompt: "Consolidate the Mate memory now using only the supplied memory tools.",
+          tools: [
+            ...createMaintenanceTools(self.store, {
+              now: self.now,
+              isPaused: self.isPaused,
+              isActive,
+              mutationEpoch,
+              getMutationEpoch: () => self.mutationEpoch,
+            }),
+            createActivityReadTool(activity, isActive),
+          ],
+        });
+        if (!isCurrentMutation()) return;
+        yield* activity.markDreamSuccess(current, {
+          beforeCommit: assertCurrentMutation(),
+        }).pipe(
+          Effect.mapError((cause) => maintenanceError("tool_failed", cause.message, cause)),
+        );
+        yield* eventEffect(self.onEvent, {
+          status: "succeeded",
+          summary: "Dream completed",
+        });
+      }).pipe(
+        Effect.catch(() =>
+          eventEffect(self.onEvent, {
+            status: "failed",
+            summary: "Dream failed",
+          }).pipe(Effect.asVoid)
+        ),
+        Effect.ensuring(
+          activity.releaseDreamLock(claim).pipe(Effect.ignore),
+        ),
+      );
+      yield* dream;
     });
-    if (!isCurrentMutation()) return;
-    if (
-      !shouldDream(state, {
-        currentSessionId,
-        now: current,
-        minHours: this.store.policy.dreamMinHours,
-        minPriorSessions: this.store.policy.dreamMinPriorSessions,
-      })
-    ) {
-      return;
-    }
-    const claim = await activity.claimDreamLock(
-      `${process.pid}:${currentSessionId}`,
-    );
-    if (!claim.acquired) return;
-    if (!isCurrentMutation()) {
-      await activity.releaseDreamLock(claim);
-      return;
-    }
-    try {
-      await this.runner({
-        ...context,
-        kind: "dream",
-        pauseGeneration,
-        mutationEpoch,
-        systemPrompt: DREAM_SYSTEM_PROMPT,
-        prompt:
-          "Consolidate the Mate memory now using only the supplied memory tools.",
-        tools: [
-          ...createMaintenanceTools(this.store, {
-            now: this.now,
-            isPaused: this.isPaused,
-            isActive,
-            mutationEpoch,
-            getMutationEpoch: () => this.mutationEpoch,
-          }),
-          createActivityReadTool(activity, isActive),
-        ],
-      });
-      if (!isCurrentMutation()) return;
-      if (!isCurrentMutation()) return;
-      await activity.markDreamSuccess(current, {
-        beforeCommit: assertCurrentMutation,
-      });
-      this.onEvent?.({
-        status: "succeeded",
-        summary: "Dream completed",
-      });
-    } catch (error) {
-      this.onEvent?.({
-        status: "failed",
-        summary: "Dream failed",
-      });
-    } finally {
-      await activity.releaseDreamLock(claim);
-    }
   }
 }
 
@@ -400,35 +487,90 @@ export function isEligibleHumanInput(
   return words.length >= 3;
 }
 
+function activeGuard(options: MaintenanceToolOptions) {
+  return Effect.suspend(() => {
+    if (options.isPaused?.()) {
+      return Effect.fail(
+        maintenanceError(
+          "inactive",
+          "Mate memory maintenance is paused for this Pi session",
+        ),
+      );
+    }
+    if (options.isActive !== undefined && !options.isActive()) {
+      return Effect.fail(
+        maintenanceError(
+          "inactive",
+          "Mate memory maintenance pause generation changed or run is no longer active",
+        ),
+      );
+    }
+    return Effect.void;
+  });
+}
+
+function mutationGuard(options: MaintenanceToolOptions) {
+  return Effect.gen(function*() {
+    yield* activeGuard(options);
+    if (
+      options.mutationEpoch !== undefined &&
+      options.getMutationEpoch !== undefined &&
+      options.mutationEpoch !== options.getMutationEpoch()
+    ) {
+      return yield* maintenanceError(
+        "inactive",
+        "Mate memory maintenance mutation epoch changed",
+      );
+    }
+  });
+}
+
+function stringField(
+  input: Readonly<Record<string, unknown>>,
+  field: string,
+) {
+  const value = input[field];
+  return typeof value === "string"
+    ? Effect.succeed(value)
+    : Effect.fail(
+      maintenanceError("tool_failed", `Memory tool field ${field} must be text.`),
+    );
+}
+
+function booleanField(
+  input: Readonly<Record<string, unknown>>,
+  field: string,
+) {
+  const value = input[field];
+  return typeof value === "boolean"
+    ? Effect.succeed(value)
+    : Effect.fail(
+      maintenanceError("tool_failed", `Memory tool field ${field} must be boolean.`),
+    );
+}
+
+function topicTypeField(
+  input: Readonly<Record<string, unknown>>,
+): Effect.Effect<TopicType, MateMemoryMaintenanceError> {
+  const value = input.type;
+  return value === "user" ||
+      value === "feedback" ||
+      value === "project" ||
+      value === "reference"
+    ? Effect.succeed(value)
+    : Effect.fail(
+      maintenanceError("tool_failed", "Memory tool field type is invalid."),
+    );
+}
+
 export function createMaintenanceTools(
   store: MateMemoryStore,
   options: MaintenanceToolOptions = {},
-): ToolDefinition[] {
-  const now = options.now ?? (() => new Date());
-  const mutation = (path: string) => options.onMutation?.(path);
-  const assertActive = () => {
-    if (options.isPaused?.()) {
-      throw new Error("Mate memory maintenance is paused for this Pi session");
-    }
-    if (options.isActive && !options.isActive()) {
-      throw new Error(
-        "Mate memory maintenance pause generation changed or run is no longer active",
-      );
-    }
-  };
-  const assertMutationEpoch = () => {
-    if (
-      options.mutationEpoch !== undefined &&
-      options.getMutationEpoch &&
-      options.mutationEpoch !== options.getMutationEpoch()
-    ) {
-      throw new Error("Mate memory maintenance mutation epoch changed");
-    }
-  };
-  const assertReadyToMutate = () => {
-    assertActive();
-    assertMutationEpoch();
-  };
+): ReadonlyArray<MaintenanceTool> {
+  const now = options.now ?? defaultNow();
+  const mutation = (path: string) => Effect.sync(() => options.onMutation?.(path));
+  const mapStoreError = (cause: Error) =>
+    maintenanceError("tool_failed", cause.message, cause);
   const Empty = Type.Object({});
   const TopicPath = Type.String({
     minLength: 1,
@@ -441,55 +583,63 @@ export function createMaintenanceTools(
       label: "List memory topics",
       description: "List validated private Mate memory topic metadata.",
       parameters: Empty,
-      async execute() {
-        assertActive();
-        const topics = await store.listTopics({
-          beforeRead: assertActive,
-          beforeCommit: assertActive,
-        });
-        assertActive();
-        return textResult(
-          JSON.stringify(
+      execute: () =>
+        Effect.gen(function*() {
+          yield* activeGuard(options);
+          const topics = yield* store.listTopics({
+            beforeRead: activeGuard(options),
+            beforeCommit: activeGuard(options),
+          }).pipe(Effect.mapError(mapStoreError));
+          yield* activeGuard(options);
+          const encoded = yield* Schema.encodeEffect(UnknownJson)(
             topics.map(({ relativePath, metadata }) => ({
               relativePath,
               ...metadata,
             })),
-          ),
-        );
-      },
+          ).pipe(
+            Effect.mapError((cause) =>
+              maintenanceError("tool_failed", "Topic inventory could not be encoded.", cause)
+            ),
+          );
+          return textResult(encoded);
+        }),
     },
     {
       name: "memory_read_index",
       label: "Read memory index",
       description: "Read the bounded private Mate MEMORY.md index.",
       parameters: Empty,
-      async execute() {
-        assertActive();
-        const startup = await store.readStartupContext({
-          beforeRead: assertActive,
-          beforeCommit: assertActive,
-        });
-        assertActive();
-        return textResult(startup.index);
-      },
+      execute: () =>
+        Effect.gen(function*() {
+          yield* activeGuard(options);
+          const startup = yield* store.readStartupContext({
+            beforeRead: activeGuard(options),
+            beforeCommit: activeGuard(options),
+          }).pipe(Effect.mapError(mapStoreError));
+          yield* activeGuard(options);
+          return textResult(startup.index);
+        }),
     },
     {
       name: "memory_read_topic",
       label: "Read memory topic",
       description: "Read one validated private Mate memory topic.",
       parameters: Type.Object({ path: TopicPath }),
-      async execute(_toolCallId, { path }) {
-        assertActive();
-        const topic = await store.readTopic(path, { beforeRead: assertActive });
-        assertActive();
-        return textResult(formatTopic(topic));
-      },
+      execute: (input) =>
+        Effect.gen(function*() {
+          const path = yield* stringField(input, "path");
+          yield* activeGuard(options);
+          const topic = yield* store.readTopic(path, {
+            beforeRead: activeGuard(options),
+          }).pipe(Effect.mapError(mapStoreError));
+          yield* activeGuard(options);
+          return textResult(formatTopic(topic));
+        }),
     },
     {
       name: "memory_write_topic",
       label: "Write memory topic",
-      description:
-        "Atomically create or replace one validated private Mate memory topic.",
+      description: "Atomically create or replace one validated private Mate memory topic.",
       parameters: Type.Object({
         path: TopicPath,
         type: Type.Union([
@@ -504,94 +654,89 @@ export function createMaintenanceTools(
         pinned: Type.Boolean(),
         body: Type.String({ minLength: 1, maxLength: 32_768 }),
       }),
-      async execute(
-        _toolCallId,
-        {
-          path,
-          type,
-          scope,
-          source_principal,
-          observed_at,
-          pinned,
-          body,
-        },
-      ) {
-        assertReadyToMutate();
-        const topic = await store.writeTopic(
-          {
+      execute: (input) =>
+        Effect.gen(function*() {
+          const path = yield* stringField(input, "path");
+          const type = yield* topicTypeField(input);
+          const scope = yield* stringField(input, "scope");
+          const sourcePrincipal = yield* stringField(input, "source_principal");
+          const observedAt = yield* stringField(input, "observed_at");
+          const pinned = yield* booleanField(input, "pinned");
+          const body = yield* stringField(input, "body");
+          yield* mutationGuard(options);
+          const timestamp = yield* now;
+          const topic = yield* store.writeTopic({
             relativePath: path,
             metadata: {
               node_type: "memory",
               type,
               scope,
-              source_principal,
-              observed_at,
-              modified: now().toISOString(),
+              source_principal: sourcePrincipal,
+              observed_at: observedAt,
+              modified: timestamp.toISOString(),
               pinned,
             },
             body,
-          },
-          {
-            beforeRead: assertActive,
-            beforeCommit: () => {
-              assertReadyToMutate();
-            },
-          },
-        );
-        assertReadyToMutate();
-        mutation(path);
-        return textResult(`Wrote ${topic.relativePath}.`);
-      },
+          }, {
+            beforeRead: activeGuard(options),
+            beforeCommit: mutationGuard(options),
+          }).pipe(Effect.mapError(mapStoreError));
+          yield* mutationGuard(options);
+          yield* mutation(path);
+          return textResult(`Wrote ${topic.relativePath}.`);
+        }),
     },
     {
       name: "memory_delete_topic",
       label: "Delete memory topic",
-      description:
-        "Delete one private Mate memory topic after determining it is wrong, obsolete, or explicitly forgotten.",
+      description: "Delete one private Mate memory topic after determining it is wrong, obsolete, or explicitly forgotten.",
       parameters: Type.Object({ path: TopicPath }),
-      async execute(_toolCallId, { path }) {
-        assertReadyToMutate();
-        await store.deleteTopic(path, {
-          beforeRead: assertActive,
-          beforeCommit: () => {
-            assertReadyToMutate();
-          },
-        });
-        assertReadyToMutate();
-        mutation(path);
-        return textResult(`Deleted ${path}.`);
-      },
+      execute: (input) =>
+        Effect.gen(function*() {
+          const path = yield* stringField(input, "path");
+          yield* mutationGuard(options);
+          yield* store.deleteTopic(path, {
+            beforeRead: activeGuard(options),
+            beforeCommit: mutationGuard(options),
+          }).pipe(Effect.mapError(mapStoreError));
+          yield* mutationGuard(options);
+          yield* mutation(path);
+          return textResult(`Deleted ${path}.`);
+        }),
     },
     {
       name: "memory_write_index",
       label: "Write memory index",
-      description:
-        "Atomically replace the concise private Mate MEMORY.md index.",
+      description: "Atomically replace the concise private Mate MEMORY.md index.",
       parameters: Type.Object({
         content: Type.String({ minLength: 1, maxLength: 25_000 }),
       }),
-      async execute(_toolCallId, { content }) {
-        assertReadyToMutate();
-        await store.writeIndex(content, {
-          beforeRead: assertActive,
-          beforeCommit: () => {
-            assertReadyToMutate();
-          },
-        });
-        assertReadyToMutate();
-        const warnings = (
-          await store.readStartupContext({
-            beforeRead: assertActive,
-            beforeCommit: assertActive,
-          })
-        ).degraded.filter(
-          (warning) => warning.startsWith("MEMORY.md"),
-        );
-        assertReadyToMutate();
-        if (warnings.length > 0) throw new Error(warnings.join("; "));
-        mutation("MEMORY.md");
-        return textResult("Wrote MEMORY.md.");
-      },
+      execute: (input) =>
+        Effect.gen(function*() {
+          const content = yield* stringField(input, "content");
+          yield* mutationGuard(options);
+          yield* store.writeIndex(content, {
+            beforeRead: activeGuard(options),
+            beforeCommit: mutationGuard(options),
+          }).pipe(Effect.mapError(mapStoreError));
+          yield* mutationGuard(options);
+          const startup = yield* store.readStartupContext({
+            beforeRead: activeGuard(options),
+            beforeCommit: activeGuard(options),
+          }).pipe(Effect.mapError(mapStoreError));
+          const warnings = startup.degraded.filter((warning) =>
+            warning.startsWith("MEMORY.md")
+          );
+          yield* mutationGuard(options);
+          if (warnings.length > 0) {
+            return yield* maintenanceError(
+              "tool_failed",
+              warnings.join("; "),
+            );
+          }
+          yield* mutation("MEMORY.md");
+          return textResult("Wrote MEMORY.md.");
+        }),
     },
   ];
 }
@@ -599,226 +744,235 @@ export function createMaintenanceTools(
 function createActivityReadTool(
   activity: MemoryActivityStore,
   isActive: () => boolean,
-): ToolDefinition {
+): MaintenanceTool {
+  const guard = () =>
+    assertEffect(isActive, "Mate memory maintenance run is no longer active");
   return {
     name: "memory_read_activity",
     label: "Read recent memory activity",
-    description:
-      "Read the bounded, redacted, derivative activity projection from the last three days.",
+    description: "Read the bounded, redacted, derivative activity projection from the last three days.",
     parameters: Type.Object({}),
-    async execute() {
-      if (!isActive()) {
-        throw new Error("Mate memory maintenance run is no longer active");
-      }
-      const recent = await activity.readRecent(3, {
-        beforeRead: () => {
-          if (!isActive()) {
-            throw new Error("Mate memory maintenance run is no longer active");
-          }
-        },
-      });
-      if (!isActive()) {
-        throw new Error("Mate memory maintenance run is no longer active");
-      }
-      return textResult(recent);
-    },
+    execute: () =>
+      Effect.gen(function*() {
+        yield* guard();
+        const recent = yield* activity.readRecent(3, {
+          beforeRead: guard(),
+        }).pipe(
+          Effect.mapError((cause) =>
+            maintenanceError("tool_failed", cause.message, cause)
+          ),
+        );
+        yield* guard();
+        return textResult(recent);
+      }),
   };
 }
 
-export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = async (
-  request,
-) => {
-  if (!request.model) throw new Error("no active model is available");
-  if (!request.modelRegistry) {
-    throw new Error("no model registry is available");
-  }
-  const auth = await request.modelRegistry.getApiKeyAndHeaders(request.model);
-  if (!auth.ok) throw new Error("maintenance model authentication unavailable");
-  const operation = await startAgentOSAuxiliaryOperation(
-    request.model,
-    request.telemetry,
-    "resumed",
-  );
-  const requestKind =
-    request.kind === "extraction"
+function defaultComplete(
+  ...args: Parameters<typeof complete>
+): Effect.Effect<CompleteResult, MateMemoryMaintenanceError> {
+  return Effect.tryPromise({
+    try: () => complete(...args),
+    catch: (cause) =>
+      maintenanceError("request_failed", "Maintenance model request failed.", cause),
+  });
+}
+
+function startTelemetry(request: MaintenanceRunRequest, model: Model<Api>) {
+  return Effect.tryPromise({
+    try: () => startAgentOSAuxiliaryOperation(model, request.telemetry, "resumed"),
+    catch: (cause) =>
+      maintenanceError(
+        "telemetry_unavailable",
+        "Maintenance telemetry could not be started.",
+        cause,
+      ),
+  });
+}
+
+export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = (request) =>
+  Effect.gen(function*() {
+    const model = request.model;
+    if (model === undefined) {
+      return yield* maintenanceError(
+        "request_failed",
+        "No active model is available.",
+      );
+    }
+    if (request.resolveAuth === undefined) {
+      return yield* maintenanceError(
+        "authentication_unavailable",
+        "No model authentication resolver is available.",
+      );
+    }
+    const auth = yield* request.resolveAuth.pipe(
+      Effect.mapError((cause) =>
+        maintenanceError(
+          "authentication_unavailable",
+          "Maintenance model authentication could not be resolved.",
+          cause,
+        )
+      ),
+    );
+    if (!auth.ok) {
+      return yield* maintenanceError(
+        "authentication_unavailable",
+        "Maintenance model authentication is unavailable.",
+        auth.error,
+      );
+    }
+    const operation = yield* startTelemetry(request, model);
+    const requestKind = request.kind === "extraction"
       ? "memory_extract"
       : "memory_consolidate";
-  let currentAttempt: AgentOSProviderAttempt | undefined;
-  const transcript = [
-    request.prompt,
-    "Return exactly one JSON object for each turn. Use {\"action\":\"call\",\"tool\":\"...\",\"arguments\":{...}} to invoke one available memory tool, or {\"action\":\"done\"} when maintenance is complete.",
-    `Available tools: ${JSON.stringify(
+    let currentAttempt: AgentOSProviderAttempt | undefined;
+    const availableTools = yield* Schema.encodeEffect(UnknownJson)(
       request.tools.map(({ name, description, parameters }) => ({
         name,
         description,
         parameters,
       })),
-    )}`,
-  ];
-  try {
-    for (let step = 0; step < MAX_MAINTENANCE_STEPS; step += 1) {
-      currentAttempt = operation.startProviderAttempt({
-        requestKind,
-        streamMode: "non_streaming",
-      });
-      const headers = { ...auth.headers };
-      currentAttempt.inject(headers);
-      const response = await (request.completeImpl ?? complete)(
-        request.model,
-        {
-          systemPrompt: request.systemPrompt,
-          messages: [
-            {
+    ).pipe(
+      Effect.mapError((cause) =>
+        maintenanceError(
+          "request_failed",
+          "Maintenance tool inventory could not be encoded.",
+          cause,
+        )
+      ),
+    );
+    const transcript = [
+      request.prompt,
+      'Return exactly one JSON object for each turn. Use {"action":"call","tool":"...","arguments":{...}} to invoke one available memory tool, or {"action":"done"} when maintenance is complete.',
+      `Available tools: ${availableTools}`,
+    ];
+    const run = Effect.gen(function*() {
+      for (let step = 0; step < MAX_MAINTENANCE_STEPS; step += 1) {
+        currentAttempt = yield* Effect.sync(() =>
+          operation.startProviderAttempt({
+            requestKind,
+            streamMode: "non_streaming",
+          })
+        );
+        const headers = { ...auth.headers };
+        yield* Effect.sync(() => currentAttempt?.inject(headers));
+        const timestamp = yield* Clock.currentTimeMillis;
+        const response = yield* (request.completeImpl ?? defaultComplete)(
+          model,
+          {
+            systemPrompt: request.systemPrompt,
+            messages: [{
               role: "user",
               content: transcript.join("\n\n"),
-              timestamp: Date.now(),
-            },
-          ],
-        },
-        {
-          apiKey: auth.apiKey,
-          headers,
-          env: auth.env,
-          signal: request.signal,
-          temperature: 0,
-          maxTokens: 2_048,
-        },
-      );
-      const failure = safeAssistantFailure(response.stopReason);
-      if (failure) {
-        currentAttempt.end({
-          status: 200,
-          error: failure,
-          streamOutcome:
-            response.stopReason === "aborted"
-              ? "aborted"
-              : "upstream_error",
-          inputTokens: safeTokenCount(response.usage.input),
-          outputTokens: safeTokenCount(response.usage.output),
-        });
+              timestamp,
+            }],
+          },
+          {
+            apiKey: auth.apiKey,
+            headers,
+            env: auth.env,
+            signal: request.signal,
+            temperature: 0,
+            maxTokens: 2_048,
+          },
+        ).pipe(
+          Effect.mapError((cause) =>
+            cause instanceof MateMemoryMaintenanceError
+              ? cause
+              : maintenanceError(
+                "request_failed",
+                "Maintenance model request failed.",
+                cause,
+              )
+          ),
+        );
+        const failure = safeAssistantFailure(response.stopReason);
+        if (failure !== undefined) {
+          yield* Effect.sync(() =>
+            currentAttempt?.end({
+              status: 200,
+              error: failure,
+              streamOutcome: response.stopReason === "aborted"
+                ? "aborted"
+                : "upstream_error",
+              inputTokens: safeTokenCount(response.usage.input),
+              outputTokens: safeTokenCount(response.usage.output),
+            })
+          );
+          currentAttempt = undefined;
+          return yield* maintenanceError(
+            "provider_failed",
+            "Maintenance model did not complete.",
+            failure,
+          );
+        }
+        const text = response.content
+          .flatMap((part) => part.type === "text" ? [part.text] : [])
+          .join("")
+          .trim();
+        const action = yield* parseMaintenanceAction(text);
+        yield* Effect.sync(() =>
+          currentAttempt?.end({
+            status: 200,
+            streamOutcome: "completed",
+            inputTokens: safeTokenCount(response.usage.input),
+            outputTokens: safeTokenCount(response.usage.output),
+          })
+        );
         currentAttempt = undefined;
-        throw new Error("maintenance model did not complete");
-      }
-      const text = response.content
-        .filter(
-          (part): part is Extract<typeof part, { type: "text" }> =>
-            part.type === "text",
-        )
-        .map(({ text }) => text)
-        .join("")
-        .trim();
-      const action = parseMaintenanceAction(text);
-      currentAttempt.end({
-        status: 200,
-        streamOutcome: "completed",
-        inputTokens: safeTokenCount(response.usage.input),
-        outputTokens: safeTokenCount(response.usage.output),
-      });
-      currentAttempt = undefined;
-      if (action.action === "done") {
-        operation.end({ status: 200 });
-        return { summary: "maintenance completed", touchedPaths: [] };
-      }
-      const tool = request.tools.find(({ name }) => name === action.tool);
-      if (!tool) {
-        throw new Error(
-          "maintenance model selected an unavailable tool",
+        if (action.action === "done") {
+          yield* Effect.sync(() => operation.end({ status: 200 }));
+          return { summary: "maintenance completed", touchedPaths: [] };
+        }
+        const tool = request.tools.find(({ name }) => name === action.tool);
+        if (tool === undefined) {
+          return yield* maintenanceError(
+            "tool_unavailable",
+            "Maintenance model selected an unavailable tool.",
+          );
+        }
+        const result = yield* tool.execute(action.arguments);
+        transcript.push(
+          `Tool ${tool.name} result:\n${boundedToolResult(toolResultText(result))}`,
         );
       }
-      const result = await tool.execute(
-        `maintenance-${step}`,
-        action.arguments as never,
-        undefined,
-        undefined,
-        {} as never,
+      return yield* maintenanceError(
+        "operation_limit",
+        "Maintenance reached its operation limit.",
       );
-      transcript.push(
-        `Tool ${tool.name} result:\n${boundedToolResult(toolResultText(result))}`,
-      );
-    }
-    throw new Error("maintenance reached its operation limit");
-  } catch (error) {
-    currentAttempt?.end({
-      error,
-      streamOutcome: "upstream_error",
     });
-    operation.end({ error });
-    throw error;
-  }
-};
+    return yield* run.pipe(
+      Effect.tapError((error) =>
+        Effect.sync(() => {
+          currentAttempt?.end({ error, streamOutcome: "upstream_error" });
+          operation.end({ error });
+        })
+      ),
+    );
+  });
 
-function textResult(text: string) {
-  return {
-    content: [{ type: "text" as const, text }],
-    details: {},
-  };
+function textResult(text: string): MaintenanceToolResult {
+  return { content: [{ type: "text", text }], details: {} };
 }
 
-const MAX_MAINTENANCE_STEPS = 16;
-const MAX_TOOL_RESULT_CHARACTERS = 32_768;
-
-function parseMaintenanceAction(value: string):
-  | { action: "call"; tool: string; arguments: Record<string, unknown> }
-  | { action: "done" } {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch {
-    throw new Error("maintenance model returned invalid JSON");
-  }
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    Array.isArray(parsed) ||
-    typeof (parsed as { action?: unknown }).action !== "string"
-  ) {
-    throw new Error("maintenance model returned an invalid action");
-  }
-  if ((parsed as { action: string }).action === "done") {
-    return { action: "done" };
-  }
-  const action = parsed as {
-    action: string;
-    tool?: unknown;
-    arguments?: unknown;
-  };
-  if (
-    action.action !== "call" ||
-    typeof action.tool !== "string" ||
-    typeof action.arguments !== "object" ||
-    action.arguments === null ||
-    Array.isArray(action.arguments)
-  ) {
-    throw new Error("maintenance model returned an invalid tool action");
-  }
-  return {
-    action: "call",
-    tool: action.tool,
-    arguments: action.arguments as Record<string, unknown>,
-  };
+function parseMaintenanceAction(value: string) {
+  return Schema.decodeUnknownEffect(
+    MaintenanceActionJson,
+    { onExcessProperty: "error" },
+  )(value).pipe(
+    Effect.mapError((cause) =>
+      maintenanceError(
+        "invalid_action",
+        "Maintenance model returned an invalid action.",
+        cause,
+      )
+    ),
+  );
 }
 
-function toolResultText(result: unknown): string {
-  if (
-    typeof result !== "object" ||
-    result === null ||
-    !("content" in result) ||
-    !Array.isArray(result.content)
-  ) {
-    return "tool completed without a text result";
-  }
-  return result.content
-    .filter(
-      (part): part is { type: "text"; text: string } =>
-        typeof part === "object" &&
-        part !== null &&
-        "type" in part &&
-        part.type === "text" &&
-        "text" in part &&
-        typeof part.text === "string",
-    )
-    .map(({ text }) => text)
-    .join("\n");
+function toolResultText(result: MaintenanceToolResult): string {
+  return result.content.map(({ text }) => text).join("\n") ||
+    "tool completed without a text result";
 }
 
 function boundedToolResult(value: string): string {
