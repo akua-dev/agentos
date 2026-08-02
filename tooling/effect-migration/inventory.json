@@ -349,11 +349,11 @@
       "id": "openfga-generated-tooling",
       "issue": 97,
       "pattern": "^services/openfga/scripts/",
-      "runtime": "bun",
+      "runtime": "bun-tooling-entrypoint",
       "package": "@agentos/openfga",
-      "io": ["filesystem", "process"],
+      "io": ["filesystem", "process", "schema", "runtime-adapter"],
       "migrationDependencies": [100, 101],
-      "status": "planned"
+      "status": "runtime-boundary"
     },
     {
       "id": "agent-workload-profile-effect-tests",
@@ -626,6 +626,26 @@
       "status": "planned"
     },
     {
+      "id": "database-drizzle-framework-adapter",
+      "issue": 97,
+      "pattern": "^database/drizzle\\.config\\.ts$|^database/runtime/drizzle\\.ts$",
+      "runtime": "bun-drizzle-entrypoint",
+      "package": "@agentos/database",
+      "io": ["config", "filesystem", "process", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "database-migration-workspace-runtime",
+      "issue": 97,
+      "pattern": "^database/runtime/prepare\\.ts$",
+      "runtime": "bun-database-entrypoint",
+      "package": "@agentos/database",
+      "io": ["config", "crypto", "filesystem", "process", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "agent-workload-profiles",
       "issue": 124,
       "pattern": "^packages/agentos/src/workloads/profiles\\.ts$",
@@ -654,6 +674,66 @@
       "io": [],
       "migrationDependencies": [100],
       "status": "pure"
+    },
+    {
+      "id": "benchmark-pi-session-adapter",
+      "issue": 97,
+      "pattern": "^benchmarks/profiles/agentos/pi-session-adapter\\.ts$",
+      "runtime": "bun-pi-session-entrypoint",
+      "package": "@agentos/root",
+      "io": ["crypto", "filesystem", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "benchmark-cli-entrypoints",
+      "issue": 97,
+      "pattern": "^benchmarks/(?:run|validate)\\.ts$",
+      "runtime": "bun-benchmark-entrypoint",
+      "package": "@agentos/root",
+      "io": ["crypto", "filesystem", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "effect-tooling-build-entrypoints",
+      "issue": 97,
+      "pattern": "^packages/agentos/build\\.ts$",
+      "runtime": "bun-tooling-entrypoint",
+      "package": "mixed",
+      "io": ["filesystem", "process", "schema", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "github-app-token-entrypoint",
+      "issue": 97,
+      "pattern": "^clis/github-app-token/github-app-token\\.ts$",
+      "runtime": "bun-github-http-entrypoint",
+      "package": "@agentos/github-app-token",
+      "io": ["clock", "config", "crypto", "filesystem", "http", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "pg-listen-entrypoint",
+      "issue": 97,
+      "pattern": "^clis/pg-listen/pg-listen\\.ts$",
+      "runtime": "bun-postgresql-entrypoint",
+      "package": "@agentos/pg-listen",
+      "io": ["config", "database", "filesystem", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "kubernetes-release-renderer",
+      "issue": 97,
+      "pattern": "^release/kubernetes/render\\.ts$",
+      "runtime": "bun-kubernetes-entrypoint",
+      "package": "@agentos/root",
+      "io": ["crypto", "filesystem", "kubernetes", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
     },
     {
       "id": "benchmarks",

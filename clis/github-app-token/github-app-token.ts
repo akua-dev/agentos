@@ -1,30 +1,25 @@
 #!/usr/bin/env bun
 
+import * as BunHttpClient from "@effect/platform-bun/BunHttpClient";
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import * as BunServices from "@effect/platform-bun/BunServices";
 import { createSign } from "node:crypto";
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
-
-type GitHubTokenResponse = {
-  token?: unknown;
-  expires_at?: unknown;
-  permissions?: unknown;
-  repository_selection?: unknown;
-  repositories?: unknown;
-};
-
-type InstallationTokenScope = {
-  repositories?: string[];
-  repository_ids?: number[];
-  permissions?: Record<string, "read" | "write">;
-};
-
-type InstallationTokenMetadata = {
-  expires_at: string;
-  permissions?: Record<string, string>;
-  repository_selection?: string;
-  repositories?: Array<{ id: number; full_name: string }>;
-};
+import {
+  Clock,
+  Config,
+  ConfigProvider,
+  Context,
+  Crypto,
+  Effect,
+  FileSystem,
+  Layer,
+  Path,
+  Runtime,
+  Schema,
+  Stdio,
+  Stream,
+} from "effect";
+import { HttpClient, HttpClientRequest } from "effect/unstable/http";
 
 const help = `github-app-token
 
@@ -47,265 +42,515 @@ reduce the installation token to selected repositories and permissions. Output
 files are replaced atomically with mode 0600; metadata never contains the token.
 `;
 
-export function createAppJwt(
-  appId: string,
-  privateKey: string,
-  now: number = Math.floor(Date.now() / 1000),
-): string {
-  const encode = (value: unknown) =>
-    Buffer.from(JSON.stringify(value)).toString("base64url");
-  const unsigned = `${encode({ alg: "RS256", typ: "JWT" })}.${encode({
-    iat: now - 60,
-    exp: now + 540,
-    iss: appId,
-  })}`;
-  const signer = createSign("RSA-SHA256");
-  signer.update(unsigned);
-  return `${unsigned}.${signer.sign(privateKey, "base64url")}`;
+const PermissionLevelSchema = Schema.Literals(["read", "write"]);
+export const InstallationTokenScopeSchema = Schema.Struct({
+  repositories: Schema.optional(Schema.Array(Schema.String)),
+  repository_ids: Schema.optional(Schema.Array(Schema.Number)),
+  permissions: Schema.optional(
+    Schema.Record(Schema.String, PermissionLevelSchema),
+  ),
+});
+export type InstallationTokenScope =
+  typeof InstallationTokenScopeSchema.Type;
+
+const InstallationTokenResponseSchema = Schema.Struct({
+  token: Schema.optional(Schema.Unknown),
+  expires_at: Schema.optional(Schema.Unknown),
+  permissions: Schema.optional(Schema.Unknown),
+  repository_selection: Schema.optional(Schema.Unknown),
+  repositories: Schema.optional(Schema.Unknown),
+  message: Schema.optional(Schema.Unknown),
+});
+const InstallationTokenResponseFromString = Schema.fromJsonString(
+  InstallationTokenResponseSchema,
+);
+const ScopeFromString = Schema.fromJsonString(InstallationTokenScopeSchema);
+const JsonFromString = Schema.fromJsonString(Schema.Unknown);
+const StringRecordSchema = Schema.Record(Schema.String, Schema.String);
+const RepositoryMetadataSchema = Schema.Struct({
+  id: Schema.Number,
+  full_name: Schema.String,
+});
+const isStringRecord = Schema.is(StringRecordSchema);
+const isRepositoryMetadata = Schema.is(RepositoryMetadataSchema);
+
+export interface InstallationTokenMetadata {
+  readonly expires_at: string;
+  readonly permissions?: Record<string, string>;
+  readonly repository_selection?: string;
+  readonly repositories?: Array<{ readonly id: number; readonly full_name: string }>;
 }
 
-export async function mintInstallationToken({
-  apiUrl,
-  appId,
-  installationId,
-  privateKey,
-  scope,
-  request = fetch,
-}: {
-  apiUrl: string;
-  appId: string;
-  installationId: string;
-  privateKey: string;
-  scope?: InstallationTokenScope;
-  request?: typeof fetch;
-}): Promise<{ token: string; metadata: InstallationTokenMetadata }> {
+const GitHubAppTokenErrorCodeSchema = Schema.Literals([
+  "configuration",
+  "filesystem",
+  "jwt",
+  "provider",
+  "encoding",
+]);
+
+export class GitHubAppTokenError extends Schema.TaggedErrorClass<GitHubAppTokenError>()(
+  "GitHubAppTokenError",
+  {
+    code: GitHubAppTokenErrorCodeSchema,
+    message: Schema.String,
+    status: Schema.optional(Schema.Number),
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override readonly [Runtime.errorExitCode] = this.code === "configuration"
+    ? 2
+    : 1;
+}
+
+const tokenError = (
+  code: typeof GitHubAppTokenErrorCodeSchema.Type,
+  message: string,
+  options?: { readonly status?: number; readonly cause?: unknown },
+) => GitHubAppTokenError.make({ code, message, ...options });
+
+export class GitHubAppJwtSigner extends Context.Service<
+  GitHubAppJwtSigner,
+  {
+    readonly sign: (
+      appId: string,
+      privateKey: string,
+      nowSeconds: number,
+    ) => Effect.Effect<string, GitHubAppTokenError>;
+  }
+>()("agentos/github-app-token/JwtSigner") {}
+
+export const GitHubAppJwtSignerLive = Layer.succeed(
+  GitHubAppJwtSigner,
+  GitHubAppJwtSigner.of({
+    sign: (appId, privateKey, nowSeconds) =>
+      Effect.try({
+        try: () => {
+          const encode = (value: unknown) =>
+            Buffer.from(JSON.stringify(value)).toString("base64url");
+          const unsigned = `${encode({ alg: "RS256", typ: "JWT" })}.${encode({
+            iat: nowSeconds - 60,
+            exp: nowSeconds + 540,
+            iss: appId,
+          })}`;
+          const signer = createSign("RSA-SHA256");
+          signer.update(unsigned);
+          return `${unsigned}.${signer.sign(privateKey, "base64url")}`;
+        },
+        catch: (cause) =>
+          tokenError("jwt", "Could not sign the GitHub App JWT", { cause }),
+      }),
+  }),
+);
+
+export interface GitHubTokenHttpRequest {
+  readonly url: string;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly scope: InstallationTokenScope | undefined;
+}
+
+export interface GitHubTokenHttpResponse {
+  readonly status: number;
+  readonly body: string;
+}
+
+export class GitHubTokenHttp extends Context.Service<
+  GitHubTokenHttp,
+  {
+    readonly execute: (
+      request: GitHubTokenHttpRequest,
+    ) => Effect.Effect<GitHubTokenHttpResponse, GitHubAppTokenError>;
+  }
+>()("agentos/github-app-token/Http") {}
+
+export const GitHubTokenHttpLive = Layer.effect(
+  GitHubTokenHttp,
+  Effect.gen(function*() {
+    const client = yield* HttpClient.HttpClient;
+    return GitHubTokenHttp.of({
+      execute: Effect.fn("agentos.githubAppToken.http")(function*(input) {
+        let request = HttpClientRequest.post(input.url).pipe(
+          HttpClientRequest.setHeaders(input.headers),
+        );
+        if (input.scope !== undefined) {
+          request = yield* HttpClientRequest.bodyJson(request, input.scope).pipe(
+            Effect.mapError((cause) =>
+              tokenError("encoding", "Could not encode the GitHub token scope", {
+                cause,
+              })
+            ),
+          );
+        }
+        const response = yield* client.execute(request).pipe(
+          Effect.mapError((cause) =>
+            tokenError("provider", "GitHub token request failed", { cause })
+          ),
+        );
+        const body = yield* response.text.pipe(
+          Effect.mapError((cause) =>
+            tokenError("provider", "GitHub token response could not be read", {
+              cause,
+            })
+          ),
+        );
+        if (new TextEncoder().encode(body).length > 64 * 1_024) {
+          return yield* tokenError(
+            "provider",
+            "GitHub token response exceeds the supported size limit",
+          );
+        }
+        return { status: response.status, body };
+      }),
+    });
+  }),
+);
+
+export const createAppJwt = Effect.fn("agentos.githubAppToken.createJwt")(
+  function*(appId: string, privateKey: string, nowSeconds?: number) {
+    const signer = yield* GitHubAppJwtSigner;
+    const current = nowSeconds ??
+      Math.floor((yield* Clock.currentTimeMillis) / 1_000);
+    return yield* signer.sign(appId, privateKey, current);
+  },
+);
+
+export const mintInstallationToken = Effect.fn(
+  "agentos.githubAppToken.mint",
+)(function*(options: {
+  readonly apiUrl: string;
+  readonly appId: string;
+  readonly installationId: string;
+  readonly privateKey: string;
+  readonly scope?: InstallationTokenScope;
+}) {
+  yield* requiredPositiveInteger("GITHUB_APP_ID", options.appId);
+  yield* requiredPositiveInteger(
+    "GITHUB_APP_INSTALLATION_ID",
+    options.installationId,
+  );
+  const jwt = yield* createAppJwt(options.appId, options.privateKey);
+  const endpoint = yield* Effect.try({
+    try: () => {
+      const base = new URL(options.apiUrl);
+      base.pathname = `${base.pathname.replace(/\/+$/, "")}/app/installations/${options.installationId}/access_tokens`;
+      return base.toString();
+    },
+    catch: (cause) =>
+      tokenError("configuration", "GITHUB_API_URL must be a valid URL", {
+        cause,
+      }),
+  });
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
-    Authorization: `Bearer ${createAppJwt(appId, privateKey)}`,
+    Authorization: `Bearer ${jwt}`,
     "User-Agent": "github-app-token",
     "X-GitHub-Api-Version": "2022-11-28",
   };
-  if (scope) headers["Content-Type"] = "application/json";
-  const response = await request(
-    `${apiUrl.replace(/\/+$/, "")}/app/installations/${installationId}/access_tokens`,
-    {
-      method: "POST",
-      headers,
-      body: scope ? JSON.stringify(scope) : undefined,
-    },
+  if (options.scope !== undefined) headers["Content-Type"] = "application/json";
+  const http = yield* GitHubTokenHttp;
+  const response = yield* http.execute({
+    url: endpoint,
+    headers,
+    scope: options.scope,
+  });
+  const body = yield* Schema.decodeUnknownEffect(
+    InstallationTokenResponseFromString,
+  )(response.body).pipe(
+    Effect.mapError((cause) =>
+      tokenError("provider", "GitHub returned malformed token metadata", {
+        cause,
+      })
+    ),
   );
-  const body = (await response.json().catch(() => ({}))) as GitHubTokenResponse & {
-    message?: unknown;
-  };
-  if (!response.ok) {
-    const message =
-      typeof body.message === "string" ? body.message : "provider request failed";
-    throw new Error(`${response.status}: ${message}`);
+  if (response.status < 200 || response.status >= 300) {
+    const message = typeof body.message === "string"
+      ? body.message
+      : "provider request failed";
+    return yield* tokenError(
+      "provider",
+      `${response.status}: ${message}`,
+      { status: response.status },
+    );
   }
   if (typeof body.token !== "string" || body.token.length === 0) {
-    throw new Error("GitHub returned no installation token");
+    return yield* tokenError("provider", "GitHub returned no installation token");
   }
   if (typeof body.expires_at !== "string" || body.expires_at.length === 0) {
-    throw new Error("GitHub returned no installation token expiry");
-  }
-
-  const metadata: InstallationTokenMetadata = { expires_at: body.expires_at };
-  if (isStringRecord(body.permissions)) {
-    metadata.permissions = body.permissions;
-  }
-  if (typeof body.repository_selection === "string") {
-    metadata.repository_selection = body.repository_selection;
-  }
-  if (Array.isArray(body.repositories)) {
-    metadata.repositories = body.repositories.flatMap((repository) =>
-      isRecord(repository) &&
-      typeof repository.id === "number" &&
-      typeof repository.full_name === "string"
-        ? [{ id: repository.id, full_name: repository.full_name }]
-        : [],
+    return yield* tokenError(
+      "provider",
+      "GitHub returned no installation token expiry",
     );
   }
+  const metadata: InstallationTokenMetadata = {
+    expires_at: body.expires_at,
+    ...(isStringRecord(body.permissions)
+      ? { permissions: body.permissions }
+      : {}),
+    ...(typeof body.repository_selection === "string"
+      ? { repository_selection: body.repository_selection }
+      : {}),
+    ...(Array.isArray(body.repositories)
+      ? {
+        repositories: body.repositories.filter(isRepositoryMetadata).map(
+          ({ id, full_name }) => ({ id, full_name }),
+        ),
+      }
+      : {}),
+  };
   return { token: body.token, metadata };
-}
+});
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isStringRecord(value: unknown): value is Record<string, string> {
-  return (
-    isRecord(value) && Object.values(value).every((item) => typeof item === "string")
+export const readInstallationTokenScope = Effect.fn(
+  "agentos.githubAppToken.readScope",
+)(function*(path: string) {
+  const fileSystem = yield* FileSystem.FileSystem;
+  const scope = yield* fileSystem.readFileString(path).pipe(
+    Effect.flatMap((source) =>
+      Schema.decodeUnknownEffect(ScopeFromString)(source, {
+        onExcessProperty: "error",
+      })
+    ),
+    Effect.mapError((cause) =>
+      tokenError("configuration", "cannot read scope file", { cause })
+    ),
   );
-}
-
-async function readScope(path: string): Promise<InstallationTokenScope> {
-  let value: unknown;
-  try {
-    value = JSON.parse(await readFile(path, "utf8"));
-  } catch (error) {
-    throw new ConfigurationError(
-      `cannot read scope file: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (!isRecord(value)) {
-    throw new ConfigurationError("scope must be a JSON object");
-  }
-  const allowed = new Set(["repositories", "repository_ids", "permissions"]);
-  const unknown = Object.keys(value).find((key) => !allowed.has(key));
-  if (unknown) {
-    throw new ConfigurationError(`unknown scope field: ${unknown}`);
-  }
-  if (value.repositories !== undefined && value.repository_ids !== undefined) {
-    throw new ConfigurationError(
+  if (scope.repositories !== undefined && scope.repository_ids !== undefined) {
+    return yield* tokenError(
+      "configuration",
       "scope must use repositories or repository_ids, not both",
     );
   }
-
-  const scope: InstallationTokenScope = {};
-  if (value.repositories !== undefined) {
-    if (
-      !Array.isArray(value.repositories) ||
-      value.repositories.length === 0 ||
-      value.repositories.length > 500 ||
-      !value.repositories.every(
-        (repository) => typeof repository === "string" && repository.length > 0,
-      )
-    ) {
-      throw new ConfigurationError(
-        "repositories must contain 1 to 500 repository names",
-      );
-    }
-    scope.repositories = value.repositories as string[];
+  if (
+    scope.repositories !== undefined &&
+    (scope.repositories.length === 0 ||
+      scope.repositories.length > 500 ||
+      scope.repositories.some((repository) => repository.length === 0))
+  ) {
+    return yield* tokenError(
+      "configuration",
+      "repositories must contain 1 to 500 repository names",
+    );
   }
-  if (value.repository_ids !== undefined) {
-    if (
-      !Array.isArray(value.repository_ids) ||
-      value.repository_ids.length === 0 ||
-      value.repository_ids.length > 500 ||
-      !value.repository_ids.every(
-        (id) => Number.isSafeInteger(id) && (id as number) > 0,
-      )
-    ) {
-      throw new ConfigurationError(
-        "repository_ids must contain 1 to 500 positive integer IDs",
-      );
-    }
-    scope.repository_ids = value.repository_ids as number[];
+  if (
+    scope.repository_ids !== undefined &&
+    (scope.repository_ids.length === 0 ||
+      scope.repository_ids.length > 500 ||
+      scope.repository_ids.some((id) =>
+        !Number.isSafeInteger(id) || id <= 0
+      ))
+  ) {
+    return yield* tokenError(
+      "configuration",
+      "repository_ids must contain 1 to 500 positive integer IDs",
+    );
   }
-  if (value.permissions !== undefined) {
-    if (
-      !isRecord(value.permissions) ||
-      Object.keys(value.permissions).length === 0 ||
-      !Object.entries(value.permissions).every(
-        ([permission, level]) =>
-          permission.length > 0 && (level === "read" || level === "write"),
-      )
-    ) {
-      throw new ConfigurationError(
-        "permissions must map permission names to read or write",
-      );
-    }
-    scope.permissions = value.permissions as Record<string, "read" | "write">;
+  if (
+    scope.permissions !== undefined &&
+    (Object.keys(scope.permissions).length === 0 ||
+      Object.keys(scope.permissions).some((permission) => permission.length === 0))
+  ) {
+    return yield* tokenError(
+      "configuration",
+      "permissions must map permission names to read or write",
+    );
   }
-  if (Object.keys(scope).length === 0) {
-    throw new ConfigurationError("scope must reduce repositories or permissions");
+  if (
+    scope.repositories === undefined &&
+    scope.repository_ids === undefined &&
+    scope.permissions === undefined
+  ) {
+    return yield* tokenError(
+      "configuration",
+      "scope must reduce repositories or permissions",
+    );
   }
   return scope;
-}
+});
 
-async function atomicWrite(path: string, contents: string): Promise<void> {
-  const temporary = join(
-    dirname(path),
-    `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`,
+export const writePrivateFileAtomic = Effect.fn(
+  "agentos.githubAppToken.atomicWrite",
+)(function*(path: string, contents: string) {
+  const crypto = yield* Crypto.Crypto;
+  const fileSystem = yield* FileSystem.FileSystem;
+  const paths = yield* Path.Path;
+  const suffix = yield* crypto.randomUUIDv4.pipe(
+    Effect.mapError((cause) =>
+      tokenError("filesystem", "Could not create a private-file nonce", {
+        cause,
+      })
+    ),
   );
-  try {
-    await writeFile(temporary, contents, { flag: "wx", mode: 0o600 });
-    await rename(temporary, path);
-  } finally {
-    await rm(temporary, { force: true });
-  }
-}
+  const temporary = paths.join(
+    paths.dirname(path),
+    `.${paths.basename(path)}.${suffix}.tmp`,
+  );
+  yield* Effect.gen(function*() {
+    yield* fileSystem.writeFileString(temporary, contents, {
+      flag: "wx",
+      mode: 0o600,
+    });
+    yield* fileSystem.rename(temporary, path);
+  }).pipe(
+    Effect.mapError((cause) =>
+      tokenError("filesystem", "Could not write a private token artifact", {
+        cause,
+      })
+    ),
+    Effect.ensuring(fileSystem.remove(temporary, { force: true }).pipe(
+      Effect.ignore,
+    )),
+  );
+});
 
-function parseArguments(args: string[]): {
-  scopeFile?: string;
-  tokenFile?: string;
-  metadataFile?: string;
-} {
-  const result: {
-    scopeFile?: string;
-    tokenFile?: string;
-    metadataFile?: string;
-  } = {};
-  const options: Record<
-    string,
-    "scopeFile" | "tokenFile" | "metadataFile"
-  > = {
-    "--scope-file": "scopeFile",
-    "--token-file": "tokenFile",
-    "--metadata-file": "metadataFile",
-  };
-  for (let index = 0; index < args.length; index += 2) {
-    const option = args[index];
-    const value = args[index + 1];
-    const key = option ? options[option] : undefined;
-    if (!key || !value || value.startsWith("--") || result[key] !== undefined) {
-      throw new ConfigurationError(help);
+const CliConfig = Config.all({
+  apiUrl: Config.url("GITHUB_API_URL").pipe(
+    Config.withDefault(new URL("https://api.github.com")),
+  ),
+  appId: Config.string("GITHUB_APP_ID"),
+  installationId: Config.string("GITHUB_APP_INSTALLATION_ID"),
+  privateKeyFile: Config.string("GITHUB_APP_PRIVATE_KEY_FILE"),
+});
+
+const parseArguments = Effect.fn("agentos.githubAppToken.parseArguments")(
+  function*(args: ReadonlyArray<string>) {
+    const result: {
+      scopeFile?: string;
+      tokenFile?: string;
+      metadataFile?: string;
+    } = {};
+    const options: Record<
+      string,
+      "scopeFile" | "tokenFile" | "metadataFile"
+    > = {
+      "--scope-file": "scopeFile",
+      "--token-file": "tokenFile",
+      "--metadata-file": "metadataFile",
+    };
+    for (let index = 0; index < args.length; index += 2) {
+      const option = args[index];
+      const value = args[index + 1];
+      const key = option === undefined ? undefined : options[option];
+      if (
+        key === undefined ||
+        value === undefined ||
+        value.startsWith("--") ||
+        result[key] !== undefined
+      ) return yield* tokenError("configuration", help);
+      result[key] = value;
     }
-    result[key] = value;
-  }
-  return result;
-}
+    return result;
+  },
+);
 
-function requiredPositiveInteger(name: string): string {
-  const value = process.env[name];
-  if (!value || !/^[1-9][0-9]*$/.test(value)) {
-    throw new ConfigurationError(`${name} must be a positive integer`);
+const requiredPositiveInteger = Effect.fn(
+  "agentos.githubAppToken.positiveInteger",
+)(function*(name: string, value: string) {
+  if (!/^[1-9][0-9]*$/.test(value)) {
+    return yield* tokenError(
+      "configuration",
+      `${name} must be a positive integer`,
+    );
   }
   return value;
-}
+});
 
-class ConfigurationError extends Error {}
+const encodeMetadata = Effect.fn("agentos.githubAppToken.encodeMetadata")(
+  function*(metadata: InstallationTokenMetadata) {
+    yield* Schema.encodeEffect(JsonFromString)(metadata).pipe(
+      Effect.mapError((cause) =>
+        tokenError("encoding", "Could not encode token metadata", { cause })
+      ),
+    );
+    return `${JSON.stringify(metadata, null, 2)}\n`;
+  },
+);
+
+export const runGitHubAppToken = Effect.gen(function*() {
+  const fileSystem = yield* FileSystem.FileSystem;
+  const stdio = yield* Stdio.Stdio;
+  const args = yield* stdio.args;
+  if (args.includes("--help") || args.includes("-h")) {
+    yield* writeStdout(help);
+    return;
+  }
+  const parsed = yield* parseArguments(args);
+  const config = yield* CliConfig.pipe(
+    Effect.mapError(() =>
+      tokenError("configuration", "GITHUB_APP_ID must be a positive integer")
+    ),
+  );
+  yield* requiredPositiveInteger("GITHUB_APP_ID", config.appId);
+  yield* requiredPositiveInteger(
+    "GITHUB_APP_INSTALLATION_ID",
+    config.installationId,
+  );
+  const privateKey = yield* fileSystem.readFileString(
+    config.privateKeyFile,
+  ).pipe(
+    Effect.mapError((cause) =>
+      tokenError("filesystem", "Could not read the mounted private key", {
+        cause,
+      })
+    ),
+  );
+  const scope = parsed.scopeFile === undefined
+    ? undefined
+    : yield* readInstallationTokenScope(parsed.scopeFile);
+  const { token, metadata } = yield* mintInstallationToken({
+    apiUrl: config.apiUrl.toString(),
+    appId: config.appId,
+    installationId: config.installationId,
+    privateKey,
+    scope,
+  });
+  if (parsed.metadataFile !== undefined) {
+    yield* writePrivateFileAtomic(
+      parsed.metadataFile,
+      yield* encodeMetadata(metadata),
+    );
+  }
+  if (parsed.tokenFile !== undefined) {
+    yield* writePrivateFileAtomic(parsed.tokenFile, `${token}\n`);
+  } else {
+    yield* writeStdout(`${token}\n`);
+  }
+});
+
+const writeStdout = Effect.fn("agentos.githubAppToken.stdout")(
+  function*(contents: string) {
+    const stdio = yield* Stdio.Stdio;
+    yield* Stream.make(contents).pipe(
+      Stream.run(stdio.stdout()),
+      Effect.mapError((cause) =>
+        tokenError("filesystem", "Could not write command output", { cause })
+      ),
+    );
+  },
+);
+
+const reportFailure = (error: GitHubAppTokenError) =>
+  Effect.gen(function*() {
+    const stdio = yield* Stdio.Stdio;
+    yield* Stream.make(`${error.message}\n`).pipe(
+      Stream.run(stdio.stderr()),
+      Effect.ignore,
+    );
+  });
 
 if (import.meta.main) {
-  if (process.argv.includes("--help") || process.argv.includes("-h")) {
-    process.stdout.write(help);
-  } else {
-    try {
-      const { scopeFile, tokenFile, metadataFile } = parseArguments(
-        process.argv.slice(2),
-      );
-      const appId = requiredPositiveInteger("GITHUB_APP_ID");
-      const installationId = requiredPositiveInteger(
-        "GITHUB_APP_INSTALLATION_ID",
-      );
-      const privateKeyFile = process.env.GITHUB_APP_PRIVATE_KEY_FILE;
-      if (!privateKeyFile) {
-        throw new ConfigurationError(
-          "GITHUB_APP_PRIVATE_KEY_FILE must name the mounted private key",
-        );
-      }
-      const privateKey = await readFile(privateKeyFile, "utf8");
-      const scope = scopeFile ? await readScope(scopeFile) : undefined;
-      const { token, metadata } = await mintInstallationToken({
-        apiUrl: process.env.GITHUB_API_URL ?? "https://api.github.com",
-        appId,
-        installationId,
-        privateKey,
-        scope,
-      });
-      if (metadataFile) {
-        await atomicWrite(metadataFile, `${JSON.stringify(metadata, null, 2)}\n`);
-      }
-      if (tokenFile) {
-        await atomicWrite(tokenFile, `${token}\n`);
-      } else {
-        process.stdout.write(`${token}\n`);
-      }
-    } catch (error) {
-      process.stderr.write(
-        `${error instanceof Error ? error.message : String(error)}\n`,
-      );
-      process.exitCode = error instanceof ConfigurationError ? 2 : 1;
-    }
-  }
+  const http = GitHubTokenHttpLive.pipe(Layer.provide(BunHttpClient.layer));
+  const live = Layer.mergeAll(
+    BunServices.layer,
+    BunHttpClient.layer,
+    GitHubAppJwtSignerLive,
+    http,
+    ConfigProvider.layer(ConfigProvider.fromEnv()),
+  );
+  BunRuntime.runMain(
+    runGitHubAppToken.pipe(
+      Effect.tapError(reportFailure),
+      Effect.provide(live),
+    ),
+    { disableErrorReporting: true },
+  );
 }
