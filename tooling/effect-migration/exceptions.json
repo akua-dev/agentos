@@ -3,6 +3,18 @@
   "exceptions": [
     {
       "kind": "outer-host-adapter",
+      "path": "website/apps/docs/scripts/script-runtime.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "All website maintenance executables share one Bun entry around typed Effect programs and Bun platform services.",
+      "ownerIssue": 99,
+      "test": "website/apps/docs/scripts/script-runtime.effect.test.ts",
+      "removalCondition": "Retain only while website maintenance is exposed through standalone Bun scripts.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "website/apps/docs/lib/effect/browser-runtime.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
