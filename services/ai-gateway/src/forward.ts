@@ -1,4 +1,3 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import {
   extractSessionKey,
   isSupportedResponsePath,
@@ -15,6 +14,7 @@ import {
 } from "@akua-dev/agentos";
 import {
   Cause,
+  Crypto,
   Effect,
   Exit,
   Option,
@@ -23,6 +23,8 @@ import {
   Stream,
 } from "effect";
 
+import { attributedSessionKey } from "./attribution.ts";
+import { timingSafeStringEqual } from "./constant-time.ts";
 import {
   AIGatewayTelemetry,
   type AIGatewayRequestTelemetry,
@@ -110,6 +112,7 @@ export const makeAIForwardHandler = Effect.fn(
     });
   }
   const telemetry = yield* AIGatewayTelemetry;
+  const crypto = yield* Crypto.Crypto;
 
   const handler: AIForwardHandler = Effect.fn(
     "agentos.aiGateway.forward",
@@ -167,10 +170,23 @@ export const makeAIForwardHandler = Effect.fn(
       }));
       return jsonResponse(400, "invalid_session");
     }
-    const sessionKey = attributedSessionKey(
+    const attributed = yield* Effect.result(attributedSessionKey(
       Option.getOrUndefined(session.success),
       authentication.authorization,
-    );
+    ).pipe(Effect.provideService(Crypto.Crypto, crypto)));
+    if (Result.isFailure(attributed)) {
+      const status = attributed.failure.code === "disabled_grant" ? 403 : 503;
+      yield* diagnostic(requestTelemetry.end({
+        status,
+        error: attributed.failure,
+        streamOutcome: "not_streamed",
+      }));
+      return jsonResponse(
+        status,
+        status === 403 ? "forbidden" : "attribution_unavailable",
+      );
+    }
+    const sessionKey = attributed.success;
     yield* diagnostic(requestTelemetry.routeStarted);
     const acquired = yield* Effect.result(options.acquire(
       sessionKey,
@@ -423,25 +439,7 @@ function isClientAuthorized(request: Request, expected: string): boolean {
     ? authorization.slice(7).trim()
     : undefined;
   const actual = dedicated ?? bearer ?? "";
-  const left = Buffer.from(actual);
-  const right = Buffer.from(expected);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
-
-function attributedSessionKey(
-  sessionKey: string | undefined,
-  grant: ProviderAuthorizationGrantV1 | undefined,
-): string | undefined {
-  if (sessionKey === undefined || grant === undefined) return sessionKey;
-  const assignmentId = grant.identity.assignmentId;
-  const kind = assignmentId === null ? "mate" : "assignment";
-  const id = assignmentId ?? grant.identity.agentId;
-  const digest = createHash("sha256")
-    .update(`${kind}:${id}`, "utf8")
-    .update("\0", "utf8")
-    .update(sessionKey, "utf8")
-    .digest("hex");
-  return `agentos-v1:${kind}:${digest}`;
+  return timingSafeStringEqual(actual, expected);
 }
 
 function makeUpstreamRequest(

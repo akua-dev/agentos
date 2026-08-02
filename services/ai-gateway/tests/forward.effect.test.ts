@@ -1,3 +1,4 @@
+import { layer as BunCryptoLayer } from "@effect/platform-bun/BunCrypto";
 import { assert, describe, layer } from "@effect/vitest";
 import {
   ProviderBudgetSettlementReporter,
@@ -180,7 +181,10 @@ const makeTelemetryRecorder = Effect.fn(
 });
 
 describe("Effect AI Gateway forwarding", () => {
-  layer(Layer.succeed(AIGatewayTelemetry)(noopAIGatewayTelemetry))((it) => {
+  layer(Layer.mergeAll(
+    BunCryptoLayer,
+    Layer.succeed(AIGatewayTelemetry)(noopAIGatewayTelemetry),
+  ))((it) => {
   it.effect("emits the complete Effect telemetry lifecycle for a streamed response", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();

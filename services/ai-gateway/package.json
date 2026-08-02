@@ -8,7 +8,7 @@
     "ai-gateway": "./src/main.ts"
   },
   "scripts": {
-    "test": "bun test tests --path-ignore-patterns='**/*.effect.test.ts'",
+    "test": "bun ../../node_modules/vitest/vitest.mjs run tests",
     "typecheck": "tsc --project ../../tsconfig.json"
   },
   "dependencies": {

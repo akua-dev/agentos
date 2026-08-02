@@ -33,10 +33,10 @@ export const defaultRoutingConfig: RoutingConfig = {
 };
 
 export interface SelectionInput {
-  candidates: Candidate[];
-  config: RoutingConfig;
-  now: number;
-  currentAccountId?: string;
+  readonly candidates: ReadonlyArray<Candidate>;
+  readonly config: RoutingConfig;
+  readonly now: number;
+  readonly currentAccountId?: string;
 }
 
 export function toRouterConfig(config: RoutingConfig): RouterRoutingConfig {
@@ -127,8 +127,8 @@ export function weeklyUrgency(snapshot: UsageSnapshot, now: number): number {
   );
 }
 
-export function selectAccount(input: SelectionInput): SelectionDecision {
-  const result = Effect.runSync(
+export const selectAccount = Effect.fn("agentos.aiGateway.selectAccount")(
+  (input: SelectionInput): Effect.Effect<SelectionDecision> =>
     Effect.result(
       selectRouterAccount({
         candidates: input.candidates.map(toRouterCandidate),
@@ -138,17 +138,16 @@ export function selectAccount(input: SelectionInput): SelectionDecision {
           ? {}
           : { currentAccountId: AccountId.make(input.currentAccountId) }),
       }),
-    ),
-  );
-  if (Result.isFailure(result)) {
-    return {
-      reason: "no_eligible_accounts",
-      candidates: result.failure.explanations.map(fromRouterExplanation),
-    };
-  }
-  return {
-    accountId: result.success.accountId,
-    reason: result.success.reason,
-    candidates: result.success.explanations.map(fromRouterExplanation),
-  };
-}
+    ).pipe(Effect.map((result) =>
+      Result.isFailure(result)
+        ? {
+            reason: "no_eligible_accounts",
+            candidates: result.failure.explanations.map(fromRouterExplanation),
+          }
+        : {
+            accountId: result.success.accountId,
+            reason: result.success.reason,
+            candidates: result.success.explanations.map(fromRouterExplanation),
+          }
+    )),
+);
