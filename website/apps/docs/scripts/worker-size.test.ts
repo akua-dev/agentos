@@ -1,5 +1,6 @@
+import * as BunServices from '@effect/platform-bun/BunServices';
 import { assert, describe, it } from '@effect/vitest';
-import { Effect } from 'effect';
+import { Effect, FileSystem, Path } from 'effect';
 import {
   assertWorkerFitsFreePlan,
   parseCompressedWorkerSize,
@@ -11,8 +12,8 @@ describe('Cloudflare Worker size contract', () => {
     Effect.gen(function*() {
       assert.strictEqual(
         yield* parseCompressedWorkerSize(
-        'Total Upload: 13833.20 KiB / gzip: 2295.89 KiB',
-      ),
+          'Total Upload: 13833.20 KiB / gzip: 2295.89 KiB',
+        ),
         2295.89,
       );
     }));
@@ -31,4 +32,15 @@ describe('Cloudflare Worker size contract', () => {
     assert.isTrue(shouldVerifyWorkerSize({ CI: 'true' }));
     assert.isTrue(shouldVerifyWorkerSize({}));
   });
+
+  it.effect('deduplicates Effect modules in the deployable Worker bundle', () =>
+    Effect.gen(function*() {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const paths = yield* Path.Path;
+      const packagePath = yield* paths.fromFileUrl(
+        new URL('../package.json', import.meta.url),
+      );
+      const source = yield* fileSystem.readFileString(packagePath);
+      assert.include(source, 'next build --webpack');
+    }).pipe(Effect.provide(BunServices.layer)));
 });
