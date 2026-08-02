@@ -11,15 +11,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in mise.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/resources/roles/firstmate/kubernetes/tests/manifests.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 14,
-      "digest": "6cf54224de6766d34e3f8c0dde786b12bf3e96e800dea9795e4850276cd846f7",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/roles/firstmate/kubernetes/tests/manifests.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/resources/roles/secondmate/kubernetes/tests/domain-lifecycle.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
