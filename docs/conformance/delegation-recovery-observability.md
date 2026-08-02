@@ -18,7 +18,10 @@ interpreted as success.
 
 The topology plan contributes bounded action/reason signals only. The workload
 compiler contributes spec and overlay digests. The renderer or reviewed runtime
-journal contributes a render digest. No component may attach charters, prompts,
+journal contributes a render digest. Compiler-originated custody persists all
+three digests through the typed workload-operation Functions, so telemetry and
+repair evidence cannot join a changed spec to an old operation merely because
+the render is equivalent. No component may attach charters, prompts,
 reasoning, raw manifests, Secrets, provider identities, transcript text, or
 memory content.
 
@@ -49,6 +52,25 @@ caught and discarded at the telemetry boundary after best-effort span cleanup.
 
 Every external input is decoded with a closed Effect Schema before projection.
 Contradictory journal states are rejected rather than silently normalized.
+
+## Typed workload recovery proof
+
+The opt-in disposable-cluster suite compiles persistent-Mate and interactive-
+Crewmate plans from ordinary native Kustomize resources, decodes the rendered
+objects, and exercises server-side dry-run, diff, apply, admission and
+namespace-scoped RBAC. It injects a failing readiness path, observes rollout
+failure, reapplies the exact plan, deletes only the stale non-ready Pod required
+by StatefulSet `OrderedReady` repair, and proves both the retained PVC UID and
+native session marker survive two Pod replacements. It then deletes the child
+plan, verifies the PVC remains, removes every disposable namespace and policy,
+and records only bounded digests and booleans.
+
+The in-memory PostgreSQL companion drives the same typed operation through
+render, apply, rollout, Herdr-launch and locator-update interruption codes. It
+proves exact retry, rejects a changed spec with an identical render, preserves
+Agent/Task/Assignment counts and joins the one operation ID and three digests
+only on protected trace attributes. Metrics receive none of those identities
+or digests.
 
 ## Operator contract
 

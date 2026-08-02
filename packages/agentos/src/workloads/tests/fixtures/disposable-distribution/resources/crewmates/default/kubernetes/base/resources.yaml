@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agentos-crewmate
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentos-crewmate
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: agentos-crewmate
+  ports:
+    - name: herdr
+      port: 3000
+      targetPort: herdr
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-crewmate
+spec:
+  replicas: 1
+  serviceName: agentos-crewmate
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-crewmate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agentos-crewmate
+    spec:
+      automountServiceAccountToken: false
+      serviceAccountName: agentos-crewmate
+      terminationGracePeriodSeconds: 1
+      securityContext:
+        fsGroup: 65535
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 65535
+        runAsNonRoot: true
+        runAsUser: 65535
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: install-tools
+          image: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+          command: ["sh", "-c", "exit 0"]
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          resources: &small-resources
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+        - name: prepare-home
+          image: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+          command: ["sh", "-c", "exit 0"]
+          securityContext: *container-security
+          resources: *small-resources
+        - name: prepare-github-provider
+          image: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+          command: ["sh", "-c", "exit 0"]
+          securityContext: *container-security
+          resources: *small-resources
+      containers:
+        - name: crewmate
+          image: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              printf '%s' "$3" > /home/agent/native-session
+              mkdir -p /home/agent/www
+              printf ready > /home/agent/www/ready
+              exec httpd -f -p 3000 -h /home/agent/www
+            - --
+          ports:
+            - name: herdr
+              containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: herdr
+            periodSeconds: 1
+            failureThreshold: 10
+          securityContext: *container-security
+          resources: *small-resources
+          volumeMounts:
+            - name: home
+              mountPath: /home/agent
+            - name: agentos-egress-identity
+              mountPath: /var/run/secrets/agentos-egress
+              readOnly: true
+      volumes:
+        - name: agentos-egress-identity
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  audience: agentos-egress-authz
+                  expirationSeconds: 600
+                  path: token
+  volumeClaimTemplates:
+    - metadata:
+        name: home
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi
