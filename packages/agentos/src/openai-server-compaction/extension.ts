@@ -19,6 +19,7 @@ import {
   Clock,
   Config,
   Effect,
+  FileSystem,
   Layer,
   Result,
   Schema,
@@ -726,9 +727,16 @@ function handleProviderRequest(
   });
 }
 
-function runExtensionEffect<A, E>(effect: Effect.Effect<A, E>) {
+function runExtensionEffect<A, E>(
+  effect: Effect.Effect<A, E, FileSystem.FileSystem>,
+) {
   return runPromiseLegacy(
-    effect.pipe(Effect.provide(legacyEnvironmentConfigLayer())),
+    effect.pipe(
+      Effect.provide(Layer.merge(
+        compactionPlatformLayer,
+        legacyEnvironmentConfigLayer(),
+      )),
+    ),
   );
 }
 
