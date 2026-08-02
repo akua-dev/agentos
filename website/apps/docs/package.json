@@ -12,7 +12,7 @@
     "deploy": "bun run build:worker && bun run deploy:worker",
     "deploy:worker": "bun ./scripts/publish-worker.ts production",
     "dev": "next dev",
-    "lint": "node ./scripts/lint.entry.ts",
+    "lint": "bun ./scripts/lint.entry.ts",
     "preview:worker": "opennextjs-cloudflare preview",
     "test": "vitest run --config vitest.config.ts",
     "upload:worker": "bun ./scripts/publish-worker.ts preview",
