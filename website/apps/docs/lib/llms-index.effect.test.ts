@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { assert, describe, it } from '@effect/vitest';
+
+import { renderLlmsIndex } from './llms-index';
 
 describe('AgentOS language-model index', () => {
-  it('publishes only absolute site links and exposes the full text bundle', async () => {
-    const { renderLlmsIndex } = await import('./llms-index');
+  it('publishes only absolute site links and exposes the full text bundle', () => {
     const text = renderLlmsIndex({
       documentation: [
         {
@@ -24,15 +25,9 @@ describe('AgentOS language-model index', () => {
       ],
     });
 
-    expect(text).toContain(
-      '[Full AgentOS text](https://agentos.akua.dev/llms-full.txt)',
-    );
-    expect(text).toContain(
-      '[Get started](https://agentos.akua.dev/docs/start/get-started)',
-    );
-    expect(text).toContain(
-      '[Benchmarks](https://agentos.akua.dev/benchmarks)',
-    );
-    expect(text).not.toMatch(/\]\(\//);
+    assert.include(text, '[Full AgentOS text](https://agentos.akua.dev/llms-full.txt)');
+    assert.include(text, '[Get started](https://agentos.akua.dev/docs/start/get-started)');
+    assert.include(text, '[Benchmarks](https://agentos.akua.dev/benchmarks)');
+    assert.notMatch(text, /\]\(\//);
   });
 });
