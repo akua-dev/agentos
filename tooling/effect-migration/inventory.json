@@ -532,7 +532,7 @@
       "package": "@agentos/ai-gateway",
       "io": ["config", "database", "http", "oauth", "stream", "telemetry"],
       "migrationDependencies": [100, 101],
-      "status": "planned"
+      "status": "migrated"
     },
     {
       "id": "website",

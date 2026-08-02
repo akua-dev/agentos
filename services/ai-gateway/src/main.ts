@@ -15,6 +15,7 @@ import {
   ConfigProvider,
   Console,
   Context,
+  Crypto,
   Data,
   Effect,
   FileSystem,
@@ -170,6 +171,7 @@ function makeAIGatewayRuntimeLive(
     AIGatewayRuntime,
     Effect.gen(function*() {
       const vault = yield* ManagedAccountVault;
+      const crypto = yield* Crypto.Crypto;
       const fileSystem = yield* FileSystem.FileSystem;
       const provider = yield* AIProviderHttp.pipe(
         Effect.provide(AIProviderHttpLive),
@@ -225,6 +227,7 @@ function makeAIGatewayRuntimeLive(
             maximumUsageEventBytes: serveConfig.maximumUsageEventBytes,
             usageCacheMillis: serveConfig.usageCacheMillis,
           }).pipe(
+            Effect.provideService(Crypto.Crypto, crypto),
             Effect.provideService(ManagedAccountVault, vault),
             Effect.provideService(AIRoutingState, routing),
             Effect.provideService(AIProviderHttp, provider),

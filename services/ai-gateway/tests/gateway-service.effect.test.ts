@@ -1,3 +1,4 @@
+import { layer as BunCryptoLayer } from "@effect/platform-bun/BunCrypto";
 import { assert, describe, it } from "@effect/vitest";
 import {
   AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
@@ -224,6 +225,7 @@ function makeApplication(
       services.settlements,
     ),
     Effect.provideService(AIGatewayTelemetry, telemetry),
+    Effect.provide(BunCryptoLayer),
   );
 }
 

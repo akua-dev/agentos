@@ -54,24 +54,3 @@ export interface RoutingConfig {
     weeklyMinimumPercent: number;
   };
 }
-
-export type RouteLease =
-  | {
-      kind: "codex_oauth";
-      accountId: string;
-      providerAccountId: string;
-      accessToken: string;
-      leaseToken: string;
-      renew(): Promise<boolean>;
-      release(): Promise<void>;
-      recordResponse?(status: number, headers: Headers): Promise<void>;
-    }
-  | {
-      kind: "openai_api_key";
-      accountId: "openai-api-key";
-      accessToken: string;
-      leaseToken: "api-key";
-      renew(): Promise<boolean>;
-      release(): Promise<void>;
-      recordResponse?(status: number, headers: Headers): Promise<void>;
-    };

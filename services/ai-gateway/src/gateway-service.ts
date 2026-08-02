@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import {
   AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
   ProviderBudgetSettlementReporter,
@@ -12,6 +11,7 @@ import {
   Schema,
 } from "effect";
 
+import { timingSafeStringEqual } from "./constant-time.ts";
 import {
   AIForwardRouteError,
   makeAIForwardHandler,
@@ -408,9 +408,7 @@ function isOperatorAuthorized(request: Request, expected: string): boolean {
   const bearer = authorization?.toLowerCase().startsWith("bearer ")
     ? authorization.slice(7).trim()
     : undefined;
-  const left = Buffer.from(dedicated ?? bearer ?? "");
-  const right = Buffer.from(expected);
-  return left.length === right.length && timingSafeEqual(left, right);
+  return timingSafeStringEqual(dedicated ?? bearer ?? "", expected);
 }
 
 function statusResponse(

@@ -209,4 +209,36 @@ describe("Effect server-owned Codex account vault", () => {
       assert.strictEqual(yield* Ref.get(interrupted), true);
       assert.strictEqual(yield* vault.remove(id), true);
     }).pipe(Effect.provide(platform))));
+
+  it.effect("does not let a stale rejected token invalidate a rotated login", () =>
+    Effect.scoped(Effect.gen(function*() {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const root = yield* fileSystem.makeTempDirectoryScoped({
+        prefix: "ai-gateway-token-race-",
+      });
+      const store = yield* makeAccountVaultStore(`${root}/accounts.json`);
+      const vault = yield* makeAccountVault({
+        store,
+        oauth: oauth(() => Effect.die("unused")),
+        now: Effect.succeed(now),
+      });
+      const original = credentials("provider-a", now + 3_600_000, "original");
+      const rotated = {
+        ...credentials("provider-a", now + 7_200_000, "rotated"),
+        access: accessToken("provider-a").replace("header.", "rotated."),
+      };
+      const id = yield* vault.addFromOAuth("A", original);
+      yield* vault.addFromOAuth("A", rotated);
+
+      assert.strictEqual(
+        yield* vault.markNeedsReauth(id, original.access),
+        false,
+      );
+      assert.strictEqual((yield* vault.list)[0]?.needsReauth, false);
+      assert.strictEqual(
+        yield* vault.markNeedsReauth(id, rotated.access),
+        true,
+      );
+      assert.strictEqual((yield* vault.list)[0]?.needsReauth, true);
+    }).pipe(Effect.provide(platform))));
 });
