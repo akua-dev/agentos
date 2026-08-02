@@ -595,6 +595,16 @@
       "status": "runtime-boundary"
     },
     {
+      "id": "mate-runtime-effect-test-entrypoint",
+      "issue": 102,
+      "pattern": "^packages/agentos/runtime/tests/fixtures/fake-herdr\\.effect\\.ts$",
+      "runtime": "bun-herdr-test-entrypoint",
+      "package": "@akua-dev/agentos",
+      "io": ["config", "filesystem", "process", "runtime-adapter", "schema", "stream", "test"],
+      "migrationDependencies": [100, 101, 104],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "agentos-telemetry-effect-tests",
       "issue": 102,
       "pattern": "^packages/agentos/src/telemetry/tests/(?:.*\\.effect\\.test\\.ts|fake-telemetry\\.ts)$",

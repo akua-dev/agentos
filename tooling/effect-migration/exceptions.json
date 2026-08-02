@@ -405,8 +405,20 @@
       "maximumOccurrences": 1,
       "reason": "The persistent Mate executable needs one reviewed Bun process boundary around its scoped Effect Herdr and Pi lifecycle program.",
       "ownerIssue": 104,
-      "test": "packages/agentos/runtime/tests/runtime.test.ts",
+      "test": "packages/agentos/runtime/tests/runtime.effect.test.ts",
       "removalCondition": "Retain only while Kubernetes invokes the persistent Mate lifecycle as a standalone executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "packages/agentos/runtime/tests/fixtures/fake-herdr.effect.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The fake Herdr executable needs one reviewed Bun process entry boundary around its typed Effect configuration, filesystem, subprocess, and lifecycle program.",
+      "ownerIssue": 102,
+      "test": "packages/agentos/runtime/tests/runtime.effect.test.ts",
+      "removalCondition": "Retain only while Mate runtime conformance requires a real Herdr subprocess ABI.",
       "expiresOn": null
     },
     {
