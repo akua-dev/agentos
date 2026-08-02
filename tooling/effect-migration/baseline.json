@@ -2,15 +2,6 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "path": "packages/agentos/resources/roles/secondmate/kubernetes/tests/domain-lifecycle.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 19,
-      "digest": "e26c205f06bc67fb05c4166696b073a8f5f04a12b4fadded0edd625841b8359f",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/roles/secondmate/kubernetes/tests/domain-lifecycle.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/agentgateway/tests/conformance.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
