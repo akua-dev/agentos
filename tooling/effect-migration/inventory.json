@@ -425,6 +425,26 @@
       "status": "runtime-boundary"
     },
     {
+      "id": "agentos-image-seed-effect-tests",
+      "issue": 102,
+      "pattern": "^packages/agentos/runtime/tests/image-seed\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "filesystem", "process", "stream"],
+      "migrationDependencies": [100, 101, 104],
+      "status": "migrated"
+    },
+    {
+      "id": "agentos-image-seed-entrypoint",
+      "issue": 104,
+      "pattern": "^packages/agentos/runtime/create-image-seed\\.ts$",
+      "runtime": "bun-entrypoint",
+      "package": "@akua-dev/agentos",
+      "io": ["filesystem", "process", "runtime-adapter", "schema", "stream"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "agentos-codex-provider-runtime",
       "issue": 104,
       "pattern": "^packages/agentos/runtime/codex-provider\\.ts$",
