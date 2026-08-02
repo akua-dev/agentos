@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "brand:generate": "bun ./scripts/generate-brand-assets.ts",
-    "build": "fumadocs-mdx && next build",
+    "build": "fumadocs-mdx && next build --webpack",
     "build:worker": "fumadocs-mdx && opennextjs-cloudflare build && bun ./scripts/finalize-worker-build.ts",
     "types:check": "next typegen && tsc --noEmit",
     "clean": "rimraf .next",
