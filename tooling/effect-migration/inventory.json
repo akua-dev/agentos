@@ -716,6 +716,16 @@
       "status": "runtime-boundary"
     },
     {
+      "id": "pg-listen-entrypoint",
+      "issue": 97,
+      "pattern": "^clis/pg-listen/pg-listen\\.ts$",
+      "runtime": "bun-postgresql-entrypoint",
+      "package": "@agentos/pg-listen",
+      "io": ["config", "database", "filesystem", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "benchmarks",
       "issue": 97,
       "pattern": "^benchmarks/",

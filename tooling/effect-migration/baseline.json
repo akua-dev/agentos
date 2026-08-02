@@ -2,24 +2,6 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "path": "clis/pg-listen/pg-listen.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 12,
-      "digest": "8535048a6f5d9ac9152375686c56d3dd271e3d64cce08a929b32ac0587db0a0a",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/pg-listen/pg-listen.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "clis/pg-listen/tests/pg-listen.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 48,
-      "digest": "a255e0aa969c5a33e6e795b026e26cdd21331b52dd209b26966d57114fba1268",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/pg-listen/tests/pg-listen.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/kubernetes/cloudnative-pg/tests/manifest.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,

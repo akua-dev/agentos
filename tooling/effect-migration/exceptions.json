@@ -75,6 +75,18 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "clis/pg-listen/pg-listen.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The PostgreSQL notification CLI enters one scoped Effect runtime around typed config, pgpass resolution, the native client Layer, LISTEN event streaming, schema encoding, and standard I/O.",
+      "ownerIssue": 97,
+      "test": "clis/pg-listen/tests/pg-listen.effect.test.ts",
+      "removalCondition": "Retain only while PostgreSQL notification waiting remains a standalone CLI.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "database/drizzle.config.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
