@@ -1,15 +1,17 @@
+import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
+import * as BunPath from "@effect/platform-bun/BunPath";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { Effect, Schema } from "effect";
-import {
-  chmod,
-  mkdir,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from "node:fs/promises";
-import { dirname, join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
+
+import {
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+  Path,
+  Result,
+  Schema,
+} from "effect";
 
 const providerId = "openai-codex";
 const markerVersion = 1;
@@ -17,6 +19,8 @@ const publicCodexTransportPlaceholder =
   "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9hY2NvdW50X2lkIjoiZmxlZXQtZ2F0ZXdheSJ9fQ.placeholder";
 
 const JsonObject = Schema.Record(Schema.String, Schema.Unknown);
+const JsonObjectFromString = Schema.fromJsonString(JsonObject);
+const UnknownFromString = Schema.fromJsonString(Schema.Unknown);
 
 class ActiveProviderMarker extends Schema.TaggedClass<ActiveProviderMarker>()(
   "Active",
@@ -39,6 +43,7 @@ const ProviderMarker = Schema.Union([
   ActiveProviderMarker,
   PendingProviderMarker,
 ]);
+const ProviderMarkerFromString = Schema.fromJsonString(ProviderMarker);
 
 type JsonObject = typeof JsonObject.Type;
 type ProviderMarker = typeof ProviderMarker.Type;
@@ -79,13 +84,7 @@ type ReconciliationState = {
   readonly settings: JsonObject;
 };
 
-function isMissingFile(cause: unknown): boolean {
-  return (
-    cause instanceof Error &&
-    "code" in cause &&
-    cause.code === "ENOENT"
-  );
-}
+const PiProviderLive = Layer.merge(BunFileSystem.layer, BunPath.layer);
 
 function fileError(operation: string, path: string, cause: unknown) {
   return PiProviderFileError.make({
@@ -100,38 +99,31 @@ function configurationError(message: string) {
   return PiProviderConfigurationError.make({ message });
 }
 
-function parseUnknownJson(source: string): unknown {
-  return JSON.parse(source);
-}
-
 const readOptionalText = Effect.fn("agentos.piProvider.readOptionalText")(
   function*(path: string) {
-    return yield* Effect.tryPromise({
-      try: async () => {
-        try {
-          return await readFile(path, "utf8");
-        } catch (cause) {
-          if (isMissingFile(cause)) return undefined;
-          throw cause;
-        }
-      },
-      catch: (cause) => fileError("read", path, cause),
-    });
+    const fileSystem = yield* FileSystem.FileSystem;
+    const result = yield* fileSystem.readFileString(path).pipe(Effect.result);
+    if (Result.isSuccess(result)) return result.success;
+    if (result.failure.reason._tag === "NotFound") return undefined;
+    return yield* fileError("read", path, result.failure);
   },
 );
 
+function sourceContainsJson(source: string): boolean {
+  return Option.isSome(
+    Schema.decodeUnknownOption(UnknownFromString)(source),
+  );
+}
+
 const parseJsonObject = Effect.fn("agentos.piProvider.parseJsonObject")(
   function*(source: string, label: string) {
-    const parsed = yield* Effect.try({
-      try: () => parseUnknownJson(source),
-      catch: () =>
-        configurationError(`${label} must contain valid JSON`),
-    });
-    return yield* Schema.decodeUnknownEffect(JsonObject)(parsed).pipe(
-      Effect.catchTag("SchemaError", () =>
-        Effect.fail(
-          configurationError(`${label} must contain a JSON object`),
-        ),
+    return yield* Schema.decodeUnknownEffect(JsonObjectFromString)(source).pipe(
+      Effect.mapError(() =>
+        configurationError(
+          sourceContainsJson(source)
+            ? `${label} must contain a JSON object`
+            : `${label} must contain valid JSON`,
+        )
       ),
     );
   },
@@ -149,118 +141,138 @@ const readOptionalMarker = Effect.fn("agentos.piProvider.readOptionalMarker")(
   function*(path: string) {
     const source = yield* readOptionalText(path);
     if (source === undefined) return undefined;
-    const parsed = yield* Effect.try({
-      try: () => parseUnknownJson(source),
-      catch: () =>
-        configurationError("pi-provider.json must contain valid JSON"),
-    });
-    return yield* Schema.decodeUnknownEffect(ProviderMarker)(parsed).pipe(
-      Effect.catchTag("SchemaError", () =>
-        Effect.fail(
-          configurationError(
-            "pi-provider.json does not match the AgentOS ownership schema",
-          ),
-        ),
+    return yield* Schema.decodeUnknownEffect(ProviderMarkerFromString)(
+      source,
+    ).pipe(
+      Effect.mapError(() =>
+        configurationError(
+          sourceContainsJson(source)
+            ? "pi-provider.json does not match the AgentOS ownership schema"
+            : "pi-provider.json must contain valid JSON",
+        )
       ),
     );
   },
 );
 
-const writePrivateJson = Effect.fn("agentos.piProvider.writePrivateJson")(
-  function*(path: string, value: unknown) {
-    yield* Effect.tryPromise({
-      try: async () => {
-        await mkdir(dirname(path), { mode: 0o700, recursive: true });
-        await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, {
-          mode: 0o600,
-        });
-        await chmod(path, 0o600);
-      },
-      catch: (cause) => fileError("write", path, cause),
-    });
+const writePrivateText = Effect.fn("agentos.piProvider.writePrivateText")(
+  function*(path: string, source: string) {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const paths = yield* Path.Path;
+    yield* fileSystem.makeDirectory(paths.dirname(path), {
+      mode: 0o700,
+      recursive: true,
+    }).pipe(Effect.mapError((cause) => fileError("write", path, cause)));
+    yield* Effect.gen(function*() {
+      yield* fileSystem.writeFileString(path, `${source}\n`, { mode: 0o600 });
+      yield* fileSystem.chmod(path, 0o600);
+    }).pipe(Effect.mapError((cause) => fileError("write", path, cause)));
   },
 );
 
+function writePrivateJson(path: string, value: JsonObject) {
+  return Schema.encodeEffect(JsonObjectFromString)(value).pipe(
+    Effect.mapError(() => configurationError(`Could not encode ${path}`)),
+    Effect.flatMap((source) => writePrivateText(path, source)),
+  );
+}
+
+function writePrivateMarker(path: string, value: ProviderMarker) {
+  return Schema.encodeEffect(ProviderMarkerFromString)(value).pipe(
+    Effect.mapError(() => configurationError(`Could not encode ${path}`)),
+    Effect.flatMap((source) => writePrivateText(path, source)),
+  );
+}
+
 const renamePrivateFile = Effect.fn("agentos.piProvider.renamePrivateFile")(
   function*(source: string, destination: string) {
-    yield* Effect.tryPromise({
-      try: () => rename(source, destination),
-      catch: (cause) => fileError("replace", destination, cause),
-    });
+    const fileSystem = yield* FileSystem.FileSystem;
+    yield* fileSystem.rename(source, destination).pipe(
+      Effect.mapError((cause) => fileError("replace", destination, cause)),
+    );
   },
 );
 
 const removeFile = Effect.fn("agentos.piProvider.removeFile")(function*(
   path: string,
 ) {
-  yield* Effect.tryPromise({
-    try: () => rm(path, { force: true }),
-    catch: (cause) => fileError("remove", path, cause),
-  });
+  const fileSystem = yield* FileSystem.FileSystem;
+  yield* fileSystem.remove(path, { force: true }).pipe(
+    Effect.mapError((cause) => fileError("remove", path, cause)),
+  );
 });
 
 function cleanupFiles(paths: ReadonlyArray<string>) {
-  return Effect.forEach(
-    paths,
-    (path) => removeFile(path).pipe(Effect.ignore),
-    { discard: true },
-  );
+  return Effect.forEach(paths, (path) => removeFile(path).pipe(Effect.ignore), {
+    discard: true,
+  });
 }
 
 function optionalEnvironment(
   environment: PiConfigurationEnvironment,
   name: string,
-): string | undefined {
+) {
   const raw = environment[name];
-  if (raw === undefined) return undefined;
+  if (raw === undefined) return Effect.succeed<string | undefined>(undefined);
   const value = raw.trim();
-  if (!value) throw configurationError(`${name} must be non-empty when configured`);
-  return value;
-}
-
-function providerMode(environment: PiConfigurationEnvironment): ProviderMode {
-  const mode = optionalEnvironment(environment, "AGENTOS_PI_PROVIDER_MODE");
-  if (mode === undefined || mode === "ai-gateway" || mode === "direct") {
-    return mode;
-  }
-  throw configurationError(
-    "AGENTOS_PI_PROVIDER_MODE must be ai-gateway or direct when configured",
-  );
-}
-
-function normalizedGatewayUrl(raw: string): string {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw configurationError("AI_GATEWAY_URL must be an absolute URL");
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw configurationError("AI_GATEWAY_URL must use http or https");
-  }
-  if (url.username || url.password || url.search || url.hash) {
-    throw configurationError(
-      "AI_GATEWAY_URL must not contain credentials, a query, or a fragment",
+  return value
+    ? Effect.succeed<string | undefined>(value)
+    : Effect.fail(
+      configurationError(`${name} must be non-empty when configured`),
     );
-  }
-  return url.toString().replace(/\/$/, "");
 }
 
-function selectedModelParts(selectedModel: string): {
-  readonly model: string;
-  readonly provider: string;
-} {
-  const separator = selectedModel.indexOf("/");
-  if (separator <= 0 || separator === selectedModel.length - 1) {
-    throw configurationError(
-      "AGENTOS_MODEL must use Pi's provider/model form",
+const providerMode = Effect.fn("agentos.piProvider.mode")(
+  function*(environment: PiConfigurationEnvironment) {
+    const mode = yield* optionalEnvironment(
+      environment,
+      "AGENTOS_PI_PROVIDER_MODE",
     );
-  }
-  return {
-    model: selectedModel.slice(separator + 1),
-    provider: selectedModel.slice(0, separator),
-  };
-}
+    if (mode === undefined || mode === "ai-gateway" || mode === "direct") {
+      return mode satisfies ProviderMode;
+    }
+    return yield* configurationError(
+      "AGENTOS_PI_PROVIDER_MODE must be ai-gateway or direct when configured",
+    );
+  },
+);
+
+const normalizedGatewayUrl = Effect.fn("agentos.piProvider.gatewayUrl")(
+  function*(raw: string) {
+    const url = Option.getOrUndefined(
+      Schema.decodeUnknownOption(Schema.URLFromString)(raw),
+    );
+    if (url === undefined) {
+      return yield* configurationError("AI_GATEWAY_URL must be an absolute URL");
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return yield* configurationError(
+        "AI_GATEWAY_URL must use http or https",
+      );
+    }
+    if (url.username || url.password || url.search || url.hash) {
+      return yield* configurationError(
+        "AI_GATEWAY_URL must not contain credentials, a query, or a fragment",
+      );
+    }
+    return url.toString().replace(/\/$/, "");
+  },
+);
+
+const selectedModelParts = Effect.fn("agentos.piProvider.selectedModelParts")(
+  function*(selectedModel: string) {
+    const separator = selectedModel.indexOf("/");
+    if (separator <= 0 || separator === selectedModel.length - 1) {
+      return yield* configurationError(
+        "AGENTOS_MODEL must use Pi's provider/model form",
+      );
+    }
+    return {
+      model: selectedModel.slice(separator + 1),
+      provider: selectedModel.slice(0, separator),
+    };
+  },
+);
 
 function gatewayProviderEntry(baseUrl: string): JsonObject {
   return {
@@ -270,46 +282,46 @@ function gatewayProviderEntry(baseUrl: string): JsonObject {
 }
 
 function optionalRecord(value: unknown): JsonObject | undefined {
-  if (
-    value === null ||
-    Array.isArray(value) ||
-    typeof value !== "object"
-  ) {
+  if (value === null || Array.isArray(value) || typeof value !== "object") {
     return undefined;
   }
   return Object.fromEntries(Object.entries(value));
 }
 
-function currentState(
-  settings: JsonObject | undefined,
-  models: JsonObject | undefined,
-  marker: ProviderMarker | undefined,
-): ReconciliationState {
-  const currentModels = models ?? {};
-  const providersValue = currentModels.providers;
-  const providers =
-    providersValue === undefined ? {} : optionalRecord(providersValue);
-  if (providers === undefined) {
-    throw configurationError(
-      "models.json providers must contain a JSON object",
-    );
-  }
-  const providerValue = providers[providerId];
-  const provider =
-    providerValue === undefined ? undefined : optionalRecord(providerValue);
-  if (providerValue !== undefined && provider === undefined) {
-    throw configurationError(
-      "openai-codex provider is not owned by AgentOS",
-    );
-  }
-  return {
-    marker,
-    models: currentModels,
-    provider,
-    providers,
-    settings: settings ?? {},
-  };
-}
+const currentState = Effect.fn("agentos.piProvider.currentState")(
+  function*(
+    settings: JsonObject | undefined,
+    models: JsonObject | undefined,
+    marker: ProviderMarker | undefined,
+  ) {
+    const currentModels = models ?? {};
+    const providersValue = currentModels.providers;
+    const providers = providersValue === undefined
+      ? {}
+      : optionalRecord(providersValue);
+    if (providers === undefined) {
+      return yield* configurationError(
+        "models.json providers must contain a JSON object",
+      );
+    }
+    const providerValue = providers[providerId];
+    const provider = providerValue === undefined
+      ? undefined
+      : optionalRecord(providerValue);
+    if (providerValue !== undefined && provider === undefined) {
+      return yield* configurationError(
+        "openai-codex provider is not owned by AgentOS",
+      );
+    }
+    return {
+      marker,
+      models: currentModels,
+      provider,
+      providers,
+      settings: settings ?? {},
+    } satisfies ReconciliationState;
+  },
+);
 
 function optionalEntryEquals(
   left: JsonObject | null | undefined,
@@ -318,28 +330,27 @@ function optionalEntryEquals(
   return isDeepStrictEqual(left ?? null, right ?? null);
 }
 
-function assertOwnedState(state: ReconciliationState): void {
+function assertOwnedState(state: ReconciliationState) {
   const marker = state.marker;
-  if (marker === undefined) return;
+  if (marker === undefined) return Effect.void;
   if (marker._tag === "Active") {
-    if (
-      state.provider !== undefined &&
-      !isDeepStrictEqual(state.provider, marker.entry)
-    ) {
-      throw configurationError(
-        "openai-codex provider changed outside AgentOS ownership",
+    return state.provider === undefined ||
+        isDeepStrictEqual(state.provider, marker.entry)
+      ? Effect.void
+      : Effect.fail(
+        configurationError(
+          "openai-codex provider changed outside AgentOS ownership",
+        ),
       );
-    }
-    return;
   }
-  if (
-    !optionalEntryEquals(state.provider, marker.previous) &&
-    !optionalEntryEquals(state.provider, marker.desired)
-  ) {
-    throw configurationError(
-      "openai-codex provider changed during an AgentOS reconciliation",
+  return optionalEntryEquals(state.provider, marker.previous) ||
+      optionalEntryEquals(state.provider, marker.desired)
+    ? Effect.void
+    : Effect.fail(
+      configurationError(
+        "openai-codex provider changed during an AgentOS reconciliation",
+      ),
     );
-  }
 }
 
 function withProvider(
@@ -361,21 +372,27 @@ function withoutProvider(state: ReconciliationState): JsonObject {
   };
 }
 
-function selectedSettings(
-  settings: JsonObject,
-  selectedModel: string | undefined,
-  selectedThinking: string | undefined,
-): JsonObject {
-  const selected: Record<string, unknown> = {};
-  if (selectedModel !== undefined) {
-    const parts = selectedModelParts(selectedModel);
-    selected.defaultProvider = parts.provider;
-    selected.defaultModel = parts.model;
-  }
-  if (selectedThinking !== undefined) {
-    selected.defaultThinkingLevel = selectedThinking;
-  }
-  return { ...settings, ...selected };
+const selectedSettings = Effect.fn("agentos.piProvider.selectedSettings")(
+  function*(
+    settings: JsonObject,
+    selectedModel: string | undefined,
+    selectedThinking: string | undefined,
+  ) {
+    const selected: Record<string, unknown> = {};
+    if (selectedModel !== undefined) {
+      const parts = yield* selectedModelParts(selectedModel);
+      selected.defaultProvider = parts.provider;
+      selected.defaultModel = parts.model;
+    }
+    if (selectedThinking !== undefined) {
+      selected.defaultThinkingLevel = selectedThinking;
+    }
+    return { ...settings, ...selected };
+  },
+);
+
+function validationError(cause: unknown, fallback: string) {
+  return configurationError(cause instanceof Error ? cause.message : fallback);
 }
 
 const validateWithPi = Effect.fn("agentos.piProvider.validateWithPi")(
@@ -386,61 +403,65 @@ const validateWithPi = Effect.fn("agentos.piProvider.validateWithPi")(
     readonly mode: ProviderMode;
     readonly selectedModel: string | undefined;
   }) {
-    yield* Effect.tryPromise({
-      try: async () => {
-        const runtime = await ModelRuntime.create({
+    const runtime = yield* Effect.tryPromise({
+      try: () =>
+        ModelRuntime.create({
           allowModelNetwork: false,
           authPath: options.authPath,
           modelsPath: options.modelsPath,
-        });
-        const loadError = runtime.getError();
-        if (loadError) {
-          throw new Error("Pi rejected the prepared models.json");
-        }
-
-        let selected;
-        if (options.selectedModel !== undefined) {
-          const parts = selectedModelParts(options.selectedModel);
-          selected = runtime.getModel(parts.provider, parts.model);
-          if (!selected) {
-            throw new Error(
-              `${options.selectedModel} is not a pinned Pi model`,
-            );
-          }
-        }
-
-        if (options.mode !== "ai-gateway") return;
-        const model = selected ?? runtime.getModels(providerId)[0];
-        if (!model) {
-          throw new Error("Pi exposes no openai-codex models");
-        }
-        if (model.provider !== providerId || model.baseUrl !== options.gatewayUrl) {
-          throw new Error("Pi did not compose the AgentOS Gateway provider");
-        }
-        const auth = await runtime.getAuth(model, { env: {} });
-        if (
-          auth?.auth.apiKey !== publicCodexTransportPlaceholder ||
-          auth.auth.headers?.["X-AI-Gateway-Token"] !== undefined
-        ) {
-          throw new Error("Pi did not compose workload-authenticated Gateway transport");
-        }
-      },
-      catch: (cause) =>
-        configurationError(
-          cause instanceof Error
-            ? cause.message
-            : "Pi rejected the prepared provider",
-        ),
+        }),
+      catch: (cause) => validationError(cause, "Pi rejected the prepared provider"),
     });
+    if (runtime.getError()) {
+      return yield* configurationError("Pi rejected the prepared models.json");
+    }
+
+    const selectedModel = options.selectedModel;
+    const selected = selectedModel === undefined
+      ? undefined
+      : yield* Effect.gen(function*() {
+        const parts = yield* selectedModelParts(selectedModel);
+        const model = runtime.getModel(parts.provider, parts.model);
+        if (model === undefined) {
+          return yield* configurationError(
+            `${selectedModel} is not a pinned Pi model`,
+          );
+        }
+        return model;
+      });
+
+    if (options.mode !== "ai-gateway") return;
+    const model = selected ?? runtime.getModels(providerId)[0];
+    if (model === undefined) {
+      return yield* configurationError("Pi exposes no openai-codex models");
+    }
+    if (model.provider !== providerId || model.baseUrl !== options.gatewayUrl) {
+      return yield* configurationError(
+        "Pi did not compose the AgentOS Gateway provider",
+      );
+    }
+    const auth = yield* Effect.tryPromise({
+      try: () => runtime.getAuth(model, { env: {} }),
+      catch: (cause) => validationError(cause, "Pi rejected Gateway transport"),
+    });
+    if (
+      auth?.auth.apiKey !== publicCodexTransportPlaceholder ||
+      auth.auth.headers?.["X-AI-Gateway-Token"] !== undefined
+    ) {
+      return yield* configurationError(
+        "Pi did not compose workload-authenticated Gateway transport",
+      );
+    }
   },
 );
 
-export const reconcilePiConfiguration = Effect.fn(
-  "agentos.piProvider.reconcilePiConfiguration",
+export const reconcilePiConfigurationEffect = Effect.fn(
+  "agentos.piProvider.reconcile.effect",
 )(function*(options: ReconcilePiConfigurationOptions) {
-  const settingsPath = join(options.piAgentDirectory, "settings.json");
-  const modelsPath = join(options.piAgentDirectory, "models.json");
-  const markerPath = join(options.stateDirectory, "pi-provider.json");
+  const paths = yield* Path.Path;
+  const settingsPath = paths.join(options.piAgentDirectory, "settings.json");
+  const modelsPath = paths.join(options.piAgentDirectory, "models.json");
+  const markerPath = paths.join(options.stateDirectory, "pi-provider.json");
   const settingsNext = `${settingsPath}.agentos-next`;
   const modelsNext = `${modelsPath}.agentos-next`;
   const validationAuth = `${modelsNext}.auth`;
@@ -453,27 +474,15 @@ export const reconcilePiConfiguration = Effect.fn(
   ]);
 
   return yield* Effect.gen(function*() {
-    const mode = yield* Effect.try({
-      try: () => providerMode(options.environment),
-      catch: (cause) =>
-        cause instanceof PiProviderConfigurationError
-          ? cause
-          : configurationError("Invalid Pi provider mode"),
-    });
-    const selectedModel = yield* Effect.try({
-      try: () => optionalEnvironment(options.environment, "AGENTOS_MODEL"),
-      catch: (cause) =>
-        cause instanceof PiProviderConfigurationError
-          ? cause
-          : configurationError("Invalid AGENTOS_MODEL"),
-    });
-    const selectedThinking = yield* Effect.try({
-      try: () => optionalEnvironment(options.environment, "AGENTOS_THINKING"),
-      catch: (cause) =>
-        cause instanceof PiProviderConfigurationError
-          ? cause
-          : configurationError("Invalid AGENTOS_THINKING"),
-    });
+    const mode = yield* providerMode(options.environment);
+    const selectedModel = yield* optionalEnvironment(
+      options.environment,
+      "AGENTOS_MODEL",
+    );
+    const selectedThinking = yield* optionalEnvironment(
+      options.environment,
+      "AGENTOS_THINKING",
+    );
     const marker = yield* readOptionalMarker(markerPath);
     if (mode === undefined && marker !== undefined) {
       return yield* configurationError(
@@ -492,73 +501,53 @@ export const reconcilePiConfiguration = Effect.fn(
       readOptionalJsonObject(settingsPath, "settings.json"),
       readOptionalJsonObject(modelsPath, "models.json"),
     ]);
-    const state = yield* Effect.try({
-      try: () => currentState(settings, models, marker),
-      catch: (cause) =>
-        cause instanceof PiProviderConfigurationError
-          ? cause
-          : configurationError("Invalid Pi configuration"),
-    });
-    yield* Effect.try({
-      try: () => assertOwnedState(state),
-      catch: (cause) =>
-        cause instanceof PiProviderConfigurationError
-          ? cause
-          : configurationError("Invalid AgentOS provider ownership"),
-    });
+    const state = yield* currentState(settings, models, marker);
+    yield* assertOwnedState(state);
 
-    let gatewayUrl: string | undefined;
-    let desiredProvider: JsonObject | undefined;
-    if (mode === "ai-gateway") {
-      gatewayUrl = yield* Effect.try({
-        try: () => {
-          const raw = optionalEnvironment(options.environment, "AI_GATEWAY_URL");
-          if (raw === undefined) {
-            throw configurationError("AI_GATEWAY_URL must be configured");
-          }
-          return normalizedGatewayUrl(raw);
-        },
-        catch: (cause) =>
-          cause instanceof PiProviderConfigurationError
-            ? cause
-            : configurationError("Invalid AI_GATEWAY_URL"),
-      });
-      if (selectedModel !== undefined) {
-        const parts = yield* Effect.try({
-          try: () => selectedModelParts(selectedModel),
-          catch: (cause) =>
-            cause instanceof PiProviderConfigurationError
-              ? cause
-              : configurationError("Invalid AGENTOS_MODEL"),
-        });
-        if (parts.provider !== providerId) {
+    const gateway = mode === "ai-gateway"
+      ? yield* Effect.gen(function*() {
+        const rawUrl = yield* optionalEnvironment(
+          options.environment,
+          "AI_GATEWAY_URL",
+        );
+        if (rawUrl === undefined) {
           return yield* configurationError(
-            "Gateway mode must select openai-codex when AGENTOS_MODEL is configured",
+            "AI_GATEWAY_URL must be configured",
           );
         }
-      }
-      if (state.marker === undefined && state.provider !== undefined) {
-        return yield* configurationError(
-          "openai-codex provider is not owned by AgentOS",
-        );
-      }
-      desiredProvider = gatewayProviderEntry(gatewayUrl);
-    }
+        const gatewayUrl = yield* normalizedGatewayUrl(rawUrl);
+        if (selectedModel !== undefined) {
+          const parts = yield* selectedModelParts(selectedModel);
+          if (parts.provider !== providerId) {
+            return yield* configurationError(
+              "Gateway mode must select openai-codex when AGENTOS_MODEL is configured",
+            );
+          }
+        }
+        if (state.marker === undefined && state.provider !== undefined) {
+          return yield* configurationError(
+            "openai-codex provider is not owned by AgentOS",
+          );
+        }
+        return {
+          gatewayUrl,
+          provider: gatewayProviderEntry(gatewayUrl),
+        };
+      })
+      : undefined;
 
+    const desiredProvider = gateway?.provider;
     const desiredModels =
       mode === "ai-gateway" && desiredProvider !== undefined
         ? withProvider(state, desiredProvider)
         : mode === "direct" && state.marker !== undefined
           ? withoutProvider(state)
           : state.models;
-    const desiredSettings = yield* Effect.try({
-      try: () =>
-        selectedSettings(state.settings, selectedModel, selectedThinking),
-      catch: (cause) =>
-        cause instanceof PiProviderConfigurationError
-          ? cause
-          : configurationError("Invalid selected Pi defaults"),
-    });
+    const desiredSettings = yield* selectedSettings(
+      state.settings,
+      selectedModel,
+      selectedThinking,
+    );
 
     if (models !== undefined || Object.keys(desiredModels).length > 0) {
       yield* writePrivateJson(modelsNext, desiredModels);
@@ -567,7 +556,7 @@ export const reconcilePiConfiguration = Effect.fn(
     yield* writePrivateJson(validationAuth, {});
     yield* validateWithPi({
       authPath: validationAuth,
-      gatewayUrl,
+      gatewayUrl: gateway?.gatewayUrl,
       modelsPath: modelsNext,
       mode,
       selectedModel,
@@ -579,12 +568,14 @@ export const reconcilePiConfiguration = Effect.fn(
     );
     const ownsProvider = state.marker !== undefined || mode === "ai-gateway";
     if (ownsProvider && (providerChanges || state.marker?._tag !== "Active")) {
-      const pending = PendingProviderMarker.make({
-        desired: desiredProvider ?? null,
-        previous: state.provider ?? null,
-        version: markerVersion,
-      });
-      yield* writePrivateJson(markerNext, pending);
+      yield* writePrivateMarker(
+        markerNext,
+        PendingProviderMarker.make({
+          desired: desiredProvider ?? null,
+          previous: state.provider ?? null,
+          version: markerVersion,
+        }),
+      );
       yield* renamePrivateFile(markerNext, markerPath);
     }
 
@@ -600,7 +591,7 @@ export const reconcilePiConfiguration = Effect.fn(
         version: markerVersion,
       });
       if (!isDeepStrictEqual(state.marker, active)) {
-        yield* writePrivateJson(markerNext, active);
+        yield* writePrivateMarker(markerNext, active);
         yield* renamePrivateFile(markerNext, markerPath);
       }
     } else if (mode === "direct" && state.marker !== undefined) {
@@ -616,6 +607,14 @@ export const reconcilePiConfiguration = Effect.fn(
     return reconciledResult(mode ?? "direct", selectedModel);
   }).pipe(Effect.ensuring(cleanup));
 });
+
+export function reconcilePiConfiguration(
+  options: ReconcilePiConfigurationOptions,
+) {
+  return reconcilePiConfigurationEffect(options).pipe(
+    Effect.provide(PiProviderLive),
+  );
+}
 
 function unchangedResult(): {
   readonly mode: "unchanged";
