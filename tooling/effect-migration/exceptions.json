@@ -99,6 +99,18 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "packages/agentos/runtime/codex-token.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The Codex projected-token helper needs one reviewed Bun process entry boundary around its bounded Effect filesystem and Stdio program.",
+      "ownerIssue": 104,
+      "test": "packages/agentos/runtime/tests/codex-token.effect.test.ts",
+      "removalCondition": "Retain only while Codex command-refreshed authentication invokes a standalone credential helper.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "packages/agentos/runtime/health.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",
