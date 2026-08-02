@@ -1,9 +1,13 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { PGlite } from "@electric-sql/pglite";
-import { readdir } from "node:fs/promises";
+import { assert, layer } from "@effect/vitest";
+import { Effect } from "effect";
 
-const database = await PGlite.create();
-const migrationsDirectory = new URL("../migrations/", import.meta.url);
+import {
+  PGliteTestDatabase,
+  asLogin,
+  firstRow,
+  makePGliteTestLayer,
+  withDatabaseLogin,
+} from "./pglite-test.ts";
 
 const ids = {
   blockedBacklog: "42000000-0000-4000-8000-000000000007",
@@ -16,7 +20,6 @@ const ids = {
   crewA: "22000000-0000-4000-8000-000000000003",
   crewB: "22000000-0000-4000-8000-000000000005",
   dependencyTask: "42000000-0000-4000-8000-000000000004",
-  firstMate: "",
   inboxA: "62000000-0000-4000-8000-000000000003",
   inboxB: "62000000-0000-4000-8000-000000000004",
   ownAssignment: "52000000-0000-4000-8000-000000000001",
@@ -32,26 +35,17 @@ const ids = {
   siblingTask: "42000000-0000-4000-8000-000000000003",
 };
 
-beforeAll(async () => {
-  const files = (await readdir(migrationsDirectory))
-    .filter((file) => /^\d+_.+\.sql$/.test(file))
-    .sort();
-
-  for (const file of files) {
-    const migration = await import(new URL(file, migrationsDirectory).href, {
-      with: { type: "text" },
-    });
-    await database.exec(migration.default);
-  }
-
-  const root = await database.query<{ id: string }>(`
+const databaseLayer = makePGliteTestLayer({
+  migrations: "all",
+  setup: (database) => Effect.gen(function*() {
+  const root = yield* database.query<{ readonly id: string }>(`
     SELECT id::text AS id
       FROM agentos.agents
      WHERE role = 'first_mate'
   `);
-  ids.firstMate = root.rows[0]!.id;
+  const firstMateId = (yield* firstRow(root, "test Fleet has no First Mate")).id;
 
-  await database.exec(`
+  yield* database.exec(`
     CREATE ROLE bearings_second_a LOGIN;
     CREATE ROLE bearings_crew_a LOGIN;
     CREATE ROLE bearings_second_b LOGIN;
@@ -70,7 +64,7 @@ beforeAll(async () => {
     ) VALUES
       (
         '${ids.secondA}', 'bearings-second-a', 'second_mate',
-        '${ids.firstMate}', 'pi', 'active', 'Second Mate A ready'
+        '${firstMateId}', 'pi', 'active', 'Second Mate A ready'
       ),
       (
         '${ids.crewA}', 'bearings-crew-a', 'crewmate',
@@ -78,7 +72,7 @@ beforeAll(async () => {
       ),
       (
         '${ids.secondB}', 'bearings-second-b', 'second_mate',
-        '${ids.firstMate}', 'pi', 'active', 'Second Mate B ready'
+        '${firstMateId}', 'pi', 'active', 'Second Mate B ready'
       ),
       (
         '${ids.crewB}', 'bearings-crew-b', 'crewmate',
@@ -159,7 +153,7 @@ beforeAll(async () => {
     ) VALUES
       (
         '${ids.ownAssignment}', '${ids.ownTask}', '${ids.secondA}',
-        '${ids.firstMate}', 'coordinate', 'active', 'Mate work active',
+        '${firstMateId}', 'coordinate', 'active', 'Mate work active',
         '# Own brief', NULL, NULL
       ),
       (
@@ -229,7 +223,7 @@ beforeAll(async () => {
       );
   `);
 
-  await asRole("bearings_second_a", () =>
+  yield* withDatabaseLogin(database, "bearings_second_a",
     database.exec(`
       INSERT INTO agentos.inbox (
         id, sender_agent_id, sender_label, recipient_agent_id, task_id, kind,
@@ -243,7 +237,7 @@ beforeAll(async () => {
     `),
   );
 
-  await asRole("bearings_second_b", () =>
+  yield* withDatabaseLogin(database, "bearings_second_b",
     database.exec(`
       INSERT INTO agentos.inbox (
         id, sender_agent_id, sender_label, recipient_agent_id, task_id, kind,
@@ -257,160 +251,137 @@ beforeAll(async () => {
     `),
   );
 
-  await database.exec(`
+  yield* database.exec(`
     INSERT INTO agentos.inbox (
       id, sender_agent_id, sender_label, recipient_agent_id, task_id, kind,
       subject, body, status, status_text, read_at, resolved_at
     ) VALUES
       (
-        '${ids.inboxA}', '${ids.firstMate}', 'firstmate',
+        '${ids.inboxA}', '${firstMateId}', 'firstmate',
         '${ids.secondA}', '${ids.childTask}', 'request',
         'Review child progress', 'Review the durable child state.',
         'open', 'Awaiting Second Mate review', NULL, NULL
       ),
       (
-        '${ids.inboxB}', '${ids.firstMate}', 'firstmate',
+        '${ids.inboxB}', '${firstMateId}', 'firstmate',
         '${ids.secondB}', '${ids.siblingTask}', 'request',
         'Review sibling progress', 'Review sibling durable state.',
         'open', 'Awaiting sibling review', NULL, NULL
       ),
       (
         '62000000-0000-4000-8000-000000000005',
-        '${ids.firstMate}', 'firstmate', '${ids.secondA}', '${ids.ownTask}',
+        '${firstMateId}', 'firstmate', '${ids.secondA}', '${ids.ownTask}',
         'notification', 'Already handled', 'This row is resolved.',
         'resolved', 'Handled already', transaction_timestamp(),
         transaction_timestamp()
       )
   `);
+  }),
 });
 
-afterAll(async () => {
-  await database.close();
-});
-
-describe.serial("current Mate bearings", () => {
-  test("returns typed durable facts for only the Second Mate domain", async () => {
-    await asRole("bearings_second_a", async () => {
-      const bearings = await readBearings();
-      const byKind = Object.groupBy(
-        bearings.rows,
-        (row) => row.bearing_kind,
+layer(databaseLayer)("current Mate bearings", (it) => {
+  it.effect("returns typed durable facts for only the Second Mate domain", () =>
+    asLogin("bearings_second_a", Effect.gen(function*() {
+      const bearings = yield* readBearings();
+      const byKind = Object.groupBy(bearings, (row) => row.bearing_kind);
+      assert.deepStrictEqual(
+        byKind.unresolved_inbox?.map((row) => row.inbox_id),
+        [ids.inboxA],
+      );
+      assert.deepStrictEqual(
+        byKind.captain_decision?.map((row) => row.inbox_id),
+        [ids.captainDecisionA],
+      );
+      assert.deepStrictEqual(
+        byKind.own_active_assignment?.map((row) => row.assignment_id),
+        [ids.ownAssignment],
+      );
+      assert.deepStrictEqual(
+        byKind.direct_child_active_assignment?.map((row) => row.assignment_id),
+        [ids.childAssignment, ids.completedActiveAssignment],
+      );
+      assert.deepStrictEqual(
+        byKind.managed_task_reconciliation?.map((row) => row.task_id),
+        [
+          ids.dependencyTask,
+          ids.completedActiveTask,
+          ids.ownershipGapTask,
+          ids.blockedBacklog,
+        ],
+      );
+      assert.deepStrictEqual(
+        byKind.queued_ready_backlog?.map((row) => row.task_id),
+        [ids.readyBacklog],
+      );
+      assert.deepStrictEqual(
+        byKind.external_event?.map((row) => row.status),
+        ["pending", "processing", "processing"],
       );
 
-      expect(byKind.unresolved_inbox?.map((row) => row.inbox_id)).toEqual([
-        ids.inboxA,
-      ]);
-      expect(byKind.captain_decision?.map((row) => row.inbox_id)).toEqual([
-        ids.captainDecisionA,
-      ]);
-      expect(
-        byKind.own_active_assignment?.map((row) => row.assignment_id),
-      ).toEqual([ids.ownAssignment]);
-      expect(
-        byKind.direct_child_active_assignment?.map(
-          (row) => row.assignment_id,
-        ),
-      ).toEqual([ids.childAssignment, ids.completedActiveAssignment]);
-      expect(
-        byKind.managed_task_reconciliation?.map((row) => row.task_id),
-      ).toEqual([
-        ids.dependencyTask,
-        ids.completedActiveTask,
-        ids.ownershipGapTask,
-        ids.blockedBacklog,
-      ]);
-      expect(
-        byKind.queued_ready_backlog?.map((row) => row.task_id),
-      ).toEqual([ids.readyBacklog]);
+      const serialized = JSON.stringify(bearings);
+      for (const excluded of [
+        ids.siblingAssignment,
+        ids.siblingBacklog,
+        ids.captainDecisionB,
+        ids.inboxB,
+        "Which boundary should apply?",
+        "repo:pending",
+      ]) assert.notInclude(serialized, excluded);
+    })));
 
-      const externalStatuses = byKind.external_event?.map((row) => row.status);
-      expect(externalStatuses).toEqual([
-        "pending",
-        "processing",
-        "processing",
-      ]);
-
-      const serialized = JSON.stringify(bearings.rows);
-      expect(serialized).not.toContain(ids.siblingAssignment);
-      expect(serialized).not.toContain(ids.siblingBacklog);
-      expect(serialized).not.toContain(ids.captainDecisionB);
-      expect(serialized).not.toContain(ids.inboxB);
-      expect(serialized).not.toContain("Which boundary should apply?");
-      expect(serialized).not.toContain("repo:pending");
-    });
-  });
-
-  test("separates categories and exposes deterministic dependency facts", async () => {
-    await asRole("bearings_second_a", async () => {
-      const bearings = await readBearings();
-      const decision = bearings.rows.find(
+  it.effect("separates categories and exposes dependency facts", () =>
+    asLogin("bearings_second_a", Effect.gen(function*() {
+      const bearings = yield* readBearings();
+      const decision = bearings.find(
         (row) => row.inbox_id === ids.captainDecisionA,
       );
-      expect(decision?.bearing_kind).toBe("captain_decision");
+      assert.strictEqual(decision?.bearing_kind, "captain_decision");
 
-      const dependency = bearings.rows.find(
-        (row) =>
-          row.bearing_kind === "managed_task_reconciliation" &&
-          row.task_id === ids.dependencyTask,
-      );
-      expect(dependency).toMatchObject({
+      const dependency = bearings.find((row) =>
+        row.bearing_kind === "managed_task_reconciliation" &&
+        row.task_id === ids.dependencyTask);
+      assert.deepInclude(dependency, {
         assignment_id: null,
         dependencies_satisfied: false,
         dependency_count: 1,
         inbox_id: null,
         unresolved_decision_count: 1,
       });
-
-      const ready = bearings.rows.find(
-        (row) =>
-          row.bearing_kind === "queued_ready_backlog" &&
-          row.task_id === ids.readyBacklog,
-      );
-      expect(ready).toMatchObject({
+      const ready = bearings.find((row) =>
+        row.bearing_kind === "queued_ready_backlog" &&
+        row.task_id === ids.readyBacklog);
+      assert.deepInclude(ready, {
         assignment_id: null,
         dependencies_satisfied: true,
         dependency_count: 0,
         inbox_id: null,
         unresolved_decision_count: 0,
       });
+      assert.isFalse(bearings.some((row) =>
+        row.task_id === ids.readyBacklog &&
+        row.bearing_kind.includes("assignment")));
+    })));
 
-      expect(
-        bearings.rows.some(
-          (row) =>
-            row.task_id === ids.readyBacklog &&
-            row.bearing_kind.includes("assignment"),
-        ),
-      ).toBe(false);
-    });
-  });
+  it.effect("is repeatable and does not revise durable rows", () =>
+    Effect.gen(function*() {
+      const before = yield* durableState();
+      yield* asLogin("bearings_second_a", Effect.gen(function*() {
+        const first = yield* readBearings();
+        assert.deepStrictEqual(yield* readBearings(), first);
+      }));
+      assert.deepStrictEqual(yield* durableState(), before);
+    }));
 
-  test("is repeatable and does not acknowledge, claim, or revise durable rows", async () => {
-    const before = await durableState();
-
-    await asRole("bearings_second_a", async () => {
-      const first = await readBearings();
-      const second = await readBearings();
-      expect(second.rows).toEqual(first.rows);
-    });
-
-    const after = await durableState();
-    expect(after.rows).toEqual(before.rows);
-  });
-
-  test("keeps execution to authenticated Mates", async () => {
-    const fleet = await readBearings();
-    expect(
-      fleet.rows.some((row) => row.task_id === ids.siblingBacklog),
-    ).toBe(true);
-
-    await asRole("bearings_crew_a", async () => {
-      await expect(readBearings()).rejects.toThrow();
-    });
-
-    await asRole("bearings_unregistered", async () => {
-      await expect(readBearings()).rejects.toThrow();
-    });
-  });
+  it.effect("keeps execution to authenticated Mates", () =>
+    Effect.gen(function*() {
+      const fleet = yield* readBearings();
+      assert.isTrue(fleet.some((row) => row.task_id === ids.siblingBacklog));
+      const errors = yield* Effect.forEach([
+        asLogin("bearings_crew_a", readBearings()),
+        asLogin("bearings_unregistered", readBearings()),
+      ], Effect.flip);
+      assert.isTrue(errors.every((error) => error.operation === "query"));
+    }));
 });
 
 type Bearing = {
@@ -435,8 +406,9 @@ type Bearing = {
   updated_at: Date;
 };
 
-function readBearings() {
-  return database.query<Bearing>(`
+const readBearings = Effect.fn("test.bearings.read")(function*() {
+  const database = yield* PGliteTestDatabase;
+  return yield* database.query<Bearing>(`
     SELECT
       bearing_kind,
       inbox_id::text,
@@ -459,12 +431,13 @@ function readBearings() {
       updated_at
     FROM agentos.current_mate_bearings()
   `);
-}
+});
 
-function durableState() {
-  return database.query<{
-    key: string;
-    state: string;
+const durableState = Effect.fn("test.bearings.durableState")(function*() {
+  const database = yield* PGliteTestDatabase;
+  return yield* database.query<{
+    readonly key: string;
+    readonly state: string;
   }>(`
     SELECT 'inbox:' || id::text AS key,
            jsonb_build_object(
@@ -506,13 +479,4 @@ function durableState() {
       FROM agentos.external_events
     ORDER BY key
   `);
-}
-
-async function asRole<T>(role: string, operation: () => Promise<T>): Promise<T> {
-  await database.exec(`SET SESSION AUTHORIZATION ${role}`);
-  try {
-    return await operation();
-  } finally {
-    await database.exec("SET SESSION AUTHORIZATION postgres");
-  }
-}
+});
