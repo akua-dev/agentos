@@ -1,6 +1,6 @@
 import './global.css';
 import type { Metadata, Viewport } from 'next';
-import { ConfigProvider, Effect, Layer } from 'effect';
+import { Effect } from 'effect';
 import {
   createMetadata,
   defaultDescription,
@@ -10,6 +10,7 @@ import { loadPostHogConfig } from '@/lib/analytics/posthog';
 import { Body } from '@/app/layout.client';
 import { Analytics } from '@/components/analytics';
 import { runServerEffect } from '@/lib/effect/server-runtime';
+import { LiveServerConfig } from '@/lib/effect/server-config';
 import { Provider } from './provider';
 import type { ReactNode } from 'react';
 import { Geist, JetBrains_Mono } from 'next/font/google';
@@ -48,10 +49,6 @@ export const viewport: Viewport = {
   ],
 };
 
-const LiveConfig = Layer.suspend(() =>
-  ConfigProvider.layer(ConfigProvider.fromEnv()),
-);
-
 const renderRootLayout = Effect.fn('agentos.website.renderRootLayout')(
   function*(children: ReactNode) {
     const analyticsConfig = yield* loadPostHogConfig;
@@ -87,6 +84,6 @@ const renderRootLayout = Effect.fn('agentos.website.renderRootLayout')(
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return runServerEffect(
-    renderRootLayout(children).pipe(Effect.provide(LiveConfig)),
+    renderRootLayout(children).pipe(Effect.provide(LiveServerConfig)),
   );
 }

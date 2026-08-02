@@ -20,12 +20,27 @@ import jsonSchema from 'fumadocs-mdx/plugins/json-schema';
 import lastModified from 'fumadocs-mdx/plugins/last-modified';
 import { canonicalSourceSchema } from './lib/content/canonical-source.ts';
 import { defaultShikiOptions } from './lib/shiki.ts';
+import { Config, Effect } from 'effect';
+import { runServerSync } from './lib/effect/server-runtime.ts';
+import { LiveServerConfig } from './lib/effect/server-config.ts';
 
-const typeTableGenerator = createGenerator({
-  cache: createFileSystemGeneratorCache('.next/cache/fumadocs-typescript'),
-});
+const sourceConfigEnvironment = runServerSync(
+  Effect.gen(function*() {
+    const lintMode = yield* Config.string('LINT').pipe(Config.withDefault('0'));
+    return yield* Effect.sync(() => ({
+      isLint: lintMode === '1',
+      typeTableGenerator: createGenerator({
+        cache: createFileSystemGeneratorCache('.next/cache/fumadocs-typescript'),
+      }),
+      typesCache: createFileSystemTypesCache(),
+    }));
+  }).pipe(
+    Effect.provide(LiveServerConfig),
+    Effect.orDie,
+  ),
+);
 
-const isLint = process.env.LINT === '1';
+const { isLint, typeTableGenerator, typesCache } = sourceConfigEnvironment;
 
 declare module 'satteri' {
   interface DataMap {
@@ -91,7 +106,7 @@ export const docs = defineDocs({
               transformers: [
                 ...(rehypeCodeDefaultOptions.transformers ?? []),
                 transformerTwoslash({
-                  typesCache: createFileSystemTypesCache(),
+                  typesCache,
                   twoslashOptions: {
                     compilerOptions: {
                       types: ['@types/node'],

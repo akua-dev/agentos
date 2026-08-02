@@ -1,6 +1,7 @@
 import type { Metadata } from 'next/types';
-import { Config, ConfigProvider, Effect, Option, Schema } from 'effect';
+import { Config, Effect, Option, Schema } from 'effect';
 import { runServerSync } from './effect/server-runtime';
+import { LiveServerConfig } from './effect/server-config';
 
 export const siteName = 'AgentOS';
 export const defaultTitle = 'AgentOS — The open-source company harness';
@@ -49,7 +50,7 @@ export const loadSiteMetadataConfig = Effect.gen(function*() {
 
 const liveMetadata = runServerSync(
   loadSiteMetadataConfig.pipe(
-    Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+    Effect.provide(LiveServerConfig),
     Effect.orDie,
   ),
 );
