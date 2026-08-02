@@ -38,15 +38,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/runtime.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/src/access/tests/github-routes.effect.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 1,
-      "digest": "08b1a84caa20968cde9e3efc966dbc55e3a6fc4df1bffb4bddf9cfde9b443d45",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/access/tests/github-routes.effect.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/src/workloads/tests/compiler-kustomize.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
