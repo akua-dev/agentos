@@ -272,15 +272,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/tests/release.effect.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "services/otel-collector/kubernetes/tests/config.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 12,
-      "digest": "8de4dd601d0635e66daf2cd7773ec2d1a83a27f175919caf0099e7a77921c6c1",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/kubernetes/tests/config.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/otel-collector/tests/e2e.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
