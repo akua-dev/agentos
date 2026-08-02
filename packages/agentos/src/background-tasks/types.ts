@@ -1,13 +1,22 @@
+import type {
+  Effect,
+  FileSystem,
+  Path,
+  Scope,
+} from "effect";
+import { Schema } from "effect";
+import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
+
 export type CompletionDelivery = "steer" | "followUp";
 
 export type BackgroundCommandRequest = {
-  command: string;
-  description: string;
-  cwd?: string;
-  timeout?: number;
-  readyOutput?: string;
-  readyTimeout?: number;
-  completionDelivery?: CompletionDelivery;
+  readonly command: string;
+  readonly description: string;
+  readonly cwd?: string;
+  readonly timeout?: number;
+  readonly readyOutput?: string;
+  readonly readyTimeout?: number;
+  readonly completionDelivery?: CompletionDelivery;
 };
 
 export type TaskState =
@@ -17,12 +26,23 @@ export type TaskState =
   | "interrupted"
   | "cancelled";
 
+export const TaskSignalSchema = Schema.Literals([
+  "SIGABRT", "SIGALRM", "SIGBUS", "SIGCHLD", "SIGCONT", "SIGFPE",
+  "SIGHUP", "SIGILL", "SIGINT", "SIGIO", "SIGIOT", "SIGKILL",
+  "SIGPIPE", "SIGPOLL", "SIGPROF", "SIGPWR", "SIGQUIT", "SIGSEGV",
+  "SIGSTKFLT", "SIGSTOP", "SIGSYS", "SIGTERM", "SIGTRAP", "SIGTSTP",
+  "SIGTTIN", "SIGTTOU", "SIGUNUSED", "SIGURG", "SIGUSR1", "SIGUSR2",
+  "SIGVTALRM", "SIGWINCH", "SIGXCPU", "SIGXFSZ", "SIGBREAK", "SIGLOST",
+  "SIGINFO",
+]);
+export type TaskSignal = typeof TaskSignalSchema.Type;
+
 export type TaskTerminalResult = {
-  state: Exclude<TaskState, "running">;
-  summary: string;
-  exitCode?: number | null;
-  signal?: NodeJS.Signals | null;
-  error?: string;
+  readonly state: Exclude<TaskState, "running">;
+  readonly summary: string;
+  readonly exitCode?: number | null;
+  readonly signal?: TaskSignal | null;
+  readonly error?: string;
 };
 
 export type TaskSnapshot = {
@@ -41,7 +61,7 @@ export type TaskSnapshot = {
   outputBytes: number;
   processId?: number;
   exitCode?: number | null;
-  signal?: NodeJS.Signals | null;
+  signal?: TaskSignal | null;
   error?: string;
   summary?: string;
   completionDelivery: CompletionDelivery;
@@ -50,25 +70,60 @@ export type TaskSnapshot = {
 };
 
 export type TaskEvent = {
-  type: "task_started" | "task_terminal";
-  task: TaskSnapshot;
+  readonly type: "task_started" | "task_terminal";
+  readonly task: TaskSnapshot;
 };
 
 export type TaskHandle = {
   readonly processId?: number;
-  completion: Promise<TaskTerminalResult>;
-  stop(): Promise<TaskTerminalResult>;
+  readonly completion: Effect.Effect<TaskTerminalResult>;
+  readonly stop: () => Effect.Effect<TaskTerminalResult>;
 };
 
 export type TaskContext = {
-  outputPath: string;
-  tailBytes: number;
-  maxOutputBytes: number;
-  terminateGraceMs: number;
-  signal: AbortSignal;
+  readonly outputPath: string;
+  readonly tailBytes: number;
+  readonly maxOutputBytes: number;
+  readonly terminateGraceMs: number;
+  readonly cancellation: Effect.Effect<void>;
 };
+
+const BackgroundTaskErrorCode = Schema.Literals([
+  "broker_shutting_down",
+  "duplicate_task",
+  "invalid_request",
+  "io_failure",
+  "readiness_exited",
+  "readiness_timeout",
+  "restore_conflict",
+  "runtime_failure",
+  "unknown_task",
+]);
+
+export class BackgroundTaskError extends Schema.TaggedErrorClass<BackgroundTaskError>()(
+  "BackgroundTaskError",
+  {
+    cause: Schema.Unknown,
+    code: BackgroundTaskErrorCode,
+    message: Schema.String,
+  },
+) {}
+
+export type BackgroundTaskRuntime =
+  | ChildProcessSpawner
+  | FileSystem.FileSystem
+  | Path.Path
+  | Scope.Scope;
 
 export type StartBackgroundCommand = (
   request: BackgroundCommandRequest,
   context: TaskContext,
-) => Promise<TaskHandle>;
+) => Effect.Effect<TaskHandle, BackgroundTaskError, BackgroundTaskRuntime>;
+
+export function backgroundTaskFailure(
+  code: BackgroundTaskError["code"],
+  message: string,
+  cause: unknown = message,
+) {
+  return BackgroundTaskError.make({ cause, code, message });
+}
