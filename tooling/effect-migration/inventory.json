@@ -712,7 +712,7 @@
       "package": "mixed",
       "io": ["test", "filesystem", "process", "http", "database", "kubernetes"],
       "migrationDependencies": [100, 101, 97, 98, 99, 104, 105],
-      "status": "planned"
+      "status": "migrated"
     },
     {
       "id": "database-drizzle-framework-adapter",
