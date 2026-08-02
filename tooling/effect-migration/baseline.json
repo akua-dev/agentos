@@ -11,15 +11,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/kubernetes/cloudnative-pg/tests/manifest.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/targeted-notifications.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 17,
-      "digest": "fc4a433770460e66e4ca03fb3b74b03d76c2fdd4fec85c5f59772948bfc00537",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/targeted-notifications.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "mise.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
