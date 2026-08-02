@@ -380,15 +380,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/roles/secondmate/kubernetes/tests/manifest.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/capacity-preflight-main.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 2,
-      "digest": "ff9c2f627ac1dc70063f3efcb79a6e6f0d3843805160dc65290b8218fa413789",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/capacity-preflight-main.ts under issue #104; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/codex-otel.ts",
       "slice": "agentos-runtime",
       "issue": 104,
@@ -425,15 +416,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/create-image-seed.ts under issue #104; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/crewmate-readiness.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 1,
-      "digest": "32d83b91f1d40753d65eb5c364a22ab9b4cd621f70db6bccda453900f8c491ea",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/crewmate-readiness.ts under issue #104; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/distribution.ts",
       "slice": "agentos-runtime",
       "issue": 104,
@@ -441,15 +423,6 @@
       "digest": "e951b158d550fcb0c33af7823e12603e0fb4c0258188c9ec48bb956f5b36708e",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/distribution.ts under issue #104; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/health.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 12,
-      "digest": "53be8f71f0c376c45c0cc864cee84f4156c75e8d22ae4db08d98f08f600062a0",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/health.ts under issue #104; never refresh touched debt."
     },
     {
       "path": "packages/agentos/runtime/kubernetes/tests/observability-manifests.test.ts",
@@ -497,24 +470,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/prepare-home.ts under issue #104; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/readiness-state-main.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 11,
-      "digest": "bda4037d21fcc34f02e54d260d08a16b8d8b7442c82f39e4e4d2cc9a39a35885",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/readiness-state-main.ts under issue #104; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/readiness.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 2,
-      "digest": "2d17a4d6691a14cd2cbf5251bd5588228e3d18d3bc3dfe2059ffd8e602a006eb",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/readiness.ts under issue #104; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/run-mate.ts",
       "slice": "agentos-runtime",
       "issue": 104,
@@ -558,15 +513,6 @@
       "digest": "92a6022572c34041b303b22281fdc82b763c46feb4b36c63819e805e24b612f6",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/codex-token.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/tests/crewmate-readiness.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 9,
-      "digest": "d168cef3d2c5a08ac0afe6ebc509490e028b7955d3298e7ccdca3ca3270a8ba8",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/crewmate-readiness.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/runtime/tests/distribution-migration.test.ts",
@@ -621,15 +567,6 @@
       "digest": "f30cdea5d7f19dfff7a1e71cad359a262797fd13a53219ce84311d9c5c74737d",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/readiness-state.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/tests/readiness.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 11,
-      "digest": "3d91e3c0003468f8746390da0f93dd7c036f4eb0f849b7047e97c31e04754a91",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/readiness.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/runtime/tests/runtime.test.ts",

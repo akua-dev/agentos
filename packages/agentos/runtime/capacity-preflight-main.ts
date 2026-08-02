@@ -1,5 +1,15 @@
-import { Effect, Schema } from "effect";
-import { classifyCrewmateCapacity } from "./capacity-preflight";
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import * as BunServices from "@effect/platform-bun/BunServices";
+import {
+  Effect,
+  Schema,
+  Stdio,
+  Stream,
+} from "effect";
+import {
+  CapacityPreflightResult,
+  classifyCrewmateCapacity,
+} from "./capacity-preflight";
 
 export class CapacityPreflightProgramError extends Schema.TaggedErrorClass<CapacityPreflightProgramError>()(
   "CapacityPreflightProgramError",
@@ -12,46 +22,70 @@ function programError(message: string) {
   return CapacityPreflightProgramError.make({ message });
 }
 
-function parseUnknownJson(source: string): unknown {
-  return JSON.parse(source);
-}
-
 export const classifyCrewmateCapacityJson = Effect.fn(
   "agentos.capacityPreflight.classifyJson",
 )(function*(source: string) {
-  const input = yield* Effect.try({
-    try: () => parseUnknownJson(source),
-    catch: () => programError("Capacity preflight stdin must be valid JSON"),
-  });
+  const input = yield* Schema.decodeUnknownEffect(
+    Schema.fromJsonString(Schema.Unknown),
+  )(source).pipe(
+    Effect.mapError(() =>
+      programError("Capacity preflight stdin must be valid JSON")
+    ),
+  );
   return yield* classifyCrewmateCapacity(input);
 });
 
 const readStandardInput = Effect.fn("agentos.capacityPreflight.readStdin")(
   function*() {
-    return yield* Effect.tryPromise({
-      try: () => Bun.stdin.text(),
-      catch: () => programError("Could not read capacity preflight stdin"),
-    });
+    const stdio = yield* Stdio.Stdio;
+    return yield* stdio.stdin.pipe(
+      Stream.decodeText(),
+      Stream.mkString,
+      Effect.mapError(() =>
+        programError("Could not read capacity preflight stdin")
+      ),
+    );
   },
 );
 
-if (import.meta.main) {
-  const program = Effect.gen(function*() {
-    const source = yield* readStandardInput();
-    return yield* classifyCrewmateCapacityJson(source);
+function writeStandardOutput(
+  output: "stderr" | "stdout",
+  value: string,
+) {
+  return Effect.gen(function*() {
+    const stdio = yield* Stdio.Stdio;
+    const sink = output === "stdout" ? stdio.stdout() : stdio.stderr();
+    yield* Stream.make(value).pipe(
+      Stream.run(sink),
+      Effect.mapError(() =>
+        programError(`Could not write capacity preflight ${output}`)
+      ),
+    );
   });
-  process.exitCode = await Effect.runPromise(
-    Effect.matchEffect(program, {
-      onFailure: (error) =>
-        Effect.sync(() => {
-          process.stderr.write(`${error.message}\n`);
-          return 1;
-        }),
-      onSuccess: (result) =>
-        Effect.sync(() => {
-          process.stdout.write(`${JSON.stringify(result)}\n`);
-          return 0;
-        }),
-    }),
+}
+
+export const capacityPreflightMain = Effect.gen(function*() {
+  const source = yield* readStandardInput();
+  const result = yield* classifyCrewmateCapacityJson(source);
+  const encoded = yield* Schema.encodeEffect(
+    Schema.fromJsonString(CapacityPreflightResult),
+  )(result).pipe(
+    Effect.mapError(() =>
+      programError("Could not encode capacity preflight result")
+    ),
+  );
+  yield* writeStandardOutput("stdout", `${encoded}\n`);
+}).pipe(
+  Effect.catch((error) =>
+    writeStandardOutput("stderr", `${error.message}\n`).pipe(
+      Effect.andThen(Effect.fail(error)),
+    )
+  ),
+);
+
+if (import.meta.main) {
+  BunRuntime.runMain(
+    capacityPreflightMain.pipe(Effect.provide(BunServices.layer)),
+    { disableErrorReporting: true },
   );
 }
