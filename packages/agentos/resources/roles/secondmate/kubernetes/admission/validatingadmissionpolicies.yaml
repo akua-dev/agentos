@@ -22,7 +22,7 @@ spec:
         request.operation == 'DELETE' ? oldObject : object
     - name: persistentMate
       expression: >-
-        variables.workload.metadata.name == 'agentos-secondmate'
+        has(variables.workload.spec.template.metadata.labels) && 'agentos.akua.dev/agent' in variables.workload.spec.template.metadata.labels && variables.workload.spec.template.metadata.labels['agentos.akua.dev/agent'] == 'secondmate'
     - name: crewmate
       expression: >-
         has(variables.workload.metadata.labels) && 'agentos.akua.dev/agent' in variables.workload.metadata.labels && variables.workload.metadata.labels['agentos.akua.dev/agent'] == 'crewmate'
@@ -43,7 +43,7 @@ spec:
         size(variables.egressIdentityVolumes) == 1 && variables.egressIdentityVolumes[0].name == 'agentos-egress-identity' && has(variables.egressIdentityVolumes[0].projected.defaultMode) && variables.egressIdentityVolumes[0].projected.defaultMode == 288 && size(variables.egressIdentityVolumes[0].projected.sources) == 1 && has(variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken) && variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken.audience == 'agentos-egress-authz' && variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken.expirationSeconds == 600 && variables.egressIdentityVolumes[0].projected.sources[0].serviceAccountToken.path == 'token' && variables.podSpec.containers.all(container, has(container.volumeMounts) && container.volumeMounts.exists(mount, mount.name == 'agentos-egress-identity' && mount.mountPath == '/var/run/secrets/agentos-egress' && has(mount.readOnly) && mount.readOnly == true)) && (!has(variables.podSpec.initContainers) || variables.podSpec.initContainers.all(container, !has(container.volumeMounts) || container.volumeMounts.all(mount, mount.name != 'agentos-egress-identity')))
   validations:
     - expression: >-
-        !variables.persistentMate || request.userInfo.username != 'system:serviceaccount:' + request.namespace + ':agentos-secondmate'
+        !variables.persistentMate || !request.userInfo.username.startsWith('system:serviceaccount:' + request.namespace + ':')
       message: A Second Mate cannot create, update, or delete its persistent Mate workload.
       reason: Forbidden
     - expression: >-
