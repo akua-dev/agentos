@@ -10,12 +10,13 @@ import { AgentOSValidationError } from "../src/shared/errors.ts";
 export class PiTestHarnessError extends Schema.TaggedErrorClass<PiTestHarnessError>()(
   "PiTestHarnessError",
   {
-    operation: Schema.Literals(["load", "emit"]),
+    operation: Schema.Literals(["load", "emit", "execute"]),
     detail: Schema.String,
   },
 ) {}
 
 export interface PiTestHarnessOptions {
+  readonly context?: Readonly<Record<string, unknown>>;
   readonly cwd?: string;
   readonly idle?: boolean;
   readonly systemPrompt?: string;
@@ -38,20 +39,24 @@ function handlerError(event: string, cause: unknown) {
   );
 }
 
-const invokePiHandler = Effect.fn("test.pi.invokeHandler")(function*(
-  event: string,
-  handler: (...args: ReadonlyArray<unknown>) => Promise<unknown>,
-  value: unknown,
-  context: unknown,
+const invokePiCallable = Effect.fn("test.pi.invokeCallable")(function*(
+  operation: "emit" | "execute",
+  label: string,
+  callable: Function,
+  args: ReadonlyArray<unknown>,
 ) {
   const outcome: unknown = yield* Effect.try({
-    try: () => handler(value, context),
-    catch: (cause) => handlerError(event, cause),
+    try: () => Reflect.apply(callable, undefined, Array.from(args)),
+    catch: (cause) => operation === "emit"
+      ? handlerError(label, cause)
+      : harnessError("execute", `Pi tool ${label} failed; details are redacted`),
   });
   if (outcome instanceof Promise) {
     return yield* Effect.tryPromise({
       try: () => outcome,
-      catch: (cause) => handlerError(event, cause),
+      catch: (cause) => operation === "emit"
+        ? handlerError(label, cause)
+        : harnessError("execute", `Pi tool ${label} failed; details are redacted`),
     });
   }
   return outcome;
@@ -62,9 +67,24 @@ export const makePiTestHarness = Effect.fn("test.pi.makeHarness")(function*(
 ) {
   let capturedApi: ExtensionAPI | undefined;
   const runtime = createExtensionRuntime();
-  const messages: Array<{ readonly message: unknown; readonly options: unknown }> = [];
+  const entries: Array<{ readonly customType: string; readonly data: unknown }> = [];
+  const messages: Array<{
+    readonly message: {
+      readonly customType: string;
+      readonly content: unknown;
+      readonly display?: boolean;
+      readonly details?: unknown;
+    };
+    readonly options: {
+      readonly triggerTurn?: boolean;
+      readonly deliverAs?: "steer" | "followUp" | "nextTurn";
+    } | undefined;
+  }> = [];
   runtime.sendMessage = (message, messageOptions) => {
     messages.push({ message, options: messageOptions });
+  };
+  runtime.appendEntry = (customType, data) => {
+    entries.push({ customType, data });
   };
   const eventBus = {
     emit(_channel: string, _data: unknown) {},
@@ -91,18 +111,34 @@ export const makePiTestHarness = Effect.fn("test.pi.makeHarness")(function*(
   const context = {
     getSystemPrompt: () => options.systemPrompt ?? "Pi base.",
     isIdle: () => options.idle ?? true,
+    ...options.context,
   };
 
   return {
     context,
+    entries,
     extension,
     messages,
     pi,
     emit: Effect.fn("test.pi.emit")((event: string, value: unknown) =>
       Effect.forEach(
         extension.handlers.get(event) ?? [],
-        (handler) => invokePiHandler(event, handler, value, context),
+        (handler) => invokePiCallable(
+          "emit",
+          event,
+          handler,
+          [value, context],
+        ),
         { concurrency: 1 },
       )),
+    executeTool: Effect.fn("test.pi.executeTool")((
+      name: string,
+      ...args: ReadonlyArray<unknown>
+    ) => {
+      const tool = extension.tools.get(name);
+      return tool === undefined
+        ? Effect.fail(harnessError("execute", `Pi tool ${name} is not registered`))
+        : invokePiCallable("execute", name, tool.definition.execute, args);
+    }),
   };
 });
