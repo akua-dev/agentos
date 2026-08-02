@@ -17,7 +17,7 @@ const OptionsSchema = Schema.Struct({
   context: Schema.String.pipe(
     Schema.check(
       Schema.isMaxLength(128),
-      Schema.isPattern(/^kind-agentos-protocol-[a-z0-9-]+$/),
+      Schema.isPattern(/^kind-agentos-(?:protocol|resilience)-[a-z0-9-]+$/),
     ),
   ),
   approvalReference: Schema.String.pipe(

@@ -5,7 +5,12 @@ import { Effect } from "effect";
 import type { ProtocolResilienceObservationV1 } from "../../protocol/resilience-conformance.ts";
 import { compileSecondMateTopologyPlan } from "../../topology/second-mate.ts";
 import {
+  resilienceMetricAttributes,
+  resilienceProtectedAttributes,
+} from "../resilience-contract.ts";
+import {
   projectAgentWorkloadPlan,
+  projectAssignmentExecutionObservation,
   projectNativeSessionObservation,
   projectProtocolResilienceObservation,
   projectRuntimeJournalObservation,
@@ -335,6 +340,68 @@ layer(BunCrypto.layer)("resilience evidence projections", (it) => {
           operationId: OperationId,
           protocolId: "a2a-task-01",
         },
+      });
+    }),
+  );
+
+  it.effect("projects retry exhaustion and recovery without high-cardinality metric labels", () =>
+    Effect.gen(function*() {
+      const exhausted = yield* projectAssignmentExecutionObservation({
+        version: 1,
+        state: "exhausted",
+        failureClass: "transport",
+        retryCeiling: 5,
+        attemptsObserved: 5,
+        recoveryAction: null,
+        agentId: SecondMateId,
+        assignmentId: AssignmentId,
+        operationId: OperationId,
+        nativeSessionRef: "codex:thread-retry-1",
+        replacementAssignmentId: null,
+      });
+      expect(exhausted).toMatchObject({
+        source: "assignment",
+        phase: "outcome",
+        outcome: "blocked",
+        cause: "retry_exhausted",
+        failureClass: "transport",
+        recovery: "awaiting_supervisor",
+        attempt: 5,
+      });
+
+      const resumed = yield* projectAssignmentExecutionObservation({
+        version: 1,
+        state: "resumed",
+        failureClass: "transport",
+        retryCeiling: 5,
+        attemptsObserved: 5,
+        recoveryAction: "resume",
+        agentId: SecondMateId,
+        assignmentId: AssignmentId,
+        operationId: OperationId,
+        nativeSessionRef: "codex:thread-retry-1",
+        replacementAssignmentId: null,
+      });
+      expect(resumed).toMatchObject({
+        outcome: "recovered",
+        recovery: "native_session_resume",
+      });
+
+      const metricAttributes = resilienceMetricAttributes(resumed);
+      expect(metricAttributes).toMatchObject({
+        "agentos.resilience.attempt": 5,
+        "agentos.resilience.failure.class": "transport",
+        "agentos.resilience.recovery": "native_session_resume",
+      });
+      expect(JSON.stringify(metricAttributes)).not.toContain(SecondMateId);
+      expect(JSON.stringify(metricAttributes)).not.toContain(AssignmentId);
+      expect(JSON.stringify(metricAttributes)).not.toContain(OperationId);
+      expect(JSON.stringify(metricAttributes)).not.toContain("codex:thread-retry-1");
+      expect(resilienceProtectedAttributes(resumed)).toMatchObject({
+        "agentos.identity.agent_id": SecondMateId,
+        "agentos.identity.assignment_id": AssignmentId,
+        "agentos.resilience.operation.id": OperationId,
+        "agentos.resilience.session.id": "codex:thread-retry-1",
       });
     }),
   );
