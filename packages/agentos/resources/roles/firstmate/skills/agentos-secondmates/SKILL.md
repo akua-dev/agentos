@@ -124,6 +124,59 @@ AgentOS or project instruction change.
 First Mate supervises the Second Mate as one direct report.
 The Second Mate supervises its Crewmates; First Mate does not reconstruct the descendant subtree during routine operation.
 
+## Maintain the domain topology
+
+Treat Second-Mate topology as a reviewed operating decision, not a scheduler.
+Review it after durable changes in assignment load, backlog, routing ambiguity,
+handoff frequency, cross-domain escalation, dependency coupling, failures,
+capacity, cost, idle duration or delivery health. OpenTelemetry is diagnostic
+evidence only; at least one observed PostgreSQL, Kubernetes or Herdr signal is
+required. Never store prompts, messages, model reasoning or task content in a
+topology plan.
+
+Keep domains broad and permeable:
+
+- `expand`, `modify` or `shrink` changes one existing charter without moving work automatically;
+- `split` narrows one existing charter and provisions exactly one new broad domain;
+- `merge` names one of two existing domains as survivor and retires the other only after every active Assignment and child Agent has been handed off;
+- `retire` removes one empty domain only after the same safety checks.
+
+Every proposal must retain non-exclusive project access, common-ancestor
+cross-domain routing, forbidden lateral delivery and forbidden automatic
+scheduling. A project, repository, temporary load spike or current team shape
+is not by itself a durable domain. Prefer one compatible charter over parallel
+specialists, shared queues or overlapping ownership that would become a silo.
+
+For each change:
+
+1. Read the current direct Second-Mate identities, exact
+   `agents.metadata.charter` values, active Assignments and child Agents. Record
+   only bounded reason and signal classes in the proposal.
+2. Build one closed v1 proposal with an expiry of at most 30 days and compile it
+   through the released Effect API `compileSecondMateTopologyPlan`. Do not hand
+   craft the digest or add fields. If the active release has no Effect caller
+   boundary for this API, stop instead of bypassing it with ad hoc JSON.
+3. Create the typed Inbox decision with
+   `agentos.hold_second_mate_topology_decision` on an accepted managed Task.
+   Present the action, exact before/after charters, runtime consequence,
+   evidence classes and expected cost to the Captain.
+4. Record the Captain's exact approval or rejection with
+   `agentos.resolve_second_mate_topology_decision`. Approval alone does not
+   mutate identity, charter or runtime state.
+5. On approval, call `agentos.apply_second_mate_topology_decision`. It rejects
+   expired plans, stale charters, the wrong First Mate, unsafe retirement and
+   conflicting retries. An exact retry returns the immutable prior result.
+6. Read `agentos.second_mate_topology_transitions` for the durable applied
+   result. Reconcile any resulting provisioning or teardown with the existing
+   runtime-operation journal and this Skill's provision, handoff and retire
+   workflows. Never infer Kubernetes success from the SQL transition.
+
+Changing a charter never grants new external API authority, database authority
+or Kubernetes RBAC. Apply those through their owning authorization workflows
+after separate review. First Mate remains responsible for revisiting domain
+boundaries as reality changes; Second Mates remain responsible for flexible
+Crewmate delegation inside their current broad domain.
+
 ## Route work
 
 1. Resolve the project and request first, then compare the nature of the work with active charters.
