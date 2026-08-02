@@ -131,6 +131,20 @@ export const makePiTestHarness = Effect.fn("test.pi.makeHarness")(function*(
         ),
         { concurrency: 1 },
       )),
+    executeCommand: Effect.fn("test.pi.executeCommand")((
+      name: string,
+      arguments_: string,
+    ) => {
+      const command = extension.commands.get(name);
+      return command === undefined
+        ? Effect.fail(harnessError("execute", `Pi command ${name} is not registered`))
+        : invokePiCallable(
+          "execute",
+          `command ${name}`,
+          command.handler,
+          [arguments_, context],
+        );
+    }),
     executeTool: Effect.fn("test.pi.executeTool")((
       name: string,
       ...args: ReadonlyArray<unknown>

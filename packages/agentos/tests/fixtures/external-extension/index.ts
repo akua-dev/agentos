@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   AGENTOS_EGRESS_TOKEN_AUDIENCE,
   buildAgentOSStartupPrompt,
+  defineAgentOSPiCommandHandler,
   registerAgentOSInstructions,
   registerAgentOSRuntime,
   registerAgentOSStartup,
@@ -9,6 +10,7 @@ import {
   type AgentOSStartupContributionV1,
   type WorkloadIdentityV1,
 } from "@akua-dev/agentos";
+import { Effect } from "effect";
 
 export const exampleEgressAudience = AGENTOS_EGRESS_TOKEN_AUDIENCE;
 export const exampleWorkloadIdentity: WorkloadIdentityV1 = {
@@ -39,9 +41,8 @@ const replacement: AgentOSRegistrationV1 = {
   register(pi) {
     pi.registerCommand("example-agentos-status", {
       description: "Show the example customization status",
-      async handler(_args, context) {
-        context.ui.notify("example ready", "info");
-      },
+      handler: defineAgentOSPiCommandHandler((_args, context) =>
+        Effect.sync(() => context.ui.notify("example ready", "info"))),
     });
   },
 };
