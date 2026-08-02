@@ -1,0 +1,39 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: agentos-a2a
+  labels:
+    app.kubernetes.io/name: agentos-a2a
+    app.kubernetes.io/component: protocol-adapter
+    app.kubernetes.io/part-of: agentos
+rules:
+  - apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - serviceaccounts
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agentos-a2a
+  labels:
+    app.kubernetes.io/name: agentos-a2a
+    app.kubernetes.io/component: protocol-adapter
+    app.kubernetes.io/part-of: agentos
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: agentos-a2a
+subjects:
+  - kind: ServiceAccount
+    name: agentos-a2a
+    namespace: agentos

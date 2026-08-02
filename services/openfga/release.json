@@ -20,6 +20,6 @@
   "model": {
     "version": "agentos-access-v1",
     "artifact": "model/agentos-access-v1.json",
-    "artifactSha256": "521c5a9fa8358beba0842374bb7ff55a5f3436d894293a2ecd08b2c756b43aeb"
+    "artifactSha256": "c0951c74e5be984d5a466d9f39161206f79e48c17ca3942293518c6568f5f08d"
   }
 }

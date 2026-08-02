@@ -5,6 +5,7 @@ import { Effect } from "effect";
 import {
   compileA2aAgentCard,
   compileA2aDeliveryRequest,
+  compileA2aPublicAgentCard,
   evaluateA2aHierarchyRoute,
   evaluateA2aOutageRecovery,
   interpretA2aTransportResult,
@@ -48,6 +49,24 @@ const delivery = (
 });
 
 describe("PostgreSQL-first A2A v1 delivery contract", () => {
+  it.effect("publishes identity and security without operational skill details", () =>
+    Effect.gen(function*() {
+      const card = yield* compileA2aPublicAgentCard({
+        version: 1,
+        targetAgentId: TargetAgentId,
+        targetHandle: "platform-mate",
+        description: "Owns the reviewed platform domain",
+        agentVersion: "2026.08.01",
+        baseUrl: "https://agents.example.test/fleet-alpha",
+      });
+      assert.strictEqual(card.name, "platform-mate");
+      assert.deepStrictEqual(card.skills, []);
+      assert.strictEqual(card.capabilities.extendedAgentCard, true);
+      assert.deepStrictEqual(card.securityRequirements, [
+        { schemes: { projectedServiceAccountBearer: [] } },
+      ]);
+    }));
+
   it.effect("compiles one content-free reference request only after the Inbox row commits", () =>
     Effect.gen(function*() {
       const compiled = yield* compileA2aDeliveryRequest(delivery());

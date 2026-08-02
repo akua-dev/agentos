@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agentos-a2a
+  labels:
+    app.kubernetes.io/name: agentos-a2a
+    app.kubernetes.io/component: protocol-adapter
+    app.kubernetes.io/part-of: agentos
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-a2a
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agentos-a2a
+        app.kubernetes.io/component: protocol-adapter
+        app.kubernetes.io/part-of: agentos
+        agentos.akua.dev/openfga-client: "true"
+    spec:
+      automountServiceAccountToken: true
+      serviceAccountName: agentos-a2a
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: agentos-a2a
+      containers:
+        - name: a2a
+          image: agentos:dev
+          imagePullPolicy: Never
+          command:
+            - agentos-a2a
+          env:
+            - name: AGENTOS_ENVIRONMENT
+              value: production
+            - name: A2A_LISTEN_HOST
+              value: 0.0.0.0
+            - name: A2A_LISTEN_PORT
+              value: "8790"
+            - name: A2A_BASE_URL
+              value: https://agentgateway-a2a.agentos.svc.cluster.local
+            - name: A2A_TARGET_DIRECTORY_FILE
+              value: /etc/agentos-a2a/targets.json
+            - name: A2A_READINESS_TOKEN_FILE
+              value: /var/run/secrets/agentos-a2a-readiness/token
+            - name: A2A_KUBERNETES_NAMESPACE
+              value: agentos
+            - name: A2A_KUBERNETES_SERVICE_ACCOUNT
+              value: agentos-a2a
+            - name: AGENTOS_DATABASE_URL_FILE
+              value: /var/run/secrets/agentos-database/database-url
+            - name: OPENFGA_BASE_URL
+              value: http://openfga.agentos.svc.cluster.local:8080
+            - name: OPENFGA_PRESHARED_KEY_FILE
+              value: /var/run/secrets/agentos-openfga/preshared-key
+            - name: OPENFGA_DEPLOYMENT_DIRECTORY
+              value: /var/run/agentos/openfga-deployment
+          ports:
+            - name: http
+              containerPort: 8790
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: database
+              mountPath: /var/run/secrets/agentos-database
+              readOnly: true
+            - name: readiness-token
+              mountPath: /var/run/secrets/agentos-a2a-readiness
+              readOnly: true
+            - name: targets
+              mountPath: /etc/agentos-a2a
+              readOnly: true
+            - name: openfga-admin
+              mountPath: /var/run/secrets/agentos-openfga
+              readOnly: true
+            - name: openfga-deployment
+              mountPath: /var/run/agentos/openfga-deployment
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: database
+          secret:
+            secretName: agentos-a2a-database
+            defaultMode: 0440
+            items:
+              - key: database-url
+                path: database-url
+        - name: readiness-token
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  audience: agentos-egress-authz
+                  expirationSeconds: 600
+                  path: token
+        - name: targets
+          configMap:
+            name: agentos-a2a-targets
+            defaultMode: 0444
+        - name: openfga-admin
+          secret:
+            secretName: openfga-admin
+            defaultMode: 0440
+            items:
+              - key: preshared-key
+                path: preshared-key
+        - name: openfga-deployment
+          configMap:
+            name: openfga-deployment
+            defaultMode: 0444
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

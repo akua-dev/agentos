@@ -42,6 +42,7 @@ const HttpsBaseUrlSchema = Schema.String.pipe(
 const EpochMillisSchema = Schema.Number.pipe(
   Schema.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
 );
+const ReferenceMediaType = "application/vnd.agentos.inbox-reference+json";
 
 export const A2aSpeechActV1Schema = Schema.Literals([
   "answer",
@@ -102,6 +103,46 @@ const A2aSkillV1Schema = Schema.Struct({
   ).pipe(Schema.check(Schema.isMinLength(1), Schema.isMaxLength(16))),
 });
 
+const A2aSecurityRequirementV1Schema = Schema.Struct({
+  schemes: Schema.Struct({
+    projectedServiceAccountBearer: Schema.Array(Schema.String),
+  }),
+});
+
+export const A2aAgentCardV1Schema = Schema.Struct({
+  name: TargetHandleSchema,
+  description: DescriptionSchema,
+  supportedInterfaces: Schema.Array(Schema.Struct({
+    url: HttpsBaseUrlSchema,
+    protocolBinding: Schema.Literal("JSONRPC"),
+    protocolVersion: Schema.Literal("1.0"),
+  })),
+  version: AgentVersionSchema,
+  capabilities: Schema.Struct({
+    streaming: Schema.Literal(false),
+    pushNotifications: Schema.Literal(false),
+    extendedAgentCard: Schema.Literal(true),
+  }),
+  securitySchemes: Schema.Struct({
+    projectedServiceAccountBearer: Schema.Struct({
+      httpAuthSecurityScheme: Schema.Struct({
+        description: Schema.String,
+        scheme: Schema.Literal("Bearer"),
+        bearerFormat: Schema.Literal("Kubernetes ServiceAccount token"),
+      }),
+    }),
+  }),
+  securityRequirements: Schema.Array(A2aSecurityRequirementV1Schema),
+  defaultInputModes: Schema.Array(Schema.Literal(ReferenceMediaType)),
+  defaultOutputModes: Schema.Array(Schema.Literal(ReferenceMediaType)),
+  skills: Schema.Array(Schema.Struct({
+    ...A2aSkillV1Schema.fields,
+    inputModes: Schema.Array(Schema.Literal(ReferenceMediaType)),
+    outputModes: Schema.Array(Schema.Literal(ReferenceMediaType)),
+    securityRequirements: Schema.Array(A2aSecurityRequirementV1Schema),
+  })),
+});
+
 export class A2aAgentCardInputV1 extends Schema.Class<A2aAgentCardInputV1>(
   "A2aAgentCardInputV1",
 )({
@@ -126,6 +167,17 @@ export class A2aAgentCardInputV1 extends Schema.Class<A2aAgentCardInputV1>(
   authorizedSkillIds: Schema.Array(SkillIdSchema).pipe(
     Schema.check(Schema.isMaxLength(256)),
   ),
+}) {}
+
+export class A2aPublicAgentCardInputV1 extends Schema.Class<A2aPublicAgentCardInputV1>(
+  "A2aPublicAgentCardInputV1",
+)({
+  version: Schema.Literal(1),
+  targetAgentId: UuidSchema,
+  targetHandle: TargetHandleSchema,
+  description: DescriptionSchema,
+  agentVersion: AgentVersionSchema,
+  baseUrl: HttpsBaseUrlSchema,
 }) {}
 
 const A2aHierarchyRelationshipV1Schema = Schema.Union([
@@ -215,8 +267,6 @@ export class A2aContractError extends Schema.TaggedErrorClass<A2aContractError>(
 export type A2aSpeechActV1 = typeof A2aSpeechActV1Schema.Type;
 export type A2aOutageV1 = typeof A2aOutageV1Schema.Type;
 export type A2aTransportStatusV1 = typeof A2aTransportStatusV1Schema.Type;
-
-const ReferenceMediaType = "application/vnd.agentos.inbox-reference+json";
 
 export const compileA2aDeliveryRequest = Effect.fn(
   "agentos.a2a.compileDeliveryRequest",
@@ -347,7 +397,7 @@ export const compileA2aAgentCard = Effect.fn(
     );
   }
 
-  return {
+  return yield* decodeContract(A2aAgentCardV1Schema, {
     name: card.targetHandle,
     description: card.description,
     supportedInterfaces: [
@@ -378,7 +428,43 @@ export const compileA2aAgentCard = Effect.fn(
     defaultInputModes: [ReferenceMediaType],
     defaultOutputModes: [ReferenceMediaType],
     skills,
-  };
+  });
+});
+
+export const compileA2aPublicAgentCard = Effect.fn(
+  "agentos.a2a.compilePublicAgentCard",
+)(function*(input: unknown) {
+  const card = yield* decodeContract(A2aPublicAgentCardInputV1, input);
+  return yield* decodeContract(A2aAgentCardV1Schema, {
+    name: card.targetHandle,
+    description: card.description,
+    supportedInterfaces: [{
+      url: `${card.baseUrl}/agents/${card.targetAgentId}/a2a/jsonrpc`,
+      protocolBinding: "JSONRPC",
+      protocolVersion: "1.0",
+    }],
+    version: card.agentVersion,
+    capabilities: {
+      streaming: false,
+      pushNotifications: false,
+      extendedAgentCard: true,
+    },
+    securitySchemes: {
+      projectedServiceAccountBearer: {
+        httpAuthSecurityScheme: {
+          description: "Kubelet-rotated projected Agent ServiceAccount identity",
+          scheme: "Bearer",
+          bearerFormat: "Kubernetes ServiceAccount token",
+        },
+      },
+    },
+    securityRequirements: [
+      { schemes: { projectedServiceAccountBearer: [] } },
+    ],
+    defaultInputModes: [ReferenceMediaType],
+    defaultOutputModes: [ReferenceMediaType],
+    skills: [],
+  });
 });
 
 export const evaluateA2aHierarchyRoute = Effect.fn(
