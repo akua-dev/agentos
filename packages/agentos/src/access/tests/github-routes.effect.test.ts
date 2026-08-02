@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
+import type { AuthorizationResourceV1 } from "../contracts.ts";
 import {
   resolveProviderAuthorizationRoute,
 } from "../http-authorizer.ts";
@@ -9,7 +10,15 @@ const repository = {
   kind: "github_repository",
   owner: "akua-dev",
   repository: "agentos",
-} as const;
+} satisfies AuthorizationResourceV1;
+const GraphQLRequest = Schema.Struct({
+  operationName: Schema.optional(Schema.String),
+  query: Schema.String,
+  variables: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+});
+const encodeGraphQLRequest = Schema.encodeEffect(
+  Schema.fromJsonString(GraphQLRequest),
+);
 
 describe("GitHub provider authorization routes", () => {
   it.effect("classifies repository-scoped REST reads and writes", () =>
@@ -82,7 +91,7 @@ describe("GitHub provider authorization routes", () => {
 
   it.effect("classifies a bounded GraphQL query from its exact repository", () =>
     Effect.gen(function*() {
-      const body = JSON.stringify({
+      const body = yield* encodeGraphQLRequest({
         operationName: "PullRequestView",
         query: `query PullRequestView($owner: String!, $name: String!, $number: Int!) {
           repository(owner: $owner, name: $name) {
@@ -108,7 +117,7 @@ describe("GitHub provider authorization routes", () => {
 
   it.effect("rejects opaque GraphQL node mutations even with a repository hint", () =>
     Effect.gen(function*() {
-      const body = JSON.stringify({
+      const body = yield* encodeGraphQLRequest({
         operationName: "MarkPullRequestReadyForReview",
         query: `mutation MarkPullRequestReadyForReview($pullRequestId: ID!) {
           markPullRequestReadyForReview(input: { pullRequestId: $pullRequestId }) {
@@ -127,10 +136,10 @@ describe("GitHub provider authorization routes", () => {
 
   it.effect("denies ambiguous, mismatched, and unsupported GitHub operations", () =>
     Effect.gen(function*() {
-      const mutation = JSON.stringify({
+      const mutation = yield* encodeGraphQLRequest({
         query: "mutation { deleteRepository(input: { repositoryId: \"R_1\" }) { clientMutationId } }",
       });
-      const mismatch = JSON.stringify({
+      const mismatch = yield* encodeGraphQLRequest({
         query: `query($owner: String!, $name: String!) {
           repository(owner: $owner, name: $name) { issues(first: 1) { totalCount } }
         }`,
