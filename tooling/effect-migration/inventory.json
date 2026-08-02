@@ -76,6 +76,7 @@
       "package": "@akua-dev/agentos",
       "io": [
         "config",
+        "crypto",
         "filesystem",
         "schema"
       ],
@@ -401,6 +402,16 @@
       "runtime": "bun",
       "package": "@akua-dev/agentos",
       "io": ["test", "crypto", "filesystem", "process", "schema"],
+      "migrationDependencies": [100, 101, 104],
+      "status": "migrated"
+    },
+    {
+      "id": "agentos-runtime-state-effect-tests",
+      "issue": 102,
+      "pattern": "^packages/agentos/runtime/tests/(?:capacity-preflight|readiness-state)\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "crypto", "filesystem", "process", "schema", "stream"],
       "migrationDependencies": [100, 101, 104],
       "status": "migrated"
     },
