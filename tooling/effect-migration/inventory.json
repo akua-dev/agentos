@@ -536,6 +536,16 @@
       "status": "migrated"
     },
     {
+      "id": "second-mate-topology-effect-tests",
+      "issue": 184,
+      "pattern": "^database/tests/second-mate-topology\\.effect\\.test\\.ts$|^packages/agentos/src/topology/tests/.*\\.effect\\.test\\.ts$",
+      "runtime": "bun-postgresql",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "crypto", "database", "filesystem", "schema"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
       "id": "effect-test-conformance",
       "issue": 102,
       "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",
@@ -642,6 +652,16 @@
       "runtime": "shared-bun-opentelemetry",
       "package": "@akua-dev/agentos",
       "io": ["config", "clock", "crypto", "schema", "telemetry", "framework-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
+      "id": "second-mate-topology-runtime",
+      "issue": 184,
+      "pattern": "^packages/agentos/src/topology/(?!tests/)",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": ["crypto", "schema"],
       "migrationDependencies": [100, 101],
       "status": "migrated"
     },

@@ -502,6 +502,25 @@ export {
   type AgentOSDiagnosticInput,
 } from "./shared/services.ts";
 export {
+  CompiledSecondMateTopologyPlanV1Schema,
+  ExistingSecondMateTopologyDestinationV1,
+  NewSecondMateTopologyDestinationV1,
+  SecondMateCharterV1,
+  SecondMateTopologyActionV1Schema,
+  SecondMateTopologyDestinationV1Schema,
+  SecondMateTopologyPlanError,
+  SecondMateTopologyProposalV1,
+  SecondMateTopologyReasonV1Schema,
+  SecondMateTopologySignalAuthorityV1Schema,
+  SecondMateTopologySignalKindV1Schema,
+  SecondMateTopologySignalV1,
+  SecondMateTopologySourceV1,
+  compileSecondMateTopologyPlan,
+  type CompiledSecondMateTopologyPlanV1,
+  type SecondMateTopologyActionV1,
+  type SecondMateTopologyReasonV1,
+} from "./topology/second-mate.ts";
+export {
   AgentWorkloadProfileNameSchema,
   AgentWorkloadSpecError,
   AgentWorkloadSpecV1Schema,
