@@ -227,15 +227,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in mise.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/build.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 2,
-      "digest": "2b7f1700b6fa13d8c34c81d3872ce201513b9a62853ed5d691c2163a3e3d3f98",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/build.ts under issue #97; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/resources/crewmates/default/kubernetes/tests/manifest.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -522,15 +513,6 @@
       "digest": "41f30abaa301899a7f92b9edd1bbe5e1e65fcfa93afe12e52a1fd1a5b9a8c054",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/agentgateway/tests/conformance.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "services/openfga/scripts/generate-model.ts",
-      "slice": "openfga-generated-tooling",
-      "issue": 97,
-      "violationCount": 2,
-      "digest": "9b4bbafa971dcabe78316840f59dc8784d7e35ecd9ec5cd06f80502b79922ec7",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/scripts/generate-model.ts under issue #97; never refresh touched debt."
     },
     {
       "path": "services/openfga/tests/live-model-conformance.ts",

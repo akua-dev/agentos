@@ -39,6 +39,30 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "packages/agentos/build.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The AgentOS package build executable enters one scoped Effect runtime around cleanup and TypeScript compilation.",
+      "ownerIssue": 97,
+      "test": "packages/agentos/tests/build.effect.test.ts",
+      "removalCondition": "Retain only while the package build remains a standalone executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "services/openfga/scripts/generate-model.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The OpenFGA model generator enters one Effect runtime around artifact checking and publication.",
+      "ownerIssue": 97,
+      "test": "services/openfga/tests/model-generation.effect.test.ts",
+      "removalCondition": "Retain only while model generation remains a standalone executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "database/drizzle.config.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
