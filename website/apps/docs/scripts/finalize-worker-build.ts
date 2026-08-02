@@ -1,12 +1,13 @@
-import { fileURLToPath } from 'node:url';
+import { Config, Effect, Option, Path, Stdio, Stream } from 'effect';
+
 import {
+  loadBuildEnvironment,
   readGitSourceState,
   resolveBuildProvenance,
   writeProvenanceArtifact,
 } from './worker-provenance';
 import { verifyWorkerSize } from './worker-size';
-
-const appDirectory = fileURLToPath(new URL('..', import.meta.url));
+import { runWebsiteScript } from './script-runtime';
 
 export function shouldVerifyWorkerSize(
   environment: Readonly<Record<string, string | undefined>>,
@@ -14,30 +15,38 @@ export function shouldVerifyWorkerSize(
   return environment.WORKERS_CI !== '1';
 }
 
-export async function finalizeWorkerBuild(): Promise<void> {
-  const gitSource = readGitSourceState(appDirectory);
-  const provenance = resolveBuildProvenance(process.env, gitSource);
+const writeLine = Effect.fn('agentos.website.writeFinalizeLine')(
+  function*(line: string) {
+    const stdio = yield* Stdio.Stdio;
+    yield* Stream.make(`${line}\n`).pipe(Stream.run(stdio.stdout()));
+  },
+);
 
-  if (shouldVerifyWorkerSize(process.env)) {
-    await verifyWorkerSize();
+export const finalizeWorkerBuild = Effect.gen(function*() {
+  const paths = yield* Path.Path;
+  const appDirectory = yield* paths.fromFileUrl(new URL('..', import.meta.url));
+  const environment = yield* loadBuildEnvironment;
+  const workersCi = yield* Config.option(Config.string('WORKERS_CI'));
+  const gitSource = yield* readGitSourceState(appDirectory, environment);
+  const provenance = yield* resolveBuildProvenance(environment, gitSource);
+
+  if (
+    shouldVerifyWorkerSize({
+      WORKERS_CI: Option.getOrUndefined(workersCi),
+    })
+  ) {
+    yield* verifyWorkerSize();
   } else {
-    console.log(
+    yield* writeLine(
       'Workers Builds will enforce the compressed-size limit during the immediate upload; skipped the redundant Wrangler dry run.',
     );
   }
 
-  writeProvenanceArtifact(appDirectory, provenance);
+  yield* writeProvenanceArtifact(appDirectory, provenance);
   const sourceState = provenance.sourceDirty ? 'dirty, not publishable' : 'clean';
-  console.log(
+  yield* writeLine(
     `Finalized Worker from Git revision ${provenance.gitSha} (${sourceState}).`,
   );
-}
+});
 
-if (import.meta.main) {
-  try {
-    await finalizeWorkerBuild();
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  }
-}
+if (import.meta.main) runWebsiteScript(finalizeWorkerBuild);

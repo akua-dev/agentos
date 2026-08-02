@@ -560,15 +560,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/llms-index.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/next.config.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 7,
-      "digest": "f98f118ad666dd6c48306ed5b33d8f00eaecdc94a4b4c75e981a4d1d3e16ac02",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/next.config.ts under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/scripts/brand-assets.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -576,15 +567,6 @@
       "digest": "74b2f1c5c6949ff87e0d8018c424d2ac1a92979e18bc914519b9318677ba433a",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/brand-assets.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/finalize-worker-build.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 3,
-      "digest": "43b4284dab1ecd2f900b6b9b8bc336796b5c5de27bb15c7db3e0829db0f8d4bb",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/finalize-worker-build.ts under issue #99; never refresh touched debt."
     },
     {
       "path": "website/apps/docs/scripts/generate-brand-assets.ts",
@@ -614,24 +596,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/lint.ts under issue #99; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/scripts/publish-worker.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 6,
-      "digest": "8dcb1e7f8f59fda406f4b09c9a75e6411b0e450d804216f6fdabb6c223aaa579",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/publish-worker.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/publish-worker.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 12,
-      "digest": "a8c23cf854b911f323ab0c4bc4f83e9802866d6ab7fb94578c7829083059caca",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/publish-worker.ts under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/scripts/site-contract.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -648,51 +612,6 @@
       "digest": "5c65148c0c82a129918fac649acc351cc6116336cb5984fb038c5c315cb5924e",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/site-contract.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/verify-worker-preview.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 6,
-      "digest": "31c9ab91fb62cc8208152566cfbc73df6d83ec3ac4cd93129528181388734fe9",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/verify-worker-preview.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/verify-worker-preview.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 24,
-      "digest": "32a596eaad5660feceff19cae712f891b8b9544f0e2ae7e8092913f3ab4d8a1a",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/verify-worker-preview.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/worker-provenance.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 2,
-      "digest": "9211f3765587fad7f6656c6fb69933cd31d5d893e814c6dd1ba397efeffc386c",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/worker-provenance.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/worker-provenance.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 17,
-      "digest": "0fc3c8b12d3db94f1ad4aebdfa35abafebce84abd0098e3f9d4a5c0e9b422260",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/worker-provenance.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/worker-size.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 5,
-      "digest": "4237161a7175df2711b37bfa3c9a8b4d9440cf1834611575222d98df91aa1bbe",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/worker-size.ts under issue #99; never refresh touched debt."
     }
   ]
 }
