@@ -571,6 +571,22 @@ export {
   type A2aDeliveryProjectionRequestV1,
 } from "./protocol/a2a-postgres.ts";
 export {
+  A2A_PROTOCOL_RESILIENCE_SCENARIOS,
+  ACP_PROTOCOL_RESILIENCE_SCENARIOS,
+  DISPOSABLE_PROTOCOL_RESILIENCE_SCENARIOS,
+  PROTOCOL_RESILIENCE_SCENARIOS,
+  ProtocolResilienceGateError,
+  ProtocolResilienceObservationV1Schema,
+  ProtocolResilienceRunV1Schema,
+  ProtocolResilienceScenarioIdSchema,
+  compileProtocolResilienceVerdict,
+  protocolResilienceScenarioDefinition,
+  type ProtocolResilienceObservationV1,
+  type ProtocolResilienceRunV1,
+  type ProtocolResilienceScenarioDefinition,
+  type ProtocolResilienceScenarioId,
+} from "./protocol/resilience-conformance.ts";
+export {
   CompiledSecondMateTopologyPlanV1Schema,
   ExistingSecondMateTopologyDestinationV1,
   NewSecondMateTopologyDestinationV1,
