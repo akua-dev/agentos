@@ -556,6 +556,26 @@
       "status": "migrated"
     },
     {
+      "id": "acp-a2a-resilience-conformance-effect-tests",
+      "issue": 130,
+      "pattern": "^packages/agentos/src/protocol/tests/(?:disposable-kubernetes|resilience-conformance)\\.effect\\.test\\.ts$",
+      "runtime": "bun-kubernetes-postgresql-herdr",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "clock", "process", "kubernetes", "schema"],
+      "migrationDependencies": [84, 87, 88, 90, 100, 101, 104, 114, 119, 125, 126, 128],
+      "status": "migrated"
+    },
+    {
+      "id": "acp-a2a-resilience-conformance-runtime",
+      "issue": 130,
+      "pattern": "^packages/agentos/src/protocol/(?:disposable-kubernetes|resilience-conformance)\\.ts$",
+      "runtime": "shared-bun-kubernetes-postgresql-herdr",
+      "package": "@akua-dev/agentos",
+      "io": ["clock", "process", "kubernetes", "schema"],
+      "migrationDependencies": [84, 87, 88, 90, 100, 101, 104, 114, 119, 125, 126, 128],
+      "status": "migrated"
+    },
+    {
       "id": "postgresql-first-a2a-contract-runtime",
       "issue": 125,
       "pattern": "^packages/agentos/src/protocol/a2a(?:-postgres|-runtime)?\\.ts$",
