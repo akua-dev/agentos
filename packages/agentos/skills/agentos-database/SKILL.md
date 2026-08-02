@@ -170,13 +170,15 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   Principal creation and credential delivery remain separate, approved
   platform operations followed by `agentos.register_agent_principal`.
 - Journal every approved Agent `provision`, `rollout`, `recover` or `teardown`
-  before its first external mutation through
-  `agentos.begin_runtime_operation`. Supply one stable caller-selected UUID,
-  the exact target Agent and supervising owner implied by `session_user`, an
-  optional matching Assignment, Kubernetes namespace and workload, SHA-256 of
-  the reviewed desired render, and only closed retained PVC/worktree identities
-  with `retain` or `discard` disposition. An exact retry returns the same UUID;
-  any owner, render or identity conflict is an ambiguity to stop on.
+  before its first external mutation. A compiler-originated workload must use
+  `agentos.begin_workload_runtime_operation` and supply spec version `1`, the
+  exact canonical spec digest, generated-overlay digest and rendered-resource
+  digest. A generic non-workload action may use `agentos.begin_runtime_operation`.
+  Supply one stable caller-selected UUID, the exact target Agent and supervising
+  owner implied by `session_user`, an optional matching Assignment, Kubernetes
+  namespace and workload, and only closed retained PVC/worktree identities with
+  `retain` or `discard` disposition. An exact retry returns the same UUID; any
+  owner, digest or identity conflict is an ambiguity to stop on.
 - After each native boundary, call `agentos.observe_runtime_operation` with
   `applied`, `workload_ready` or `harness_ready`. On interruption or ambiguous
   partial success record `recovery_required` plus one stable privacy-safe
@@ -186,8 +188,10 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   credentials or heartbeat into PostgreSQL.
 - Complete only after the action-specific boundary is verified. Use
   `agentos.fail_runtime_operation` for an ended attempt. When desired render or
-  recovery strategy changes, use `agentos.supersede_runtime_operation` to link
-  one new operation atomically; never begin an unlinked replacement to race
+  recovery strategy changes, use `agentos.supersede_workload_runtime_operation`
+  for typed workload custody or `agentos.supersede_runtime_operation` for a
+  generic operation to link one new operation atomically. A typed replacement
+  must bind all three new digests; never begin an unlinked replacement to race
   the same Agent. A teardown requires ended Assignments and explicit
   disposition for the recorded PVC. The Functions create no Agent, Task,
   Assignment, Kubernetes resource or worktree and replace no native tool.
