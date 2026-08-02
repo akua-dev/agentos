@@ -12,6 +12,7 @@ import {
 } from "effect";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import { fileURLToPath } from "node:url";
+import { parse as parseTomlSource } from "toml";
 
 const RequestedTools = Schema.Record(
   Schema.String,
@@ -159,7 +160,7 @@ const installFleetBaseline = Effect.fn("test.mise.installFleetBaseline")(
 
 const parseToml = Effect.fn("test.mise.parseToml")((source: string) =>
   Effect.try({
-    try: () => Bun.TOML.parse(source),
+    try: () => parseTomlSource(source),
     catch: () => testError("toml", "invalid TOML fixture"),
   }));
 
