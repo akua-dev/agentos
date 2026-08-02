@@ -1,13 +1,50 @@
-import { createHash } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+#!/usr/bin/env bun
+
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import * as BunServices from "@effect/platform-bun/BunServices";
+import {
+  Crypto,
+  Effect,
+  FileSystem,
+  Runtime,
+  Schema,
+  Stdio,
+  Stream,
+} from "effect";
 
 const SCHEMA_VERSION = "0.1.0";
 const SUPPORTED_PI_SESSION_VERSION = 3;
-const UNOBSERVED = "unobserved" as const;
+const UNOBSERVED = "unobserved";
 const MAX_SESSION_CHARACTERS = 10_000_000;
 const MAX_SESSION_ENTRIES = 10_000;
 const MAX_EVENTS = 1_000;
 const MAX_TEXT_LENGTH = 256;
+
+const ProjectionErrorCodeSchema = Schema.Literals([
+  "invalid_argument",
+  "invalid_json",
+  "invalid_session",
+  "unsupported_version",
+  "session_limit",
+  "invalid_branch",
+  "invalid_action",
+  "result_mismatch",
+  "filesystem",
+  "encoding",
+  "usage",
+]);
+
+export class PiSessionProjectionError extends Schema.TaggedErrorClass<PiSessionProjectionError>()(
+  "PiSessionProjectionError",
+  {
+    code: ProjectionErrorCodeSchema,
+    message: Schema.String,
+    line: Schema.optional(Schema.Number),
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override readonly [Runtime.errorExitCode] = 1;
+}
 
 type JsonObject = Record<string, unknown>;
 
@@ -35,111 +72,264 @@ export interface PiActionTrajectory {
 }
 
 interface PendingAction {
-  toolCallId: string;
-  event: PiActionEvent;
-  callTimestampMs: number | undefined;
+  readonly toolCallId: string;
+  readonly event: PiActionEvent;
+  readonly callTimestampMs: number | undefined;
 }
 
-function asObject(value: unknown): JsonObject | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as JsonObject
-    : undefined;
+interface BranchEntry {
+  readonly id: string;
+  readonly parentId: string | null;
+  readonly value: JsonObject;
 }
 
-function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  const object = value as JsonObject;
-  return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`).join(",")}}`;
+const JsonObjectSchema = Schema.Record(Schema.String, Schema.Unknown);
+const JsonObjectFromString = Schema.fromJsonString(JsonObjectSchema);
+const JsonValueFromString = Schema.fromJsonString(Schema.Unknown);
+
+const isJsonObject = Schema.is(JsonObjectSchema);
+
+const PiActionEventSchema = Schema.Struct({
+  timestamp: Schema.String,
+  actor: Schema.String,
+  event_type: Schema.Literals(["tool_call", "bash_execution"]),
+  tool_name: Schema.String,
+  arguments_digest: Schema.String,
+  result_class: Schema.Literals(["success", "error", UNOBSERVED]),
+  duration_ms: Schema.Union([Schema.Number, Schema.Literal(UNOBSERVED)]),
+  retry_of: Schema.Union([
+    Schema.Number,
+    Schema.Null,
+    Schema.Literal(UNOBSERVED),
+  ]),
+  accepted_work_reference: Schema.String,
+});
+
+export const PiActionTrajectorySchema = Schema.Struct({
+  schema_version: Schema.Literal(SCHEMA_VERSION),
+  harness: Schema.Literal("pi"),
+  events: Schema.Array(PiActionEventSchema),
+  redactions: Schema.Array(Schema.Struct({
+    kind: Schema.String,
+    count: Schema.Number,
+    method: Schema.String,
+  })),
+});
+
+const projectionError = (
+  code: typeof ProjectionErrorCodeSchema.Type,
+  message: string,
+  options?: { readonly line?: number; readonly cause?: unknown },
+) => PiSessionProjectionError.make({ code, message, ...options });
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!isJsonObject(value)) return value;
+  const canonical: JsonObject = {};
+  for (const key of Object.keys(value).sort()) {
+    canonical[key] = canonicalize(value[key]);
+  }
+  return canonical;
 }
 
-function argumentDigest(value: unknown): string | typeof UNOBSERVED {
-  if (asObject(value) === undefined) return UNOBSERVED;
-  return `sha256:${createHash("sha256").update(canonicalJson(value)).digest("hex")}`;
-}
+const argumentDigest = Effect.fn("agentos.benchmark.pi.argumentDigest")(
+  function*(value: unknown) {
+    if (!isJsonObject(value)) return UNOBSERVED;
+    const crypto = yield* Crypto.Crypto;
+    const canonical = yield* Schema.encodeEffect(JsonValueFromString)(
+      canonicalize(value),
+    ).pipe(
+      Effect.mapError((cause) =>
+        projectionError(
+          "encoding",
+          "Pi tool arguments could not be canonically encoded",
+          { cause },
+        )
+      ),
+    );
+    const digest = yield* crypto.digest(
+      "SHA-256",
+      new TextEncoder().encode(canonical),
+    ).pipe(
+      Effect.mapError((cause) =>
+        projectionError("encoding", "Pi tool arguments could not be hashed", {
+          cause,
+        })
+      ),
+    );
+    return `sha256:${Array.from(
+      digest,
+      (byte) => byte.toString(16).padStart(2, "0"),
+    ).join("")}`;
+  },
+);
 
 function timestampMilliseconds(value: unknown): number | undefined {
   if (typeof value === "number") {
-    return Number.isFinite(value) && value >= 0 && Number.isFinite(new Date(value).getTime()) ? value : undefined;
+    return Number.isFinite(value) &&
+        value >= 0 &&
+        Number.isFinite(new Date(value).getTime())
+      ? value
+      : undefined;
   }
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return undefined;
+  if (
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
+  ) return undefined;
   const parsed = Date.parse(value);
-  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value ? parsed : undefined;
+  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value
+    ? parsed
+    : undefined;
 }
 
-function normalizedTimestamp(messageTimestamp: unknown, entryTimestamp: unknown): string | typeof UNOBSERVED {
-  const milliseconds = timestampMilliseconds(messageTimestamp) ?? timestampMilliseconds(entryTimestamp);
-  return milliseconds === undefined ? UNOBSERVED : new Date(milliseconds).toISOString();
+function normalizedTimestamp(
+  messageTimestamp: unknown,
+  entryTimestamp: unknown,
+): string | typeof UNOBSERVED {
+  const milliseconds = timestampMilliseconds(messageTimestamp) ??
+    timestampMilliseconds(entryTimestamp);
+  return milliseconds === undefined
+    ? UNOBSERVED
+    : new Date(milliseconds).toISOString();
 }
 
-function parseJsonLines(content: string): JsonObject[] {
-  if (content.length > MAX_SESSION_CHARACTERS) throw new Error("Pi session exceeds the supported size limit");
-  const entries: JsonObject[] = [];
-  for (const [index, line] of content.split(/\r?\n/).entries()) {
-    if (line.trim() === "") continue;
-    let value: unknown;
-    try {
-      value = JSON.parse(line);
-    } catch {
-      throw new Error(`Pi session line ${index + 1} is not valid JSON`);
+const parseJsonLines = Effect.fn("agentos.benchmark.pi.parseJsonLines")(
+  function*(content: string) {
+    if (content.length > MAX_SESSION_CHARACTERS) {
+      return yield* projectionError(
+        "session_limit",
+        "Pi session exceeds the supported size limit",
+      );
     }
-    const entry = asObject(value);
-    if (entry === undefined) throw new Error(`Pi session line ${index + 1} is not an object`);
-    entries.push(entry);
-    if (entries.length > MAX_SESSION_ENTRIES) throw new Error("Pi session exceeds the supported entry limit");
-  }
-  return entries;
-}
-
-function activeBranch(entries: JsonObject[]): JsonObject[] {
-  if (entries.length === 0) return [];
-  const entriesById = new Map<string, JsonObject>();
-  for (const entry of entries) {
-    if (typeof entry.id !== "string" || entry.id === "") throw new Error("Pi session entry is missing its id");
-    if (entriesById.has(entry.id)) throw new Error(`duplicate Pi session entry id: ${entry.id}`);
-    if (entry.parentId !== null && typeof entry.parentId !== "string") {
-      throw new Error(`Pi session entry ${entry.id} has an invalid parentId`);
+    const entries: JsonObject[] = [];
+    for (const [index, line] of content.split(/\r?\n/).entries()) {
+      if (line.trim() === "") continue;
+      const entry = yield* Schema.decodeUnknownEffect(JsonObjectFromString)(
+        line,
+      ).pipe(
+        Effect.mapError((cause) =>
+          projectionError(
+            "invalid_json",
+            `Pi session line ${index + 1} is not a valid JSON object`,
+            { cause, line: index + 1 },
+          )
+        ),
+      );
+      entries.push(entry);
+      if (entries.length > MAX_SESSION_ENTRIES) {
+        return yield* projectionError(
+          "session_limit",
+          "Pi session exceeds the supported entry limit",
+        );
+      }
     }
-    entriesById.set(entry.id, entry);
-  }
+    return entries;
+  },
+);
 
-  const branch: JsonObject[] = [];
-  const visited = new Set<string>();
-  let current: JsonObject | undefined = entries.at(-1);
-  while (current !== undefined) {
-    const id = current.id as string;
-    if (visited.has(id)) throw new Error("Pi session branch contains a cycle");
-    visited.add(id);
-    branch.push(current);
-    if (current.parentId === null) break;
-    current = entriesById.get(current.parentId as string);
-    if (current === undefined) throw new Error(`Pi session entry ${id} references a missing parent`);
-  }
-  return branch.reverse();
-}
+const activeBranch = Effect.fn("agentos.benchmark.pi.activeBranch")(
+  function*(entries: ReadonlyArray<JsonObject>) {
+    if (entries.length === 0) return [];
+    const entriesById = new Map<string, BranchEntry>();
+    let latest: BranchEntry | undefined;
+    for (const entry of entries) {
+      const id = entry.id;
+      if (typeof id !== "string" || id === "") {
+        return yield* projectionError(
+          "invalid_branch",
+          "Pi session entry is missing its id",
+        );
+      }
+      if (entriesById.has(id)) {
+        return yield* projectionError(
+          "invalid_branch",
+          `duplicate Pi session entry id: ${id}`,
+        );
+      }
+      const parentId = entry.parentId;
+      if (parentId !== null && typeof parentId !== "string") {
+        return yield* projectionError(
+          "invalid_branch",
+          `Pi session entry ${id} has an invalid parentId`,
+        );
+      }
+      latest = { id, parentId, value: entry };
+      entriesById.set(id, latest);
+    }
 
-function countRedactedContent(message: JsonObject, counts: Map<string, number>): void {
+    const branch: JsonObject[] = [];
+    const visited = new Set<string>();
+    let current = latest;
+    while (current !== undefined) {
+      if (visited.has(current.id)) {
+        return yield* projectionError(
+          "invalid_branch",
+          "Pi session branch contains a cycle",
+        );
+      }
+      visited.add(current.id);
+      branch.push(current.value);
+      if (current.parentId === null) break;
+      const childId = current.id;
+      current = entriesById.get(current.parentId);
+      if (current === undefined) {
+        return yield* projectionError(
+          "invalid_branch",
+          `Pi session entry ${childId} references a missing parent`,
+        );
+      }
+    }
+    return branch.reverse();
+  },
+);
+
+function countRedactedContent(
+  message: JsonObject,
+  counts: Map<string, number>,
+): void {
   const role = message.role;
   const content = Array.isArray(message.content) ? message.content : [];
-  if (role === "user") counts.set("full_prompts", (counts.get("full_prompts") ?? 0) + 1);
-  if (role === "toolResult") counts.set("tool_results", (counts.get("tool_results") ?? 0) + 1);
+  if (role === "user") {
+    counts.set("full_prompts", (counts.get("full_prompts") ?? 0) + 1);
+  }
+  if (role === "toolResult") {
+    counts.set("tool_results", (counts.get("tool_results") ?? 0) + 1);
+  }
   if (role !== "assistant") return;
   for (const block of content) {
-    const type = asObject(block)?.type;
-    if (type === "thinking") counts.set("raw_reasoning", (counts.get("raw_reasoning") ?? 0) + 1);
-    else if (type !== "toolCall") counts.set("assistant_content", (counts.get("assistant_content") ?? 0) + 1);
+    const type = isJsonObject(block) ? block.type : undefined;
+    if (type === "thinking") {
+      counts.set("raw_reasoning", (counts.get("raw_reasoning") ?? 0) + 1);
+    } else if (type !== "toolCall") {
+      counts.set(
+        "assistant_content",
+        (counts.get("assistant_content") ?? 0) + 1,
+      );
+    }
   }
 }
 
-function countRedactedEntry(entry: JsonObject, counts: Map<string, number>): void {
+function countRedactedEntry(
+  entry: JsonObject,
+  counts: Map<string, number>,
+): void {
   if (entry.type === "compaction" || entry.type === "branch_summary") {
-    counts.set("session_summaries", (counts.get("session_summaries") ?? 0) + 1);
+    counts.set(
+      "session_summaries",
+      (counts.get("session_summaries") ?? 0) + 1,
+    );
   } else if (entry.type === "custom" || entry.type === "custom_message") {
-    counts.set("extension_content", (counts.get("extension_content") ?? 0) + 1);
+    counts.set(
+      "extension_content",
+      (counts.get("extension_content") ?? 0) + 1,
+    );
   } else if (entry.type === "model_change") {
     counts.set("model_changes", (counts.get("model_changes") ?? 0) + 1);
   } else if (entry.type === "thinking_level_change") {
-    counts.set("thinking_level_changes", (counts.get("thinking_level_changes") ?? 0) + 1);
+    counts.set(
+      "thinking_level_changes",
+      (counts.get("thinking_level_changes") ?? 0) + 1,
+    );
   } else if (entry.type === "label") {
     counts.set("labels", (counts.get("labels") ?? 0) + 1);
   } else if (entry.type === "session_info") {
@@ -147,54 +337,83 @@ function countRedactedEntry(entry: JsonObject, counts: Map<string, number>): voi
   }
 }
 
-function requireBoundedText(label: string, value: string): void {
-  if (value.trim() === "") throw new Error(`${label} must not be empty`);
-  if (value.length > MAX_TEXT_LENGTH) throw new Error(`${label} exceeds the supported length limit`);
-}
+const requireBoundedText = Effect.fn("agentos.benchmark.pi.requireText")(
+  function*(label: string, value: string) {
+    if (value.trim() === "") {
+      return yield* projectionError(
+        "invalid_argument",
+        `${label} must not be empty`,
+      );
+    }
+    if (value.length > MAX_TEXT_LENGTH) {
+      return yield* projectionError(
+        "invalid_argument",
+        `${label} exceeds the supported length limit`,
+      );
+    }
+  },
+);
 
-export function projectPiSession(
+export const projectPiSession = Effect.fn(
+  "agentos.benchmark.pi.projectSession",
+)(function*(
   content: string,
   actor: string,
   acceptedWorkReference: string,
-): PiActionTrajectory {
-  requireBoundedText("actor", actor);
-  requireBoundedText("accepted-work reference", acceptedWorkReference);
+) {
+  yield* requireBoundedText("actor", actor);
+  yield* requireBoundedText("accepted-work reference", acceptedWorkReference);
 
-  const entries = parseJsonLines(content);
+  const entries = yield* parseJsonLines(content);
   const header = entries[0];
-  if (header?.type !== "session") throw new Error("Pi session must begin with a session header");
+  if (header?.type !== "session") {
+    return yield* projectionError(
+      "invalid_session",
+      "Pi session must begin with a session header",
+    );
+  }
   const version = header.version ?? 1;
   if (version !== SUPPORTED_PI_SESSION_VERSION) {
-    throw new Error(`unsupported Pi session version: ${String(version)}`);
+    return yield* projectionError(
+      "unsupported_version",
+      `unsupported Pi session version: ${String(version)}`,
+    );
   }
 
   const actions: PendingAction[] = [];
   const actionsByToolCallId = new Map<string, PendingAction>();
   const redactionCounts = new Map<string, number>([["session_metadata", 1]]);
 
-  for (const entry of activeBranch(entries.slice(1))) {
+  for (const entry of yield* activeBranch(entries.slice(1))) {
     if (entry.type !== "message") {
       countRedactedEntry(entry, redactionCounts);
       continue;
     }
-    const message = asObject(entry.message);
-    if (message === undefined) throw new Error("Pi message entry is missing its message object");
+    const message = isJsonObject(entry.message) ? entry.message : undefined;
+    if (message === undefined) {
+      return yield* projectionError(
+        "invalid_session",
+        "Pi message entry is missing its message object",
+      );
+    }
     countRedactedContent(message, redactionCounts);
 
     if (message.role === "bashExecution") {
       const digest = typeof message.command === "string"
-        ? argumentDigest({ command: message.command })
+        ? yield* argumentDigest({ command: message.command })
         : UNOBSERVED;
-      if (digest === UNOBSERVED) {
-        redactionCounts.set("unavailable_arguments", (redactionCounts.get("unavailable_arguments") ?? 0) + 1);
-      } else {
-        redactionCounts.set("tool_arguments", (redactionCounts.get("tool_arguments") ?? 0) + 1);
-      }
-      redactionCounts.set("tool_results", (redactionCounts.get("tool_results") ?? 0) + 1);
+      incrementArgumentRedaction(redactionCounts, digest);
+      redactionCounts.set(
+        "tool_results",
+        (redactionCounts.get("tool_results") ?? 0) + 1,
+      );
       let resultClass: PiActionEvent["result_class"] = UNOBSERVED;
       if (message.cancelled === true) resultClass = "error";
-      else if (typeof message.exitCode === "number") resultClass = message.exitCode === 0 ? "success" : "error";
-      const messageTimestampMs = timestampMilliseconds(message.timestamp) ?? timestampMilliseconds(entry.timestamp);
+      else if (typeof message.exitCode === "number") {
+        resultClass = message.exitCode === 0 ? "success" : "error";
+      }
+      const messageTimestampMs = timestampMilliseconds(message.timestamp) ??
+        timestampMilliseconds(entry.timestamp);
       actions.push({
         toolCallId: `bash-execution:${actions.length + 1}`,
         callTimestampMs: messageTimestampMs,
@@ -210,32 +429,52 @@ export function projectPiSession(
           accepted_work_reference: acceptedWorkReference,
         },
       });
-      if (actions.length > MAX_EVENTS) throw new Error("Pi session exceeds the supported action limit");
+      yield* ensureActionLimit(actions.length);
       continue;
     }
 
     if (message.role === "assistant") {
       const blocks = Array.isArray(message.content) ? message.content : [];
       for (const blockValue of blocks) {
-        const block = asObject(blockValue);
+        const block = isJsonObject(blockValue) ? blockValue : undefined;
         if (block?.type !== "toolCall") continue;
-        if (typeof block.id !== "string" || block.id === "") throw new Error("Pi tool call is missing its id");
-        if (typeof block.name !== "string" || block.name === "") throw new Error(`Pi tool call ${block.id} is missing its name`);
-        if (block.name.length > MAX_TEXT_LENGTH) throw new Error(`Pi tool call ${block.id} name exceeds the supported length limit`);
-        if (actionsByToolCallId.has(block.id)) throw new Error(`duplicate Pi tool call id: ${block.id}`);
-
-        const digest = argumentDigest(block.arguments);
-        if (digest === UNOBSERVED) {
-          redactionCounts.set("unavailable_arguments", (redactionCounts.get("unavailable_arguments") ?? 0) + 1);
-        } else {
-          redactionCounts.set("tool_arguments", (redactionCounts.get("tool_arguments") ?? 0) + 1);
+        if (typeof block.id !== "string" || block.id === "") {
+          return yield* projectionError(
+            "invalid_action",
+            "Pi tool call is missing its id",
+          );
         }
-        const callTimestampMs = timestampMilliseconds(message.timestamp) ?? timestampMilliseconds(entry.timestamp);
+        if (typeof block.name !== "string" || block.name === "") {
+          return yield* projectionError(
+            "invalid_action",
+            `Pi tool call ${block.id} is missing its name`,
+          );
+        }
+        if (block.name.length > MAX_TEXT_LENGTH) {
+          return yield* projectionError(
+            "invalid_action",
+            `Pi tool call ${block.id} name exceeds the supported length limit`,
+          );
+        }
+        if (actionsByToolCallId.has(block.id)) {
+          return yield* projectionError(
+            "invalid_action",
+            `duplicate Pi tool call id: ${block.id}`,
+          );
+        }
+
+        const digest = yield* argumentDigest(block.arguments);
+        incrementArgumentRedaction(redactionCounts, digest);
+        const callTimestampMs = timestampMilliseconds(message.timestamp) ??
+          timestampMilliseconds(entry.timestamp);
         const action: PendingAction = {
           toolCallId: block.id,
           callTimestampMs,
           event: {
-            timestamp: normalizedTimestamp(message.timestamp, entry.timestamp),
+            timestamp: normalizedTimestamp(
+              message.timestamp,
+              entry.timestamp,
+            ),
             actor,
             event_type: "tool_call",
             tool_name: block.name,
@@ -247,44 +486,42 @@ export function projectPiSession(
           },
         };
         actions.push(action);
-        if (actions.length > MAX_EVENTS) throw new Error("Pi session exceeds the supported action limit");
+        yield* ensureActionLimit(actions.length);
         actionsByToolCallId.set(block.id, action);
       }
       continue;
     }
 
-    if (message.role !== "toolResult" || typeof message.toolCallId !== "string") continue;
+    if (
+      message.role !== "toolResult" ||
+      typeof message.toolCallId !== "string"
+    ) continue;
     const action = actionsByToolCallId.get(message.toolCallId);
     if (action === undefined) continue;
-    if (typeof message.toolName === "string" && message.toolName !== action.event.tool_name) {
-      throw new Error(`Pi tool result name does not match call ${message.toolCallId}`);
+    if (
+      typeof message.toolName === "string" &&
+      message.toolName !== action.event.tool_name
+    ) {
+      return yield* projectionError(
+        "result_mismatch",
+        `Pi tool result name does not match call ${message.toolCallId}`,
+      );
     }
     if (message.isError === true) action.event.result_class = "error";
     else if (message.isError === false) action.event.result_class = "success";
 
-    const resultTimestampMs = timestampMilliseconds(message.timestamp) ?? timestampMilliseconds(entry.timestamp);
-    if (action.callTimestampMs !== undefined && resultTimestampMs !== undefined && resultTimestampMs >= action.callTimestampMs) {
+    const resultTimestampMs = timestampMilliseconds(message.timestamp) ??
+      timestampMilliseconds(entry.timestamp);
+    if (
+      action.callTimestampMs !== undefined &&
+      resultTimestampMs !== undefined &&
+      resultTimestampMs >= action.callTimestampMs
+    ) {
       action.event.duration_ms = resultTimestampMs - action.callTimestampMs;
     }
   }
 
-  const previousBySignature = new Map<string, { latestFailure?: number; hasUnobserved: boolean }>();
-  for (const [index, action] of actions.entries()) {
-    const digest = action.event.arguments_digest;
-    if (digest === UNOBSERVED) {
-      action.event.retry_of = UNOBSERVED;
-      continue;
-    }
-    const signature = `${action.event.event_type}\u0000${action.event.tool_name}\u0000${digest}`;
-    const previous = previousBySignature.get(signature);
-    if (previous?.latestFailure !== undefined) action.event.retry_of = previous.latestFailure;
-    else if (previous?.hasUnobserved === true) action.event.retry_of = UNOBSERVED;
-    previousBySignature.set(signature, {
-      latestFailure: action.event.result_class === "error" ? index + 1 : previous?.latestFailure,
-      hasUnobserved: action.event.result_class === UNOBSERVED || previous?.hasUnobserved === true,
-    });
-  }
-
+  annotateRetries(actions);
   const redactionMethods: Record<string, string> = {
     full_prompts: "omitted",
     raw_reasoning: "omitted",
@@ -300,40 +537,159 @@ export function projectPiSession(
     unavailable_arguments: "marked unobserved",
     tool_results: "classified from native Pi result state, then omitted",
   };
+  const redactions = [...redactionCounts.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([kind, count]) => ({
+      kind,
+      count,
+      method: redactionMethods[kind] ?? "omitted",
+    }));
 
   return {
     schema_version: SCHEMA_VERSION,
     harness: "pi",
     events: actions.map(({ event }) => event),
-    redactions: [...redactionCounts.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([kind, count]) => ({ kind, count, method: redactionMethods[kind]! })),
-  };
+    redactions,
+  } satisfies PiActionTrajectory;
+});
+
+function incrementArgumentRedaction(
+  counts: Map<string, number>,
+  digest: string | typeof UNOBSERVED,
+): void {
+  const kind = digest === UNOBSERVED
+    ? "unavailable_arguments"
+    : "tool_arguments";
+  counts.set(kind, (counts.get(kind) ?? 0) + 1);
 }
 
-function usage(): never {
-  throw new Error("usage: bun benchmarks/profiles/agentos/pi-session-adapter.ts <session.jsonl> --actor <actor> --accepted-work-reference <reference>");
+const ensureActionLimit = Effect.fn("agentos.benchmark.pi.actionLimit")(
+  function*(length: number) {
+    if (length > MAX_EVENTS) {
+      return yield* projectionError(
+        "session_limit",
+        "Pi session exceeds the supported action limit",
+      );
+    }
+  },
+);
+
+function annotateRetries(actions: ReadonlyArray<PendingAction>): void {
+  const previousBySignature = new Map<
+    string,
+    { latestFailure?: number; hasUnobserved: boolean }
+  >();
+  for (const [index, action] of actions.entries()) {
+    const digest = action.event.arguments_digest;
+    if (digest === UNOBSERVED) {
+      action.event.retry_of = UNOBSERVED;
+      continue;
+    }
+    const signature = [
+      action.event.event_type,
+      action.event.tool_name,
+      digest,
+    ].join("\u0000");
+    const previous = previousBySignature.get(signature);
+    if (previous?.latestFailure !== undefined) {
+      action.event.retry_of = previous.latestFailure;
+    } else if (previous?.hasUnobserved === true) {
+      action.event.retry_of = UNOBSERVED;
+    }
+    previousBySignature.set(signature, {
+      latestFailure: action.event.result_class === "error"
+        ? index + 1
+        : previous?.latestFailure,
+      hasUnobserved: action.event.result_class === UNOBSERVED ||
+        previous?.hasUnobserved === true,
+    });
+  }
 }
 
-function optionValue(args: string[], name: string): string | undefined {
+function optionValue(
+  args: ReadonlyArray<string>,
+  name: string,
+): string | undefined {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : undefined;
 }
 
-if (import.meta.main) {
-  try {
-    const args = Bun.argv.slice(2);
-    const sessionPath = args[0];
-    const actor = optionValue(args, "--actor");
-    const acceptedWorkReference = optionValue(args, "--accepted-work-reference");
-    if (sessionPath === undefined || actor === undefined || acceptedWorkReference === undefined) usage();
-    if ((await stat(sessionPath)).size > MAX_SESSION_CHARACTERS) {
-      throw new Error("Pi session exceeds the supported size limit");
-    }
-    const content = await readFile(sessionPath, "utf8");
-    console.log(JSON.stringify(projectPiSession(content, actor, acceptedWorkReference), null, 2));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+export const runPiSessionAdapter = Effect.gen(function*() {
+  const fileSystem = yield* FileSystem.FileSystem;
+  const stdio = yield* Stdio.Stdio;
+  const args = yield* stdio.args;
+  const sessionPath = args[0];
+  const actor = optionValue(args, "--actor");
+  const acceptedWorkReference = optionValue(
+    args,
+    "--accepted-work-reference",
+  );
+  if (
+    sessionPath === undefined ||
+    actor === undefined ||
+    acceptedWorkReference === undefined
+  ) {
+    return yield* projectionError(
+      "usage",
+      "usage: bun benchmarks/profiles/agentos/pi-session-adapter.ts <session.jsonl> --actor <actor> --accepted-work-reference <reference>",
+    );
   }
+
+  const info = yield* fileSystem.stat(sessionPath).pipe(
+    Effect.mapError((cause) =>
+      projectionError("filesystem", "Could not inspect Pi session", { cause })
+    ),
+  );
+  if (info.size > MAX_SESSION_CHARACTERS) {
+    return yield* projectionError(
+      "session_limit",
+      "Pi session exceeds the supported size limit",
+    );
+  }
+  const content = yield* fileSystem.readFileString(sessionPath).pipe(
+    Effect.mapError((cause) =>
+      projectionError("filesystem", "Could not read Pi session", { cause })
+    ),
+  );
+  const trajectory = yield* projectPiSession(
+    content,
+    actor,
+    acceptedWorkReference,
+  );
+  const encoded = yield* Schema.encodeEffect(
+    Schema.fromJsonString(PiActionTrajectorySchema),
+  )(trajectory).pipe(
+    Effect.mapError((cause) =>
+      projectionError("encoding", "Could not encode Pi trajectory", {
+        cause,
+      })
+    ),
+  );
+  yield* Stream.make(`${encoded}\n`).pipe(
+    Stream.run(stdio.stdout()),
+    Effect.mapError((cause) =>
+      projectionError("filesystem", "Could not write Pi trajectory", {
+        cause,
+      })
+    ),
+  );
+});
+
+const reportFailure = (error: PiSessionProjectionError) =>
+  Effect.gen(function*() {
+    const stdio = yield* Stdio.Stdio;
+    yield* Stream.make(`${error.message}\n`).pipe(
+      Stream.run(stdio.stderr()),
+      Effect.ignore,
+    );
+  });
+
+if (import.meta.main) {
+  BunRuntime.runMain(
+    runPiSessionAdapter.pipe(
+      Effect.tapError(reportFailure),
+      Effect.provide(BunServices.layer),
+    ),
+    { disableErrorReporting: true },
+  );
 }

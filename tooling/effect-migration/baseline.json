@@ -2,114 +2,6 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "path": "benchmarks/profiles/agentos/pi-session-adapter.ts",
-      "slice": "benchmarks",
-      "issue": 97,
-      "violationCount": 30,
-      "digest": "df8b67cac81d318b278c43609ab1f2508e40ad1d7b11fea436a4818e2ecfc1d0",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/profiles/agentos/pi-session-adapter.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/run.ts",
-      "slice": "benchmarks",
-      "issue": 97,
-      "violationCount": 3,
-      "digest": "0fbbb82881452dcb9323d10c714049ccce315806e06e7dda5c822d64931d30fb",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/run.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/runner.ts",
-      "slice": "benchmarks",
-      "issue": 97,
-      "violationCount": 63,
-      "digest": "405fd020f0e7a27fa217c4b7f720b31d054eb6c3626c50edd16b5f2b6204defd",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/runner.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/tests/contracts.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 27,
-      "digest": "4605b2e559d74769d5da26f0ba457895899cdeb5661952d048b74eb1dc44df43",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/tests/contracts.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/tests/pi-session-adapter.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 7,
-      "digest": "d08a007ed33ff47be85145067e5d0c75e8517214f3a98cc751761af264997c6a",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/tests/pi-session-adapter.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/tests/runner.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 22,
-      "digest": "a88550329a8c7b615a1ea1b6a26809ad1ed820693a8153ae0fb2c9d2babc8a61",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/tests/runner.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/validate.ts",
-      "slice": "benchmarks",
-      "issue": 97,
-      "violationCount": 23,
-      "digest": "ba0cd0dc9d9d1ec533b2c30f1cd710263e02635db5caca88e10b5a8614989941",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/validate.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "clis/github-app-token/github-app-token.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 32,
-      "digest": "50c394d0ea0e24d72ceccf5b8a2f7e1c63f0d75b7f157d122093645c26697a33",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/github-app-token/github-app-token.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "clis/github-app-token/tests/github-app-token.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 18,
-      "digest": "75adb30c51af09b5a5874ac797a4e4574de1b61b0af5f9d1ffc260f3021201b8",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/github-app-token/tests/github-app-token.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "clis/pg-listen/pg-listen.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 12,
-      "digest": "8535048a6f5d9ac9152375686c56d3dd271e3d64cce08a929b32ac0587db0a0a",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/pg-listen/pg-listen.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "clis/pg-listen/tests/pg-listen.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 48,
-      "digest": "a255e0aa969c5a33e6e795b026e26cdd21331b52dd209b26966d57114fba1268",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/pg-listen/tests/pg-listen.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "database/drizzle.config.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 2,
-      "digest": "309af5ae7092d2c4fdc006150210b0eda3c75be4923d7466d3ff40665595506c",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/drizzle.config.ts under issue #97; never refresh touched debt."
-    },
-    {
       "path": "database/kubernetes/cloudnative-pg/tests/manifest.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -117,24 +9,6 @@
       "digest": "f03d66e3199c0a85a0516f5c0bc0999d1a3c621a839836f8f7f2475777d08446",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/kubernetes/cloudnative-pg/tests/manifest.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "database/runtime/database-credentials.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 16,
-      "digest": "6d61027cf909489ceee0766cdafd83b1d083a11371a1e9f990612d96630c4b65",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/runtime/database-credentials.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "database/runtime/prepare.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 10,
-      "digest": "2d8d3716a97ee6e83c84962eee833219884fa8b72ad5a1740379e7253d7f0f8b",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/runtime/prepare.ts under issue #97; never refresh touched debt."
     },
     {
       "path": "database/tests/access-control-plane.test.ts",
@@ -198,15 +72,6 @@
       "digest": "6db66b992be261d3231d6db269b20232c6e5421eaa5cd137977d7be978f43cbf",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/current-mate-bearings.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "database/tests/database-credentials.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 11,
-      "digest": "4f6979da035c1986fdca46c6c60891558cbab6f307f0b7442f9b2f5334f35250",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/database-credentials.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "database/tests/fleet-initialization.test.ts",
@@ -308,15 +173,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/runtime-operation-journal.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/runtime.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 12,
-      "digest": "5e50ee082e790843dcd1984d8d909274e2336e2b6c5011e2176a7c61798156c4",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/runtime.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/tests/targeted-notifications.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -333,15 +189,6 @@
       "digest": "7ea33450bd8338a2af0c2fb24e6ecbdcefb0e8b1ab7dd89e87c5671d44d45372",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in mise.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/build.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 2,
-      "digest": "2b7f1700b6fa13d8c34c81d3872ce201513b9a62853ed5d691c2163a3e3d3f98",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/build.ts under issue #97; never refresh touched debt."
     },
     {
       "path": "packages/agentos/resources/crewmates/default/kubernetes/tests/manifest.test.ts",
@@ -605,24 +452,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/startup.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "release/kubernetes/render.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 14,
-      "digest": "f468b100011ecf68aa7eeb217e1e47fe1641190124afade6b88742138aef3b8e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in release/kubernetes/render.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "release/kubernetes/tests/release.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 7,
-      "digest": "05abbeffda10c8e7c45044c57ca7fe31ff9c0e7a9c3ec80803653a7b942a723f",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in release/kubernetes/tests/release.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/agentgateway/tests/conformance.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -630,15 +459,6 @@
       "digest": "41f30abaa301899a7f92b9edd1bbe5e1e65fcfa93afe12e52a1fd1a5b9a8c054",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/agentgateway/tests/conformance.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "services/openfga/scripts/generate-model.ts",
-      "slice": "openfga-generated-tooling",
-      "issue": 97,
-      "violationCount": 2,
-      "digest": "9b4bbafa971dcabe78316840f59dc8784d7e35ecd9ec5cd06f80502b79922ec7",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/scripts/generate-model.ts under issue #97; never refresh touched debt."
     },
     {
       "path": "services/openfga/tests/live-model-conformance.ts",

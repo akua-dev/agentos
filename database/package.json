@@ -5,13 +5,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "migration:new": "drizzle-kit generate --custom --dialect=postgresql --schema=./drizzle.tooling.ts --out=./migrations",
-    "migration:check": "drizzle-kit check --config=drizzle.config.ts",
-    "migrate": "drizzle-kit migrate --config=drizzle.config.ts"
+    "migration:new": "bun runtime/drizzle.ts generate --custom --dialect=postgresql --schema=./drizzle.tooling.ts --out=./migrations",
+    "migration:check": "bun runtime/drizzle.ts check --config=drizzle.config.ts",
+    "migrate": "bun runtime/drizzle.ts migrate --config=drizzle.config.ts"
   },
   "dependencies": {
+    "@effect/platform-bun": "4.0.0-beta.102",
     "drizzle-kit": "0.31.10",
     "drizzle-orm": "0.45.2",
+    "effect": "4.0.0-beta.102",
     "pg": "8.22.0"
   },
   "devDependencies": {
