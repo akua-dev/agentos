@@ -524,6 +524,27 @@ export {
   type HarnessProviderV1,
 } from "./harness-control/acp.ts";
 export {
+  A2aAgentCardInputV1,
+  A2aContractError,
+  A2aDeliveryInputV1,
+  A2aHierarchyRouteInputV1,
+  A2aOutageRecoveryInputV1,
+  A2aOutageV1Schema,
+  A2aRetryInputV1,
+  A2aSpeechActV1Schema,
+  A2aTransportResultInputV1,
+  A2aTransportStatusV1Schema,
+  compileA2aAgentCard,
+  compileA2aDeliveryRequest,
+  evaluateA2aHierarchyRoute,
+  evaluateA2aOutageRecovery,
+  interpretA2aTransportResult,
+  planA2aRetry,
+  type A2aOutageV1,
+  type A2aSpeechActV1,
+  type A2aTransportStatusV1,
+} from "./protocol/a2a.ts";
+export {
   CompiledSecondMateTopologyPlanV1Schema,
   ExistingSecondMateTopologyDestinationV1,
   NewSecondMateTopologyDestinationV1,
