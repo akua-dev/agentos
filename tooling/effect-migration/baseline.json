@@ -128,15 +128,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/fixtures/replacement-package/registration.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/instructions.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 5,
-      "digest": "e65d3e319dc5c20ce0ca2f8ea61f8abdb4133c71abf42e1cbbf1d6d8f9331a62",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/instructions.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/tests/lifecycle.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -146,15 +137,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/lifecycle.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/load-effects.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 10,
-      "digest": "b0b24c5e1c914cb7ca5828355aa8b69779a0db32263c47b06e0f32b59d09f8a2",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/load-effects.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/tests/preflight.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -162,15 +144,6 @@
       "digest": "bd230118cf281b269fe10b3989b421bc1055ce2266167fc1c51d14bf876f30c5",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/preflight.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/tests/resources.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 5,
-      "digest": "f288dcb8f9abc862976c36a896d646dea4b7554a25274cb8ecf27784febb2d47",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/resources.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/tests/runtime-behaviors.test.ts",
