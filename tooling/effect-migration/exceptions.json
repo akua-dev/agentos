@@ -93,7 +93,7 @@
       "maximumOccurrences": 1,
       "reason": "The capacity classifier executable needs one reviewed Bun process entry boundary around its typed stdin and schema program.",
       "ownerIssue": 104,
-      "test": "packages/agentos/runtime/tests/capacity-preflight.test.ts",
+      "test": "packages/agentos/runtime/tests/capacity-preflight.effect.test.ts",
       "removalCondition": "Retain only while capacity preflight remains a standalone Bun executable.",
       "expiresOn": null
     },
