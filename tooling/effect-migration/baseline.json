@@ -45,24 +45,6 @@
       "digest": "41f30abaa301899a7f92b9edd1bbe5e1e65fcfa93afe12e52a1fd1a5b9a8c054",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/agentgateway/tests/conformance.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "services/otel-collector/tests/e2e.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 19,
-      "digest": "791cefd6022930513fa221b2759e66c25cb92af35c75534d5b91b7412ba3b1b8",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/tests/e2e.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "services/otel-collector/tests/otlp-sink.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 1,
-      "digest": "5e98a1a9b8e44468e1d7eaf220ec9a6dcfd3a7ebdca145dd1fc07f1e0545ba2b",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/tests/otlp-sink.ts under issue #102; never refresh touched debt."
     }
   ]
 }
