@@ -29,15 +29,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/current-mate-bearings.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/runtime-authorization.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 21,
-      "digest": "ceb2430742a04b1d0ecfdad860caa0fcdcf672ec6a0c6d14fe099902043c877b",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/runtime-authorization.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/tests/runtime-operation-journal.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
