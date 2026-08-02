@@ -20,15 +20,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/roles/secondmate/kubernetes/tests/domain-lifecycle.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/resources/roles/secondmate/kubernetes/tests/manifest.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 13,
-      "digest": "346bb77498d0d67ec5285841538da5c197e3157b50b1572382d6f908b3a2d145",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/roles/secondmate/kubernetes/tests/manifest.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/kubernetes/tests/observability-manifests.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
