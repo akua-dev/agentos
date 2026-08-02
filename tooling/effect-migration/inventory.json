@@ -706,6 +706,16 @@
       "status": "runtime-boundary"
     },
     {
+      "id": "github-app-token-entrypoint",
+      "issue": 97,
+      "pattern": "^clis/github-app-token/github-app-token\\.ts$",
+      "runtime": "bun-github-http-entrypoint",
+      "package": "@agentos/github-app-token",
+      "io": ["clock", "config", "crypto", "filesystem", "http", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "benchmarks",
       "issue": 97,
       "pattern": "^benchmarks/",

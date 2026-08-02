@@ -2,24 +2,6 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "path": "clis/github-app-token/github-app-token.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 32,
-      "digest": "50c394d0ea0e24d72ceccf5b8a2f7e1c63f0d75b7f157d122093645c26697a33",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/github-app-token/github-app-token.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "clis/github-app-token/tests/github-app-token.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 18,
-      "digest": "75adb30c51af09b5a5874ac797a4e4574de1b61b0af5f9d1ffc260f3021201b8",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in clis/github-app-token/tests/github-app-token.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "clis/pg-listen/pg-listen.ts",
       "slice": "database-and-clis",
       "issue": 97,

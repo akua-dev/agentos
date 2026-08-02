@@ -63,6 +63,18 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "clis/github-app-token/github-app-token.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The GitHub App token CLI enters one Effect runtime around typed config, RSA signer service, HTTP, scope schemas, private filesystem publication, and standard I/O.",
+      "ownerIssue": 97,
+      "test": "clis/github-app-token/tests/github-app-token.effect.test.ts",
+      "removalCondition": "Retain only while GitHub App token minting remains a standalone CLI.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "database/drizzle.config.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
