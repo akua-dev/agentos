@@ -56,15 +56,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/workloads/tests/compiler-kustomize.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/ai-gateway-skill.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 4,
-      "digest": "5f2582fba424ca6aef5d13c2d8a8f86eb72e21d3d4a588238216802e15ca9ed7",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/ai-gateway-skill.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/tests/artifact.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -164,15 +155,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/load-effects.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/manifest.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 4,
-      "digest": "0e7cb05c9ddd6b1336dc567560c4299e23077a7eeb0bee83d88b652e5a265912",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/manifest.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/tests/preflight.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -180,15 +162,6 @@
       "digest": "bd230118cf281b269fe10b3989b421bc1055ce2266167fc1c51d14bf876f30c5",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/preflight.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/tests/public-api.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 4,
-      "digest": "8854319e88da590424958004fd7e8c25135a1ac787a4312c83d1f8090a2e8fc0",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/public-api.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/tests/resources.test.ts",
