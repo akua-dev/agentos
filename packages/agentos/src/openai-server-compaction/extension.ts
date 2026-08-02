@@ -53,10 +53,8 @@ import {
   resolvePiWorkloadIdentity,
   type PiWorkloadIdentityOptions,
 } from "../access/pi-workload-identity.ts";
-import {
-  legacyEnvironmentConfigLayer,
-  runPromiseLegacy,
-} from "../shared/legacy.ts";
+import { environmentConfigLayer } from "../shared/platform.ts";
+import { runAgentOSPiProgram } from "../pi-host-adapter.ts";
 import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
 import {
   agentOSRouteForModel,
@@ -721,20 +719,23 @@ function handleProviderRequest(
 function runExtensionEffect<A, E>(
   effect: Effect.Effect<A, E, FileSystem.FileSystem>,
 ) {
-  return runPromiseLegacy(
+  return runAgentOSPiProgram(
     effect.pipe(
       Effect.provide(Layer.merge(
         compactionPlatformLayer,
-        legacyEnvironmentConfigLayer(),
+        environmentConfigLayer(),
       )),
     ),
   );
 }
 
-export function createOpenAIServerCompactionExtension(
+export const registerOpenAIServerCompactionEffect = Effect.fn(
+  "agentos.compaction.registerPiExtension",
+)(function*(
+  pi: ExtensionAPI,
   dependencies: OpenAIServerCompactionDependencies = defaults,
 ) {
-  return (pi: ExtensionAPI) => {
+  yield* Effect.sync(() => {
     const requestShapes = new Map<string, ProviderRequestShape>();
     const clearRequestShapes = () =>
       runExtensionEffect(Effect.sync(() => requestShapes.clear()));
@@ -756,7 +757,16 @@ export function createOpenAIServerCompactionExtension(
     pi.on("session_compact", clearRequestShapes);
     pi.on("model_select", clearRequestShapes);
     pi.on("session_shutdown", clearRequestShapes);
-  };
+  });
+});
+
+export function createOpenAIServerCompactionExtension(
+  dependencies: OpenAIServerCompactionDependencies = defaults,
+) {
+  return (pi: ExtensionAPI) =>
+    runAgentOSPiProgram(
+      registerOpenAIServerCompactionEffect(pi, dependencies),
+    );
 }
 
 export { NATIVE_DETAILS_KEY };

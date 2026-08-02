@@ -1,8 +1,6 @@
-import {
-  loadPackagedRoleSetup,
-  type DefaultRoleSetupV1,
-} from "./default.ts";
+import { loadPackagedRoleSetupEffect } from "./default.ts";
 
-export function loadFirstMateSetup(): Promise<DefaultRoleSetupV1> {
-  return loadPackagedRoleSetup("first_mate", "firstmate");
-}
+export const loadFirstMateSetupEffect = loadPackagedRoleSetupEffect(
+  "first_mate",
+  "firstmate",
+);

@@ -12,10 +12,12 @@ export const replacementRegistration: AgentOSRegistrationV1 = {
     commands: ["example-ecosystem-status"],
   },
   register(pi) {
-    pi.registerCommand("example-ecosystem-status", {
-      description: "Inspect the replacement example",
-      handler: defineAgentOSPiCommandHandler((_arguments, context) =>
-        Effect.sync(() => context.ui.notify("replacement example active", "info"))),
+    return Effect.sync(() => {
+      pi.registerCommand("example-ecosystem-status", {
+        description: "Inspect the replacement example",
+        handler: defineAgentOSPiCommandHandler((_arguments, context) =>
+          Effect.sync(() => context.ui.notify("replacement example active", "info"))),
+      });
     });
   },
 };

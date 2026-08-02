@@ -1,4 +1,5 @@
 import type { AgentOSRegistrationV1 } from "../src/preflight.ts";
+import { Effect } from "effect";
 import type {
   DefaultAgentOSRole,
   DefaultRoleSetupV1,
@@ -13,7 +14,7 @@ export function roleSetupFixture(
     id: `@example/${role}:runtime`,
     names: { version: 1, commands: [`example-${role}`] },
     register(pi) {
-      pi.on("session_start", () => undefined);
+      return Effect.sync(() => pi.on("session_start", () => undefined));
     },
   };
   return {

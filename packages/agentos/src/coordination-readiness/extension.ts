@@ -22,11 +22,8 @@ import {
   invalidateCoordinationReadiness,
   writeCoordinationReadiness,
 } from "../readiness-state.ts";
-import {
-  legacyEnvironmentConfigLayer,
-  runPromiseLegacy,
-  runSyncLegacy,
-} from "../shared/legacy.ts";
+import { environmentConfigLayer } from "../shared/platform.ts";
+import { runAgentOSPiProgram } from "../pi-host-adapter.ts";
 
 const ListenerTaskParameters = Type.Object({
   listener_task_id: Type.String({ minLength: 1 }),
@@ -105,12 +102,13 @@ export type CoordinationReadinessRuntime = {
   readonly shutdown: Effect.Effect<void>;
 };
 
-export function registerCoordinationReadiness(
+export const registerCoordinationReadinessEffect = Effect.fn(
+  "agentos.coordinationReadiness.register",
+)(function*(
   pi: ExtensionAPI,
   options: CoordinationReadinessOptions,
 ) {
-  return runSyncLegacy(
-    Effect.gen(function*() {
+  return yield* Effect.gen(function*() {
       const configured = yield* CoordinationConfig;
       const paths = yield* Path.Path;
       const home = Option.getOrUndefined(configured.home);
@@ -131,9 +129,15 @@ export function registerCoordinationReadiness(
       return runtime;
     }).pipe(
       Effect.provide(BunServices.layer),
-      Effect.provide(legacyEnvironmentConfigLayer()),
-    ),
+      Effect.provide(environmentConfigLayer()),
   );
+});
+
+export function registerCoordinationReadiness(
+  pi: ExtensionAPI,
+  options: CoordinationReadinessOptions,
+) {
+  return runAgentOSPiProgram(registerCoordinationReadinessEffect(pi, options));
 }
 
 export const makeCoordinationReadiness = Effect.fn(
@@ -297,7 +301,7 @@ function registerPiCoordinationReadiness(
     ],
     parameters: ListenerTaskParameters,
     execute(_toolCallId, params) {
-      return runPromiseLegacy(runtime.attest(params));
+      return runAgentOSPiProgram(runtime.attest(params));
     },
   });
   pi.registerTool({
@@ -311,10 +315,10 @@ function registerPiCoordinationReadiness(
     ],
     parameters: ListenerTaskParameters,
     execute(_toolCallId, params) {
-      return runPromiseLegacy(runtime.confirmCatchup(params));
+      return runAgentOSPiProgram(runtime.confirmCatchup(params));
     },
   });
-  pi.on("session_shutdown", () => runPromiseLegacy(runtime.shutdown));
+  pi.on("session_shutdown", () => runAgentOSPiProgram(runtime.shutdown));
 }
 
 const verifiedListener = Effect.fn(

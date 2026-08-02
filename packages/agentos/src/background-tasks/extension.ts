@@ -33,11 +33,8 @@ import {
   type TaskSnapshot,
   type TaskState,
 } from "./types.ts";
-import {
-  legacyEnvironmentConfigLayer,
-  runPromiseLegacy,
-  runSyncLegacy,
-} from "../shared/legacy.ts";
+import { environmentConfigLayer } from "../shared/platform.ts";
+import { runAgentOSPiProgram } from "../pi-host-adapter.ts";
 
 const MESSAGE_TYPE = "agentos-background-command-completion";
 
@@ -185,19 +182,28 @@ const BackgroundTasksConfig = Config.all({
   home: Config.option(Config.string("HOME")),
 });
 
-export function registerAgentosBackgroundTasks(
+export const registerAgentosBackgroundTasksEffect = Effect.fn(
+  "agentos.backgroundTasks.extension.register",
+)(function*(
   pi: ExtensionAPI,
   options: AgentOSBackgroundTasksOptions = {},
 ) {
-  return runSyncLegacy(
-    Effect.gen(function*() {
+  return yield* Effect.gen(function*() {
       const runtime = yield* makeAgentosBackgroundTasks(piHost(pi), options);
       registerPiBackgroundTasks(pi, runtime);
       return runtime.broker;
     }).pipe(
       Effect.provide(BunServices.layer),
-      Effect.provide(legacyEnvironmentConfigLayer()),
-    ),
+      Effect.provide(environmentConfigLayer()),
+  );
+});
+
+export function registerAgentosBackgroundTasks(
+  pi: ExtensionAPI,
+  options: AgentOSBackgroundTasksOptions = {},
+) {
+  return runAgentOSPiProgram(
+    registerAgentosBackgroundTasksEffect(pi, options),
   );
 }
 
@@ -426,7 +432,7 @@ function registerPiBackgroundTasks(
     ],
     parameters: RunBackgroundCommandParameters,
     execute(_toolCallId, params) {
-      return runPromiseLegacy(runtime.run(params));
+      return runAgentOSPiProgram(runtime.run(params));
     },
   });
   pi.registerTool({
@@ -436,7 +442,7 @@ function registerPiBackgroundTasks(
       "Get status and bounded output from one background command, optionally waiting for completion.",
     parameters: GetBackgroundCommandOutputParameters,
     execute(_toolCallId, params) {
-      return runPromiseLegacy(runtime.output(params));
+      return runAgentOSPiProgram(runtime.output(params));
     },
   });
   pi.registerTool({
@@ -446,7 +452,7 @@ function registerPiBackgroundTasks(
       "List background commands without output. Defaults to every running command; select a terminal state with a bounded page and optional older-page cursor.",
     parameters: ListBackgroundCommandsParameters,
     execute(_toolCallId, params) {
-      return runPromiseLegacy(runtime.list(params));
+      return runAgentOSPiProgram(runtime.list(params));
     },
   });
   pi.registerTool({
@@ -456,13 +462,13 @@ function registerPiBackgroundTasks(
       "Stop one owned background command. The explicit kill response consumes its completion notification.",
     parameters: KillBackgroundCommandParameters,
     execute(_toolCallId, params) {
-      return runPromiseLegacy(runtime.kill(params));
+      return runAgentOSPiProgram(runtime.kill(params));
     },
   });
   pi.registerCommand("background-commands", {
     description: "List AgentOS background commands",
     handler(_arguments, context) {
-      return runPromiseLegacy(runtime.listRunning.pipe(
+      return runAgentOSPiProgram(runtime.listRunning.pipe(
         Effect.flatMap((message) =>
           piOperation("notify background command list", () =>
             context.ui.notify(message, "info"))
@@ -471,14 +477,14 @@ function registerPiBackgroundTasks(
     },
   });
   pi.on("session_start", (_event, context) =>
-    runPromiseLegacy(
+    runAgentOSPiProgram(
       piOperation(
         "read session branch",
         () => context.sessionManager.getBranch(),
       ).pipe(Effect.flatMap(runtime.sessionStart)),
     ));
-  pi.on("session_tree", () => runPromiseLegacy(runtime.sessionTree));
-  pi.on("session_shutdown", () => runPromiseLegacy(runtime.shutdown));
+  pi.on("session_tree", () => runAgentOSPiProgram(runtime.sessionTree));
+  pi.on("session_shutdown", () => runAgentOSPiProgram(runtime.shutdown));
 }
 
 export default registerAgentosBackgroundTasks;

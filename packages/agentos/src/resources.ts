@@ -1,4 +1,3 @@
-import * as BunPath from "@effect/platform-bun/BunPath";
 import {
   loadSkills,
   type ExtensionAPI,
@@ -15,7 +14,6 @@ import {
   decodeOrValidationError,
   makeValidationError,
 } from "./shared/errors.ts";
-import { runPromiseLegacy, runSyncLegacy } from "./shared/legacy.ts";
 
 export type {
   AgentOSResourceInputV1,
@@ -115,31 +113,6 @@ export const registerAgentOSResourcesEffect = Effect.fn(
     pi.on("resources_discover", () => result);
   });
 });
-
-export function discoverAgentOSSkillNames(
-  paths: readonly string[],
-): Promise<string[]> {
-  return runPromiseLegacy(
-    discoverAgentOSSkillNamesEffect(paths, process.cwd()).pipe(
-      Effect.provide(BunPath.layer),
-    ),
-  );
-}
-
-export function resolveAgentOSResources(
-  input: AgentOSResourceInputV1,
-): AgentOSResourcesV1 {
-  return runSyncLegacy(
-    resolveAgentOSResourcesEffect(input).pipe(Effect.provide(BunPath.layer)),
-  );
-}
-
-export function registerAgentOSResources(
-  pi: ExtensionAPI,
-  resources: AgentOSResourcesV1,
-): void {
-  runSyncLegacy(registerAgentOSResourcesEffect(pi, resources));
-}
 
 const resolveContainedPathsEffect = Effect.fn(
   "agentos.resources.resolveContainedPaths",

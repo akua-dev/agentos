@@ -200,7 +200,7 @@ describe("AgentOS shared Effect foundation", () => {
         version: 1,
         id,
         names: { version: 1, tools: ["shared-tool"] },
-        register() {},
+        register: () => Effect.void,
       });
       const error = yield* preflightAgentOSRegistrationsEffect([
         registration("@example/one"),
@@ -217,7 +217,7 @@ describe("AgentOS shared Effect foundation", () => {
       );
     }));
 
-  it.effect("registers mixed synchronous and asynchronous adapters in order", () =>
+  it.effect("registers Effect programs in order", () =>
     Effect.gen(function*() {
       const fake = yield* makePiTestHarness();
       const order: string[] = [];
@@ -227,7 +227,7 @@ describe("AgentOS shared Effect foundation", () => {
           id: "@example/first",
           names: { version: 1 },
           register() {
-            order.push("first");
+            return Effect.sync(() => order.push("first"));
           },
         },
         {
@@ -235,9 +235,7 @@ describe("AgentOS shared Effect foundation", () => {
           id: "@example/second",
           names: { version: 1 },
           register() {
-            return Promise.resolve().then(() => {
-              order.push("second");
-            });
+            return Effect.sync(() => order.push("second"));
           },
         },
         {
@@ -245,7 +243,7 @@ describe("AgentOS shared Effect foundation", () => {
           id: "@example/third",
           names: { version: 1 },
           register() {
-            order.push("third");
+            return Effect.sync(() => order.push("third"));
           },
         },
       ];
