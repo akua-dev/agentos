@@ -546,6 +546,16 @@
       "status": "migrated"
     },
     {
+      "id": "acp-harness-control-effect-tests",
+      "issue": 126,
+      "pattern": "^packages/agentos/src/harness-control/tests/.*\\.effect\\.test\\.ts$",
+      "runtime": "bun-herdr",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "schema"],
+      "migrationDependencies": [100, 101, 104],
+      "status": "migrated"
+    },
+    {
       "id": "effect-test-conformance",
       "issue": 102,
       "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",
@@ -663,6 +673,16 @@
       "package": "@akua-dev/agentos",
       "io": ["crypto", "schema"],
       "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
+      "id": "acp-harness-control-runtime",
+      "issue": 126,
+      "pattern": "^packages/agentos/src/harness-control/(?!tests/)",
+      "runtime": "shared-bun-herdr",
+      "package": "@akua-dev/agentos",
+      "io": ["schema"],
+      "migrationDependencies": [100, 101, 104],
       "status": "migrated"
     },
     {

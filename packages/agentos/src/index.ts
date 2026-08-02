@@ -502,6 +502,28 @@ export {
   type AgentOSDiagnosticInput,
 } from "./shared/services.ts";
 export {
+  AcpControlEventError,
+  AcpControlEventV1Schema,
+  CodexNativeSessionRefV1,
+  HarnessControlModeV1Schema,
+  HarnessControlPlanError,
+  HarnessControlPlanInputV1,
+  HarnessControlPlanV1Schema,
+  HarnessCorrelationV1,
+  HarnessNativeSessionRefV1Schema,
+  HarnessProviderV1Schema,
+  HarnessWriterV1,
+  PiNativeSessionRefV1,
+  compileHarnessControlPlan,
+  decodeAcpControlEvent,
+  decodeHarnessCorrelation,
+  type AcpControlEventV1,
+  type HarnessControlModeV1,
+  type HarnessControlPlanV1,
+  type HarnessNativeSessionRefV1,
+  type HarnessProviderV1,
+} from "./harness-control/acp.ts";
+export {
   CompiledSecondMateTopologyPlanV1Schema,
   ExistingSecondMateTopologyDestinationV1,
   NewSecondMateTopologyDestinationV1,
