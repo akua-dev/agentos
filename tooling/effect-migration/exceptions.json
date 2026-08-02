@@ -15,6 +15,30 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "benchmarks/run.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The benchmark runner CLI enters one Effect runtime around typed plan decoding, immutable freeze, collection, and evidence publication.",
+      "ownerIssue": 97,
+      "test": "benchmarks/tests/runner.effect.test.ts",
+      "removalCondition": "Retain only while portable benchmark execution remains a standalone CLI.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "benchmarks/validate.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The benchmark contract CLI enters one Effect runtime around typed filesystem input, schema decoding, semantic validation, and standard output.",
+      "ownerIssue": 97,
+      "test": "benchmarks/tests/contracts.effect.test.ts",
+      "removalCondition": "Retain only while contract validation remains a standalone CLI.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "database/drizzle.config.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",

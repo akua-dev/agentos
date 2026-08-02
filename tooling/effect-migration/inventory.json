@@ -686,6 +686,16 @@
       "status": "runtime-boundary"
     },
     {
+      "id": "benchmark-cli-entrypoints",
+      "issue": 97,
+      "pattern": "^benchmarks/(?:run|validate)\\.ts$",
+      "runtime": "bun-benchmark-entrypoint",
+      "package": "@agentos/root",
+      "io": ["crypto", "filesystem", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "benchmarks",
       "issue": 97,
       "pattern": "^benchmarks/",

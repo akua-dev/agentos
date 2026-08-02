@@ -2,51 +2,6 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "path": "benchmarks/run.ts",
-      "slice": "benchmarks",
-      "issue": 97,
-      "violationCount": 3,
-      "digest": "0fbbb82881452dcb9323d10c714049ccce315806e06e7dda5c822d64931d30fb",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/run.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/runner.ts",
-      "slice": "benchmarks",
-      "issue": 97,
-      "violationCount": 63,
-      "digest": "405fd020f0e7a27fa217c4b7f720b31d054eb6c3626c50edd16b5f2b6204defd",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/runner.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/tests/contracts.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 27,
-      "digest": "4605b2e559d74769d5da26f0ba457895899cdeb5661952d048b74eb1dc44df43",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/tests/contracts.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/tests/runner.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 22,
-      "digest": "a88550329a8c7b615a1ea1b6a26809ad1ed820693a8153ae0fb2c9d2babc8a61",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/tests/runner.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/validate.ts",
-      "slice": "benchmarks",
-      "issue": 97,
-      "violationCount": 23,
-      "digest": "ba0cd0dc9d9d1ec533b2c30f1cd710263e02635db5caca88e10b5a8614989941",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/validate.ts under issue #97; never refresh touched debt."
-    },
-    {
       "path": "clis/github-app-token/github-app-token.ts",
       "slice": "database-and-clis",
       "issue": 97,
