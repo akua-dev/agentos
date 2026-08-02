@@ -111,6 +111,7 @@ describe("canonical provider capabilities and Captain ceilings", () => {
         assert.deepStrictEqual(
           accessCapabilitiesV1.map(({ id }) => id),
           [
+            "agentos.a2a.send",
             "github.actions.dispatch",
             "github.actions.read",
             "github.contents.write",
@@ -138,6 +139,17 @@ describe("canonical provider capabilities and Captain ceilings", () => {
               capability.resourceKinds.length > 0 &&
               !capability.id.includes("*"),
           ),
+        );
+        assert.deepStrictEqual(
+          accessCapabilitiesV1.find(({ id }) => id === "agentos.a2a.send"),
+          {
+            id: "agentos.a2a.send",
+            provider: "agentos",
+            action: "a2a_send",
+            resourceKinds: ["agent_skill"],
+            registryAuthority: "captain-platform",
+            grantAuthority: "first-mate-within-ceiling",
+          },
         );
         assert.deepStrictEqual(
           accessCapabilitiesV1.find(({ id }) => id === "github.issue.write"),
@@ -205,6 +217,14 @@ describe("canonical provider capabilities and Captain ceilings", () => {
         assert.strictEqual(
           authorizationResourceName(decodedProfile.permissions[0]!.resource),
           "github:repository:akua-dev/agentos",
+        );
+        assert.strictEqual(
+          authorizationResourceName({
+            kind: "agent_skill",
+            targetAgentId: "22222222-2222-4222-8222-222222222222",
+            skillId: "repository.implementation@v1",
+          }),
+          "agent:22222222-2222-4222-8222-222222222222/skill:repository.implementation@v1",
         );
         assert.strictEqual(decodedCeiling.owner.authority, "captain-platform");
         assert.deepStrictEqual(

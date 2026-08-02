@@ -108,6 +108,7 @@ COPY clis/github-app-token/package.json clis/github-app-token/package.json
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
+COPY services/a2a/package.json services/a2a/package.json
 COPY services/agentgateway/package.json services/agentgateway/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
 COPY services/egress-authz/package.json services/egress-authz/package.json
@@ -127,6 +128,7 @@ RUN bun install \
       --filter @akua-dev/agentos \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
+      --filter @agentos/a2a \
       --filter @agentos/ai-gateway \
       --filter @agentos/egress-authz \
       --filter @agentos/github-broker \
@@ -143,6 +145,7 @@ COPY clis/github-app-token/package.json clis/github-app-token/package.json
 COPY clis/pg-listen/package.json clis/pg-listen/package.json
 COPY database/package.json database/package.json
 COPY packages/agentos/package.json packages/agentos/package.json
+COPY services/a2a/package.json services/a2a/package.json
 COPY services/agentgateway/package.json services/agentgateway/package.json
 COPY services/ai-gateway/package.json services/ai-gateway/package.json
 COPY services/egress-authz/package.json services/egress-authz/package.json
@@ -170,6 +173,9 @@ COPY --from=agentos-runtime-dependencies \
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/clis/pg-listen/node_modules/ \
   /opt/agentos/clis/pg-listen/node_modules/
+COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/services/a2a/node_modules/ \
+  /opt/agentos/services/a2a/node_modules/
 COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/ai-gateway/node_modules/ \
   /opt/agentos/services/ai-gateway/node_modules/
@@ -204,6 +210,7 @@ RUN chmod 0644 \
     /opt/agentos/packages/agentos/runtime/create-image-seed.ts \
     /opt/agentos/packages/agentos/runtime/run-mate.ts \
     /opt/agentos/packages/agentos/runtime/health.ts \
+    /opt/agentos/services/a2a/src/main.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \
     /opt/agentos/services/egress-authz/src/main.ts \
     /opt/agentos/services/github-broker/src/main.ts \
@@ -218,6 +225,9 @@ RUN chmod 0644 \
   && ln -s \
     /opt/agentos/clis/pg-listen/pg-listen.ts \
     /usr/local/bin/pg-listen \
+  && ln -s \
+    /opt/agentos/services/a2a/src/main.ts \
+    /usr/local/bin/agentos-a2a \
   && ln -s \
     /opt/agentos/services/ai-gateway/src/main.ts \
     /usr/local/bin/ai-gateway \

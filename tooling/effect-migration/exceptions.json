@@ -204,6 +204,18 @@
       "test": "services/egress-authz/tests/main.effect.test.ts",
       "removalCondition": "Retain only while the egress authorizer remains a standalone Bun service entrypoint.",
       "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "services/a2a/src/main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The PostgreSQL-first A2A service needs one reviewed Bun process entry boundary around its fully typed, scoped Effect Platform application.",
+      "ownerIssue": 125,
+      "test": "services/a2a/tests/main.effect.test.ts",
+      "removalCondition": "Retain only while the A2A adapter remains a standalone Bun service and keep all domain behavior inside Effect.",
+      "expiresOn": null
     }
   ]
 }

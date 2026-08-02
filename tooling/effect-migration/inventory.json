@@ -546,6 +546,46 @@
       "status": "migrated"
     },
     {
+      "id": "postgresql-first-a2a-effect-tests",
+      "issue": 125,
+      "pattern": "^database/tests/a2a-delivery\\.effect\\.test\\.ts$|^packages/agentos/src/(?:access/tests/a2a-policy|protocol/tests/a2a)\\.effect\\.test\\.ts$|^services/a2a/tests/.*\\.effect\\.test\\.ts$",
+      "runtime": "bun-kubernetes-postgresql",
+      "package": "mixed",
+      "io": ["test", "clock", "filesystem", "http", "kubernetes", "database", "authorization", "telemetry"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90, 104, 126],
+      "status": "migrated"
+    },
+    {
+      "id": "postgresql-first-a2a-contract-runtime",
+      "issue": 125,
+      "pattern": "^packages/agentos/src/protocol/a2a(?:-postgres|-runtime)?\\.ts$",
+      "runtime": "shared-bun-postgresql",
+      "package": "@akua-dev/agentos",
+      "io": ["clock", "database", "schema", "authorization", "telemetry"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90, 104, 126],
+      "status": "migrated"
+    },
+    {
+      "id": "postgresql-first-a2a-entrypoint",
+      "issue": 125,
+      "pattern": "^services/a2a/src/main\\.ts$",
+      "runtime": "bun-entrypoint",
+      "package": "@agentos/a2a",
+      "io": ["config", "filesystem", "http", "kubernetes", "database", "authorization", "telemetry", "runtime-adapter"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90, 104, 126],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "postgresql-first-a2a-service",
+      "issue": 125,
+      "pattern": "^services/a2a/src/(?!main\\.ts$)",
+      "runtime": "bun-kubernetes-postgresql",
+      "package": "@agentos/a2a",
+      "io": ["config", "filesystem", "http", "kubernetes", "database", "authorization", "telemetry"],
+      "migrationDependencies": [100, 101, 87, 88, 89, 90, 104, 126],
+      "status": "migrated"
+    },
+    {
       "id": "acp-harness-control-effect-tests",
       "issue": 126,
       "pattern": "^packages/agentos/src/harness-control/tests/.*\\.effect\\.test\\.ts$",
