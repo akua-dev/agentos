@@ -2,15 +2,6 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "path": "database/kubernetes/cloudnative-pg/tests/manifest.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 4,
-      "digest": "f03d66e3199c0a85a0516f5c0bc0999d1a3c621a839836f8f7f2475777d08446",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/kubernetes/cloudnative-pg/tests/manifest.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "mise.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,

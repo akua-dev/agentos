@@ -616,6 +616,16 @@
       "status": "migrated"
     },
     {
+      "id": "effect-test-support",
+      "issue": 102,
+      "pattern": "^tooling/testing/",
+      "runtime": "bun-kubernetes",
+      "package": "@agentos/root",
+      "io": ["test", "filesystem", "process", "kubernetes", "schema"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
       "id": "effect-test-conformance",
       "issue": 102,
       "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",
