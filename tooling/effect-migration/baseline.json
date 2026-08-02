@@ -713,33 +713,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/llms-index.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/lib/llms-index.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 1,
-      "digest": "2fd3aa557140f1cdce58f1690adaedee2135be01b992738db19bb77129830de7",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/llms-index.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/lib/metadata.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 5,
-      "digest": "ee1ee68fa256aa4ca2f2e605240818473b37cc2a5a8124ed625583f334c9abf9",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/metadata.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/lib/structured-data.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 1,
-      "digest": "74199de1bc2313bc312c447107e1344dfb869102485dfe064b3007d5d2e52b04",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/structured-data.ts under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/next.config.ts",
       "slice": "website",
       "issue": 99,
