@@ -2,15 +2,6 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "path": "mise.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 17,
-      "digest": "7ea33450bd8338a2af0c2fb24e6ecbdcefb0e8b1ab7dd89e87c5671d44d45372",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in mise.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/resources/roles/secondmate/kubernetes/tests/domain-lifecycle.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
