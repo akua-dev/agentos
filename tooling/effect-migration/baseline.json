@@ -137,24 +137,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/lifecycle.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/preflight.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 6,
-      "digest": "bd230118cf281b269fe10b3989b421bc1055ce2266167fc1c51d14bf876f30c5",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/preflight.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/tests/runtime-behaviors.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 1,
-      "digest": "c38df1cd56ace10b0020cc2d5081838cd064bd85093648594a38f3441679edc2",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/runtime-behaviors.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/tests/startup.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
