@@ -51,6 +51,18 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "tooling/testing/bun-http.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runPromise",
+      "maximumOccurrences": 1,
+      "reason": "Bun's HTTP test-server ABI requires Promise-returning fetch handlers, so one domain-free adapter runs Effect request programs and scopes server shutdown.",
+      "ownerIssue": 102,
+      "test": "tooling/testing/tests/bun-http.effect.test.ts",
+      "removalCondition": "Remove when Bun test servers accept Effect request programs directly.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "website/apps/docs/lib/effect/browser-runtime.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
