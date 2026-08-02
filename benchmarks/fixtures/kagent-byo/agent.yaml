@@ -1,0 +1,57 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: agentos-kagent-external
+  namespace: kagent-interop
+  labels:
+    app.kubernetes.io/part-of: agentos-kagent-interop
+spec:
+  description: Credential-free external A2A interoperability fixture
+  type: BYO
+  byo:
+    deployment:
+      image: nginxinc/nginx-unprivileged@sha256:27985295bdb22a1ef8f712863210bd5877c0f3006494a593e86b3fe0fa55467e
+      imagePullPolicy: IfNotPresent
+      replicas: 1
+      serviceAccountName: agentos-kagent-external
+      labels:
+        app.kubernetes.io/part-of: agentos-kagent-interop
+        agentos.akua.dev/external-provider: "true"
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      volumes:
+        - name: a2a-config
+          configMap:
+            name: agentos-kagent-a2a-fixture
+        - name: tmp
+          emptyDir:
+            sizeLimit: 8Mi
+        - name: cache
+          emptyDir:
+            sizeLimit: 8Mi
+      volumeMounts:
+        - name: a2a-config
+          mountPath: /etc/nginx/conf.d
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /var/cache/nginx
