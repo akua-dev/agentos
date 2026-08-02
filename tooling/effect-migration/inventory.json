@@ -506,6 +506,26 @@
       "status": "migrated"
     },
     {
+      "id": "mate-runtime-effect",
+      "issue": 104,
+      "pattern": "^packages/agentos/runtime/(?:codex-otel|distribution|pi-session)\\.ts$",
+      "runtime": "shared-bun-herdr",
+      "package": "@akua-dev/agentos",
+      "io": ["config", "filesystem", "process", "schema", "stream"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
+      "id": "mate-runtime-entrypoints",
+      "issue": 104,
+      "pattern": "^packages/agentos/runtime/(?:prepare-home|run-mate)\\.ts$",
+      "runtime": "bun-kubernetes-herdr-entrypoint",
+      "package": "@akua-dev/agentos",
+      "io": ["config", "filesystem", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "effect-test-conformance",
       "issue": 102,
       "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",

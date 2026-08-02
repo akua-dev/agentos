@@ -380,24 +380,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/roles/secondmate/kubernetes/tests/manifest.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/codex-otel.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 19,
-      "digest": "ff461794bd8bfc7845a8d8b65ac4437e35a454df79b61b71064b21e22b669089",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/codex-otel.ts under issue #104; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/distribution.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 4,
-      "digest": "e951b158d550fcb0c33af7823e12603e0fb4c0258188c9ec48bb956f5b36708e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/distribution.ts under issue #104; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/kubernetes/tests/observability-manifests.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -414,51 +396,6 @@
       "digest": "98acfd1565ce4f38fcf4b1666dd53d374affd1942be4e03793c60dc1500f66a5",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/kubernetes/tests/secret-lifecycle.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/pi-session.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 34,
-      "digest": "3b6342c257a51065fe55d6e8ea97959ef20230908b995b7d0a6627e163ee8e2d",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/pi-session.ts under issue #104; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/prepare-home.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 47,
-      "digest": "754345f03ee6632606c5aa27f70b57fbfb5ca73ca328030fdf15adf5f8a11682",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/prepare-home.ts under issue #104; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/run-mate.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 34,
-      "digest": "1775fcd5b33de27ebc2f73fde74dcd8650120f1de89bfc41abb69ecfb971a6a2",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/run-mate.ts under issue #104; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/tests/codex-otel.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 19,
-      "digest": "698a501a6a6f2e339319d857effb1c9650d2e1794aea1075cc9d111abe2bc5c4",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/codex-otel.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/tests/distribution-migration.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 14,
-      "digest": "38ab9494e6ec9fe6f6c21a6311911d64ab14732f9fa8c52ec3243894694e692b",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/distribution-migration.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/runtime/tests/kubernetes.test.ts",
