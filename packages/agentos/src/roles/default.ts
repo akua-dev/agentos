@@ -39,6 +39,7 @@ import {
   type AgentOSStartupContributionV1,
 } from "../startup.ts";
 import {
+  AgentOSValidationError,
   decodeOrValidationError,
   makeValidationError,
 } from "../shared/errors.ts";
@@ -66,6 +67,14 @@ export type DefaultRoleSetupV1 = {
 };
 
 export type DefaultAgentOSEntrypointOptions = {
+  role?: string;
+  loadRoleEffect?: (
+    role: DefaultAgentOSRole,
+  ) => Effect.Effect<
+    DefaultRoleSetupV1,
+    AgentOSValidationError | Config.ConfigError,
+    FileSystem.FileSystem | Path.Path
+  >;
   getRole?: () => string | undefined;
   loadRole?: (
     role: DefaultAgentOSRole,
@@ -103,8 +112,12 @@ export const selectedDefaultAgentOSRoleEffect = DefaultAgentOSRoleConfig.pipe(
 export const registerDefaultAgentOSEntrypointEffect = Effect.fn(
   "agentos.roles.registerDefaultEntrypoint",
 )(function*(pi: ExtensionAPI, options: DefaultAgentOSEntrypointOptions = {}) {
-  const role = yield* selectedRoleEffect(options.getRole);
-  const setup = yield* loadRoleSetupEffect(role, options.loadRole);
+  const role = yield* selectedRoleEffect(options.role, options.getRole);
+  const setup = yield* loadRoleSetupEffect(
+    role,
+    options.loadRoleEffect,
+    options.loadRole,
+  );
   const startupPrompt = yield* preflightDefaultRoleSetupEffect(role, setup);
   const claims = roleSetupClaims(role, setup.names);
 
@@ -288,19 +301,21 @@ const selectedDistributionRootEffect = Effect.gen(function*() {
 });
 
 const selectedRoleEffect = Effect.fn("agentos.roles.select")(function*(
+  role: string | undefined,
   getRole: (() => string | undefined) | undefined,
 ) {
-  if (getRole === undefined) return yield* selectedDefaultAgentOSRoleEffect;
-  const value = yield* Effect.try({
-    try: getRole,
-    catch: () =>
-      makeValidationError(
-        "invalid_shape",
-        "role_config",
-        "AGENTOS_AGENT_ROLE",
-        "AGENTOS_AGENT_ROLE could not be read",
-      ),
-  });
+  const value = role ?? (getRole === undefined
+    ? yield* selectedDefaultAgentOSRoleEffect
+    : yield* Effect.try({
+      try: getRole,
+      catch: () =>
+        makeValidationError(
+          "invalid_shape",
+          "role_config",
+          "AGENTOS_AGENT_ROLE",
+          "AGENTOS_AGENT_ROLE could not be read",
+        ),
+    }));
   return yield* decodeOrValidationError(
     DefaultAgentOSRoleSchema,
     value,
@@ -315,8 +330,10 @@ const selectedRoleEffect = Effect.fn("agentos.roles.select")(function*(
 
 const loadRoleSetupEffect = Effect.fn("agentos.roles.loadSelected")(function*(
   role: DefaultAgentOSRole,
+  loadRoleEffect: DefaultAgentOSEntrypointOptions["loadRoleEffect"],
   loadRole: DefaultAgentOSEntrypointOptions["loadRole"],
 ) {
+  if (loadRoleEffect !== undefined) return yield* loadRoleEffect(role);
   if (loadRole !== undefined) {
     return yield* Effect.tryPromise({
       try: () => loadRole(role),

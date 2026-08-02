@@ -83,15 +83,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/ecosystem.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/entrypoint.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 34,
-      "digest": "7acd60bdf0709ec56676289ffff758c2653ce56d8b0d0ddd6b092f0c63f639db",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/entrypoint.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/tests/fake-pi.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -126,15 +117,6 @@
       "digest": "1a4ab1c21f1da3d3adc417dfd5faf989ac8da25a200c6a1ecf3ce80b991f8ad7",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/fixtures/replacement-package/registration.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/tests/lifecycle.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 12,
-      "digest": "6c36eb918568b7be39daec5df107e4a8ede717855dc29e2ac2915c93c9ea3fa0",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/lifecycle.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "services/agentgateway/tests/conformance.test.ts",
