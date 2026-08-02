@@ -1,8 +1,5 @@
-import { createHash } from "node:crypto";
-import { basename } from "node:path";
-
 import { writeCrewmateReadiness } from "@akua-dev/agentos";
-import { Effect, Option, Schema } from "effect";
+import { Crypto, Effect, Encoding, Option, Path, Schema } from "effect";
 
 const HerdrAgentSession = Schema.Struct({
   kind: Schema.String,
@@ -134,9 +131,19 @@ export const confirmCrewmateReadiness = Effect.fn(
   if (brief === undefined || brief.length === 0) {
     return yield* fail("brief_missing");
   }
-  const observedBriefDigest = createHash("sha256")
-    .update(brief)
-    .digest("hex");
+  const crypto = yield* Crypto.Crypto;
+  const observedBriefDigest = yield* crypto.digest(
+    "SHA-256",
+    new TextEncoder().encode(brief),
+  ).pipe(
+    Effect.map(Encoding.encodeHex),
+    Effect.mapError(() =>
+      CrewmateConfirmationError.make({
+        message: "brief_digest_invalid",
+        reason: "brief_digest_invalid",
+      })
+    ),
+  );
   if (observedBriefDigest !== expectedBriefDigest) {
     return yield* fail("brief_digest_mismatch");
   }
@@ -206,8 +213,9 @@ export const confirmCrewmateReadiness = Effect.fn(
   if (processInfo === undefined) {
     return yield* fail("pane_process_unavailable");
   }
+  const paths = yield* Path.Path;
   const process = processInfo.result.process_info.foreground_processes.find(
-    ({ argv0 }) => basename(argv0) === harness,
+    ({ argv0 }) => paths.basename(argv0) === harness,
   );
   if (
     explanation.agent !== harness ||
@@ -241,13 +249,9 @@ function decode<S extends Schema.ConstraintDecoder<unknown>>(
   source: string | undefined,
 ): S["Type"] | undefined {
   if (source === undefined) return undefined;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(source);
-  } catch {
-    return undefined;
-  }
-  return Option.getOrUndefined(Schema.decodeUnknownOption(schema)(parsed));
+  return Option.getOrUndefined(
+    Schema.decodeUnknownOption(Schema.fromJsonString(schema))(source),
+  );
 }
 
 function fail(reason: Reason) {
