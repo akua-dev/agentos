@@ -11,15 +11,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/kubernetes/cloudnative-pg/tests/manifest.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/access-control-plane.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 20,
-      "digest": "15b09b6458efc468a3391f72536c3319f5081d87323a83919e28792285feb8b3",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/access-control-plane.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/tests/targeted-notifications.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
