@@ -19,10 +19,10 @@
       "rule": "no-runtime-execution",
       "match": "Effect.runPromise",
       "maximumOccurrences": 1,
-      "reason": "Pi's command registration ABI requires Promise-returning handlers, so this domain-free adapter is the sole one-way boundary from Effect command programs into Pi.",
+      "reason": "Pi extension, command, event, tool, and provider callback ABIs require Promises, so this domain-free adapter is the sole one-way boundary from AgentOS Effect programs into host-owned callbacks.",
       "ownerIssue": 103,
       "test": "packages/agentos/tests/pi-host-adapter.effect.test.ts",
-      "removalCondition": "Remove when Pi accepts Effect command programs directly.",
+      "removalCondition": "Remove when every Pi and provider callback ABI used by AgentOS accepts Effect programs directly.",
       "expiresOn": null
     },
     {
@@ -252,30 +252,6 @@
       "test": "tooling/effect-migration/tests/check.test.ts",
       "removalCondition": "Retain only while the policy checker is a standalone Bun executable.",
       "expiresOn": null
-    },
-    {
-      "kind": "temporary-migration-adapter",
-      "path": "packages/agentos/src/shared/legacy.ts",
-      "rule": "no-runtime-execution",
-      "match": "Effect.runSync",
-      "maximumOccurrences": 1,
-      "reason": "Published synchronous APIs retain one reviewed adapter while consumers migrate to typed Effect programs.",
-      "ownerIssue": 103,
-      "test": "packages/agentos/src/shared/tests/foundation.effect.test.ts",
-      "removalCondition": "Remove after issue #103 migrates every synchronous published consumer to Effect.",
-      "expiresOn": "2026-10-31"
-    },
-    {
-      "kind": "temporary-migration-adapter",
-      "path": "packages/agentos/src/shared/legacy.ts",
-      "rule": "no-runtime-execution",
-      "match": "Effect.runPromise",
-      "maximumOccurrences": 1,
-      "reason": "Published Promise and framework APIs retain one reviewed adapter while consumers migrate to typed Effect programs.",
-      "ownerIssue": 103,
-      "test": "packages/agentos/src/shared/tests/foundation.effect.test.ts",
-      "removalCondition": "Remove after issue #103 migrates every Promise and framework consumer to Effect.",
-      "expiresOn": "2026-10-31"
     },
     {
       "kind": "outer-host-adapter",

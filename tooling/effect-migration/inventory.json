@@ -55,20 +55,6 @@
       "status": "migrated"
     },
     {
-      "id": "shared-legacy-runtime-adapter",
-      "issue": 101,
-      "pattern": "^packages/agentos/src/shared/legacy\\.ts$",
-      "runtime": "bun",
-      "package": "@akua-dev/agentos",
-      "io": [
-        "runtime-adapter"
-      ],
-      "migrationDependencies": [
-        100
-      ],
-      "status": "runtime-boundary"
-    },
-    {
       "id": "pi-command-host-adapter",
       "issue": 103,
       "pattern": "^packages/agentos/src/pi-host-adapter\\.ts$",
@@ -832,7 +818,7 @@
       "package": "@agentos/root",
       "io": ["filesystem", "process", "stream"],
       "migrationDependencies": [100, 101],
-      "status": "planned"
+      "status": "migrated"
     },
     {
       "id": "database-and-clis",
@@ -842,7 +828,7 @@
       "package": "database-clis-release",
       "io": ["config", "database", "filesystem", "http", "process", "stream"],
       "migrationDependencies": [100, 101],
-      "status": "planned"
+      "status": "migrated"
     },
     {
       "id": "pi-memory-compaction",
@@ -852,7 +838,7 @@
       "package": "@akua-dev/agentos",
       "io": ["filesystem", "http", "native-session", "process", "stream"],
       "migrationDependencies": [100, 101],
-      "status": "planned"
+      "status": "migrated"
     },
     {
       "id": "github-workload-auth-entrypoint",
@@ -922,7 +908,7 @@
       "package": "@akua-dev/agentos",
       "io": ["config", "schema", "telemetry"],
       "migrationDependencies": [100],
-      "status": "planned"
+      "status": "migrated"
     },
     {
       "id": "agentos-runtime",
@@ -932,7 +918,7 @@
       "package": "@akua-dev/agentos",
       "io": ["config", "database", "filesystem", "http", "kubernetes", "process", "stream", "telemetry"],
       "migrationDependencies": [100, 101],
-      "status": "planned"
+      "status": "migrated"
     },
     {
       "id": "ai-gateway-entrypoint",
@@ -992,7 +978,7 @@
       "package": "@agentos/docs",
       "io": ["config", "filesystem", "http", "worker"],
       "migrationDependencies": [100, 101],
-      "status": "planned"
+      "status": "migrated"
     }
   ]
 }
