@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 
 import {
   CODEX_GATEWAY_PROVIDER_ID,
@@ -174,6 +174,7 @@ export type HealthFileMetadata = {
 };
 export type SemanticHealthRuntime = {
   readonly basename: (path: string) => string;
+  readonly isAbsolute: (path: string) => boolean;
   readonly join: (...paths: ReadonlyArray<string>) => string;
   readonly parseToml: (source: string) => Effect.Effect<unknown | undefined>;
   readonly run: (
@@ -517,15 +518,13 @@ const verifyCodexGatewayProvider = Effect.fn(
           Schema.fromJsonString(Schema.Unknown),
         )(markerSource),
       ));
-  const expected = yield* Effect.try({
-    try: () => codexGatewayProviderEntry(environment),
-    catch: () => undefined,
-  }).pipe(
-    Effect.match({
-      onFailure: () => undefined,
-      onSuccess: (value) => value,
-    }),
-  );
+  const expectedResult = yield* codexGatewayProviderEntry(
+    environment,
+    probeRuntime,
+  ).pipe(Effect.result);
+  const expected = Result.isSuccess(expectedResult)
+    ? expectedResult.success
+    : undefined;
   const configurationValid =
     isPrivateRegularFile(metadata) &&
     config?.model_provider === CODEX_GATEWAY_PROVIDER_ID &&

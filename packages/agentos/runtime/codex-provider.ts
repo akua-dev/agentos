@@ -1,15 +1,16 @@
-import {
-  chmod,
-  mkdir,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from "node:fs/promises";
-import { dirname, isAbsolute, join } from "node:path";
+import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
+import * as BunPath from "@effect/platform-bun/BunPath";
 import { isDeepStrictEqual } from "node:util";
 
-import { Effect, Schema } from "effect";
+import {
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+  Path,
+  Result,
+  Schema,
+} from "effect";
 
 export const CODEX_GATEWAY_PROVIDER_ID = "agentos-gateway";
 const providerId = CODEX_GATEWAY_PROVIDER_ID;
@@ -17,6 +18,23 @@ const markerVersion = 1;
 const defaultTokenFile = "/var/run/secrets/agentos-egress/token";
 
 const JsonObject = Schema.Record(Schema.String, Schema.Unknown);
+const GatewayProviderEntry = Schema.Struct({
+  name: Schema.Literal("AgentOS workload gateway"),
+  base_url: Schema.String,
+  wire_api: Schema.Literal("responses"),
+  supports_websockets: Schema.Literal(false),
+  request_max_retries: Schema.Literal(0),
+  stream_max_retries: Schema.Literal(0),
+  env_http_headers: Schema.Struct({
+    "X-AgentOS-Assignment-Id": Schema.Literal("AGENTOS_ASSIGNMENT_ID"),
+  }),
+  auth: Schema.Struct({
+    command: Schema.String,
+    args: Schema.Array(Schema.String),
+    timeout_ms: Schema.Literal(5_000),
+    refresh_interval_ms: Schema.Literal(60_000),
+  }),
+});
 
 class ActiveMarker extends Schema.TaggedClass<ActiveMarker>()("Active", {
   entry: JsonObject,
@@ -34,6 +52,7 @@ class PendingMarker extends Schema.TaggedClass<PendingMarker>()("Pending", {
 const ProviderMarker = Schema.Union([ActiveMarker, PendingMarker]);
 
 type JsonObject = typeof JsonObject.Type;
+type GatewayProviderEntry = typeof GatewayProviderEntry.Type;
 type ProviderMarker = typeof ProviderMarker.Type;
 export type CodexProviderEnvironment = Readonly<
   Record<string, string | undefined>
@@ -62,6 +81,16 @@ export interface ReconcileCodexProviderOptions {
   readonly stateDirectory: string;
 }
 
+export interface CodexProviderPathRuntime {
+  readonly isAbsolute: (path: string) => boolean;
+  readonly join: (...paths: ReadonlyArray<string>) => string;
+}
+
+const CodexProviderLive = Layer.merge(
+  BunFileSystem.layer,
+  BunPath.layer,
+);
+
 function configurationError(message: string) {
   return CodexProviderConfigurationError.make({ message });
 }
@@ -78,86 +107,106 @@ function fileError(operation: string, path: string, cause: unknown) {
 function optionalEnvironment(
   environment: Environment,
   name: string,
-): string | undefined {
+) {
   const raw = environment[name];
-  if (raw === undefined) return undefined;
+  if (raw === undefined) return Effect.succeed<string | undefined>(undefined);
   const value = raw.trim();
-  if (!value) throw configurationError(`${name} must be non-empty`);
-  return value;
+  return value
+    ? Effect.succeed<string | undefined>(value)
+    : Effect.fail(configurationError(`${name} must be non-empty`));
 }
 
-function providerMode(environment: Environment): ProviderMode {
-  const mode = optionalEnvironment(environment, "AGENTOS_CODEX_PROVIDER_MODE");
-  if (mode === undefined || mode === "ai-gateway" || mode === "direct") {
-    return mode;
-  }
-  throw configurationError(
-    "AGENTOS_CODEX_PROVIDER_MODE must be ai-gateway or direct",
-  );
-}
-
-function normalizedGatewayUrl(raw: string): string {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw configurationError("AI_GATEWAY_URL must be an absolute URL");
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw configurationError("AI_GATEWAY_URL must use http or https");
-  }
-  if (url.username || url.password || url.search || url.hash) {
-    throw configurationError(
-      "AI_GATEWAY_URL must not contain credentials, a query, or a fragment",
+const providerMode = Effect.fn("agentos.codexProvider.mode")(
+  function*(environment: Environment) {
+    const mode = yield* optionalEnvironment(
+      environment,
+      "AGENTOS_CODEX_PROVIDER_MODE",
     );
-  }
-  return url.toString().replace(/\/$/, "");
-}
+    if (mode === undefined || mode === "ai-gateway" || mode === "direct") {
+      return mode satisfies ProviderMode;
+    }
+    return yield* configurationError(
+      "AGENTOS_CODEX_PROVIDER_MODE must be ai-gateway or direct",
+    );
+  },
+);
 
-function requiredAbsolutePath(
+const normalizedGatewayUrl = Effect.fn("agentos.codexProvider.gatewayUrl")(
+  function*(raw: string) {
+    const url = Option.getOrUndefined(
+      Schema.decodeUnknownOption(Schema.URLFromString)(raw),
+    );
+    if (url === undefined) {
+      return yield* configurationError("AI_GATEWAY_URL must be an absolute URL");
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return yield* configurationError(
+        "AI_GATEWAY_URL must use http or https",
+      );
+    }
+    if (url.username || url.password || url.search || url.hash) {
+      return yield* configurationError(
+        "AI_GATEWAY_URL must not contain credentials, a query, or a fragment",
+      );
+    }
+    return url.toString().replace(/\/$/, "");
+  },
+);
+
+const requiredAbsolutePath = Effect.fn(
+  "agentos.codexProvider.absolutePath",
+)(function*(
   environment: Environment,
+  paths: CodexProviderPathRuntime,
   name: string,
   fallback?: string,
-): string {
-  const value = optionalEnvironment(environment, name) ?? fallback;
-  if (!value || !isAbsolute(value)) {
-    throw configurationError(`${name} must be an absolute path`);
+) {
+  const value = (yield* optionalEnvironment(environment, name)) ?? fallback;
+  if (value === undefined || !paths.isAbsolute(value)) {
+    return yield* configurationError(`${name} must be an absolute path`);
   }
   return value;
-}
+});
 
-export function codexGatewayProviderEntry(
+export const codexGatewayProviderEntry = Effect.fn(
+  "agentos.codexProvider.gatewayEntry",
+)(function*(
   environment: CodexProviderEnvironment,
-): Readonly<Record<string, unknown>> {
-  const rawUrl = optionalEnvironment(environment, "AI_GATEWAY_URL");
-  if (!rawUrl) throw configurationError("AI_GATEWAY_URL must be configured");
-  const assignmentId = optionalEnvironment(
+  paths: CodexProviderPathRuntime,
+) {
+  const rawUrl = yield* optionalEnvironment(environment, "AI_GATEWAY_URL");
+  if (rawUrl === undefined) {
+    return yield* configurationError("AI_GATEWAY_URL must be configured");
+  }
+  const assignmentId = yield* optionalEnvironment(
     environment,
     "AGENTOS_ASSIGNMENT_ID",
   );
   if (
-    !assignmentId ||
+    assignmentId === undefined ||
     !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       assignmentId,
     )
   ) {
-    throw configurationError(
+    return yield* configurationError(
       "AGENTOS_ASSIGNMENT_ID must be a UUID v4 in Gateway mode",
     );
   }
-  const home = requiredAbsolutePath(environment, "HOME");
-  const releaseRoot = requiredAbsolutePath(
+  const home = yield* requiredAbsolutePath(environment, paths, "HOME");
+  const releaseRoot = yield* requiredAbsolutePath(
     environment,
+    paths,
     "AGENTOS_RELEASE_ROOT",
   );
-  const tokenFile = requiredAbsolutePath(
+  const tokenFile = yield* requiredAbsolutePath(
     environment,
+    paths,
     "AGENTOS_EGRESS_TOKEN_FILE",
     defaultTokenFile,
   );
-  return {
+  const entry = {
     name: "AgentOS workload gateway",
-    base_url: normalizedGatewayUrl(rawUrl),
+    base_url: yield* normalizedGatewayUrl(rawUrl),
     wire_api: "responses",
     supports_websockets: false,
     request_max_retries: 0,
@@ -166,36 +215,33 @@ export function codexGatewayProviderEntry(
       "X-AgentOS-Assignment-Id": "AGENTOS_ASSIGNMENT_ID",
     },
     auth: {
-      command: join(home, ".local", "share", "mise", "shims", "bun"),
+      command: paths.join(home, ".local", "share", "mise", "shims", "bun"),
       args: [
-        join(releaseRoot, "packages", "agentos", "runtime", "codex-token.ts"),
+        paths.join(
+          releaseRoot,
+          "packages",
+          "agentos",
+          "runtime",
+          "codex-token.ts",
+        ),
         tokenFile,
       ],
       timeout_ms: 5_000,
       refresh_interval_ms: 60_000,
     },
   };
-}
+  return yield* Schema.decodeUnknownEffect(GatewayProviderEntry)(entry).pipe(
+    Effect.mapError(() => configurationError("Invalid workload Gateway provider")),
+  );
+});
 
 const readOptionalText = Effect.fn("agentos.codexProvider.readOptionalText")(
   function*(path: string) {
-    return yield* Effect.tryPromise({
-      try: async () => {
-        try {
-          return await readFile(path, "utf8");
-        } catch (cause) {
-          if (
-            cause instanceof Error &&
-            "code" in cause &&
-            cause.code === "ENOENT"
-          ) {
-            return "";
-          }
-          throw cause;
-        }
-      },
-      catch: (cause) => fileError("read", path, cause),
-    });
+    const fileSystem = yield* FileSystem.FileSystem;
+    const result = yield* fileSystem.readFileString(path).pipe(Effect.result);
+    if (Result.isSuccess(result)) return result.success;
+    if (result.failure.reason._tag === "NotFound") return "";
+    return yield* fileError("read", path, result.failure);
   },
 );
 
@@ -203,14 +249,10 @@ const readMarker = Effect.fn("agentos.codexProvider.readMarker")(
   function*(path: string) {
     const source = yield* readOptionalText(path);
     if (!source) return undefined;
-    const parsed = yield* Effect.try({
-      try: () => JSON.parse(source),
-      catch: () => configurationError("codex-provider.json is invalid"),
-    });
-    return yield* Schema.decodeUnknownEffect(ProviderMarker)(parsed).pipe(
-      Effect.catchTag("SchemaError", () =>
-        Effect.fail(configurationError("codex-provider.json is invalid"))
-      ),
+    return yield* Schema.decodeUnknownEffect(
+      Schema.fromJsonString(ProviderMarker),
+    )(source).pipe(
+      Effect.mapError(() => configurationError("codex-provider.json is invalid")),
     );
   },
 );
@@ -218,23 +260,30 @@ const readMarker = Effect.fn("agentos.codexProvider.readMarker")(
 const parseConfig = Effect.fn("agentos.codexProvider.parseConfig")(
   function*(source: string) {
     const parsed = yield* Effect.try({
-      try: () => Bun.TOML.parse(source) as Record<string, unknown>,
+      try: () => Bun.TOML.parse(source),
       catch: () => configurationError("Codex config.toml is invalid"),
     });
-    const selected = parsed.model_provider;
-    if (selected !== undefined && typeof selected !== "string") {
+    const root = objectValue(parsed);
+    if (root === undefined) {
+      return yield* configurationError("Codex config.toml is invalid");
+    }
+    const rawSelected = root.model_provider;
+    if (rawSelected !== undefined && typeof rawSelected !== "string") {
       return yield* configurationError(
         "Codex model_provider must be a string",
       );
     }
-    const providers = objectValue(parsed.model_providers);
+    const providers = objectValue(root.model_providers);
     const entry = objectValue(providers?.[providerId]);
     if (providers?.[providerId] !== undefined && entry === undefined) {
       return yield* configurationError(
         `${providerId} provider is not a table`,
       );
     }
-    return { entry, selected: selected as string | undefined };
+    return {
+      entry,
+      selected: typeof rawSelected === "string" ? rawSelected : undefined,
+    };
   },
 );
 
@@ -253,58 +302,65 @@ function assertOwned(
   marker: ProviderMarker,
 ) {
   if (marker._tag === "Active") {
-    if (
-      state.selected !== providerId ||
-      !isDeepStrictEqual(state.entry, marker.entry)
-    ) {
-      throw configurationError(
+    return state.selected === providerId &&
+        isDeepStrictEqual(state.entry, marker.entry)
+      ? Effect.void
+      : Effect.fail(configurationError(
         `${providerId} provider changed outside AgentOS ownership`,
-      );
-    }
-    return;
+      ));
   }
   const matches = (entry: JsonObject | null) =>
     isDeepStrictEqual(state.entry ?? null, entry) &&
     state.selected === (entry === null ? markerPrevious(marker) : providerId);
-  if (!matches(marker.current) && !matches(marker.desired)) {
-    throw configurationError(
+  return matches(marker.current) || matches(marker.desired)
+    ? Effect.void
+    : Effect.fail(configurationError(
       `${providerId} provider changed during AgentOS reconciliation`,
-    );
-  }
+    ));
 }
 
 const writePrivate = Effect.fn("agentos.codexProvider.writePrivate")(
   function*(path: string, contents: string) {
-    yield* Effect.tryPromise({
-      try: async () => {
-        await mkdir(dirname(path), { mode: 0o700, recursive: true });
-        const temporary = `${path}.agentos-next`;
-        await writeFile(temporary, contents, { mode: 0o600 });
-        await chmod(temporary, 0o600);
-        await rename(temporary, path);
-      },
-      catch: (cause) => fileError("write", path, cause),
-    });
+    const fileSystem = yield* FileSystem.FileSystem;
+    const paths = yield* Path.Path;
+    const temporary = `${path}.agentos-next`;
+    yield* fileSystem.makeDirectory(paths.dirname(path), {
+      mode: 0o700,
+      recursive: true,
+    }).pipe(Effect.mapError((cause) => fileError("write", path, cause)));
+    yield* Effect.gen(function*() {
+      yield* fileSystem.writeFileString(temporary, contents, { mode: 0o600 });
+      yield* fileSystem.chmod(temporary, 0o600);
+      yield* fileSystem.rename(temporary, path);
+    }).pipe(
+      Effect.mapError((cause) => fileError("write", path, cause)),
+      Effect.ensuring(
+        fileSystem.remove(temporary, { force: true }).pipe(Effect.ignore),
+      ),
+    );
   },
 );
 
 function writeMarker(path: string, marker: ProviderMarker) {
-  return writePrivate(path, `${JSON.stringify(marker, null, 2)}\n`);
+  return Schema.encodeEffect(Schema.fromJsonString(ProviderMarker))(marker).pipe(
+    Effect.mapError(() => configurationError("Could not encode provider marker")),
+    Effect.flatMap((source) => writePrivate(path, `${source}\n`)),
+  );
 }
 
 const removeMarker = Effect.fn("agentos.codexProvider.removeMarker")(
   function*(path: string) {
-    yield* Effect.tryPromise({
-      try: () => rm(path, { force: true }),
-      catch: (cause) => fileError("remove", path, cause),
-    });
+    const fileSystem = yield* FileSystem.FileSystem;
+    yield* fileSystem.remove(path, { force: true }).pipe(
+      Effect.mapError((cause) => fileError("remove", path, cause)),
+    );
   },
 );
 
 function renderConfig(
   source: string,
   selected: string | undefined,
-  entry: JsonObject | undefined,
+  entry: GatewayProviderEntry | undefined,
 ): string {
   const preserved = removeManagedProvider(source).trim();
   const blocks: string[] = [];
@@ -336,8 +392,7 @@ function removeManagedProvider(source: string): string {
   return kept.join("\n");
 }
 
-function renderProvider(entry: JsonObject): string {
-  const auth = entry.auth as JsonObject;
+function renderProvider(entry: GatewayProviderEntry): string {
   return [
     `[model_providers.${providerId}]`,
     `name = ${JSON.stringify(entry.name)}`,
@@ -349,24 +404,19 @@ function renderProvider(entry: JsonObject): string {
     `env_http_headers = { "X-AgentOS-Assignment-Id" = "AGENTOS_ASSIGNMENT_ID" }`,
     "",
     `[model_providers.${providerId}.auth]`,
-    `command = ${JSON.stringify(auth.command)}`,
-    `args = ${JSON.stringify(auth.args)}`,
-    `timeout_ms = ${auth.timeout_ms}`,
-    `refresh_interval_ms = ${auth.refresh_interval_ms}`,
+    `command = ${JSON.stringify(entry.auth.command)}`,
+    `args = ${JSON.stringify(entry.auth.args)}`,
+    `timeout_ms = ${entry.auth.timeout_ms}`,
+    `refresh_interval_ms = ${entry.auth.refresh_interval_ms}`,
   ].join("\n");
 }
 
-export const reconcileCodexProviderConfiguration = Effect.fn(
-  "agentos.codexProvider.reconcile",
+export const reconcileCodexProviderConfigurationEffect = Effect.fn(
+  "agentos.codexProvider.reconcile.effect",
 )(function*(options: ReconcileCodexProviderOptions) {
-  const markerPath = join(options.stateDirectory, "codex-provider.json");
-  const mode = yield* Effect.try({
-    try: () => providerMode(options.environment),
-    catch: (cause) =>
-      cause instanceof CodexProviderConfigurationError
-        ? cause
-        : configurationError("Invalid Codex provider mode"),
-  });
+  const paths = yield* Path.Path;
+  const markerPath = paths.join(options.stateDirectory, "codex-provider.json");
+  const mode = yield* providerMode(options.environment);
   const [source, marker] = yield* Effect.all([
     readOptionalText(options.configPath),
     readMarker(markerPath),
@@ -386,15 +436,7 @@ export const reconcileCodexProviderConfiguration = Effect.fn(
       `${providerId} provider is not owned by AgentOS`,
     );
   }
-  if (marker !== undefined) {
-    yield* Effect.try({
-      try: () => assertOwned(state, marker),
-      catch: (cause) =>
-        cause instanceof CodexProviderConfigurationError
-          ? cause
-          : configurationError("Invalid AgentOS Codex provider ownership"),
-    });
-  }
+  if (marker !== undefined) yield* assertOwned(state, marker);
 
   const previous = marker === undefined
     ? state.selected
@@ -416,23 +458,20 @@ export const reconcileCodexProviderConfiguration = Effect.fn(
     return;
   }
 
-  const desired = yield* Effect.try({
-    try: () => codexGatewayProviderEntry(options.environment),
-    catch: (cause) =>
-      cause instanceof CodexProviderConfigurationError
-        ? cause
-        : configurationError("Invalid workload Gateway provider"),
-  });
+  const desired = yield* codexGatewayProviderEntry(
+    options.environment,
+    paths,
+  );
   const next = renderConfig(source, providerId, desired);
   if (
     marker?._tag === "Active" &&
     isDeepStrictEqual(marker.entry, desired) &&
     source === next
   ) {
-    yield* Effect.tryPromise({
-      try: () => chmod(options.configPath, 0o600),
-      catch: (cause) => fileError("chmod", options.configPath, cause),
-    });
+    const fileSystem = yield* FileSystem.FileSystem;
+    yield* fileSystem.chmod(options.configPath, 0o600).pipe(
+      Effect.mapError((cause) => fileError("chmod", options.configPath, cause)),
+    );
     return;
   }
   const pending = PendingMarker.make({
@@ -452,3 +491,11 @@ export const reconcileCodexProviderConfiguration = Effect.fn(
     }),
   );
 });
+
+export function reconcileCodexProviderConfiguration(
+  options: ReconcileCodexProviderOptions,
+) {
+  return reconcileCodexProviderConfigurationEffect(options).pipe(
+    Effect.provide(CodexProviderLive),
+  );
+}

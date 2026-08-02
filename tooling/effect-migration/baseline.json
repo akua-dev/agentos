@@ -389,24 +389,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/codex-otel.ts under issue #104; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/codex-provider.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 18,
-      "digest": "42b8e5931d31a7b9b110437118be2919f230d36f23d716ce1cf99e5036c7c4fb",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/codex-provider.ts under issue #104; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/codex-token.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 2,
-      "digest": "85a9c28435a33563c97953fa21226cf91582f3c8bea0c7d291a4684e4ab06cd3",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/codex-token.ts under issue #104; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/create-image-seed.ts",
       "slice": "agentos-runtime",
       "issue": 104,
@@ -495,24 +477,6 @@
       "digest": "698a501a6a6f2e339319d857effb1c9650d2e1794aea1075cc9d111abe2bc5c4",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/codex-otel.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/tests/codex-provider.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 16,
-      "digest": "76fe574baa9c6ce188a9c286836a3aab73f99de0a8bf6a2aabd3a7ace008bb26",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/codex-provider.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/tests/codex-token.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 7,
-      "digest": "92a6022572c34041b303b22281fdc82b763c46feb4b36c63819e805e24b612f6",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/codex-token.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/runtime/tests/distribution-migration.test.ts",

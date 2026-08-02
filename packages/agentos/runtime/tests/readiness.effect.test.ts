@@ -43,6 +43,7 @@ function runtime(options: RuntimeOptions = {}): SemanticHealthRuntime {
   const unavailableText = new Set(options.unavailableTextFiles ?? []);
   return {
     basename: (path) => path.split("/").at(-1) ?? path,
+    isAbsolute: (path) => path.startsWith("/"),
     join: (...paths) => paths.join("/").replaceAll(/\/{2,}/g, "/"),
     parseToml: (source) => Effect.succeed(options.parseToml?.(source)),
     run: (args) =>
