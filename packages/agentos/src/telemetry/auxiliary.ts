@@ -1,29 +1,35 @@
-import type { Model } from "@earendil-works/pi-ai";
-import {
-  initializeAgentOSTelemetryFromEnvironment,
-  type AgentOSOperation,
-  type AgentOSTelemetry,
-} from "./runtime.ts";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import { Effect, Option, Schema } from "effect";
+
 import type {
   AgentOSAIModelFamily,
   AgentOSAIProviderFamily,
   AgentOSAIRoute,
   AgentOSAISessionState,
 } from "./contract.ts";
+import {
+  initializeAgentOSTelemetryFromEnvironment,
+  type AgentOSOperation,
+  type AgentOSTelemetry,
+} from "./runtime.ts";
 
 export type AgentOSTelemetrySource =
   | AgentOSTelemetry
-  | Promise<AgentOSTelemetry>;
+  | Effect.Effect<AgentOSTelemetry>;
 
-export async function startAgentOSAuxiliaryOperation(
-  model: Model<any>,
+export const startAgentOSAuxiliaryOperation = Effect.fn(
+  "agentos.telemetry.startAuxiliaryOperation",
+)(function*(
+  model: Model<Api>,
   telemetry: AgentOSTelemetrySource | undefined,
   sessionState: AgentOSAISessionState,
-): Promise<AgentOSOperation> {
-  const resolved = await (
-    telemetry ?? initializeAgentOSTelemetryFromEnvironment()
-  );
-  return resolved.startOperation({
+): Effect.fn.Return<AgentOSOperation, never> {
+  const resolved = telemetry === undefined
+    ? yield* initializeAgentOSTelemetryFromEnvironment()
+    : Effect.isEffect(telemetry)
+    ? yield* telemetry
+    : telemetry;
+  return yield* resolved.startOperation({
     runtime: "pi",
     runtimeVersion: "0.81.1",
     route: agentOSRouteForModel(model),
@@ -31,19 +37,19 @@ export async function startAgentOSAuxiliaryOperation(
     modelFamily: agentOSModelFamily(model.id),
     providerFamily: agentOSProviderFamily(model.provider),
   });
-}
+});
 
 export function agentOSRouteForModel(
-  model: Pick<Model<any>, "baseUrl">,
+  model: Pick<Model<Api>, "baseUrl">,
 ): AgentOSAIRoute {
   const baseUrl = model.baseUrl?.trim().toLowerCase() ?? "";
   if (!baseUrl) return "direct";
-  try {
-    const hostname = new URL(baseUrl).hostname;
-    return hostname.includes("gateway") ? "ai_gateway" : "direct";
-  } catch {
-    return baseUrl.includes("gateway") ? "ai_gateway" : "direct";
-  }
+  const url = Option.getOrUndefined(
+    Schema.decodeUnknownOption(Schema.URLFromString)(baseUrl),
+  );
+  return (url?.hostname ?? baseUrl).includes("gateway")
+    ? "ai_gateway"
+    : "direct";
 }
 
 export function agentOSModelFamily(
@@ -68,16 +74,14 @@ export function agentOSProviderFamily(
 export function safeTokenCount(
   value: number | undefined,
 ): number | undefined {
-  return value !== undefined &&
-    Number.isSafeInteger(value) &&
-    value >= 0
+  return value !== undefined && Number.isSafeInteger(value) && value >= 0
     ? value
     : undefined;
 }
 
 export function safeAssistantFailure(
   stopReason: string | undefined,
-): { name: "AbortError" | "ProviderError" } | undefined {
+): { readonly name: "AbortError" | "ProviderError" } | undefined {
   if (stopReason === "aborted") return { name: "AbortError" };
   if (stopReason === "error") return { name: "ProviderError" };
   return undefined;

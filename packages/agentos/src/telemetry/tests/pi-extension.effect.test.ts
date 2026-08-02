@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, it } from "@effect/vitest";
 import type {
   AgentOSOperation,
   AgentOSOperationInput,
@@ -8,8 +8,9 @@ import type {
   AgentOSProviderAttemptOutcome,
   AgentOSTelemetry,
 } from "../runtime.ts";
-import { registerAgentOSObservability } from "../pi-extension.ts";
+import { registerAgentOSObservabilityEffect } from "../pi-extension.ts";
 import { createFakePi } from "../../../tests/fake-pi.ts";
+import { Effect } from "effect";
 
 function recorder() {
   const operations: Array<{
@@ -26,20 +27,23 @@ function recorder() {
   const telemetry: AgentOSTelemetry = {
     enabled: true,
     startOperation(input) {
-      const record = { input, attempts: [] } as (typeof operations)[number];
+      return Effect.sync(() => {
+      const record: (typeof operations)[number] = { input, attempts: [] };
       operations.push(record);
       const operation: AgentOSOperation = {
         id: `operation-${++nextId}`,
         startProviderAttempt(attemptInput) {
-          const attemptRecord = {
+          return Effect.sync(() => {
+          const attemptRecord: (typeof record.attempts)[number] = {
             id: `attempt-${++nextId}`,
             input: attemptInput,
             headers: {},
-          } as (typeof record.attempts)[number];
+          };
           record.attempts.push(attemptRecord);
           const attempt: AgentOSProviderAttempt = {
             id: attemptRecord.id,
             inject(headers) {
+              return Effect.sync(() => {
               if (headers instanceof Headers) {
                 headers.set(
                   "traceparent",
@@ -60,20 +64,27 @@ function recorder() {
                   ? headers.entries()
                   : Object.entries(headers),
               );
+              });
             },
             end(outcome) {
-              attemptRecord.outcome = outcome;
+              return Effect.sync(() => {
+                attemptRecord.outcome = outcome;
+              });
             },
           };
           return attempt;
+          });
         },
         end(outcome) {
-          record.outcome = outcome;
+          return Effect.sync(() => {
+            record.outcome = outcome;
+          });
         },
       };
       return operation;
+      });
     },
-    async shutdown() {},
+    shutdown: Effect.void,
   };
   return { operations, telemetry };
 }
@@ -103,9 +114,12 @@ function assistantMessage(
     },
     stopReason,
     errorMessage: "SEED_PROMPT provider-private body",
-    timestamp: Date.now(),
+    timestamp: 1_785_648_000_000,
   };
 }
+
+const emit = <A>(evaluate: () => Promise<A>) =>
+  Effect.tryPromise({ try: evaluate, catch: (cause) => cause });
 
 function configureContext(
   fake: ReturnType<typeof createFakePi>,
@@ -125,39 +139,39 @@ function configureContext(
 }
 
 describe("Pi provider observability extension", () => {
-  test("records one safe main attempt and propagates correlation headers", async () => {
+  it.effect("records one safe main attempt and propagates correlation headers", () => Effect.gen(function*() {
     const fake = createFakePi();
     configureContext(fake, [{ type: "session" }]);
     const recorded = recorder();
-    registerAgentOSObservability(fake.pi, {
+    yield* registerAgentOSObservabilityEffect(fake.pi, {
       telemetry: recorded.telemetry,
       runtimeVersion: "0.81.1",
     });
 
-    await fake.emit("before_agent_start", {
+    yield* emit(() => fake.emit("before_agent_start", {
       type: "before_agent_start",
       prompt: "SEED_PROMPT sk-seeded-secret",
       systemPrompt: "private system prompt",
       systemPromptOptions: {},
-    });
+    }));
     const headers: Record<string, string> = {};
-    await fake.emit("before_provider_headers", {
+    yield* emit(() => fake.emit("before_provider_headers", {
       type: "before_provider_headers",
       headers,
-    });
-    await fake.emit("after_provider_response", {
+    }));
+    yield* emit(() => fake.emit("after_provider_response", {
       type: "after_provider_response",
       status: 200,
       headers: {
         "x-request-id": "req_safe_1",
         authorization: "Bearer provider-secret",
       },
-    });
-    await fake.emit("message_end", {
+    }));
+    yield* emit(() => fake.emit("message_end", {
       type: "message_end",
       message: assistantMessage("stop"),
-    });
-    await fake.emit("agent_settled", { type: "agent_settled" });
+    }));
+    yield* emit(() => fake.emit("agent_settled", { type: "agent_settled" }));
 
     expect(headers.traceparent).toBe(
       "00-11111111111111111111111111111111-2222222222222222-01",
@@ -204,30 +218,30 @@ describe("Pi provider observability extension", () => {
     expect(JSON.stringify(recorded.operations)).not.toContain(
       "provider-secret",
     );
-  });
+  }));
 
-  test("classifies a failed stream without copying Pi error text", async () => {
+  it.effect("classifies a failed stream without copying Pi error text", () => Effect.gen(function*() {
     const fake = createFakePi();
     configureContext(fake);
     const recorded = recorder();
-    registerAgentOSObservability(fake.pi, {
+    yield* registerAgentOSObservabilityEffect(fake.pi, {
       telemetry: recorded.telemetry,
     });
 
-    await fake.emit("before_provider_headers", {
+    yield* emit(() => fake.emit("before_provider_headers", {
       type: "before_provider_headers",
       headers: {},
-    });
-    await fake.emit("after_provider_response", {
+    }));
+    yield* emit(() => fake.emit("after_provider_response", {
       type: "after_provider_response",
       status: 503,
       headers: {},
-    });
-    await fake.emit("message_end", {
+    }));
+    yield* emit(() => fake.emit("message_end", {
       type: "message_end",
       message: assistantMessage("error"),
-    });
-    await fake.emit("agent_settled", { type: "agent_settled" });
+    }));
+    yield* emit(() => fake.emit("agent_settled", { type: "agent_settled" }));
 
     const attempt = recorded.operations[0]?.attempts[0];
     expect(attempt?.outcome).toMatchObject({
@@ -242,26 +256,26 @@ describe("Pi provider observability extension", () => {
     expect(JSON.stringify(recorded.operations)).not.toContain(
       "provider-private body",
     );
-  });
+  }));
 
-  test("classifies a stream without a terminal message as a provider failure", async () => {
+  it.effect("classifies a stream without a terminal message as a provider failure", () => Effect.gen(function*() {
     const fake = createFakePi();
     configureContext(fake);
     const recorded = recorder();
-    registerAgentOSObservability(fake.pi, {
+    yield* registerAgentOSObservabilityEffect(fake.pi, {
       telemetry: recorded.telemetry,
     });
 
-    await fake.emit("before_provider_headers", {
+    yield* emit(() => fake.emit("before_provider_headers", {
       type: "before_provider_headers",
       headers: {},
-    });
-    await fake.emit("after_provider_response", {
+    }));
+    yield* emit(() => fake.emit("after_provider_response", {
       type: "after_provider_response",
       status: 200,
       headers: {},
-    });
-    await fake.emit("agent_settled", { type: "agent_settled" });
+    }));
+    yield* emit(() => fake.emit("agent_settled", { type: "agent_settled" }));
 
     const attempt = recorded.operations[0]?.attempts[0];
     expect(attempt?.outcome).toMatchObject({
@@ -273,12 +287,12 @@ describe("Pi provider observability extension", () => {
       error: { name: "ProviderError" },
       status: 200,
     });
-  });
+  }));
 
-  test("can run alone as the explicit extension-disabled control", () => {
+  it.effect("can run alone as the explicit extension-disabled control", () => Effect.gen(function*() {
     const fake = createFakePi();
     const recorded = recorder();
-    registerAgentOSObservability(fake.pi, {
+    yield* registerAgentOSObservabilityEffect(fake.pi, {
       telemetry: recorded.telemetry,
     });
 
@@ -300,5 +314,5 @@ describe("Pi provider observability extension", () => {
       ),
     ).toEqual([]);
     expect(fake.handlers.has("before_provider_request")).toBe(false);
-  });
+  }));
 });

@@ -13,6 +13,7 @@ import {
   type AgentOSAIErrorClass,
   type AgentOSAIStatusClass,
 } from "./contract.ts";
+import { Option } from "effect";
 
 export type AgentOSTelemetrySignal = "span" | "metric" | "log";
 export type AgentOSTelemetryAttributeValue = string | number | boolean;
@@ -32,8 +33,12 @@ interface AttributeRule {
   value: ValueRule;
 }
 
-const allSignals = ["span", "metric", "log"] as const;
-const correlatedSignals = ["span", "log"] as const;
+const allSignals = ["span", "metric", "log"] satisfies ReadonlyArray<
+  AgentOSTelemetrySignal
+>;
+const correlatedSignals = ["span", "log"] satisfies ReadonlyArray<
+  AgentOSTelemetrySignal
+>;
 
 const rules: Readonly<Record<string, AttributeRule>> = Object.freeze({
   "agentos.telemetry.contract.version": {
@@ -313,10 +318,10 @@ function safeErrorField(
   field: "name" | "code",
 ): string {
   if (typeof error !== "object" || error === null) return "";
-  try {
-    const value = Reflect.get(error, field);
-    return typeof value === "string" && value.length <= 64 ? value : "";
-  } catch {
-    return "";
-  }
+  const value = Option.getOrUndefined(
+    Option.liftThrowable((target: object, name: string) =>
+      Reflect.get(target, name)
+    )(error, field),
+  );
+  return typeof value === "string" && value.length <= 64 ? value : "";
 }

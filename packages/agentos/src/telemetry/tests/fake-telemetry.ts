@@ -5,6 +5,7 @@ import type {
   AgentOSProviderAttemptOutcome,
   AgentOSTelemetry,
 } from "../runtime.ts";
+import { Effect } from "effect";
 
 export interface RecordedTelemetryOperation {
   input: AgentOSOperationInput;
@@ -21,6 +22,7 @@ export function createTelemetryRecorder() {
   const telemetry: AgentOSTelemetry = {
     enabled: true,
     startOperation(input) {
+      return Effect.sync(() => {
       const record: RecordedTelemetryOperation = {
         input,
         attempts: [],
@@ -29,15 +31,17 @@ export function createTelemetryRecorder() {
       return {
         id: `operation-${++nextId}`,
         startProviderAttempt(attemptInput) {
-          const attempt = { input: attemptInput } as (
-            typeof record.attempts
-          )[number];
+          return Effect.sync(() => {
+          const attempt: RecordedTelemetryOperation["attempts"][number] = {
+            input: attemptInput,
+          };
           record.attempts.push(attempt);
           const attemptId = `attempt-${++nextId}`;
           const suffix = nextId.toString(16);
           return {
             id: attemptId,
             inject(carrier) {
+              return Effect.sync(() => {
               const traceparent =
                 `00-${suffix.padStart(32, "0")}-${suffix.padStart(16, "0")}-01`;
               if (carrier instanceof Headers) {
@@ -47,18 +51,25 @@ export function createTelemetryRecorder() {
                 carrier.traceparent = traceparent;
                 carrier["x-agentos-request-attempt-id"] = attemptId;
               }
+              });
             },
             end(outcome) {
-              attempt.outcome = outcome;
+              return Effect.sync(() => {
+                attempt.outcome = outcome;
+              });
             },
           };
+          });
         },
         end(outcome) {
-          record.outcome = outcome;
+          return Effect.sync(() => {
+            record.outcome = outcome;
+          });
         },
       };
+      });
     },
-    async shutdown() {},
+    shutdown: Effect.void,
   };
   return { operations, telemetry };
 }
