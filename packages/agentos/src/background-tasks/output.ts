@@ -1,94 +1,185 @@
-import { mkdir, open, type FileHandle } from "node:fs/promises";
-import { dirname } from "node:path";
+import {
+  Effect,
+  Exit,
+  FileSystem,
+  Path,
+  Ref,
+  Schema,
+  Scope,
+  Semaphore,
+} from "effect";
 
 const DEFAULT_TAIL_BYTES = 64 * 1024;
 const DEFAULT_MAX_BYTES = 1024 * 1024 * 1024;
 
-export class TaskOutputLimitError extends Error {
-  constructor(readonly maxBytes: number) {
-    super(`Background task output reached the ${maxBytes}-byte limit`);
-    this.name = "TaskOutputLimitError";
-  }
+const TaskOutputErrorCode = Schema.Literals([
+  "closed",
+  "invalid_limits",
+  "io_failure",
+  "output_limit_reached",
+]);
+
+export class TaskOutputError extends Schema.TaggedErrorClass<TaskOutputError>()(
+  "TaskOutputError",
+  {
+    cause: Schema.Unknown,
+    code: TaskOutputErrorCode,
+    message: Schema.String,
+    path: Schema.String,
+  },
+) {}
+
+export interface TaskOutputSnapshot {
+  readonly bytesWritten: number;
+  readonly tail: string;
+  readonly truncated: boolean;
+  readonly limitReached: boolean;
 }
 
-export class BoundedTaskOutput {
-  static async open(
-    path: string,
-    options: { tailBytes?: number; maxBytes?: number } = {},
-  ) {
-    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-    const file = await open(path, "w", 0o600);
-    return new BoundedTaskOutput(
-      path,
-      file,
-      options.tailBytes ?? DEFAULT_TAIL_BYTES,
-      options.maxBytes ?? DEFAULT_MAX_BYTES,
-    );
-  }
-
+export interface BoundedTaskOutput {
   readonly path: string;
-  bytesWritten = 0;
-  truncated = false;
-  limitReached = false;
+  readonly write: (chunk: Uint8Array) => Effect.Effect<void, TaskOutputError>;
+  readonly snapshot: Effect.Effect<TaskOutputSnapshot>;
+  readonly close: Effect.Effect<void, TaskOutputError>;
+}
 
-  #tail = Buffer.alloc(0);
-  #pending: Promise<void> = Promise.resolve();
-  #closed = false;
+interface OutputState {
+  readonly bytesWritten: number;
+  readonly closed: boolean;
+  readonly limitReached: boolean;
+  readonly tail: Uint8Array;
+  readonly truncated: boolean;
+}
 
-  private constructor(
+export const BoundedTaskOutput = {
+  open: Effect.fn("agentos.backgroundTasks.output.open")(function*(
     path: string,
-    private readonly file: FileHandle,
-    private readonly tailBytes: number,
-    private readonly maxBytes: number,
+    options: { readonly tailBytes?: number; readonly maxBytes?: number } = {},
   ) {
+    const tailBytes = options.tailBytes ?? DEFAULT_TAIL_BYTES;
+    const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
     if (tailBytes < 0 || maxBytes <= 0) {
-      throw new Error("Output limits must be positive");
+      return yield* outputFailure(
+        "invalid_limits",
+        path,
+        "Output limits must be positive",
+      );
     }
-    this.path = path;
-  }
 
-  write(chunk: Uint8Array): Promise<void> {
-    if (this.#closed) return Promise.reject(new Error("Task output is closed"));
-    const copy = Buffer.from(chunk);
-    const write = this.#pending.then(async () => {
-      const remaining = Math.max(0, this.maxBytes - this.bytesWritten);
-      const accepted = copy.subarray(0, remaining);
-      if (accepted.length > 0) {
-        await this.file.write(accepted);
-        this.bytesWritten += accepted.length;
-        this.#appendTail(accepted);
-      }
-      if (accepted.length !== copy.length) {
-        this.limitReached = true;
-        throw new TaskOutputLimitError(this.maxBytes);
-      }
+    const fileSystem = yield* FileSystem.FileSystem;
+    const paths = yield* Path.Path;
+    yield* fileSystem.makeDirectory(paths.dirname(path), {
+      recursive: true,
+      mode: 0o700,
+    }).pipe(Effect.mapError(mapIo(path, "create output directory")));
+
+    const fileScope = yield* Scope.make();
+    const file = yield* fileSystem.open(path, {
+      flag: "w",
+      mode: 0o600,
+    }).pipe(
+      Effect.provideService(Scope.Scope, fileScope),
+      Effect.mapError(mapIo(path, "open output")),
+    );
+    const lock = yield* Semaphore.make(1);
+    const state = yield* Ref.make<OutputState>({
+      bytesWritten: 0,
+      closed: false,
+      limitReached: false,
+      tail: new Uint8Array(),
+      truncated: false,
     });
-    this.#pending = write.catch(() => undefined);
-    return write;
-  }
 
-  tail(): string {
-    return this.#tail.toString("utf8");
-  }
+    const write = (chunk: Uint8Array) =>
+      lock.withPermit(Effect.gen(function*() {
+        const current = yield* Ref.get(state);
+        if (current.closed) {
+          return yield* outputFailure(
+            "closed",
+            path,
+            "Background task output is closed",
+          );
+        }
+        const remaining = Math.max(0, maxBytes - current.bytesWritten);
+        const accepted = chunk.subarray(0, remaining);
+        if (accepted.length > 0) {
+          yield* file.writeAll(accepted).pipe(
+            Effect.mapError(mapIo(path, "write output")),
+          );
+        }
+        const bytesWritten = current.bytesWritten + accepted.length;
+        const nextTail = appendTail(current.tail, accepted, tailBytes);
+        const overflowed = accepted.length !== chunk.length;
+        yield* Ref.set(state, {
+          bytesWritten,
+          closed: false,
+          limitReached: current.limitReached || overflowed,
+          tail: nextTail,
+          truncated: current.truncated || bytesWritten > nextTail.length,
+        });
+        if (overflowed) {
+          return yield* outputFailure(
+            "output_limit_reached",
+            path,
+            `Background task output reached the ${maxBytes}-byte limit`,
+          );
+        }
+      }));
 
-  async close(): Promise<void> {
-    if (this.#closed) return;
-    this.#closed = true;
-    await this.#pending;
-    await this.file.close();
-  }
+    const snapshot = Ref.get(state).pipe(
+      Effect.map((current): TaskOutputSnapshot => ({
+        bytesWritten: current.bytesWritten,
+        tail: new TextDecoder().decode(current.tail),
+        truncated: current.truncated,
+        limitReached: current.limitReached,
+      })),
+    );
 
-  #appendTail(chunk: Buffer) {
-    if (this.tailBytes === 0) {
-      this.truncated ||= this.bytesWritten > 0;
-      return;
-    }
-    const combined = Buffer.concat([this.#tail, chunk]);
-    if (combined.length > this.tailBytes) {
-      this.#tail = combined.subarray(combined.length - this.tailBytes);
-      this.truncated = true;
-    } else {
-      this.#tail = combined;
-    }
-  }
+    const close = lock.withPermit(Effect.gen(function*() {
+      const current = yield* Ref.get(state);
+      if (current.closed) return;
+      yield* Ref.set(state, { ...current, closed: true });
+      yield* file.sync.pipe(Effect.mapError(mapIo(path, "sync output")));
+      yield* Scope.close(fileScope, Exit.void);
+    }));
+
+    return { path, write, snapshot, close } satisfies BoundedTaskOutput;
+  }),
+};
+
+function appendTail(
+  previous: Uint8Array,
+  chunk: Uint8Array,
+  maximumBytes: number,
+) {
+  if (maximumBytes === 0) return new Uint8Array();
+  const combined = new Uint8Array(previous.length + chunk.length);
+  combined.set(previous);
+  combined.set(chunk, previous.length);
+  return combined.length <= maximumBytes
+    ? combined
+    : combined.slice(combined.length - maximumBytes);
+}
+
+function mapIo(path: string, operation: string) {
+  return (cause: unknown) =>
+    TaskOutputError.make({
+      cause,
+      code: "io_failure",
+      message: `Failed to ${operation}`,
+      path,
+    });
+}
+
+function outputFailure(
+  code: TaskOutputError["code"],
+  path: string,
+  message: string,
+) {
+  return Effect.fail(TaskOutputError.make({
+    cause: message,
+    code,
+    message,
+    path,
+  }));
 }

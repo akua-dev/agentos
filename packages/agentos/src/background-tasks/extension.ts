@@ -1,26 +1,43 @@
-import { join } from "node:path";
-
+import * as BunServices from "@effect/platform-bun/BunServices";
 import { Type } from "@earendil-works/pi-ai";
 import type {
   AgentToolResult,
   ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
+import {
+  Config,
+  Effect,
+  Exit,
+  Option,
+  Path,
+  Ref,
+  Result,
+  Schema,
+  Scope,
+} from "effect";
 
-import { assertSafeBackgroundRequest } from "./command.ts";
 import { BackgroundTaskBroker } from "./broker.ts";
 import {
   restoreTaskLifecycle,
   TASK_LIFECYCLE_ENTRY,
   taskLifecycleEntry,
+  type TaskLifecycleEntry,
 } from "./lifecycle.ts";
-import type {
-  BackgroundCommandRequest,
-  CompletionDelivery,
-  StartBackgroundCommand,
-  TaskEvent,
-  TaskSnapshot,
-  TaskState,
+import {
+  backgroundTaskFailure,
+  type BackgroundCommandRequest,
+  type BackgroundTaskError,
+  type CompletionDelivery,
+  type StartBackgroundCommand,
+  type TaskEvent,
+  type TaskSnapshot,
+  type TaskState,
 } from "./types.ts";
+import {
+  legacyEnvironmentConfigLayer,
+  runPromiseLegacy,
+  runSyncLegacy,
+} from "../shared/legacy.ts";
 
 const MESSAGE_TYPE = "agentos-background-command-completion";
 
@@ -29,22 +46,18 @@ const RunBackgroundCommandParameters = Type.Object({
   description: Type.String({ minLength: 1 }),
   cwd: Type.Optional(Type.String({ minLength: 1 })),
   timeout: Type.Optional(Type.Number({ minimum: 0, maximum: 36_000_000 })),
-  ready_output: Type.Optional(
-    Type.String({
-      minLength: 1,
-      maxLength: 4_096,
-      description:
-        "Literal stdout or stderr text that must appear before the start is reported as successful.",
-    }),
-  ),
-  ready_timeout: Type.Optional(
-    Type.Number({
-      minimum: 1,
-      maximum: 600_000,
-      description:
-        "Maximum milliseconds to wait for ready_output; defaults to 30000.",
-    }),
-  ),
+  ready_output: Type.Optional(Type.String({
+    minLength: 1,
+    maxLength: 4_096,
+    description:
+      "Literal stdout or stderr text that must appear before the start is reported as successful.",
+  })),
+  ready_timeout: Type.Optional(Type.Number({
+    minimum: 1,
+    maximum: 600_000,
+    description:
+      "Maximum milliseconds to wait for ready_output; defaults to 30000.",
+  })),
   completion_delivery: Type.Optional(
     Type.Union([Type.Literal("steer"), Type.Literal("followUp")], {
       description:
@@ -55,26 +68,20 @@ const RunBackgroundCommandParameters = Type.Object({
 
 const GetBackgroundCommandOutputParameters = Type.Object({
   task_id: Type.String({ minLength: 1 }),
-  timeout_ms: Type.Optional(
-    Type.Number({ minimum: 0, maximum: 600_000 }),
-  ),
-  output_bytes: Type.Optional(
-    Type.Number({ minimum: 0, maximum: 65_536 }),
-  ),
+  timeout_ms: Type.Optional(Type.Number({ minimum: 0, maximum: 600_000 })),
+  output_bytes: Type.Optional(Type.Number({ minimum: 0, maximum: 65_536 })),
 });
 
 const ListBackgroundCommandsParameters = Type.Object({
-  state: Type.Optional(
-    Type.Union([
-      Type.Literal("running"),
-      Type.Literal("succeeded"),
-      Type.Literal("failed"),
-      Type.Literal("interrupted"),
-      Type.Literal("cancelled"),
-      Type.Literal("terminal"),
-      Type.Literal("all"),
-    ]),
-  ),
+  state: Type.Optional(Type.Union([
+    Type.Literal("running"),
+    Type.Literal("succeeded"),
+    Type.Literal("failed"),
+    Type.Literal("interrupted"),
+    Type.Literal("cancelled"),
+    Type.Literal("terminal"),
+    Type.Literal("all"),
+  ])),
   limit: Type.Optional(Type.Number({ minimum: 1, maximum: 100 })),
   before_task_id: Type.Optional(Type.String({ minLength: 1 })),
 });
@@ -84,102 +91,325 @@ const KillBackgroundCommandParameters = Type.Object({
 });
 
 export type AgentOSBackgroundTasksOptions = {
-  startCommand?: StartBackgroundCommand;
-  rootDirectory?: string;
-  createId?: () => string;
-  batchDelayMs?: number;
+  readonly startCommand?: StartBackgroundCommand;
+  readonly rootDirectory?: string;
+  readonly createId?: () => Effect.Effect<string, BackgroundTaskError>;
+  readonly batchDelayMs?: number;
+};
+
+export type BackgroundTaskCompletion = {
+  readonly content: string;
+  readonly deliverAs: CompletionDelivery;
+  readonly taskIds: readonly string[];
+};
+
+export type AgentOSBackgroundTasksHost = {
+  readonly appendLifecycle: (
+    entry: TaskLifecycleEntry,
+  ) => Effect.Effect<void, BackgroundTaskError>;
+  readonly sendCompletion: (
+    completion: BackgroundTaskCompletion,
+  ) => Effect.Effect<void, BackgroundTaskError>;
 };
 
 const DEFAULT_TERMINAL_PAGE_LIMIT = 20;
 
 type TaskListState = TaskState | "terminal" | "all";
-
 type TaskListQuery = {
-  state: TaskListState;
-  limit: number;
-  beforeTaskId?: string;
+  readonly state: TaskListState;
+  readonly limit: number;
+  readonly beforeTaskId?: string;
+};
+type TaskListSelection = {
+  readonly tasks: TaskSnapshot[];
+  readonly nextCursor?: string;
+};
+export type AgentOSBackgroundTasksRuntime = {
+  readonly broker: BackgroundTaskBroker;
+  readonly run: (
+    input: unknown,
+  ) => Effect.Effect<AgentToolResult<TaskSnapshot>, BackgroundTaskError>;
+  readonly output: (
+    input: unknown,
+  ) => Effect.Effect<AgentToolResult<TaskSnapshot>, BackgroundTaskError>;
+  readonly list: (
+    input: unknown,
+  ) => Effect.Effect<AgentToolResult<TaskListSelection>, BackgroundTaskError>;
+  readonly kill: (
+    input: unknown,
+  ) => Effect.Effect<AgentToolResult<TaskSnapshot>, BackgroundTaskError>;
+  readonly listRunning: Effect.Effect<string, BackgroundTaskError>;
+  readonly sessionStart: (
+    entries: readonly unknown[],
+  ) => Effect.Effect<void, BackgroundTaskError>;
+  readonly sessionTree: Effect.Effect<void, BackgroundTaskError>;
+  readonly shutdown: Effect.Effect<void>;
+};
+type WakeState = {
+  readonly active: boolean;
+  readonly pending: ReadonlySet<string>;
+  readonly scheduled: boolean;
 };
 
-type TaskListSelection = {
-  tasks: TaskSnapshot[];
-  nextCursor?: string;
-};
+const NonBlankString = Schema.String.pipe(
+  Schema.check(Schema.makeFilter((value) => value.trim().length > 0, {
+    expected: "a non-blank string",
+  })),
+);
+const RunInputSchema = Schema.Struct({
+  command: NonBlankString,
+  description: NonBlankString,
+  cwd: Schema.optional(NonBlankString),
+  timeout: Schema.optional(boundedNumber(0, 36_000_000)),
+  ready_output: Schema.optional(NonBlankString),
+  ready_timeout: Schema.optional(boundedNumber(1, 600_000)),
+  completion_delivery: Schema.optional(Schema.Literals(["steer", "followUp"])),
+});
+const OutputInputSchema = Schema.Struct({
+  task_id: NonBlankString,
+  timeout_ms: Schema.optional(boundedNumber(0, 600_000)),
+  output_bytes: Schema.optional(boundedNumber(0, 65_536)),
+});
+const TaskListStateSchema = Schema.Literals([
+  "running", "succeeded", "failed", "interrupted", "cancelled", "terminal", "all",
+]);
+const ListInputSchema = Schema.Struct({
+  state: Schema.optional(TaskListStateSchema),
+  limit: Schema.optional(boundedNumber(1, 100)),
+  before_task_id: Schema.optional(NonBlankString),
+});
+const KillInputSchema = Schema.Struct({ task_id: NonBlankString });
+
+const BackgroundTasksConfig = Config.all({
+  rootDirectory: Config.option(Config.string("AGENTOS_BACKGROUND_TASK_DIR")),
+  home: Config.option(Config.string("HOME")),
+});
 
 export function registerAgentosBackgroundTasks(
   pi: ExtensionAPI,
   options: AgentOSBackgroundTasksOptions = {},
 ) {
-  const rootDirectory =
-    options.rootDirectory ??
-    process.env.AGENTOS_BACKGROUND_TASK_DIR ??
-    join(
-      process.env.HOME ?? process.cwd(),
+  return runSyncLegacy(
+    Effect.gen(function*() {
+      const runtime = yield* makeAgentosBackgroundTasks(piHost(pi), options);
+      registerPiBackgroundTasks(pi, runtime);
+      return runtime.broker;
+    }).pipe(
+      Effect.provide(BunServices.layer),
+      Effect.provide(legacyEnvironmentConfigLayer()),
+    ),
+  );
+}
+
+export const makeAgentosBackgroundTasks = Effect.fn(
+  "agentos.backgroundTasks.extension.make",
+)(function*(
+  host: AgentOSBackgroundTasksHost,
+  options: AgentOSBackgroundTasksOptions = {},
+) {
+  const paths = yield* Path.Path;
+  const configured = yield* BackgroundTasksConfig;
+  const rootDirectory = options.rootDirectory ??
+    Option.getOrUndefined(configured.rootDirectory) ??
+    paths.join(
+      Option.getOrUndefined(configured.home) ?? paths.resolve("."),
       ".local",
       "state",
       "agentos",
       "background-commands",
     );
-  const broker = new BackgroundTaskBroker({
+  const runtimeScope = yield* Scope.make();
+  const broker = yield* BackgroundTaskBroker.make({
     rootDirectory,
     startCommand: options.startCommand,
     createId: options.createId,
-  });
-  const pending = new Set<string>();
+  }).pipe(Effect.provideService(Scope.Scope, runtimeScope));
   const batchDelayMs = options.batchDelayMs ?? 100;
-  let batchTimer: ReturnType<typeof setTimeout> | undefined;
-  let active = true;
-  let restored = false;
-
-  broker.onEvent((event) => {
-    pi.appendEntry(TASK_LIFECYCLE_ENTRY, taskLifecycleEntry(event.task));
-    if (!eligibleForWake(event)) return;
-    pending.add(event.task.id);
-    scheduleFlush();
+  const wakeState = yield* Ref.make<WakeState>({
+    active: true,
+    pending: new Set(),
+    scheduled: false,
   });
+  const restored = yield* Ref.make(false);
 
-  function scheduleFlush(delay = batchDelayMs) {
-    if (!active || batchTimer || pending.size === 0) return;
-    batchTimer = setTimeout(() => {
-      batchTimer = undefined;
-      void flush();
-    }, delay);
+  let flush: Effect.Effect<void, BackgroundTaskError>;
+
+  function scheduleFlush(delayMillis: number): Effect.Effect<void> {
+    return Effect.gen(function*() {
+      const schedule = yield* Ref.modify(wakeState, (state) => {
+        if (!state.active || state.scheduled || state.pending.size === 0) {
+          return [false, state];
+        }
+        return [true, { ...state, scheduled: true }];
+      });
+      if (!schedule) return;
+      yield* Effect.sleep(Math.max(0, delayMillis)).pipe(
+        Effect.andThen(flush),
+        Effect.forkIn(runtimeScope, { startImmediately: true }),
+      );
+    });
   }
 
-  async function flush() {
-    if (!active || pending.size === 0) return;
-    const taskIds = [...pending];
-    pending.clear();
-    const tasks = (await Promise.all(taskIds.map((id) => broker.get(id)))).filter(
+  flush = Effect.gen(function*() {
+    const taskIds = yield* Ref.modify(wakeState, (state) => {
+      if (!state.active || state.pending.size === 0) {
+        return [[], { ...state, scheduled: false }];
+      }
+      return [[...state.pending], {
+        ...state,
+        pending: new Set<string>(),
+        scheduled: false,
+      }];
+    });
+    if (taskIds.length === 0) return;
+    const tasks = (yield* Effect.forEach(taskIds, (id) => broker.get(id))).filter(
       taskNeedsWake,
     );
-    if (tasks.length === 0) return;
-
     const groups = new Map<CompletionDelivery, TaskSnapshot[]>([
       ["steer", []],
       ["followUp", []],
     ]);
-    for (const task of tasks) groups.get(task.completionDelivery)!.push(task);
-
+    for (const task of tasks) {
+      const group = groups.get(task.completionDelivery);
+      if (group !== undefined) group.push(task);
+    }
     for (const [deliverAs, group] of groups) {
       if (group.length === 0) continue;
-      try {
-        await pi.sendMessage(
-          {
-            customType: MESSAGE_TYPE,
-            content: completionMessage(group),
-            display: true,
-            details: { taskIds: group.map(({ id }) => id) },
-          },
-          { deliverAs, triggerTurn: true },
-        );
-      } catch {
-        if (!active) return;
-        for (const task of group) pending.add(task.id);
+      const delivered = yield* Effect.result(host.sendCompletion({
+        content: completionMessage(group),
+        deliverAs,
+        taskIds: group.map(({ id }) => id),
+      }));
+      if (Result.isFailure(delivered)) {
+        yield* Ref.update(wakeState, (state) => ({
+          ...state,
+          pending: new Set([...state.pending, ...group.map(({ id }) => id)]),
+        }));
       }
     }
-    if (pending.size > 0) scheduleFlush(Math.max(1_000, batchDelayMs));
-  }
+    yield* scheduleFlush(Math.max(1_000, batchDelayMs));
+  });
 
+  const unsubscribe = yield* broker.onEvent((event) =>
+    Effect.gen(function*() {
+      yield* host.appendLifecycle(taskLifecycleEntry(event.task)).pipe(
+        Effect.catch((error) =>
+          Effect.logWarning("Failed to append background task lifecycle", {
+            error: error.message,
+            taskId: event.task.id,
+          })
+        ),
+      );
+      if (!eligibleForWake(event)) return;
+      yield* Ref.update(wakeState, (state) => ({
+        ...state,
+        pending: new Set([...state.pending, event.task.id]),
+      }));
+      yield* scheduleFlush(batchDelayMs);
+    }));
+
+  const run = (input: unknown) =>
+    Effect.gen(function*() {
+      const request = yield* parseRequest(input);
+      const task = yield* broker.start(request);
+      return result(task, formatStart(task));
+    });
+  const output = (input: unknown) =>
+    Effect.gen(function*() {
+      const params = yield* decodeInput(OutputInputSchema, input);
+      const task = yield* broker.get(params.task_id, {
+        waitMs: params.timeout_ms,
+        outputBytes: params.output_bytes,
+        observeCompletion: true,
+      });
+      return result(task, formatTaskWithOutput(task));
+    });
+  const list = (input: unknown) =>
+    Effect.gen(function*() {
+      const tasks = yield* broker.list();
+      const query = yield* parseTaskListQuery(input);
+      const selection = yield* selectTaskList(tasks, query);
+      return result(selection, formatTaskList(selection));
+    });
+  const kill = (input: unknown) =>
+    Effect.gen(function*() {
+      const params = yield* decodeInput(KillInputSchema, input);
+      const task = yield* broker.kill(params.task_id);
+      return result(task, `Killed background command "${task.id}".`);
+    });
+  const listRunning = Effect.gen(function*() {
+    const tasks = yield* broker.list();
+    const selection = yield* selectTaskList(tasks, {
+      state: "running",
+      limit: DEFAULT_TERMINAL_PAGE_LIMIT,
+    });
+    return formatTaskList(selection);
+  });
+  const sessionStart = (entries: readonly unknown[]) =>
+    Effect.gen(function*() {
+      yield* Ref.update(wakeState, (state) => ({ ...state, active: true }));
+      const alreadyRestored = yield* Ref.getAndSet(restored, true);
+      if (alreadyRestored) return;
+      const lifecycle = restoreTaskLifecycle(entries);
+      yield* broker.restore(lifecycle.tasks);
+      for (const task of lifecycle.interrupted) {
+        yield* host.appendLifecycle(taskLifecycleEntry(task));
+      }
+  });
+  const sessionTree = Effect.gen(function*() {
+    for (const task of yield* broker.list()) {
+      if (task.state === "running") {
+        yield* host.appendLifecycle(taskLifecycleEntry(task));
+      }
+    }
+  });
+  const shutdown = Effect.gen(function*() {
+    yield* Ref.set(wakeState, {
+      active: false,
+      pending: new Set<string>(),
+      scheduled: false,
+    });
+    yield* unsubscribe;
+    yield* broker.shutdown;
+    yield* Scope.close(runtimeScope, Exit.void);
+  });
+
+  return {
+    broker,
+    kill,
+    list,
+    listRunning,
+    output,
+    run,
+    sessionStart,
+    sessionTree,
+    shutdown,
+  } satisfies AgentOSBackgroundTasksRuntime;
+});
+
+function piHost(pi: ExtensionAPI): AgentOSBackgroundTasksHost {
+  return {
+    appendLifecycle: (entry) =>
+      piOperation("append task lifecycle", () =>
+        pi.appendEntry(TASK_LIFECYCLE_ENTRY, entry)),
+    sendCompletion: (completion) =>
+      piOperation("send completion message", () =>
+        pi.sendMessage({
+          customType: MESSAGE_TYPE,
+          content: completion.content,
+          display: true,
+          details: { taskIds: completion.taskIds },
+        }, {
+          deliverAs: completion.deliverAs,
+          triggerTurn: true,
+        })),
+  };
+}
+
+function registerPiBackgroundTasks(
+  pi: ExtensionAPI,
+  runtime: AgentOSBackgroundTasksRuntime,
+) {
   pi.registerTool({
     name: "run_background_command",
     label: "Run background command",
@@ -195,115 +425,72 @@ export function registerAgentosBackgroundTasks(
       "Never put credentials in the command string; use approved environment or native config.",
     ],
     parameters: RunBackgroundCommandParameters,
-    async execute(_toolCallId, params) {
-      const request = parseRequest(params);
-      const task = await broker.start(request);
-      return result(task, formatStart(task));
+    execute(_toolCallId, params) {
+      return runPromiseLegacy(runtime.run(params));
     },
   });
-
   pi.registerTool({
     name: "get_background_command_output",
     label: "Get background command output",
     description:
       "Get status and bounded output from one background command, optionally waiting for completion.",
     parameters: GetBackgroundCommandOutputParameters,
-    async execute(_toolCallId, params) {
-      const task = await broker.get(requiredString(params, "task_id"), {
-        waitMs: optionalBoundedNumber(params, "timeout_ms", 0, 600_000),
-        outputBytes: optionalBoundedNumber(params, "output_bytes", 0, 65_536),
-        observeCompletion: true,
-      });
-      return result(task, formatTaskWithOutput(task));
+    execute(_toolCallId, params) {
+      return runPromiseLegacy(runtime.output(params));
     },
   });
-
   pi.registerTool({
     name: "list_background_commands",
     label: "List background commands",
     description:
       "List background commands without output. Defaults to every running command; select a terminal state with a bounded page and optional older-page cursor.",
     parameters: ListBackgroundCommandsParameters,
-    async execute(_toolCallId, params) {
-      const tasks = await broker.list();
-      const selection = selectTaskList(tasks, parseTaskListQuery(params));
-      return result(selection, formatTaskList(selection));
+    execute(_toolCallId, params) {
+      return runPromiseLegacy(runtime.list(params));
     },
   });
-
   pi.registerTool({
     name: "kill_background_command",
     label: "Kill background command",
     description:
       "Stop one owned background command. The explicit kill response consumes its completion notification.",
     parameters: KillBackgroundCommandParameters,
-    async execute(_toolCallId, params) {
-      const task = await broker.kill(requiredString(params, "task_id"));
-      return result(task, `Killed background command "${task.id}".`);
+    execute(_toolCallId, params) {
+      return runPromiseLegacy(runtime.kill(params));
     },
   });
-
   pi.registerCommand("background-commands", {
     description: "List AgentOS background commands",
-    handler: async (_args, context) => {
-      const tasks = await broker.list();
-      context.ui.notify(
-        formatTaskList(
-          selectTaskList(tasks, {
-            state: "running",
-            limit: DEFAULT_TERMINAL_PAGE_LIMIT,
-          }),
+    handler(_arguments, context) {
+      return runPromiseLegacy(runtime.listRunning.pipe(
+        Effect.flatMap((message) =>
+          piOperation("notify background command list", () =>
+            context.ui.notify(message, "info"))
         ),
-        "info",
-      );
+      ));
     },
   });
-
-  pi.on("session_start", (_event, context) => {
-    active = true;
-    if (restored) return;
-    restored = true;
-    const lifecycle = restoreTaskLifecycle(
-      context.sessionManager.getBranch(),
-    );
-    broker.restore(lifecycle.tasks);
-    for (const task of lifecycle.interrupted) {
-      pi.appendEntry(TASK_LIFECYCLE_ENTRY, taskLifecycleEntry(task));
-    }
-  });
-
-  pi.on("session_tree", async () => {
-    for (const task of await broker.list()) {
-      if (task.state === "running") {
-        pi.appendEntry(TASK_LIFECYCLE_ENTRY, taskLifecycleEntry(task));
-      }
-    }
-  });
-
-  pi.on("session_shutdown", async () => {
-    active = false;
-    if (batchTimer) clearTimeout(batchTimer);
-    batchTimer = undefined;
-    pending.clear();
-    await broker.shutdown();
-  });
-
-  return broker;
+  pi.on("session_start", (_event, context) =>
+    runPromiseLegacy(
+      piOperation(
+        "read session branch",
+        () => context.sessionManager.getBranch(),
+      ).pipe(Effect.flatMap(runtime.sessionStart)),
+    ));
+  pi.on("session_tree", () => runPromiseLegacy(runtime.sessionTree));
+  pi.on("session_shutdown", () => runPromiseLegacy(runtime.shutdown));
 }
 
 export default registerAgentosBackgroundTasks;
 
 function eligibleForWake(event: TaskEvent) {
-  if (event.type !== "task_terminal") return false;
-  return taskNeedsWake(event.task);
+  return event.type === "task_terminal" && taskNeedsWake(event.task);
 }
 
 function taskNeedsWake(task: TaskSnapshot) {
-  return (
-    !task.completionObserved &&
+  return !task.completionObserved &&
     !task.explicitlyKilled &&
-    task.state !== "cancelled"
-  );
+    task.state !== "cancelled";
 }
 
 function completionMessage(tasks: TaskSnapshot[]) {
@@ -338,13 +525,11 @@ function formatTask(task: TaskSnapshot) {
   return `${task.id} ${task.state}${status} ${task.description}`;
 }
 
-function selectTaskList(
-  tasks: TaskSnapshot[],
-  query: TaskListQuery,
-): TaskListSelection {
+function selectTaskList(tasks: TaskSnapshot[], query: TaskListQuery) {
   const running = tasks.filter(({ state }) => state === "running");
-  if (query.state === "running") return { tasks: running };
-
+  if (query.state === "running") {
+    return Effect.succeed<TaskListSelection>({ tasks: running });
+  }
   let terminal = tasks
     .filter(({ state }) => state !== "running")
     .reverse()
@@ -355,25 +540,23 @@ function selectTaskList(
   if (query.beforeTaskId !== undefined) {
     const cursor = terminal.findIndex(({ id }) => id === query.beforeTaskId);
     if (cursor < 0) {
-      throw new Error(
+      return Effect.fail(backgroundTaskFailure(
+        "unknown_task",
         `Unknown background command cursor: ${query.beforeTaskId}`,
-      );
+      ));
     }
     terminal = terminal.slice(cursor + 1);
   }
   const page = terminal.slice(0, query.limit);
-  const nextCursor =
-    terminal.length > page.length ? page.at(-1)?.id : undefined;
-  return {
+  const nextCursor = terminal.length > page.length ? page.at(-1)?.id : undefined;
+  return Effect.succeed<TaskListSelection>({
     tasks: query.state === "all" ? [...running, ...page] : page,
     ...(nextCursor === undefined ? {} : { nextCursor }),
-  };
+  });
 }
 
 function compareTerminalRecency(left: TaskSnapshot, right: TaskSnapshot) {
-  return terminalTimestamp(right).localeCompare(
-    terminalTimestamp(left),
-  );
+  return terminalTimestamp(right).localeCompare(terminalTimestamp(left));
 }
 
 function terminalTimestamp(task: TaskSnapshot) {
@@ -400,107 +583,90 @@ function formatTaskWithOutput(task: TaskSnapshot) {
 }
 
 function formatStart(task: TaskSnapshot) {
-  if (task.state === "running") {
-    return `Started background command "${task.id}": ${task.description}\nOutput: ${task.outputPath}`;
-  }
-  return `Background command "${task.id}" ${task.state} before the start response.\n${formatTaskWithOutput(task)}`;
+  return task.state === "running"
+    ? `Started background command "${task.id}": ${task.description}\nOutput: ${task.outputPath}`
+    : `Background command "${task.id}" ${task.state} before the start response.\n${formatTaskWithOutput(task)}`;
 }
 
-function parseRequest(params: Record<string, unknown>): BackgroundCommandRequest {
-  const request: BackgroundCommandRequest = {
-    command: requiredString(params, "command"),
-    description: requiredString(params, "description"),
-    ...(params.cwd === undefined ? {} : { cwd: requiredString(params, "cwd") }),
-    ...(params.timeout === undefined
-      ? {}
-      : { timeout: optionalBoundedNumber(params, "timeout", 0, 36_000_000)! }),
-    ...(params.ready_output === undefined
-      ? {}
-      : { readyOutput: requiredString(params, "ready_output") }),
-    ...(params.ready_timeout === undefined
-      ? {}
-      : {
-          readyTimeout: optionalBoundedNumber(
-            params,
-            "ready_timeout",
-            1,
-            600_000,
-          )!,
-        }),
-    ...(params.completion_delivery === undefined
-      ? {}
-      : {
-          completionDelivery: completionDelivery(params.completion_delivery),
-        }),
-  };
-  assertSafeBackgroundRequest(request);
-  return request;
+function parseRequest(input: unknown) {
+  return Effect.gen(function*() {
+    const params = yield* decodeInput(RunInputSchema, input);
+    if (params.ready_timeout !== undefined && params.ready_output === undefined) {
+      return yield* Effect.fail(backgroundTaskFailure(
+        "invalid_request",
+        "ready_timeout requires ready_output",
+      ));
+    }
+    return {
+      command: params.command,
+      description: params.description,
+      ...(params.cwd === undefined ? {} : { cwd: params.cwd }),
+      ...(params.timeout === undefined ? {} : { timeout: Math.floor(params.timeout) }),
+      ...(params.ready_output === undefined ? {} : { readyOutput: params.ready_output }),
+      ...(params.ready_timeout === undefined
+        ? {}
+        : { readyTimeout: Math.floor(params.ready_timeout) }),
+      ...(params.completion_delivery === undefined
+        ? {}
+        : { completionDelivery: params.completion_delivery }),
+    } satisfies BackgroundCommandRequest;
+  });
 }
 
-function completionDelivery(value: unknown): CompletionDelivery {
-  if (value === "steer" || value === "followUp") return value;
-  throw new Error("completion_delivery must be steer or followUp");
+function parseTaskListQuery(input: unknown) {
+  return decodeInput(ListInputSchema, input).pipe(
+    Effect.flatMap((params) => {
+      const state = params.state ?? "running";
+      if (state === "running" && params.before_task_id !== undefined) {
+        return Effect.fail(backgroundTaskFailure(
+          "invalid_request",
+          "before_task_id requires a terminal state or all",
+        ));
+      }
+      return Effect.succeed<TaskListQuery>({
+        state,
+        limit: Math.floor(params.limit ?? DEFAULT_TERMINAL_PAGE_LIMIT),
+        ...(params.before_task_id === undefined
+          ? {}
+          : { beforeTaskId: params.before_task_id }),
+      });
+    }),
+  );
 }
 
-function parseTaskListQuery(
-  params: Record<string, unknown>,
-): TaskListQuery {
-  const state = taskListState(params.state);
-  const beforeTaskId =
-    params.before_task_id === undefined
-      ? undefined
-      : requiredString(params, "before_task_id");
-  if (state === "running" && beforeTaskId !== undefined) {
-    throw new Error("before_task_id requires a terminal state or all");
-  }
-  return {
-    state,
-    limit:
-      optionalBoundedNumber(params, "limit", 1, 100) ??
-      DEFAULT_TERMINAL_PAGE_LIMIT,
-    ...(beforeTaskId === undefined ? {} : { beforeTaskId }),
-  };
-}
-
-function taskListState(value: unknown): TaskListState {
-  if (value === undefined) return "running";
-  if (
-    value === "running" ||
-    value === "succeeded" ||
-    value === "failed" ||
-    value === "interrupted" ||
-    value === "cancelled" ||
-    value === "terminal" ||
-    value === "all"
-  ) {
-    return value;
-  }
-  throw new Error("state is not a supported background command state");
-}
-
-function requiredString(params: Record<string, unknown>, name: string) {
-  const value = params[name];
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(`${name} must be a non-empty string`);
-  }
-  return value;
-}
-
-function optionalBoundedNumber(
-  params: Record<string, unknown>,
-  name: string,
-  minimum: number,
-  maximum: number,
+function decodeInput<S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  input: unknown,
 ) {
-  const value = params[name];
-  if (value === undefined) return undefined;
-  if (
-    typeof value !== "number" ||
-    !Number.isFinite(value) ||
-    value < minimum ||
-    value > maximum
-  ) {
-    throw new Error(`${name} must be between ${minimum} and ${maximum}`);
-  }
-  return Math.floor(value);
+  return Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(input).pipe(
+    Effect.mapError((cause) =>
+      backgroundTaskFailure(
+        "invalid_request",
+        `Invalid background command input: ${String(cause)}`,
+        cause,
+      )
+    ),
+  );
+}
+
+function boundedNumber(minimum: number, maximum: number) {
+  return Schema.Number.pipe(
+    Schema.check(
+      Schema.isFinite(),
+      Schema.isGreaterThanOrEqualTo(minimum),
+      Schema.isLessThanOrEqualTo(maximum),
+    ),
+  );
+}
+
+function piOperation<A>(operation: string, evaluate: () => A) {
+  return Effect.try({
+    try: evaluate,
+    catch: (cause) =>
+      backgroundTaskFailure(
+        "runtime_failure",
+        `Failed to ${operation}`,
+        cause,
+      ),
+  });
 }

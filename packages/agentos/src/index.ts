@@ -328,12 +328,21 @@ export {
   defaultAgentOSRuntime,
 } from "./behaviors.ts";
 export {
+  makeAgentosBackgroundTasks,
   registerAgentosBackgroundTasks,
+  type AgentOSBackgroundTasksHost,
   type AgentOSBackgroundTasksOptions,
+  type AgentOSBackgroundTasksRuntime,
+  type BackgroundTaskCompletion,
 } from "./background-tasks/extension.ts";
 export {
+  makeCoordinationReadiness,
   registerCoordinationReadiness,
+  CoordinationReadinessError,
   type CoordinationReadinessOptions,
+  type CoordinationReadinessResult,
+  type CoordinationReadinessRuntime,
+  type CoordinationReadinessRuntimeOptions,
 } from "./coordination-readiness/extension.ts";
 export {
   attestPiProviderReadiness,
