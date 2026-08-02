@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agentos-a2a
+  labels:
+    app.kubernetes.io/name: agentos-a2a
+    app.kubernetes.io/component: protocol-adapter
+    app.kubernetes.io/part-of: agentos
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-a2a
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: agentos
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: agentgateway-a2a
+      ports:
+        - protocol: TCP
+          port: 8790

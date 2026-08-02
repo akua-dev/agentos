@@ -87,6 +87,19 @@
         "@earendil-works/pi-coding-agent": "0.81.1",
       },
     },
+    "services/a2a": {
+      "name": "@agentos/a2a",
+      "version": "0.0.0",
+      "bin": {
+        "agentos-a2a": "./src/main.ts",
+      },
+      "dependencies": {
+        "@akua-dev/agentos": "workspace:*",
+        "@effect/platform-bun": "4.0.0-beta.102",
+        "@effect/sql-pg": "4.0.0-beta.102",
+        "effect": "4.0.0-beta.102",
+      },
+    },
     "services/agentgateway": {
       "name": "@agentos/agentgateway",
       "version": "0.0.0",
@@ -219,6 +232,8 @@
   },
   "packages": {
     "@acemir/cssom": ["@acemir/cssom@0.9.31", "", {}, "sha512-ZnR3GSaH+/vJ0YlHau21FjfLYjMpYVIzTD8M8vIEQvIGxeOXyXdzCI140rrCY862p/C/BbzWsjc1dgnM9mkoTA=="],
+
+    "@agentos/a2a": ["@agentos/a2a@workspace:services/a2a"],
 
     "@agentos/agentgateway": ["@agentos/agentgateway@workspace:services/agentgateway"],
 

@@ -158,6 +158,15 @@
         "fleet": {
           "this": {}
         },
+        "profile_agentos_a2a_send": {
+          "this": {}
+        },
+        "ceiling_agentos_a2a_send": {
+          "this": {}
+        },
+        "allow_agentos_a2a_send": {
+          "this": {}
+        },
         "profile_github_actions_dispatch": {
           "this": {}
         },
@@ -291,6 +300,34 @@
             "directly_related_user_types": [
               {
                 "type": "fleet"
+              }
+            ]
+          },
+          "profile_agentos_a2a_send": {
+            "directly_related_user_types": [
+              {
+                "type": "access_profile",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "ceiling_agentos_a2a_send": {
+            "directly_related_user_types": [
+              {
+                "type": "access_ceiling",
+                "condition": "active_window"
+              }
+            ]
+          },
+          "allow_agentos_a2a_send": {
+            "directly_related_user_types": [
+              {
+                "type": "mate",
+                "condition": "active_window"
+              },
+              {
+                "type": "assignment",
+                "condition": "active_window"
               }
             ]
           },

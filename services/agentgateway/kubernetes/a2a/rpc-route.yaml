@@ -1,0 +1,22 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: agentos-a2a-rpc
+  labels:
+    app.kubernetes.io/name: agentgateway-a2a
+    app.kubernetes.io/component: protocol-gateway
+    app.kubernetes.io/part-of: agentos
+spec:
+  parentRefs:
+    - name: agentgateway-a2a
+      sectionName: https
+  rules:
+    - matches:
+        - method: POST
+          path:
+            type: PathPrefix
+            value: /agents/
+      backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: agentos-a2a

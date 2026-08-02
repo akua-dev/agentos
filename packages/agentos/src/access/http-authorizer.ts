@@ -804,6 +804,8 @@ function authorizationResourceFromHeaders(headers: Headers): unknown {
 
 function authorizationResourceKey(resource: AuthorizationResourceV1): string {
   switch (resource.kind) {
+    case "agent_skill":
+      return `agent_skill:${resource.targetAgentId}/${resource.skillId}`;
     case "provider_service":
       return `provider_service:${resource.provider}:${resource.service}`;
     case "provider_account":
@@ -875,8 +877,10 @@ function subjectForIdentity(
 
 function providerForAuthorizationResource(
   resource: AuthorizationResourceV1,
-): "github" | "openai" | "" {
+): "agentos" | "github" | "openai" | "" {
   switch (resource.kind) {
+    case "agent_skill":
+      return "agentos";
     case "provider_service":
     case "provider_account":
     case "provider_adapter":

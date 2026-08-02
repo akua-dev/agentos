@@ -84,6 +84,8 @@ Agentgateway preserves the external authorization denial body and upstream statu
 - standalone release `v1.4.1`, commit `163ea2146acb7b82082acea30ed691b29079095f`;
 - the multi-architecture image index digest;
 - the standalone Helm chart version, OCI manifest digest and downloaded archive SHA-256;
+- the Kubernetes controller image index digest plus the controller and CRD OCI
+  chart digests and downloaded archive SHA-256 values;
 - Darwin arm64, Linux amd64 and Linux arm64 binary SHA-256 values.
 
 The release is stable, not an alpha or nightly build. The executable test validates the binary version's configuration directly. See the [v1.4.1 release](https://github.com/agentgateway/agentgateway/releases/tag/v1.4.1) and [standalone release notes](https://agentgateway.dev/docs/standalone/latest/reference/release-notes/).
@@ -150,6 +152,15 @@ version, and Git revision, and can optionally write its bounded numeric latency
 sample to `AGENTOS_A2A_METRICS_PATH`. The full PostgreSQL-first decision,
 version gap, authority boundaries, and implementation gate are recorded in
 [`a2a-postgresql-first-evaluation.md`](../../docs/research/a2a-postgresql-first-evaluation.md).
+
+The implemented A2A path uses the pinned Kubernetes API surface. The reviewed
+Kustomize resources in [`kubernetes/a2a`](./kubernetes/a2a) define an HTTPS
+`Gateway`, A2A `AgentgatewayBackend`, separate public-GET and private-POST
+`HTTPRoute` objects, and fail-closed body-forwarding external authorization for
+RPC delivery. Agentgateway routes the ordinary
+[`agentos-a2a`](../a2a/README.md) Service and owns no Agent workload or durable
+Task state. Installing the pinned controller and CRDs is a cluster prerequisite,
+not an instruction to make Helm the AgentOS deployment authority.
 
 ## Helm versus Kustomize
 

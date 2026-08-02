@@ -52,7 +52,18 @@ const CorrelationId = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^corr_[0-9a-f]{32}$/)),
 );
 
-export const AccessProviderIdSchema = Schema.Literals(["github", "openai"]);
+const AgentSkillId = Schema.String.pipe(
+  Schema.check(
+    Schema.isMaxLength(128),
+    Schema.isPattern(/^[a-z][a-z0-9._-]*@v[1-9][0-9]*$/),
+  ),
+);
+
+export const AccessProviderIdSchema = Schema.Literals([
+  "agentos",
+  "github",
+  "openai",
+]);
 export const AccessRateClassIdSchema = Schema.Literals([
   "disabled",
   "low",
@@ -60,6 +71,7 @@ export const AccessRateClassIdSchema = Schema.Literals([
   "high",
 ]);
 export const AccessCapabilityIdSchema = Schema.Literals([
+  "agentos.a2a.send",
   "github.actions.dispatch",
   "github.actions.read",
   "github.contents.write",
@@ -120,6 +132,11 @@ export const AccessCeilingScopeV1Schema = Schema.Union([
 ]);
 
 export const AuthorizationResourceV1Schema = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("agent_skill"),
+    targetAgentId: Uuid,
+    skillId: AgentSkillId,
+  }),
   Schema.Struct({
     kind: Schema.Literal("provider_service"),
     provider: AccessProviderIdSchema,
@@ -325,6 +342,7 @@ export interface AccessCapabilityDefinitionV1 {
   readonly id: AccessCapabilityId;
   readonly provider: AccessProviderId | "provider-adapter";
   readonly action:
+    | "a2a_send"
     | "actions_dispatch"
     | "actions_read"
     | "contents_write"
@@ -355,6 +373,14 @@ function capability(
 
 export const accessCapabilitiesV1: ReadonlyArray<AccessCapabilityDefinitionV1> =
   Object.freeze([
+    capability({
+      id: "agentos.a2a.send",
+      provider: "agentos",
+      action: "a2a_send",
+      resourceKinds: ["agent_skill"],
+      registryAuthority: "captain-platform",
+      grantAuthority: "first-mate-within-ceiling",
+    }),
     capability({
       id: "github.actions.dispatch",
       provider: "github",
@@ -514,6 +540,8 @@ export function authorizationSubjectName(subject: AuthorizationSubjectV1) {
 
 export function authorizationResourceName(resource: AuthorizationResourceV1) {
   switch (resource.kind) {
+    case "agent_skill":
+      return `agent:${resource.targetAgentId}/skill:${resource.skillId}`;
     case "provider_service":
       return `provider:${resource.provider}/service:${resource.service}`;
     case "provider_account":

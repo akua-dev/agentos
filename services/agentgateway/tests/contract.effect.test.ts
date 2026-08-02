@@ -29,6 +29,40 @@ const ReleaseSchema = Schema.Struct({
       "b52cf0f6414c96c49f2d6976e09e24e6a035b913f5023e952cb0f6e95901ec86",
     ),
   }),
+  kubernetes: Schema.Struct({
+    controllerImage: Schema.Struct({
+      reference: Schema.Literal(
+        "cr.agentgateway.dev/controller:v1.4.1",
+      ),
+      indexDigest: Schema.Literal(
+        "sha256:8b9e2bbe65b6a4b2ed93acd4fd0ede11f1eb2cfa8495e2b67c2d890e7fce8cec",
+      ),
+    }),
+    chart: Schema.Struct({
+      reference: Schema.Literal(
+        "oci://cr.agentgateway.dev/charts/agentgateway",
+      ),
+      version: Schema.Literal("1.4.1"),
+      digest: Schema.Literal(
+        "sha256:5276b3ac0d17a8b997f7cb4123b3adf2ff3f8f051b0046252a4af009c5c9e3a5",
+      ),
+      archiveSha256: Schema.Literal(
+        "aace0555ba061920b705b976a31cb967a0806e9e4e1bbd71b31a7bb87271d59f",
+      ),
+    }),
+    crdsChart: Schema.Struct({
+      reference: Schema.Literal(
+        "oci://cr.agentgateway.dev/charts/agentgateway-crds",
+      ),
+      version: Schema.Literal("1.4.1"),
+      digest: Schema.Literal(
+        "sha256:e82095934b8119b2199e08a8fb2b00a32e2dd4835f565715ef36c91595af7cb3",
+      ),
+      archiveSha256: Schema.Literal(
+        "16a6f36c51ec82832dd3684ea6d45e7c48ca642a6297116878fc02ce3ba8da3a",
+      ),
+    }),
+  }),
   binaries: Schema.Struct({
     darwinArm64: Schema.Literal(
       "f0fdc496b6dfd23f740bf458ff3a80c4453d7fd2397f0851bb42c5e00b6841d7",
@@ -247,6 +281,10 @@ layer(Layer.merge(BunFileSystem.layer, BunPath.layer))(
           path.join(testDirectory, "../release.json"),
         );
         assert.strictEqual(release.version, "1.4.1");
+        assert.strictEqual(
+          release.kubernetes.controllerImage.indexDigest,
+          "sha256:8b9e2bbe65b6a4b2ed93acd4fd0ede11f1eb2cfa8495e2b67c2d890e7fce8cec",
+        );
       }),
     );
 

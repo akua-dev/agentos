@@ -1,0 +1,12 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: agentos-a2a
+  labels:
+    app.kubernetes.io/name: agentgateway-a2a
+    app.kubernetes.io/component: protocol-gateway
+    app.kubernetes.io/part-of: agentos
+spec:
+  a2a:
+    host: agentos-a2a.agentos.svc.cluster.local
+    port: 8790

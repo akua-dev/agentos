@@ -466,6 +466,8 @@ const providerForResource = (
   resource: ProviderCredentialPlanInput["resource"],
 ): ProviderCredentialPlanInput["provider"] => {
   switch (resource.kind) {
+    case "agent_skill":
+      return "agentos";
     case "provider_service":
     case "provider_account":
     case "provider_adapter":

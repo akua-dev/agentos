@@ -524,11 +524,13 @@ export {
   type HarnessProviderV1,
 } from "./harness-control/acp.ts";
 export {
+  A2aAgentCardV1Schema,
   A2aAgentCardInputV1,
   A2aContractError,
   A2aDeliveryInputV1,
   A2aHierarchyRouteInputV1,
   A2aOutageRecoveryInputV1,
+  A2aPublicAgentCardInputV1,
   A2aOutageV1Schema,
   A2aRetryInputV1,
   A2aSpeechActV1Schema,
@@ -536,6 +538,7 @@ export {
   A2aTransportStatusV1Schema,
   compileA2aAgentCard,
   compileA2aDeliveryRequest,
+  compileA2aPublicAgentCard,
   evaluateA2aHierarchyRoute,
   evaluateA2aOutageRecovery,
   interpretA2aTransportResult,
@@ -544,6 +547,29 @@ export {
   type A2aSpeechActV1,
   type A2aTransportStatusV1,
 } from "./protocol/a2a.ts";
+export {
+  A2aCanonicalDeliveryStore,
+  A2aCanonicalReferenceVerificationV1Schema,
+  A2aCanonicalStoreError,
+  A2aDeliveryProjectionV1Schema,
+  A2aPolicyAuthorizationRequestV1Schema,
+  A2aPolicyAuthorizer,
+  A2aPolicyError,
+  A2aPolicyGrantV1Schema,
+  A2aTransportTelemetry,
+  A2aTransportTelemetryEventV1Schema,
+  A2aVerifiedCanonicalReferenceV1Schema,
+  makeA2aPolicyAuthorizerLayer,
+  type A2aPolicyAuthorizationRequestV1,
+  type A2aSkillFilterRequestV1,
+} from "./protocol/a2a-runtime.ts";
+export {
+  A2aCanonicalDatabase,
+  A2aCanonicalDatabaseSqlLayer,
+  A2aCanonicalDatabaseUnavailable,
+  A2aCanonicalDeliveryStorePostgresLayer,
+  type A2aDeliveryProjectionRequestV1,
+} from "./protocol/a2a-postgres.ts";
 export {
   CompiledSecondMateTopologyPlanV1Schema,
   ExistingSecondMateTopologyDestinationV1,

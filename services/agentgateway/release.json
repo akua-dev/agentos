@@ -12,6 +12,24 @@
     "digest": "sha256:88b04ce071461841562b7e697a935c5d432c8f4859f7dc46d267791e737820e3",
     "archiveSha256": "b52cf0f6414c96c49f2d6976e09e24e6a035b913f5023e952cb0f6e95901ec86"
   },
+  "kubernetes": {
+    "controllerImage": {
+      "reference": "cr.agentgateway.dev/controller:v1.4.1",
+      "indexDigest": "sha256:8b9e2bbe65b6a4b2ed93acd4fd0ede11f1eb2cfa8495e2b67c2d890e7fce8cec"
+    },
+    "chart": {
+      "reference": "oci://cr.agentgateway.dev/charts/agentgateway",
+      "version": "1.4.1",
+      "digest": "sha256:5276b3ac0d17a8b997f7cb4123b3adf2ff3f8f051b0046252a4af009c5c9e3a5",
+      "archiveSha256": "aace0555ba061920b705b976a31cb967a0806e9e4e1bbd71b31a7bb87271d59f"
+    },
+    "crdsChart": {
+      "reference": "oci://cr.agentgateway.dev/charts/agentgateway-crds",
+      "version": "1.4.1",
+      "digest": "sha256:e82095934b8119b2199e08a8fb2b00a32e2dd4835f565715ef36c91595af7cb3",
+      "archiveSha256": "16a6f36c51ec82832dd3684ea6d45e7c48ca642a6297116878fc02ce3ba8da3a"
+    }
+  },
   "binaries": {
     "darwinArm64": "f0fdc496b6dfd23f740bf458ff3a80c4453d7fd2397f0851bb42c5e00b6841d7",
     "linuxAmd64": "20f7b298e0c36eef33e7d612b0d0b91d87d43124f59b01f6e9b730477f66d982",

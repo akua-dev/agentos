@@ -130,6 +130,9 @@ function routeIsCanonical(request: ProviderPolicyDecisionRequestV1) {
   ) {
     return request.resource.provider === request.provider;
   }
+  if (request.resource.kind === "agent_skill") {
+    return request.provider === "agentos";
+  }
   return request.provider === "github";
 }
 

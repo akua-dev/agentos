@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: agentos
+resources:
+  - gateway.yaml
+  - backend.yaml
+  - public-route.yaml
+  - rpc-route.yaml
+  - rpc-policy.yaml
