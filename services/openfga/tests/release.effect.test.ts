@@ -1,7 +1,6 @@
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { assert, describe, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import * as BunServices from "@effect/platform-bun/BunServices";
+import { assert, layer } from "@effect/vitest";
+import { Crypto, Effect, Encoding, FileSystem, Path, Schema } from "effect";
 
 import { AgentOSOpenFgaAuthorizationModelV1 } from "../../../packages/agentos/src/access/openfga.ts";
 
@@ -37,28 +36,66 @@ const ReleaseSchema = Schema.Struct({
     ),
   }),
 });
+const OpenFgaModelSchema = Schema.Struct({
+  schema_version: Schema.Literal("1.1"),
+  type_definitions: Schema.Array(Schema.Struct({
+    type: Schema.String,
+    relations: Schema.optional(Schema.Record(
+      Schema.String,
+      Schema.Record(Schema.String, Schema.Unknown),
+    )),
+    metadata: Schema.optional(Schema.Struct({
+      relations: Schema.Record(Schema.String, Schema.Struct({
+        directly_related_user_types: Schema.Array(Schema.Struct({
+          type: Schema.String,
+          condition: Schema.optional(Schema.String),
+        })),
+      })),
+    })),
+  })),
+  conditions: Schema.Record(Schema.String, Schema.Struct({
+    name: Schema.String,
+    expression: Schema.String,
+    parameters: Schema.Record(Schema.String, Schema.Struct({
+      type_name: Schema.Literal("TYPE_NAME_TIMESTAMP"),
+    })),
+  })),
+});
 
-const serviceRoot = new URL("..", import.meta.url);
+const serviceRootUrl = new URL("..", import.meta.url);
 
-describe("OpenFGA release pin", () => {
+layer(BunServices.layer)("OpenFGA release pin", (it) => {
   it.effect("pins reviewed runtime, predecessor, database, and immutable model artifacts", () =>
     Effect.gen(function*() {
-      const releaseSource = yield* Effect.tryPromise(() =>
-        readFile(new URL("release.json", serviceRoot), "utf8")
+      const crypto = yield* Crypto.Crypto;
+      const fileSystem = yield* FileSystem.FileSystem;
+      const paths = yield* Path.Path;
+      const serviceRoot = yield* paths.fromFileUrl(serviceRootUrl);
+      const releaseSource = yield* fileSystem.readFileString(
+        paths.join(serviceRoot, "release.json"),
       );
       const release = yield* Schema.decodeUnknownEffect(
         Schema.fromJsonString(ReleaseSchema),
         { onExcessProperty: "error" },
       )(releaseSource);
-      const modelSource = yield* Effect.tryPromise(() =>
-        readFile(new URL(release.model.artifact, serviceRoot), "utf8")
+      const modelSource = yield* fileSystem.readFileString(
+        paths.join(serviceRoot, release.model.artifact),
       );
+      const model = yield* Schema.decodeUnknownEffect(
+        Schema.fromJsonString(OpenFgaModelSchema),
+        { onExcessProperty: "error" },
+      )(modelSource);
       assert.strictEqual(
-        createHash("sha256").update(modelSource).digest("hex"),
+        Encoding.encodeHex(
+          yield* crypto.digest(
+            "SHA-256",
+            new TextEncoder().encode(modelSource),
+          ),
+        ),
         release.model.artifactSha256,
       );
       assert.deepStrictEqual(
-        JSON.parse(modelSource),
+        model,
         AgentOSOpenFgaAuthorizationModelV1,
       );
       assert.strictEqual(
