@@ -18,32 +18,35 @@ function serverError(
 /** One-way adapter from Effect request programs into Bun's Promise HTTP ABI. */
 export function acquireBunTestServer<E>(
   program: (request: Request) => Effect.Effect<Response, E>,
+  options: { readonly hostname?: string } = {},
 ) {
   return Effect.acquireRelease(
     Effect.try({
       try: () => Bun.serve({
-        hostname: "127.0.0.1",
+        hostname: options.hostname ?? "127.0.0.1",
         port: 0,
         fetch: (request) => Effect.runPromise(program(request)),
       }),
       catch: () => serverError("start", "Bun test server failed to start"),
     }).pipe(
       Effect.flatMap((server) => {
-        if (server.port !== undefined) return Effect.succeed(server);
+        if (server.port !== undefined) {
+          return Effect.succeed({ port: server.port, server });
+        }
         return Effect.sync(() => server.stop(true)).pipe(
           Effect.andThen(serverError("start", "Bun allocated no test port")),
         );
       }),
     ),
-    (server) => Effect.sync(() => server.stop(true)),
+    ({ server }) => Effect.sync(() => server.stop(true)),
   );
 }
 
 export const allocateBunTestPort = Effect.fn("test.bunHttp.allocatePort")(() =>
   Effect.acquireUseRelease(
     acquireBunTestServer(() => Effect.succeed(new Response())),
-    (server) => Effect.succeed(server.port),
-    (server) => Effect.sync(() => server.stop(true)),
+    ({ port }) => Effect.succeed(port),
+    ({ server }) => Effect.sync(() => server.stop(true)),
   ));
 
 export const readWebRequestText = Effect.fn("test.bunHttp.readText")(
