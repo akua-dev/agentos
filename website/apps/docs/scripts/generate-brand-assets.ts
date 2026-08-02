@@ -1,13 +1,24 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { Effect, FileSystem, Path, Runtime, Schema } from 'effect';
 import sharp from 'sharp';
 
-const appDirectory = new URL('../app/', import.meta.url);
-const publicDirectory = new URL('../public/', import.meta.url);
-const brandDirectory = new URL('../../../../docs/brand/', import.meta.url);
-const iconSource = new URL('agentos-browser-icon.svg', brandDirectory);
-const wordmarkSource = new URL('agentos-wordmark-bone.svg', brandDirectory);
+import { runWebsiteScript } from './script-runtime';
 
-function createIco(images: readonly { size: number; bytes: Buffer }[]): Buffer {
+const FAVICON_SIZES = [16, 32, 48];
+
+export class BrandAssetError extends Schema.TaggedErrorClass<BrandAssetError>()(
+  'BrandAssetError',
+  {
+    code: Schema.Literals(['filesystem', 'image']),
+    message: Schema.String,
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override readonly [Runtime.errorExitCode] = 1;
+}
+
+function createIco(
+  images: ReadonlyArray<{ readonly size: number; readonly bytes: Buffer }>,
+): Buffer {
   const directory = Buffer.alloc(6 + images.length * 16);
   directory.writeUInt16LE(0, 0);
   directory.writeUInt16LE(1, 2);
@@ -30,52 +41,120 @@ function createIco(images: readonly { size: number; bytes: Buffer }[]): Buffer {
   return Buffer.concat([directory, ...images.map(({ bytes }) => bytes)]);
 }
 
-async function renderIcon(source: Buffer, size: number): Promise<Buffer> {
-  return sharp(source)
-    .resize(size, size, { fit: 'fill' })
-    .png({ compressionLevel: 9, adaptiveFiltering: true })
-    .toBuffer();
+function renderImage(label: string, render: () => Promise<Buffer>) {
+  return Effect.tryPromise({
+    try: render,
+    catch: (cause) =>
+      new BrandAssetError({
+        code: 'image',
+        message: `Could not render ${label}`,
+        cause,
+      }),
+  });
 }
 
-export async function generateBrandAssets(): Promise<void> {
-  const [iconSvg, wordmarkSvg] = await Promise.all([
-    readFile(iconSource),
-    readFile(wordmarkSource),
-  ]);
-  const [icon, appleIcon] = await Promise.all([
-    renderIcon(iconSvg, 512),
-    renderIcon(iconSvg, 180),
-  ]);
-  const faviconImages = await Promise.all(
-    [16, 32, 48].map(async (size) => ({
-      size,
-      bytes: await renderIcon(iconSvg, size),
-    })),
+function renderIcon(source: Uint8Array, size: number) {
+  return renderImage(`${size}x${size} browser icon`, () =>
+    sharp(source)
+      .resize(size, size, { fit: 'fill' })
+      .png({ compressionLevel: 9, adaptiveFiltering: true })
+      .toBuffer(),
   );
-  const wordmark = await sharp(wordmarkSvg)
-    .resize({ width: 720, withoutEnlargement: true })
-    .png({ compressionLevel: 9, adaptiveFiltering: true })
-    .toBuffer();
-  const socialImage = await sharp({
-    create: {
-      width: 1200,
-      height: 630,
-      channels: 4,
-      background: '#080A0E',
-    },
-  })
-    .composite([{ input: wordmark, gravity: 'center' }])
-    .png({ compressionLevel: 9, adaptiveFiltering: true })
-    .toBuffer();
-
-  await Promise.all([
-    writeFile(new URL('icon.png', appDirectory), icon),
-    writeFile(new URL('apple-icon.png', appDirectory), appleIcon),
-    writeFile(new URL('favicon.ico', appDirectory), createIco(faviconImages)),
-    writeFile(new URL('opengraph-image.png', publicDirectory), socialImage),
-  ]);
 }
 
-if (import.meta.main) {
-  await generateBrandAssets();
-}
+export const generateBrandAssets = Effect.fn(
+  'agentos.website.generateBrandAssets',
+)(function*() {
+  const fileSystem = yield* FileSystem.FileSystem;
+  const paths = yield* Path.Path;
+  const appDirectory = yield* paths.fromFileUrl(
+    new URL('../app/', import.meta.url),
+  );
+  const publicDirectory = yield* paths.fromFileUrl(
+    new URL('../public/', import.meta.url),
+  );
+  const brandDirectory = yield* paths.fromFileUrl(
+    new URL('../../../../docs/brand/', import.meta.url),
+  );
+  const [iconSvg, wordmarkSvg] = yield* Effect.all(
+    [
+      fileSystem.readFile(paths.join(brandDirectory, 'agentos-browser-icon.svg')),
+      fileSystem.readFile(paths.join(brandDirectory, 'agentos-wordmark-bone.svg')),
+    ],
+    { concurrency: 'unbounded' },
+  ).pipe(
+    Effect.mapError(
+      (cause) =>
+        new BrandAssetError({
+          code: 'filesystem',
+          message: 'Could not read the canonical AgentOS brand sources',
+          cause,
+        }),
+    ),
+  );
+
+  const [icon, appleIcon, faviconImages, wordmark] = yield* Effect.all(
+    [
+      renderIcon(iconSvg, 512),
+      renderIcon(iconSvg, 180),
+      Effect.forEach(
+        FAVICON_SIZES,
+        (size) =>
+          renderIcon(iconSvg, size).pipe(
+            Effect.map((bytes) => ({ size, bytes })),
+          ),
+        { concurrency: 'unbounded' },
+      ),
+      renderImage('AgentOS wordmark', () =>
+        sharp(wordmarkSvg)
+          .resize({ width: 720, withoutEnlargement: true })
+          .png({ compressionLevel: 9, adaptiveFiltering: true })
+          .toBuffer(),
+      ),
+    ],
+    { concurrency: 'unbounded' },
+  );
+  const socialImage = yield* renderImage('AgentOS social image', () =>
+    sharp({
+      create: {
+        width: 1200,
+        height: 630,
+        channels: 4,
+        background: '#080A0E',
+      },
+    })
+      .composite([{ input: wordmark, gravity: 'center' }])
+      .png({ compressionLevel: 9, adaptiveFiltering: true })
+      .toBuffer(),
+  );
+
+  yield* Effect.all(
+    [
+      fileSystem.writeFile(paths.join(appDirectory, 'icon.png'), icon),
+      fileSystem.writeFile(
+        paths.join(appDirectory, 'apple-icon.png'),
+        appleIcon,
+      ),
+      fileSystem.writeFile(
+        paths.join(appDirectory, 'favicon.ico'),
+        createIco(faviconImages),
+      ),
+      fileSystem.writeFile(
+        paths.join(publicDirectory, 'opengraph-image.png'),
+        socialImage,
+      ),
+    ],
+    { concurrency: 'unbounded' },
+  ).pipe(
+    Effect.mapError(
+      (cause) =>
+        new BrandAssetError({
+          code: 'filesystem',
+          message: 'Could not write the generated AgentOS brand assets',
+          cause,
+        }),
+    ),
+  );
+});
+
+if (import.meta.main) runWebsiteScript(generateBrandAssets());
