@@ -1,41 +1,86 @@
+import type { Api, Model } from "@earendil-works/pi-ai";
 import { complete } from "@earendil-works/pi-ai/compat";
-import type { Model } from "@earendil-works/pi-ai";
-import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { Clock, Effect, Schema } from "effect";
 
 import type { StartupMemoryContext } from "../memory/store.ts";
-import {
-  redactAuxiliaryInput,
-  RELEVANT_SELECTION_SYSTEM_PROMPT,
-} from "./prompts.ts";
 import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
 import {
   safeAssistantFailure,
   safeTokenCount,
   startAgentOSAuxiliaryOperation,
 } from "../telemetry/auxiliary.ts";
+import {
+  redactAuxiliaryInput,
+  RELEVANT_SELECTION_SYSTEM_PROMPT,
+} from "./prompts.ts";
+
+type CompleteResult = Awaited<ReturnType<typeof complete>>;
+
+export type RelevantSelectionAuth =
+  | {
+    readonly ok: true;
+    readonly apiKey?: string;
+    readonly headers?: Record<string, string>;
+    readonly env?: Record<string, string>;
+  }
+  | { readonly ok: false; readonly error: string };
 
 export interface RelevantSelectionInput {
-  prompt: string;
-  startup: StartupMemoryContext;
-  model: Model<any> | undefined;
-  modelRegistry: ModelRegistry;
-  signal?: AbortSignal;
-  telemetry?: AgentOSTelemetrySource;
-  completeImpl?: typeof complete;
+  readonly prompt: string;
+  readonly startup: StartupMemoryContext;
+  readonly model: Model<Api> | undefined;
+  readonly resolveAuth: Effect.Effect<RelevantSelectionAuth, unknown>;
+  readonly signal?: AbortSignal;
+  readonly telemetry?: AgentOSTelemetrySource;
+  readonly completeImpl?: (
+    ...args: Parameters<typeof complete>
+  ) => Effect.Effect<CompleteResult, unknown>;
+  readonly now?: Effect.Effect<number>;
 }
 
 export type RelevantTopicSelector = (
   input: RelevantSelectionInput,
-) => Promise<string[]>;
+) => Effect.Effect<ReadonlyArray<string>, RelevantSelectionError>;
+
+const RelevantSelectionErrorCode = Schema.Literals([
+  "authentication_unavailable",
+  "invalid_response",
+  "provider_failed",
+  "request_failed",
+  "telemetry_unavailable",
+]);
+
+export class RelevantSelectionError extends Schema.TaggedErrorClass<RelevantSelectionError>()(
+  "RelevantSelectionError",
+  {
+    cause: Schema.Unknown,
+    code: RelevantSelectionErrorCode,
+    message: Schema.String,
+  },
+) {}
+
+const SelectionResponseSchema = Schema.Struct({
+  ids: Schema.Array(Schema.String),
+});
+const SelectionResponseJson = Schema.fromJsonString(SelectionResponseSchema);
+const SelectionRequestJson = Schema.fromJsonString(Schema.Unknown);
+
+function selectionError(
+  code: RelevantSelectionError["code"],
+  message: string,
+  cause: unknown,
+) {
+  return RelevantSelectionError.make({ cause, code, message });
+}
 
 function relevantTopicId(index: number): string {
   return `topic-${index}`;
 }
 
 export function relevantSelectionMessage(
-  input: RelevantSelectionInput,
-): string {
-  return JSON.stringify({
+  input: Pick<RelevantSelectionInput, "prompt" | "startup">,
+) {
+  return Schema.encodeEffect(SelectionRequestJson)({
     request: redactAuxiliaryInput(input.prompt),
     index: redactAuxiliaryInput(input.startup.index),
     inventory: input.startup.inventory.map((topic, index) => ({
@@ -45,48 +90,96 @@ export function relevantSelectionMessage(
       modified: redactAuxiliaryInput(topic.modified),
       pinned: topic.pinned,
     })),
-  });
+  }).pipe(
+    Effect.mapError((cause) =>
+      selectionError(
+        "request_failed",
+        "Mate memory selector request could not be encoded.",
+        cause,
+      )
+    ),
+  );
 }
 
 export function resolveRelevantTopicIds(
-  ids: string[],
+  ids: ReadonlyArray<string>,
   inventory: RelevantSelectionInput["startup"]["inventory"],
-): string[] {
+): ReadonlyArray<string> {
   const pathsById = new Map(
     inventory.map((topic, index) => [relevantTopicId(index), topic.relativePath]),
   );
   return ids.flatMap((id) => {
     const path = pathsById.get(id);
-    return path ? [path] : [];
+    return path === undefined ? [] : [path];
   });
 }
 
-export const selectRelevantTopics: RelevantTopicSelector = async (input) => {
-  if (!input.model || input.startup.inventory.length === 0) return [];
-  const auth = await input.modelRegistry.getApiKeyAndHeaders(input.model);
-  if (!auth.ok) throw new Error(auth.error);
-  const operation = await startAgentOSAuxiliaryOperation(
-    input.model,
-    input.telemetry,
-    "resumed",
-  );
-  const attempt = operation.startProviderAttempt({
-    requestKind: "extension",
-    streamMode: "non_streaming",
+function defaultComplete(
+  ...args: Parameters<typeof complete>
+): Effect.Effect<CompleteResult, RelevantSelectionError> {
+  return Effect.tryPromise({
+    try: () => complete(...args),
+    catch: (cause) =>
+      selectionError(
+        "request_failed",
+        "Mate memory selector request failed.",
+        cause,
+      ),
   });
-  const headers = { ...auth.headers };
-  attempt.inject(headers);
-  let attemptEnded = false;
-  try {
-    const response = await (input.completeImpl ?? complete)(
-      input.model,
+}
+
+function startTelemetry(input: RelevantSelectionInput, model: Model<Api>) {
+  return Effect.tryPromise({
+    try: () => startAgentOSAuxiliaryOperation(model, input.telemetry, "resumed"),
+    catch: (cause) =>
+      selectionError(
+        "telemetry_unavailable",
+        "Mate memory selector telemetry could not be started.",
+        cause,
+      ),
+  });
+}
+
+export const selectRelevantTopics: RelevantTopicSelector = (input) =>
+  Effect.gen(function*() {
+    const model = input.model;
+    if (model === undefined || input.startup.inventory.length === 0) return [];
+    const auth = yield* input.resolveAuth.pipe(
+      Effect.mapError((cause) =>
+        selectionError(
+          "authentication_unavailable",
+          "Mate memory selector authentication could not be resolved.",
+          cause,
+        )
+      ),
+    );
+    if (!auth.ok) {
+      return yield* selectionError(
+        "authentication_unavailable",
+        "Mate memory selector authentication is unavailable.",
+        auth.error,
+      );
+    }
+    const operation = yield* startTelemetry(input, model);
+    const attempt = yield* Effect.sync(() =>
+      operation.startProviderAttempt({
+        requestKind: "extension",
+        streamMode: "non_streaming",
+      })
+    );
+    const headers = { ...auth.headers };
+    yield* Effect.sync(() => attempt.inject(headers));
+    const message = yield* relevantSelectionMessage(input);
+    const timestamp = yield* input.now ?? Clock.currentTimeMillis;
+    const provider = (input.completeImpl ?? defaultComplete)(
+      model,
       {
         systemPrompt: RELEVANT_SELECTION_SYSTEM_PROMPT,
         messages: [
           {
             role: "user",
-            content: relevantSelectionMessage(input),
-            timestamp: Date.now(),
+            content: message,
+            timestamp,
           },
         ],
       },
@@ -98,57 +191,72 @@ export const selectRelevantTopics: RelevantTopicSelector = async (input) => {
         temperature: 0,
         maxTokens: 1_024,
       },
+    ).pipe(
+      Effect.mapError((cause) =>
+        cause instanceof RelevantSelectionError
+          ? cause
+          : selectionError(
+            "request_failed",
+            "Mate memory selector request failed.",
+            cause,
+          )
+      ),
+      Effect.tap((response) => {
+        const failure = safeAssistantFailure(response.stopReason);
+        return Effect.sync(() =>
+          attempt.end({
+            status: 200,
+            error: failure,
+            streamOutcome: failure === undefined
+              ? "completed"
+              : response.stopReason === "aborted"
+              ? "aborted"
+              : "upstream_error",
+            inputTokens: safeTokenCount(response.usage.input),
+            outputTokens: safeTokenCount(response.usage.output),
+          })
+        );
+      }),
+      Effect.tapError((error) =>
+        Effect.sync(() =>
+          attempt.end({ error, streamOutcome: "upstream_error" })
+        )
+      ),
     );
-    const failure = safeAssistantFailure(response.stopReason);
-    attempt.end({
-      status: 200,
-      error: failure,
-      streamOutcome: failure
-        ? response.stopReason === "aborted"
-          ? "aborted"
-          : "upstream_error"
-        : "completed",
-      inputTokens: safeTokenCount(response.usage.input),
-      outputTokens: safeTokenCount(response.usage.output),
-    });
-    attemptEnded = true;
-    if (failure) {
-      throw new Error(
-        response.stopReason === "aborted"
-          ? "memory selector aborted"
-          : "memory selector failed",
+
+    const selected = yield* Effect.gen(function*() {
+      const response = yield* provider;
+      const failure = safeAssistantFailure(response.stopReason);
+      if (failure !== undefined) {
+        return yield* selectionError(
+          "provider_failed",
+          response.stopReason === "aborted"
+            ? "Mate memory selector was aborted."
+            : "Mate memory selector provider failed.",
+          failure,
+        );
+      }
+      const text = response.content
+        .flatMap((part) => part.type === "text" ? [part.text] : [])
+        .join("");
+      const decoded = yield* Schema.decodeUnknownEffect(
+        SelectionResponseJson,
+        { onExcessProperty: "error" },
+      )(text).pipe(
+        Effect.mapError((cause) =>
+          selectionError(
+            "invalid_response",
+            "Mate memory selector returned an invalid ID response.",
+            cause,
+          )
+        ),
       );
-    }
-    const text = response.content
-      .filter(
-        (
-          part,
-        ): part is Extract<
-          (typeof response.content)[number],
-          { type: "text" }
-        > => part.type === "text",
-      )
-      .map(({ text }) => text)
-      .join("");
-    const parsed = JSON.parse(text) as unknown;
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      Array.isArray(parsed) ||
-      Object.keys(parsed).length !== 1 ||
-      !("ids" in parsed) ||
-      !Array.isArray(parsed.ids) ||
-      !parsed.ids.every((id) => typeof id === "string")
-    ) {
-      throw new Error("memory selector returned an invalid ID response");
-    }
-    operation.end({ status: 200 });
-    return resolveRelevantTopicIds(parsed.ids, input.startup.inventory);
-  } catch (error) {
-    if (!attemptEnded) {
-      attempt.end({ error, streamOutcome: "upstream_error" });
-    }
-    operation.end({ error });
-    throw error;
-  }
-};
+      return resolveRelevantTopicIds(decoded.ids, input.startup.inventory);
+    }).pipe(
+      Effect.tap(() => Effect.sync(() => operation.end({ status: 200 }))),
+      Effect.tapError((error) =>
+        Effect.sync(() => operation.end({ error }))
+      ),
+    );
+    return selected;
+  });

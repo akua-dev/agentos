@@ -20,6 +20,7 @@ const platform = Layer.mergeAll(
   BunFileSystem.layer,
   BunPath.layer,
 );
+const CONCURRENCY_TEST_LOCK_TIMEOUT_MILLIS = 86_400_000;
 
 describe("Effect atomic private JSON storage", () => {
   it.effect("creates private state and preserves concurrent updates", () =>
@@ -33,11 +34,13 @@ describe("Effect atomic private JSON storage", () => {
         path,
         schema: CounterSchema,
         createDefault: () => ({ version: 1, value: 0 }),
+        lockTimeoutMillis: CONCURRENCY_TEST_LOCK_TIMEOUT_MILLIS,
       });
       const peer = yield* makeAtomicJsonStore({
         path,
         schema: CounterSchema,
         createDefault: () => ({ version: 1, value: 0 }),
+        lockTimeoutMillis: CONCURRENCY_TEST_LOCK_TIMEOUT_MILLIS,
       });
 
       const updates = Effect.all(

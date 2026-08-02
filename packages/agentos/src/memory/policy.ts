@@ -14,7 +14,7 @@ export interface MateMemoryPolicy {
   maxSessionAttachmentBytes: number;
 }
 
-export const mateMemoryPolicy = {
+export const mateMemoryPolicy: MateMemoryPolicy = {
   enabled: true,
   extractionEnabled: true,
   extractionStride: 1,
@@ -28,7 +28,7 @@ export const mateMemoryPolicy = {
   maxRelevantTopics: 5,
   maxPinnedTopics: 4,
   maxSessionAttachmentBytes: 61_440,
-} as const satisfies MateMemoryPolicy;
+};
 
 export function resolveMateMemoryPolicy(
   overrides: Partial<MateMemoryPolicy> = {},
