@@ -17,9 +17,14 @@ describe("Effect PGlite test boundary", () => {
         const database = yield* PGliteTestDatabase;
         yield* database.exec("CREATE TABLE example (value text NOT NULL)");
         yield* database.exec("INSERT INTO example (value) VALUES ('effect')");
-        return yield* database.query<{ readonly value: string }>(
+        const rows = yield* database.query<{ readonly value: string }>(
           "SELECT value FROM example",
         );
+        const parameterized = yield* database.query<{ readonly value: string }>(
+          "SELECT $1::text AS value",
+          ["effect"],
+        );
+        return { parameterized, rows };
       });
 
       const rows = yield* Effect.scoped(program.pipe(Effect.provide(
@@ -29,7 +34,10 @@ describe("Effect PGlite test boundary", () => {
         }),
       )));
 
-      assert.deepStrictEqual(rows, [{ value: "effect" }]);
+      assert.deepStrictEqual(rows, {
+        parameterized: [{ value: "effect" }],
+        rows: [{ value: "effect" }],
+      });
       assert.isTrue(yield* Ref.get(finalized));
     }), 15_000);
 

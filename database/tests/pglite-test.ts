@@ -51,6 +51,7 @@ export interface PGliteTestDatabaseService {
   ) => Effect.Effect<void, PGliteTestDatabaseError>;
   readonly query: <Row extends object>(
     statement: string,
+    parameters?: ReadonlyArray<unknown>,
   ) => Effect.Effect<ReadonlyArray<Row>, PGliteTestDatabaseError>;
   readonly migrate: (
     filename: string,
@@ -151,9 +152,15 @@ export function makePGliteTestLayer(
         catch: (cause) => failure("exec", cause),
       }).pipe(Effect.asVoid));
 
-    const query = <Row extends object>(statement: string) =>
+    const query = <Row extends object>(
+      statement: string,
+      parameters?: ReadonlyArray<unknown>,
+    ) =>
       Effect.tryPromise({
-        try: () => database.query<Row>(statement),
+        try: () => database.query<Row>(
+          statement,
+          parameters === undefined ? undefined : Array.from(parameters),
+        ),
         catch: (cause) => failure("query", cause),
       }).pipe(Effect.map((result) => result.rows));
 

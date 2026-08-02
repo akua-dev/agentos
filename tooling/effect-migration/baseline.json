@@ -65,33 +65,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/fleet-initialization.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/inbox-receipt.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 11,
-      "digest": "6307cabc88308004e6c2894858139ee3d6d5ec3d3184a716e3e512702f583a84",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/inbox-receipt.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "database/tests/inbox-routing.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 11,
-      "digest": "285f33b2302cca611e7a4380991db049aaed056ef9a88527470d0596cb05409e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/inbox-routing.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "database/tests/inbox-vocabulary.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 8,
-      "digest": "7f844257faeedb25f97f569d3f60396d4a525d8ce74ba8c96e378851365ff7d8",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/inbox-vocabulary.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/tests/package-unification-migration.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
