@@ -1,8 +1,8 @@
-import { expect, test } from "bun:test";
-import { readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import * as BunServices from "@effect/platform-bun/BunServices";
+import { assert, layer } from "@effect/vitest";
+import { Crypto, Effect, FileSystem, Path, Schema } from "effect";
 
-const databaseRoot = resolve(import.meta.dir, "..");
+const databaseRootUrl = new URL("../", import.meta.url);
 
 const publishedMigrations = [
   {
@@ -85,32 +85,53 @@ const publishedMigrations = [
     tag: "0015_mate_memory",
     when: 1785198333179,
   },
-] as const;
+];
 
-test("published migration history remains append-only and byte-identical", async () => {
-  const journal = JSON.parse(
-    await readFile(
-      join(databaseRoot, "migrations", "meta", "_journal.json"),
-      "utf8",
-    ),
-  ) as {
-    entries: Array<{ idx: number; tag: string; when: number }>;
-  };
+const JournalSchema = Schema.Struct({
+  entries: Schema.Array(Schema.Struct({
+    idx: Schema.Number,
+    tag: Schema.String,
+    when: Schema.Number,
+  })),
+});
 
-  expect(
-    journal.entries.slice(0, publishedMigrations.length).map((entry) => ({
-      tag: entry.tag,
-      when: entry.when,
-    })),
-  ).toEqual(publishedMigrations.map(({ tag, when }) => ({ tag, when })));
+function hex(bytes: Uint8Array) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
-  const hashes = await Promise.all(
-    publishedMigrations.map(async ({ tag }) => {
-      const contents = await readFile(
-        join(databaseRoot, "migrations", `${tag}.sql`),
+layer(BunServices.layer)("published database migrations", (it) => {
+  it.effect("keeps history append-only and byte-identical", () =>
+    Effect.gen(function*() {
+      const crypto = yield* Crypto.Crypto;
+      const fileSystem = yield* FileSystem.FileSystem;
+      const paths = yield* Path.Path;
+      const databaseRoot = yield* paths.fromFileUrl(databaseRootUrl);
+      const journal = yield* fileSystem.readFileString(
+        paths.join(databaseRoot, "migrations", "meta", "_journal.json"),
+      ).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(
+          Schema.fromJsonString(JournalSchema),
+        )),
       );
-      return new Bun.CryptoHasher("sha256").update(contents).digest("hex");
-    }),
-  );
-  expect(hashes).toEqual(publishedMigrations.map(({ hash }) => hash));
+
+      assert.deepStrictEqual(
+        journal.entries.slice(0, publishedMigrations.length).map((entry) => ({
+          tag: entry.tag,
+          when: entry.when,
+        })),
+        publishedMigrations.map(({ tag, when }) => ({ tag, when })),
+      );
+
+      const hashes = yield* Effect.forEach(publishedMigrations, ({ tag }) =>
+        fileSystem.readFile(
+          paths.join(databaseRoot, "migrations", `${tag}.sql`),
+        ).pipe(
+          Effect.flatMap((contents) => crypto.digest("SHA-256", contents)),
+          Effect.map(hex),
+        ));
+      assert.deepStrictEqual(
+        Array.from(hashes),
+        publishedMigrations.map(({ hash }) => hash),
+      );
+    }));
 });

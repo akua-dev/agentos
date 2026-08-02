@@ -20,15 +20,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/access-control-plane.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/atomic-acceptance-migration.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 4,
-      "digest": "0e3b1b864e4ba3a4b1f55621cbb7ae0b26b9a514e5fb7871e948afc802de0921",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/atomic-acceptance-migration.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/tests/atomic-acceptance.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -45,15 +36,6 @@
       "digest": "f0ceedbdf0218fa68f4312f86e3dba28acc01ba2e3af51f7e60d14f0c63c617d",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/authorization.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "database/tests/captain-table-removal-migration.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 4,
-      "digest": "b6336f6213073fc6b8e566bc1f9f332d4e5bc3f1ba7113971de78b89c433a8f0",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/captain-table-removal-migration.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "database/tests/coordination-contracts.test.ts",
@@ -110,24 +92,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/inbox-vocabulary.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/migration.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 2,
-      "digest": "0195e14e3d6a5e990cecd99e5719700fd9daa0bb261d30f51b66e56fdc6d7a72",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/migration.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "database/tests/notifications.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 8,
-      "digest": "104ee23f2e6bb43b862bf619f7b73ff100fa5f1f4d74af3063d5f8b232662809",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/notifications.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/tests/package-unification-migration.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -137,15 +101,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/package-unification-migration.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/published-migration-history.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 6,
-      "digest": "7a38f2c2955e0f9956f6f04543aeefc0a1ee797d2e62687ba4aeab9e5cc6d74c",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/published-migration-history.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/tests/runtime-authorization.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -153,15 +108,6 @@
       "digest": "ceb2430742a04b1d0ecfdad860caa0fcdcf672ec6a0c6d14fe099902043c877b",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/runtime-authorization.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "database/tests/runtime-operation-journal-migration.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 8,
-      "digest": "4996486d8cccbf857c7a2d3d52aed5476f352a3a44116388b22d2a2fc11d1492",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/runtime-operation-journal-migration.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "database/tests/runtime-operation-journal.test.ts",
