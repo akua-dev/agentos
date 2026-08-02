@@ -389,15 +389,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/codex-otel.ts under issue #104; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/create-image-seed.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 10,
-      "digest": "c49427ecf168641df3457a799a8958436c7b848f95e248f6fa5240541ec47766",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/create-image-seed.ts under issue #104; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/distribution.ts",
       "slice": "agentos-runtime",
       "issue": 104,
@@ -477,15 +468,6 @@
       "digest": "38ab9494e6ec9fe6f6c21a6311911d64ab14732f9fa8c52ec3243894694e692b",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/distribution-migration.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/tests/image-seed.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 8,
-      "digest": "909c579c3af76c54f70bb796f9bd3b3aa767fa9a4d3ad35b04a2c805def9bc0f",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/image-seed.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/runtime/tests/kubernetes.test.ts",
