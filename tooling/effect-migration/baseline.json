@@ -533,15 +533,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/tests/otlp-sink.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/app/(home)/page.client.tsx",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 1,
-      "digest": "09cb5d6cb8e5af72d93dc4785ff2941faea10708e3ef148fbedcc1500701538a",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/(home)/page.client.tsx under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/components/landing-page.test.tsx",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -551,24 +542,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/components/landing-page.test.tsx under issue #102; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/components/layouts/default/index.tsx",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 2,
-      "digest": "70fac546d1ca16b24b06194e05f22e84b304bf782b2ecfc82ac7d499757fac0b",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/components/layouts/default/index.tsx under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/components/learn/course-introduction.tsx",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 2,
-      "digest": "60f7c632fd6396e23a2eba159a43a7f9d96926aecaf8902b4753d677d98e7fa8",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/components/learn/course-introduction.tsx under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/components/learn/lesson-progress.test.tsx",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -576,15 +549,6 @@
       "digest": "6f4113f2b52b7e71e851347f2618e7af95cabe1d0a82954296d191d913798e17",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/components/learn/lesson-progress.test.tsx under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/components/mdx/mermaid.tsx",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 1,
-      "digest": "4e13a882c2f5949e6c403a0e64663f42ea771a6ff07948918b647ede11281f65",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/components/mdx/mermaid.tsx under issue #99; never refresh touched debt."
     },
     {
       "path": "website/apps/docs/instrumentation-client.ts",

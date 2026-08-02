@@ -1,9 +1,17 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { Effect } from 'effect';
+import { loadBrowserModule } from '@/lib/effect/browser-effects';
+import { runBrowserPromise } from '@/lib/effect/browser-runtime';
 
 const MermaidRenderer = dynamic(
-  () => import('./mermaid').then((module) => module.Mermaid),
+  () =>
+    runBrowserPromise(
+      loadBrowserModule('./mermaid', () => import('./mermaid')).pipe(
+        Effect.map((module) => module.Mermaid),
+      ),
+    ),
   { ssr: false },
 );
 
