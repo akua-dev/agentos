@@ -74,3 +74,87 @@ selectors, Pi observability extension activation, Codex `[otel]` exporters,
 Collector NetworkPolicy and receiver counters, pipeline processors/exporters,
 queue health, and backend ingest. A healthy request with absent spans is a
 telemetry fault, not evidence that the AI path is healthy or unhealthy.
+
+<a id="invalid-or-conflicting-workload-plan"></a>
+## Invalid or conflicting workload plan
+
+Start at the protected `agentos.resilience.operation` trace. Compare the
+workload plan's spec and overlay digests with the runtime journal's reviewed
+render digest; never retrieve or attach raw YAML. A cause of
+`invalid_workload_plan` belongs to schema/profile compilation. A cause of
+`conflicting_workload_plan` belongs to stale authority, incompatible desired
+state, or a competing operation. Confirm the topology proposal is still valid,
+that its Agent and Assignment correlation matches, and that only one durable
+operation owns reconciliation. Supersede stale work or repair forward from the
+durable journal; do not mutate a live Pod by hand.
+
+<a id="stuck-or-retry-exhausted-operation"></a>
+## Stuck or retry-exhausted operation
+
+Walk the ordered child spans and stop at the last observed phase: workload plan,
+render, apply, capacity, placement, semantic readiness, provider, listener,
+protocol, native session, reconciliation, or outcome. `render_boundary` and
+`apply_boundary` identify manifest boundaries; `capacity` and `placement`
+identify cluster scheduling; `readiness`, `provider`, and `listener` identify
+semantic startup; `retry_exhausted` is terminal evidence after the bounded
+retry policy. Check the runtime journal attempt and recovery class, but look up
+the operation, Pod, PVC, or session only in the protected trace. Do not increase
+retry bounds until the underlying cause and duplicate-side-effect risk are
+known.
+
+<a id="repaired-operation-loop"></a>
+## Repaired operation loop
+
+For repeated `repair_forward`, correlate `reconciliation` with the exact
+reviewed render digest and the next readiness/outcome span. Distinguish
+`reconciliation` drift from `policy` denial and `native_session` loss. Confirm
+the journal advances monotonically, a superseded operation never writes again,
+and each retry resumes from durable evidence instead of replaying an already
+completed side effect. If the loop cannot make a new durable transition, stop
+or reassign it through the owning controller rather than deleting retained
+state.
+
+<a id="protocol-fallback-degradation"></a>
+## Protocol fallback degradation
+
+For ACP/A2A evidence, separate `protocol_adapter` transport loss from `policy`
+denial, `listener`/PostgreSQL unavailability, and `native_session` replacement.
+Verify the canonical work record before and after fallback. The supported
+recovery path is PostgreSQL listener delivery followed by Herdr wake where
+declared; it must preserve one writer and one durable mutation. Inspect the
+protected protocol and Assignment IDs only after bounded protocol metrics show
+impact. Repeated successful fallback is still degraded transport and should be
+repaired rather than normalized.
+
+<a id="unobserved-resilience-boundary"></a>
+## Unobserved resilience boundary
+
+An expected source that cannot emit evidence must produce an explicit
+`unobserved` outcome/recovery pair. Check the workload plan, runtime journal,
+semantic readiness, native session, and ACP/A2A projection in that order, then
+check Collector receive/export health. Never substitute a missing series with a
+success assumption. Collector failure cannot influence controller decisions,
+reconciliation, readiness, retry, or fallback; restore telemetry independently
+and record the evidence gap.
+
+## Bounded cause-to-evidence map
+
+| Cause | Native evidence source | First response |
+| --- | --- | --- |
+| `invalid_workload_plan` | workload plan | Revalidate the Effect Schema and selected profile. |
+| `conflicting_workload_plan` | topology/workload plan plus runtime journal | Resolve durable ownership and supersede stale work. |
+| `render_boundary` | reviewed render digest | Reproduce the render from the same spec/overlay digests. |
+| `apply_boundary` | runtime journal and Kubernetes apply result | Inspect bounded apply status without recording YAML. |
+| `capacity` | Kubernetes scheduling/capacity evidence | Confirm requests, quotas, and available capacity. |
+| `placement` | Kubernetes Pod/PVC placement evidence | Confirm node, volume, and affinity constraints. |
+| `readiness` | semantic readiness | Follow the stable readiness component class. |
+| `provider` | provider readiness and AI route evidence | Repair the selected provider authority. |
+| `listener` | PostgreSQL listener and coordination readiness | Restore catch-up/listening before Herdr wake. |
+| `protocol_adapter` | ACP/A2A adapter conformance evidence | Verify fallback and single-writer custody. |
+| `native_session` | native session availability/resume evidence | Resume the native session without transcript capture. |
+| `policy` | bounded authorization decision | Repair the binding/profile/ceiling, never bypass it. |
+| `reconciliation` | runtime journal transition | Repair forward from the last durable phase. |
+| `retry_exhausted` | terminal runtime journal outcome | Stop or reassign after cause-specific review. |
+
+`none` is reserved for a successful/pending observation or explicit unobserved
+evidence; it is not a substitute for an unknown failure.

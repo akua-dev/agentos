@@ -27,15 +27,22 @@ telemetry export health as independent signals.
    `ai-gateway.route.acquire`, `ai-gateway.upstream`, and
    `ai-gateway.stream`. Use trace/request/attempt IDs only for protected
    correlation, never as metric labels.
-6. Compare bounded metrics with
+6. For delegation or runtime recovery, follow
+   `agentos.resilience.operation` through the ordered
+   `agentos.resilience.<phase>` spans. Correlate the topology plan, workload
+   spec/overlay digests, reviewed render digest, runtime journal, Kubernetes
+   placement, semantic readiness, provider, listener, ACP/A2A adapter, native
+   session, policy, and reconciliation evidence. A missing boundary must be
+   recorded as `unobserved`; never infer success from absence.
+7. Compare bounded metrics with
    [references/dashboards.md](references/dashboards.md), then select the
    matching [alert](references/alerts.md) and
    [runbook](references/runbooks.md).
-7. If spans are absent, walk outward: runtime SDK/config, pod `OTEL_*`
+8. If spans are absent, walk outward: runtime SDK/config, pod `OTEL_*`
    variables, Collector receive/export self-telemetry, persistent queue/PVC,
    then the remote backend. Do not restart serving workloads to repair
    telemetry.
-8. Report observed facts, ruled-out layers, remaining hypotheses, exact
+9. Report observed facts, ruled-out layers, remaining hypotheses, exact
    correlation window, and any rollback. Keep prompts, bodies, headers,
    credentials, provider account data, memory content, and raw exceptions out
    of the report.
@@ -55,3 +62,9 @@ telemetry export health as independent signals.
 - Never enable `log_user_prompt`; the Codex bridge must keep it false.
 - Never enable the local diagnostic archive casually. It is bounded,
   temporary, access-controlled evidence, not a query backend.
+- Keep agent, Assignment, proposal, operation, Pod, PVC, native-session, and
+  protocol identifiers plus workload/render digests in protected traces and
+  access-controlled logs only. Never place them in metric attributes.
+- Treat telemetry as fail-open evidence. Collector, exporter, diagnostic sink,
+  or backend failure cannot alter reconciliation, retries, fallback, readiness,
+  or serving outcomes.
