@@ -1,51 +1,205 @@
-import { assert, describe, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
-import { execFile } from "node:child_process";
-import { parseAllDocuments } from "yaml";
+import * as BunServices from "@effect/platform-bun/BunServices";
+import { assert, layer } from "@effect/vitest";
+import { Effect, Path, Schema } from "effect";
 
-const ResourceSchema = Schema.Struct({
+import { renderKustomize } from "../../../tooling/testing/kubernetes.ts";
+
+const Metadata = Schema.Struct({
+  name: Schema.String,
+  namespace: Schema.optional(Schema.String),
+  labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+});
+const Resource = Schema.Struct({
   apiVersion: Schema.String,
   kind: Schema.String,
-  metadata: Schema.Struct({
+  metadata: Metadata,
+  spec: Schema.optional(Schema.Unknown),
+});
+const Resources = Schema.Array(Resource);
+type Resource = typeof Resource.Type;
+
+const SecretKeySelector = Schema.Struct({
+  key: Schema.String,
+  name: Schema.String,
+});
+const EnvironmentEntry = Schema.Struct({
+  name: Schema.String,
+  value: Schema.optional(Schema.String),
+  valueFrom: Schema.optional(Schema.Struct({
+    secretKeyRef: Schema.optional(SecretKeySelector),
+    fieldRef: Schema.optional(Schema.Unknown),
+  })),
+});
+const VolumeMount = Schema.Struct({
+  mountPath: Schema.String,
+  name: Schema.String,
+  readOnly: Schema.optional(Schema.Boolean),
+});
+const Container = Schema.Struct({
+  name: Schema.String,
+  image: Schema.optional(Schema.String),
+  args: Schema.optional(Schema.Array(Schema.String)),
+  command: Schema.optional(Schema.Array(Schema.String)),
+  env: Schema.optional(Schema.Array(EnvironmentEntry)),
+  readinessProbe: Schema.optional(Schema.Struct({
+    httpGet: Schema.Unknown,
+  })),
+  volumeMounts: Schema.optional(Schema.Array(VolumeMount)),
+});
+const Volume = Schema.Struct({
+  name: Schema.String,
+  secret: Schema.optional(Schema.Struct({ defaultMode: Schema.Number })),
+  configMap: Schema.optional(Schema.Struct({
     name: Schema.String,
-    namespace: Schema.optional(Schema.String),
-    labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+    optional: Schema.optional(Schema.Boolean),
+  })),
+});
+const PodSpec = Schema.Struct({
+  automountServiceAccountToken: Schema.optional(Schema.Boolean),
+  serviceAccountName: Schema.optional(Schema.String),
+  securityContext: Schema.optional(Schema.Unknown),
+  containers: Schema.Array(Container),
+  volumes: Schema.optional(Schema.Array(Volume)),
+});
+const Job = Schema.Struct({
+  kind: Schema.Literal("Job"),
+  metadata: Metadata,
+  spec: Schema.Struct({ template: Schema.Struct({ spec: PodSpec }) }),
+});
+const Deployment = Schema.Struct({
+  kind: Schema.Literal("Deployment"),
+  metadata: Metadata,
+  spec: Schema.Struct({
+    replicas: Schema.Number,
+    strategy: Schema.Unknown,
+    template: Schema.Struct({ spec: PodSpec }),
   }),
-  spec: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 });
-type Resource = typeof ResourceSchema.Type;
-
-const kubernetesDirectory = new URL("../kubernetes", import.meta.url).pathname;
-
-const render = Effect.fn("agentos.openfga.test.render")(function*() {
-  const stdout = yield* Effect.tryPromise({
-    try: (signal) => new Promise<string>((resolve, reject) => {
-      const child = execFile(
-        "kubectl",
-        ["kustomize", kubernetesDirectory],
-        { maxBuffer: 4 * 1_024 * 1_024 },
-        (error, output) => error === null ? resolve(output) : reject(error),
-      );
-      signal.addEventListener("abort", () => child.kill("SIGTERM"), {
-        once: true,
-      });
+const DatabaseCluster = Schema.Struct({
+  kind: Schema.Literal("Cluster"),
+  metadata: Metadata,
+  spec: Schema.Struct({
+    instances: Schema.Number,
+    bootstrap: Schema.Struct({
+      initdb: Schema.Struct({
+        database: Schema.String,
+        owner: Schema.String,
+      }),
     }),
-    catch: (cause) => cause instanceof Error ? cause : new Error("render failed"),
-  });
-  return yield* Schema.decodeUnknownEffect(Schema.Array(ResourceSchema))(
-    parseAllDocuments(stdout).map((document) => document.toJSON()),
+    backup: Schema.Unknown,
+  }),
+});
+const DisruptionBudget = Schema.Struct({
+  kind: Schema.Literal("PodDisruptionBudget"),
+  metadata: Metadata,
+  spec: Schema.Struct({ minAvailable: Schema.Number }),
+});
+const Service = Schema.Struct({
+  kind: Schema.Literal("Service"),
+  metadata: Metadata,
+  spec: Schema.Struct({
+    publishNotReadyAddresses: Schema.optional(Schema.Boolean),
+  }),
+});
+const NetworkPolicy = Schema.Struct({
+  kind: Schema.Literal("NetworkPolicy"),
+  metadata: Metadata,
+  spec: Schema.Struct({
+    policyTypes: Schema.Array(Schema.String),
+    podSelector: Schema.Struct({
+      matchLabels: Schema.Record(Schema.String, Schema.String),
+    }),
+    ingress: Schema.Array(Schema.Struct({
+      from: Schema.Array(Schema.Struct({
+        namespaceSelector: Schema.Struct({
+          matchLabels: Schema.Record(Schema.String, Schema.String),
+        }),
+        podSelector: Schema.Struct({
+          matchLabels: Schema.Record(Schema.String, Schema.String),
+        }),
+      })),
+      ports: Schema.Array(Schema.Struct({
+        port: Schema.Number,
+        protocol: Schema.String,
+      })),
+    })),
+    egress: Schema.optional(Schema.Unknown),
+  }),
+});
+
+class ManifestFixtureError extends Schema.TaggedErrorClass<ManifestFixtureError>()(
+  "ManifestFixtureError",
+  { detail: Schema.String },
+) {}
+
+const required = Effect.fn("test.openfgaManifest.required")(function*<A>(
+  value: A | undefined,
+  detail: string,
+) {
+  if (value === undefined) return yield* ManifestFixtureError.make({ detail });
+  return value;
+});
+
+const resource = Effect.fn("test.openfgaManifest.resource")(function*(
+  resources: ReadonlyArray<Resource>,
+  kind: string,
+  name: string,
+) {
+  return yield* required(
+    resources.find((candidate) =>
+      candidate.kind === kind && candidate.metadata.name === name
+    ),
+    `Missing ${kind}/${name}`,
   );
 });
 
-function resource(resources: ReadonlyArray<Resource>, kind: string, name: string) {
-  const match = resources.find((item) =>
-    item.kind === kind && item.metadata.name === name
-  );
-  assert.isDefined(match, `missing ${kind}/${name}`);
-  return match!;
+function decodeResource<S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  kind: string,
+  name: string,
+) {
+  return (resources: ReadonlyArray<Resource>) =>
+    resource(resources, kind, name).pipe(
+      Effect.flatMap(Schema.decodeUnknownEffect(schema)),
+    );
 }
 
-describe("OpenFGA Kubernetes topology", () => {
+function containsText(value: unknown, text: string): boolean {
+  if (typeof value === "string") return value.includes(text);
+  if (Array.isArray(value)) return value.some((item) => containsText(item, text));
+  if (typeof value !== "object" || value === null) return false;
+  return Object.values(value).some((item) => containsText(item, text));
+}
+
+const kubernetesDirectoryUrl = new URL("../kubernetes", import.meta.url);
+const render = Effect.fn("test.openfgaManifest.render")(function*() {
+  const paths = yield* Path.Path;
+  const kubernetesDirectory = yield* paths.fromFileUrl(kubernetesDirectoryUrl);
+  const documents = yield* renderKustomize(kubernetesDirectory);
+  return yield* Schema.decodeUnknownEffect(Resources)(documents);
+});
+const database = decodeResource(
+  DatabaseCluster,
+  "Cluster",
+  "openfga-postgres",
+);
+const migration = decodeResource(Job, "Job", "openfga-migrate-v1-18-1");
+const deployment = decodeResource(Deployment, "Deployment", "openfga");
+const disruption = decodeResource(
+  DisruptionBudget,
+  "PodDisruptionBudget",
+  "openfga",
+);
+const bootstrapService = decodeResource(Service, "Service", "openfga-bootstrap");
+const service = decodeResource(Service, "Service", "openfga");
+const bootstrap = decodeResource(
+  Job,
+  "Job",
+  "openfga-bootstrap-agentos-access-v1",
+);
+const policy = decodeResource(NetworkPolicy, "NetworkPolicy", "openfga");
+
+layer(BunServices.layer)("OpenFGA Kubernetes topology", (it) => {
   it.effect("renders ordered migration, HA runtime, and idempotent bootstrap phases", () =>
     Effect.gen(function*() {
       const resources = yield* render();
@@ -67,11 +221,13 @@ describe("OpenFGA Kubernetes topology", () => {
         ].sort(),
       );
 
-      const database = resource(resources, "Cluster", "openfga-postgres");
-      assert.strictEqual(database.spec?.instances, 3);
-      assert.strictEqual((database.spec as any).bootstrap.initdb.database, "openfga");
-      assert.strictEqual((database.spec as any).bootstrap.initdb.owner, "openfga");
-      assert.deepStrictEqual((database.spec as any).backup, {
+      const databaseCluster = yield* database(resources);
+      assert.strictEqual(databaseCluster.spec.instances, 3);
+      assert.deepStrictEqual(databaseCluster.spec.bootstrap.initdb, {
+        database: "openfga",
+        owner: "openfga",
+      });
+      assert.deepStrictEqual(databaseCluster.spec.backup, {
         target: "prefer-standby",
         volumeSnapshot: {
           online: true,
@@ -83,44 +239,49 @@ describe("OpenFGA Kubernetes topology", () => {
         },
       });
 
-      const migration = resource(resources, "Job", "openfga-migrate-v1-18-1");
-      const migrationPod = (migration.spec as any).template.spec;
+      const migrationJob = yield* migration(resources);
+      const migrationPod = migrationJob.spec.template.spec;
       assert.isFalse(migrationPod.automountServiceAccountToken);
+      const migrationContainer = yield* required(
+        migrationPod.containers[0],
+        "Missing migration container",
+      );
       assert.strictEqual(
-        migrationPod.containers[0].image,
+        migrationContainer.image,
         "docker.io/openfga/openfga@sha256:efde89d24487da1a8bc37d85b61341f1fb7024943a1ded65f4b7d51a75666688",
       );
-      assert.deepStrictEqual(migrationPod.containers[0].args, [
-        "migrate",
-      ]);
+      assert.deepStrictEqual(migrationContainer.args, ["migrate"]);
 
-      const deployment = resource(resources, "Deployment", "openfga");
-      assert.strictEqual(deployment.spec?.replicas, 2);
-      assert.deepNestedInclude(deployment.spec, {
-        strategy: {
-          type: "RollingUpdate",
-          rollingUpdate: { maxSurge: 1, maxUnavailable: 0 },
-        },
+      const runtimeDeployment = yield* deployment(resources);
+      assert.strictEqual(runtimeDeployment.spec.replicas, 2);
+      assert.deepStrictEqual(runtimeDeployment.spec.strategy, {
+        type: "RollingUpdate",
+        rollingUpdate: { maxSurge: 1, maxUnavailable: 0 },
       });
-      const pod = (deployment.spec as any).template.spec;
+      const pod = runtimeDeployment.spec.template.spec;
       assert.isFalse(pod.automountServiceAccountToken);
-      assert.deepNestedInclude(pod.securityContext, {
+      assert.deepInclude(pod.securityContext, {
         fsGroup: 1000,
         fsGroupChangePolicy: "OnRootMismatch",
       });
       assert.lengthOf(pod.containers, 2);
-      const runtime = pod.containers.find(({ name }: { name: string }) =>
-        name === "openfga"
+      const runtime = yield* required(
+        pod.containers.find(({ name }) => name === "openfga"),
+        "Missing OpenFGA runtime container",
       );
-      const readiness = pod.containers.find(({ name }: { name: string }) =>
-        name === "semantic-readiness"
+      const readiness = yield* required(
+        pod.containers.find(({ name }) => name === "semantic-readiness"),
+        "Missing semantic readiness container",
       );
       assert.strictEqual(
         runtime.image,
         "docker.io/openfga/openfga@sha256:efde89d24487da1a8bc37d85b61341f1fb7024943a1ded65f4b7d51a75666688",
       );
-      assert.deepNestedInclude(
-        Object.fromEntries(runtime.env.map((entry: any) => [entry.name, entry.value ?? entry.valueFrom])),
+      assert.deepInclude(
+        Object.fromEntries((runtime.env ?? []).map((entry) => [
+          entry.name,
+          entry.value ?? entry.valueFrom,
+        ])),
         {
           OPENFGA_AUTHN_METHOD: "preshared",
           OPENFGA_AUTHN_PRESHARED_KEYS: {
@@ -131,46 +292,50 @@ describe("OpenFGA Kubernetes topology", () => {
           },
         },
       );
-      assert.deepStrictEqual(runtime.readinessProbe.httpGet, {
+      assert.deepStrictEqual(runtime.readinessProbe?.httpGet, {
         path: "/readyz",
         port: 8090,
       });
       assert.deepStrictEqual(readiness.command, ["agentos-openfga-readiness"]);
       assert.deepStrictEqual(readiness.volumeMounts, [
-        { mountPath: "/var/run/secrets/agentos-openfga", name: "admin", readOnly: true },
-        { mountPath: "/var/run/agentos/openfga-deployment", name: "deployment", readOnly: true },
+        {
+          mountPath: "/var/run/secrets/agentos-openfga",
+          name: "admin",
+          readOnly: true,
+        },
+        {
+          mountPath: "/var/run/agentos/openfga-deployment",
+          name: "deployment",
+          readOnly: true,
+        },
       ]);
-      const deploymentVolume = pod.volumes.find(({ name }: { name: string }) =>
-        name === "deployment"
+      const deploymentVolume = yield* required(
+        pod.volumes?.find(({ name }) => name === "deployment"),
+        "Missing deployment volume",
       );
-      const adminVolume = pod.volumes.find(({ name }: { name: string }) =>
-        name === "admin"
+      const adminVolume = yield* required(
+        pod.volumes?.find(({ name }) => name === "admin"),
+        "Missing admin volume",
       );
-      assert.strictEqual(adminVolume.secret.defaultMode, 0o440);
-      assert.strictEqual(deploymentVolume.configMap.name, "openfga-deployment");
-      assert.isTrue(deploymentVolume.configMap.optional);
+      assert.strictEqual(adminVolume.secret?.defaultMode, 0o440);
+      assert.strictEqual(deploymentVolume.configMap?.name, "openfga-deployment");
+      assert.isTrue(deploymentVolume.configMap?.optional);
 
-      const disruption = resource(resources, "PodDisruptionBudget", "openfga");
-      assert.strictEqual(disruption.spec?.minAvailable, 1);
-
-      const bootstrapService = resource(resources, "Service", "openfga-bootstrap");
-      assert.isTrue(bootstrapService.spec?.publishNotReadyAddresses);
-      const service = resource(resources, "Service", "openfga");
-      assert.notProperty(service.spec!, "publishNotReadyAddresses");
-
-      const bootstrap = resource(
-        resources,
-        "Job",
-        "openfga-bootstrap-agentos-access-v1",
+      assert.strictEqual((yield* disruption(resources)).spec.minAvailable, 1);
+      assert.isTrue(
+        (yield* bootstrapService(resources)).spec.publishNotReadyAddresses,
       );
-      const bootstrapPod = (bootstrap.spec as any).template.spec;
+      assert.isUndefined((yield* service(resources)).spec.publishNotReadyAddresses);
+
+      const bootstrapJob = yield* bootstrap(resources);
+      const bootstrapPod = bootstrapJob.spec.template.spec;
       assert.strictEqual(bootstrapPod.serviceAccountName, "openfga-bootstrap");
-      assert.deepNestedInclude(bootstrapPod.securityContext, {
+      assert.deepInclude(bootstrapPod.securityContext, {
         fsGroup: 1000,
         fsGroupChangePolicy: "OnRootMismatch",
       });
-      assert.strictEqual(bootstrapPod.volumes[0].secret.defaultMode, 0o440);
-      assert.deepStrictEqual(bootstrapPod.containers[0].command, [
+      assert.strictEqual(bootstrapPod.volumes?.[0]?.secret?.defaultMode, 0o440);
+      assert.deepStrictEqual(bootstrapPod.containers[0]?.command, [
         "agentos-openfga-bootstrap",
       ]);
     }));
@@ -181,22 +346,21 @@ describe("OpenFGA Kubernetes topology", () => {
       assert.isEmpty(resources.filter(({ kind }) =>
         kind === "Secret" || kind === "Ingress"
       ));
-      const source = JSON.stringify(resources);
-      assert.notInclude(source, "firstmate");
-      assert.notInclude(source, "secondmate");
-      assert.notInclude(source, "crewmate");
+      for (const forbidden of ["firstmate", "secondmate", "crewmate"]) {
+        assert.isFalse(containsText(resources, forbidden));
+      }
 
-      const policy = resource(resources, "NetworkPolicy", "openfga");
-      assert.deepNestedInclude(policy.spec, {
-        policyTypes: ["Ingress"],
-        podSelector: {
-          matchLabels: { "app.kubernetes.io/name": "openfga" },
-        },
+      const networkPolicy = yield* policy(resources);
+      assert.deepStrictEqual(networkPolicy.spec.policyTypes, ["Ingress"]);
+      assert.deepStrictEqual(networkPolicy.spec.podSelector, {
+        matchLabels: { "app.kubernetes.io/name": "openfga" },
       });
-      assert.notProperty(policy.spec!, "egress");
-      const ingress = (policy.spec as any).ingress;
-      const clientIngress = ingress.find((entry: any) =>
-        entry.ports.some(({ port }: { port: number }) => port === 8080)
+      assert.isUndefined(networkPolicy.spec.egress);
+      const clientIngress = yield* required(
+        networkPolicy.spec.ingress.find((entry) =>
+          entry.ports.some(({ port }) => port === 8080)
+        ),
+        "Missing OpenFGA client ingress",
       );
       assert.deepStrictEqual(clientIngress, {
         from: [{
