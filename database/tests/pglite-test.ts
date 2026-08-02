@@ -211,19 +211,29 @@ export const firstRow = Effect.fn("test.pglite.firstRow")(function*<Row>(
   return row;
 });
 
+export const withDatabaseLogin = Effect.fn("test.pglite.withDatabaseLogin")(
+  function*<A, E, R>(
+    database: PGliteTestDatabaseService,
+    role: string,
+    operation: Effect.Effect<A, E, R>,
+  ) {
+    if (!/^[a-z][a-z0-9_]*$/.test(role)) {
+      return yield* failure("fixture", "invalid test login role");
+    }
+    return yield* Effect.acquireUseRelease(
+      database.exec(`SET SESSION AUTHORIZATION ${role}`),
+      () => operation,
+      () => database.exec("SET SESSION AUTHORIZATION postgres").pipe(
+        Effect.orDie,
+      ),
+    );
+  },
+);
+
 export const asLogin = Effect.fn("test.pglite.asLogin")(function*<A, E, R>(
   role: string,
   operation: Effect.Effect<A, E, R>,
 ) {
-  if (!/^[a-z][a-z0-9_]*$/.test(role)) {
-    return yield* failure("fixture", "invalid test login role");
-  }
   const database = yield* PGliteTestDatabase;
-  return yield* Effect.acquireUseRelease(
-    database.exec(`SET SESSION AUTHORIZATION ${role}`),
-    () => operation,
-    () => database.exec("SET SESSION AUTHORIZATION postgres").pipe(
-      Effect.orDie,
-    ),
-  );
+  return yield* withDatabaseLogin(database, role, operation);
 });
