@@ -5,18 +5,16 @@ import {
   RoutingState as CodexRoutingState,
   SessionKey,
   classifyUpstreamResponse,
-  selectAccount as selectRouterAccount,
 } from "@akua-dev/codex-router/core";
 import {
   Effect,
   Layer,
   Option,
   Ref,
-  Result,
 } from "effect";
 
 import {
-  fromRouterExplanation,
+  selectAccount,
   toRouterCandidate,
   toRouterConfig,
 } from "./selection.ts";
@@ -212,20 +210,5 @@ function selectEffect(
   config: RoutingConfig,
   now: number,
 ): Effect.Effect<SelectionDecision> {
-  return Effect.result(selectRouterAccount({
-    candidates: candidates.map(toRouterCandidate),
-    config: toRouterConfig(config),
-    now,
-  })).pipe(Effect.map((result) =>
-    Result.isFailure(result)
-      ? {
-          reason: "no_eligible_accounts",
-          candidates: result.failure.explanations.map(fromRouterExplanation),
-        }
-      : {
-          accountId: result.success.accountId,
-          reason: result.success.reason,
-          candidates: result.success.explanations.map(fromRouterExplanation),
-        }
-  ));
+  return selectAccount({ candidates, config, now });
 }
