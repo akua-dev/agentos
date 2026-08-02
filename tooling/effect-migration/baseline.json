@@ -578,15 +578,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/brand-assets.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/scripts/docs-contract.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 3,
-      "digest": "e2d4f0f4a95aaac194e5697df109c706676fc32a3f0e75b51f3afb710b11184f",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/docs-contract.ts under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/scripts/finalize-worker-build.ts",
       "slice": "website",
       "issue": 99,
@@ -603,15 +594,6 @@
       "digest": "6e4e33c7ad250247515a554f178f0dfb09390893085ce349fcef3e38d2947af7",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/generate-brand-assets.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/scripts/learn-contract.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 2,
-      "digest": "e6712b8692056f9f9d250002290cd6613a60b2289ada2ce843159d2978427272",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/learn-contract.ts under issue #99; never refresh touched debt."
     },
     {
       "path": "website/apps/docs/scripts/lint.entry.ts",
@@ -711,15 +693,6 @@
       "digest": "4237161a7175df2711b37bfa3c9a8b4d9440cf1834611575222d98df91aa1bbe",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/scripts/worker-size.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/source.config.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 2,
-      "digest": "7a76bd1440eb95be3deb5041a3e502032ad88837b11e0eec6719694e361b1481",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/source.config.ts under issue #99; never refresh touched debt."
     }
   ]
 }
