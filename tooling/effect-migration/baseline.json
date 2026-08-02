@@ -695,15 +695,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/learn/curriculum.ts under issue #99; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/lib/learn/progress.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 2,
-      "digest": "a8cbd971d019504508d472091af479841d233e90eca306180c8bdbc0eb4f2926",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/learn/progress.ts under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/lib/learn/source.ts",
       "slice": "website",
       "issue": 99,
