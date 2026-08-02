@@ -59,16 +59,18 @@ CNAP's first-party `https://ph.akua.dev` endpoint. Production builds on `main` u
 CNAP's public PostHog project token by default. Non-production Workers Builds previews stay
 disabled unless `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` explicitly overrides the
 project. Set `NEXT_PUBLIC_POSTHOG_HOST` only to override the first-party
-endpoint. Development stays disabled when no token override is present.
+endpoint. Development stays disabled when no token override is present. The
+server decodes this public configuration through Effect Config and passes the
+typed result to the client analytics Effect.
 
 The selected PostHog project must keep the stateful **Cookieless server hash
 mode** disabled under **Project Settings → Web analytics**. This client relies on
 browser cookies for anonymous visitors.
 
 Both PostHog values are public browser configuration, not server secrets.
-When overriding them in Cloudflare Workers Builds, remember that Next.js
-embeds `NEXT_PUBLIC_*` values while building the client bundle;
-`wrangler.jsonc` runtime variables cannot configure an already-built bundle.
+When overriding them in Cloudflare Workers Builds, remember that the static
+site output captures their values during the build; `wrangler.jsonc` runtime
+variables cannot reconfigure already-built pages.
 
 The `agentos-site` production trigger in Cloudflare Workers Builds uses:
 
