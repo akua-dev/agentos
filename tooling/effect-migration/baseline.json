@@ -560,15 +560,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/manifest.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/observability-skill.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 5,
-      "digest": "b34385e5b2be2aa9f4cc769a03c3e99264f6b959621879c166ad13b3e0009a41",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/observability-skill.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/tests/preflight.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
