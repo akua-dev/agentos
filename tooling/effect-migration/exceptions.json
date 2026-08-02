@@ -99,6 +99,30 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "website/apps/docs/lib/effect/server-runtime.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runPromise",
+      "maximumOccurrences": 1,
+      "reason": "Next.js route and page callback ABIs require a Promise, so one domain-free adapter enters an Effect runtime for server and Cloudflare programs.",
+      "ownerIssue": 99,
+      "test": "website/apps/docs/lib/effect/server-runtime.effect.test.ts",
+      "removalCondition": "Remove when Next.js accepts Effect values directly from route, page, and metadata callbacks.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "website/apps/docs/lib/effect/server-runtime.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runSync",
+      "maximumOccurrences": 1,
+      "reason": "Next.js and Fumadocs configuration modules require synchronous exported values, so one domain-free adapter enters Effect after all typed failures are handled.",
+      "ownerIssue": 99,
+      "test": "website/apps/docs/lib/effect/server-runtime.effect.test.ts",
+      "removalCondition": "Remove when every framework configuration callback accepts Effect values asynchronously.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "database/drizzle.config.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
