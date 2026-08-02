@@ -108,6 +108,7 @@ The release is stable, not an alpha or nightly build. The executable test valida
 | Retry                                      | Passed exactly two attempts on one explicitly matched 503-safe route; no global provider retry      |
 | HTTP/2 gRPC                                | Passed with frame fidelity and backend-token replacement                                            |
 | MCP                                        | Passed modern `2026-07-28` tool discovery through streamable HTTP                                   |
+| A2A v1 live delivery                       | Passed authenticated card rewrite and reference-only `SendMessage`; PostgreSQL remains authoritative |
 | Prometheus metrics                         | Passed on `/metrics`                                                                                |
 | OTLP/HTTP tracing                          | Passed; protected payload and all test credentials absent from exported bytes                       |
 | Static validation                          | Passed with `--validate-only`                                                                       |
@@ -136,10 +137,19 @@ AGENTOS_AGENTGATEWAY_BIN=/absolute/path/to/agentgateway-darwin-arm64 \
 AGENTOS_AGENTGATEWAY_CHART=/absolute/path/to/agentgateway-standalone-1.4.1.tgz \
 bun run --cwd services/agentgateway conformance
 
+AGENTOS_AGENTGATEWAY_BIN=/absolute/path/to/agentgateway-darwin-arm64 \
+bun run --cwd services/agentgateway a2a:conformance
+
 bun run --cwd services/agentgateway test
 ```
 
 The executable conformance is explicitly skipped by the ordinary offline test suite unless both paths are set. It never downloads a mutable `latest` artifact.
+
+The A2A spike uses only the binary path, verifies its platform checksum,
+version, and Git revision, and can optionally write its bounded numeric latency
+sample to `AGENTOS_A2A_METRICS_PATH`. The full PostgreSQL-first decision,
+version gap, authority boundaries, and implementation gate are recorded in
+[`a2a-postgresql-first-evaluation.md`](../../docs/research/a2a-postgresql-first-evaluation.md).
 
 ## Helm versus Kustomize
 

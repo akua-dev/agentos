@@ -5,7 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run tests/contract.effect.test.ts",
+    "test": "bun ../../node_modules/vitest/vitest.mjs run tests/contract.effect.test.ts tests/a2a-v1.effect.test.ts",
+    "a2a:conformance": "bun ../../node_modules/vitest/vitest.mjs run tests/a2a-v1.effect.test.ts",
     "conformance": "bun test tests/conformance.test.ts"
   }
 }
