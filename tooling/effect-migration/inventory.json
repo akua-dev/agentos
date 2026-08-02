@@ -85,6 +85,23 @@
       "status": "runtime-boundary"
     },
     {
+      "id": "openfga-live-model-conformance-entrypoint",
+      "issue": 102,
+      "pattern": "^services/openfga/tests/live-model-conformance-main\\.ts$",
+      "runtime": "bun-openfga-entrypoint",
+      "package": "@agentos/openfga",
+      "io": [
+        "config",
+        "http",
+        "runtime-adapter"
+      ],
+      "migrationDependencies": [
+        100,
+        101
+      ],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "shared-foundation-consumers",
       "issue": 101,
       "pattern": "^packages/agentos/src/(?:instructions|preflight|readiness-state|resources|startup)\\.ts$|^packages/agentos/src/roles/default\\.ts$",

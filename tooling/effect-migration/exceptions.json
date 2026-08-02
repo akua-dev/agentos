@@ -27,6 +27,18 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "services/openfga/tests/live-model-conformance-main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The disposable OpenFGA live-model conformance executable enters one Effect runtime around typed configuration, authorization I/O, assertions, redacted failures, and schema-encoded output.",
+      "ownerIssue": 102,
+      "test": "services/openfga/tests/postgres-upgrade-conformance.ts",
+      "removalCondition": "Retain only while live-model conformance is invoked as a standalone subprocess by the upgrade harness.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "website/apps/docs/lib/effect/browser-runtime.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",

@@ -47,15 +47,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/agentgateway/tests/conformance.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "services/openfga/tests/live-model-conformance.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 8,
-      "digest": "7a738138ece1a8369fcbb0c8686e28a500c1c5d42a8cc51d05bca0387d3ac44f",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/tests/live-model-conformance.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/openfga/tests/postgres-upgrade-conformance.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
