@@ -272,7 +272,7 @@ const ModelConformanceResultSchema = Schema.Struct({
 function runModelConformance(operation: string, baseUrl: string) {
   return command(operation, [
     "bun",
-    "tests/live-model-conformance.ts",
+    "tests/live-model-conformance-main.ts",
   ], {
     cwd: new URL("..", import.meta.url).pathname,
     environment: { OPENFGA_TEST_URL: baseUrl },
