@@ -626,6 +626,26 @@
       "status": "planned"
     },
     {
+      "id": "database-drizzle-framework-adapter",
+      "issue": 97,
+      "pattern": "^database/drizzle\\.config\\.ts$|^database/runtime/drizzle\\.ts$",
+      "runtime": "bun-drizzle-entrypoint",
+      "package": "@agentos/database",
+      "io": ["config", "filesystem", "process", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "database-migration-workspace-runtime",
+      "issue": 97,
+      "pattern": "^database/runtime/prepare\\.ts$",
+      "runtime": "bun-database-entrypoint",
+      "package": "@agentos/database",
+      "io": ["config", "crypto", "filesystem", "process", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "agent-workload-profiles",
       "issue": 124,
       "pattern": "^packages/agentos/src/workloads/profiles\\.ts$",
