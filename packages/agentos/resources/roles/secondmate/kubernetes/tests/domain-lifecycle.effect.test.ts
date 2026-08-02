@@ -881,6 +881,9 @@ layer(platform)("Second Mate domain lifecycle", (it) => {
         "Direct provider-root credential environment variables are not permitted",
       );
 
+      const selfMutationPatch = yield* encodeJson({
+        metadata: { annotations: { "agentos.akua.dev/test": "denied" } },
+      });
       const selfMutation = yield* kubectl(
         context,
         environment,
@@ -895,7 +898,7 @@ layer(platform)("Second Mate domain lifecycle", (it) => {
           "--dry-run=server",
           "--type=merge",
           "--patch",
-          '{"metadata":{"annotations":{"agentos.akua.dev/test":"denied"}}}',
+          selfMutationPatch,
         ],
       );
       assert.strictEqual(selfMutation.exitCode, 1);
