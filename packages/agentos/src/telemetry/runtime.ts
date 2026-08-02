@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import {
   context,
   metrics,
@@ -21,8 +20,16 @@ import {
   type ViewOptions,
 } from "@opentelemetry/sdk-metrics";
 import {
-  AGENTOS_AI_METRICS,
+  Clock,
+  Config,
+  Effect,
+  Option,
+  Ref,
+} from "effect";
+
+import {
   AGENTOS_AI_DURATION_BUCKETS_SECONDS,
+  AGENTOS_AI_METRICS,
   AGENTOS_AI_TELEMETRY_CONTRACT_VERSION,
   type AgentOSAICompactionPath,
   type AgentOSAIModelFamily,
@@ -42,34 +49,34 @@ import {
 } from "./privacy.ts";
 
 export interface AgentOSOperationInput {
-  runtime: AgentOSAIRuntime;
-  runtimeVersion?: string;
-  route: AgentOSAIRoute;
-  sessionState: AgentOSAISessionState;
-  modelFamily: AgentOSAIModelFamily;
-  providerFamily: AgentOSAIProviderFamily;
+  readonly runtime: AgentOSAIRuntime;
+  readonly runtimeVersion?: string;
+  readonly route: AgentOSAIRoute;
+  readonly sessionState: AgentOSAISessionState;
+  readonly modelFamily: AgentOSAIModelFamily;
+  readonly providerFamily: AgentOSAIProviderFamily;
 }
 
 export interface AgentOSProviderAttemptInput {
-  requestKind: AgentOSAIRequestKind;
-  streamMode: AgentOSAIStreamMode;
-  compactionPath?: AgentOSAICompactionPath;
-  routeSlot?: string;
-  retryCount?: number;
+  readonly requestKind: AgentOSAIRequestKind;
+  readonly streamMode: AgentOSAIStreamMode;
+  readonly compactionPath?: AgentOSAICompactionPath;
+  readonly routeSlot?: string;
+  readonly retryCount?: number;
 }
 
 export interface AgentOSOperationOutcome {
-  status?: number;
-  error?: unknown;
+  readonly status?: number;
+  readonly error?: unknown;
 }
 
 export interface AgentOSProviderAttemptOutcome extends AgentOSOperationOutcome {
-  streamOutcome?: AgentOSAIStreamOutcome;
-  providerRequestId?: string;
-  chunks?: number;
-  bytes?: number;
-  inputTokens?: number;
-  outputTokens?: number;
+  readonly streamOutcome?: AgentOSAIStreamOutcome;
+  readonly providerRequestId?: string;
+  readonly chunks?: number;
+  readonly bytes?: number;
+  readonly inputTokens?: number;
+  readonly outputTokens?: number;
 }
 
 export type AgentOSTraceCarrier =
@@ -77,35 +84,39 @@ export type AgentOSTraceCarrier =
 
 export interface AgentOSProviderAttempt {
   readonly id: string;
-  inject(carrier: Headers | Record<string, string>): void;
-  end(outcome?: AgentOSProviderAttemptOutcome): void;
+  readonly inject: (
+    carrier: Headers | Record<string, string>,
+  ) => Effect.Effect<void>;
+  readonly end: (
+    outcome?: AgentOSProviderAttemptOutcome,
+  ) => Effect.Effect<void>;
 }
 
 export interface AgentOSOperation {
   readonly id: string;
-  startProviderAttempt(
+  readonly startProviderAttempt: (
     input: AgentOSProviderAttemptInput,
-  ): AgentOSProviderAttempt;
-  end(outcome?: AgentOSOperationOutcome): void;
+  ) => Effect.Effect<AgentOSProviderAttempt>;
+  readonly end: (outcome?: AgentOSOperationOutcome) => Effect.Effect<void>;
 }
 
 export interface AgentOSTelemetry {
   readonly enabled: boolean;
-  startOperation(
+  readonly startOperation: (
     input: AgentOSOperationInput,
     parentCarrier?: AgentOSTraceCarrier,
-  ): AgentOSOperation;
-  shutdown(): Promise<void>;
+  ) => Effect.Effect<AgentOSOperation>;
+  readonly shutdown: Effect.Effect<void>;
 }
 
 export interface AgentOSTelemetryOptions {
-  enabled?: boolean;
-  tracer?: Tracer;
-  meter?: Meter;
-  propagator?: TextMapPropagator;
-  clock?: () => number;
-  id?: () => string;
-  shutdown?: () => Promise<void>;
+  readonly enabled?: boolean;
+  readonly tracer?: Tracer;
+  readonly meter?: Meter;
+  readonly propagator?: TextMapPropagator;
+  readonly clock?: Effect.Effect<number>;
+  readonly id?: Effect.Effect<string>;
+  readonly shutdown?: Effect.Effect<void>;
 }
 
 export function createAgentOSMetricViews(): ViewOptions[] {
@@ -122,27 +133,21 @@ export function createAgentOSMetricViews(): ViewOptions[] {
     instrumentType: InstrumentType.HISTOGRAM,
     aggregation: {
       type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
-      options: {
-        boundaries: [...AGENTOS_AI_DURATION_BUCKETS_SECONDS],
-      },
+      options: { boundaries: [...AGENTOS_AI_DURATION_BUCKETS_SECONDS] },
     },
   }));
 }
 
 interface Instruments {
-  operations: Counter;
-  providerAttempts: Counter;
-  operationDuration: Histogram;
-  providerDuration: Histogram;
+  readonly operations: Counter;
+  readonly providerAttempts: Counter;
+  readonly operationDuration: Histogram;
+  readonly providerDuration: Histogram;
 }
 
 const carrierGetter: TextMapGetter<Record<string, string>> = {
-  keys(carrier) {
-    return Object.keys(carrier);
-  },
-  get(carrier, key) {
-    return carrier[key];
-  },
+  keys: Object.keys,
+  get: (carrier, key) => carrier[key],
 };
 
 const carrierSetter: TextMapSetter<Record<string, string>> = {
@@ -151,392 +156,346 @@ const carrierSetter: TextMapSetter<Record<string, string>> = {
   },
 };
 
-let environmentTelemetry: Promise<AgentOSTelemetry> | undefined;
-
-export function createAgentOSTelemetry(
-  options: AgentOSTelemetryOptions = {},
-): AgentOSTelemetry {
-  if (options.enabled === false) return createNoopAgentOSTelemetry();
-  const tracer = options.tracer ?? trace.getTracer("@akua-dev/agentos");
-  const meter = options.meter ?? metrics.getMeter("@akua-dev/agentos");
-  const propagator = options.propagator ?? propagation;
-  const clock = options.clock ?? monotonicMilliseconds;
-  const id = options.id ?? randomUUID;
-  const shutdown = options.shutdown ?? (async () => undefined);
-  const instruments = createInstruments(meter);
+const createAgentOSTelemetryCore = Effect.fn(
+  "agentos.telemetry.create",
+)(function*(options: AgentOSTelemetryOptions = {}) {
+  if (options.enabled === false) return noopTelemetry;
+  const clockService = yield* Clock.Clock;
+  const clock = options.clock ?? Effect.sync(() => clockService.currentTimeMillisUnsafe());
+  const id = options.id ?? Effect.sync(() => globalThis.crypto.randomUUID());
+  const configured = yield* Effect.try({
+    try: () => {
+      const tracer = options.tracer ?? trace.getTracer("@akua-dev/agentos");
+      const meter = options.meter ?? metrics.getMeter("@akua-dev/agentos");
+      return {
+        tracer,
+        meter,
+        propagator: options.propagator ?? propagation,
+        instruments: createInstruments(meter),
+      };
+    },
+    catch: () => undefined,
+  });
+  if (configured === undefined) return noopTelemetry;
 
   return {
     enabled: true,
-    startOperation(input, parentCarrier) {
-      try {
-        const parentContext = extractParent(propagator, parentCarrier);
-        const operationId = id();
-        const startedAt = clock();
-        const base = operationAttributes(input);
-        const span = tracer.startSpan(
-          "agentos.ai.operation",
-          {
-            attributes: safeTelemetryAttributes(
-              {
-                ...base,
-                "agentos.ai.operation.id": operationId,
-              },
-              "span",
-            ),
-          },
-          parentContext,
-        );
-        const operationContext = trace.setSpan(parentContext, span);
-        let ended = false;
+    startOperation: (input, parentCarrier) =>
+      startOperation({
+        clock,
+        id,
+        input,
+        instruments: configured.instruments,
+        parentCarrier,
+        propagator: configured.propagator,
+        tracer: configured.tracer,
+      }),
+    shutdown: (options.shutdown ?? Effect.void).pipe(
+      Effect.catchCause(() => Effect.void),
+    ),
+  } satisfies AgentOSTelemetry;
+});
 
-        return {
-          id: operationId,
-          startProviderAttempt(attemptInput) {
-            return startProviderAttempt({
-              attemptInput,
-              base,
-              clock,
-              id,
-              instruments,
-              operationContext,
-              propagator,
-              tracer,
-            });
-          },
-          end(outcome = {}) {
-            if (ended) return;
-            ended = true;
-            const final = outcomeAttributes(outcome);
-            finishSpan(span, final);
-            record(() =>
-              instruments.operations.add(
-                1,
-                safeTelemetryAttributes({ ...base, ...final }, "metric"),
-              ),
-            );
-            record(() =>
-              instruments.operationDuration.record(
-                elapsedSeconds(startedAt, clock()),
-                safeTelemetryAttributes({ ...base, ...final }, "metric"),
-              ),
-            );
-          },
-        };
-      } catch {
-        return noopOperation;
-      }
-    },
-    async shutdown() {
-      try {
-        await shutdown();
-      } catch {
-        // Export shutdown is diagnostic-only and must remain fail-open.
-      }
-    },
-  };
+export function createAgentOSTelemetry(options?: AgentOSTelemetryOptions) {
+  return createAgentOSTelemetryCore(options).pipe(
+    Effect.catchCause(() => Effect.succeed(noopTelemetry)),
+  );
 }
 
 export function createNoopAgentOSTelemetry(): AgentOSTelemetry {
   return noopTelemetry;
 }
 
-export function initializeAgentOSTelemetryFromEnvironment(): Promise<AgentOSTelemetry> {
-  if (environmentTelemetry) return environmentTelemetry;
-  environmentTelemetry = initializeEnvironmentTelemetry();
-  return environmentTelemetry;
+const TelemetryEnvironmentConfig = Config.all({
+  disabled: Config.option(Config.string("OTEL_SDK_DISABLED")),
+  endpoint: Config.option(Config.string("OTEL_EXPORTER_OTLP_ENDPOINT")),
+  tracesEndpoint: Config.option(Config.string("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")),
+  metricsEndpoint: Config.option(Config.string("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")),
+  logsEndpoint: Config.option(Config.string("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT")),
+  tracesExporter: Config.option(Config.string("OTEL_TRACES_EXPORTER")),
+  metricsExporter: Config.option(Config.string("OTEL_METRICS_EXPORTER")),
+  logsExporter: Config.option(Config.string("OTEL_LOGS_EXPORTER")),
+});
+
+const initializeAgentOSTelemetryFromEnvironmentCore = Effect.fn(
+  "agentos.telemetry.initializeEnvironment",
+)(function*() {
+  const environment = yield* TelemetryEnvironmentConfig;
+  if (
+    Option.getOrUndefined(environment.disabled)?.trim().toLowerCase() === "true" ||
+    !hasExporterConfiguration(environment)
+  ) return noopTelemetry;
+
+  const sdkModule = yield* Effect.tryPromise({
+    try: () => import("@opentelemetry/sdk-node"),
+    catch: () => undefined,
+  }).pipe(Effect.option);
+  if (Option.isNone(sdkModule)) return noopTelemetry;
+  const sdk = yield* Effect.try({
+    try: () => new sdkModule.value.NodeSDK({ views: createAgentOSMetricViews() }),
+    catch: () => undefined,
+  });
+  if (sdk === undefined) return noopTelemetry;
+  const started = yield* Effect.tryPromise({
+    try: () => Promise.resolve(sdk.start()),
+    catch: () => undefined,
+  }).pipe(Effect.option);
+  if (Option.isNone(started)) return noopTelemetry;
+  return yield* createAgentOSTelemetry({
+    enabled: true,
+    shutdown: Effect.tryPromise({
+      try: () => sdk.shutdown(),
+      catch: () => undefined,
+    }).pipe(Effect.ignore),
+  });
+});
+
+export function initializeAgentOSTelemetryFromEnvironment() {
+  return initializeAgentOSTelemetryFromEnvironmentCore().pipe(
+    Effect.catchCause(() => Effect.succeed(noopTelemetry)),
+  );
 }
 
-function startProviderAttempt(options: {
-  attemptInput: AgentOSProviderAttemptInput;
-  base: AgentOSTelemetryAttributes;
-  clock: () => number;
-  id: () => string;
-  instruments: Instruments;
-  operationContext: Context;
-  propagator: TextMapPropagator;
-  tracer: Tracer;
-}): AgentOSProviderAttempt {
-  try {
-    const attemptId = options.id();
-    const startedAt = options.clock();
+const startOperationCore = Effect.fn("agentos.telemetry.startOperation")(
+  function*(options: {
+    readonly clock: Effect.Effect<number>;
+    readonly id: Effect.Effect<string, unknown>;
+    readonly input: AgentOSOperationInput;
+    readonly instruments: Instruments;
+    readonly parentCarrier?: AgentOSTraceCarrier;
+    readonly propagator: TextMapPropagator;
+    readonly tracer: Tracer;
+  }) {
+    const parentContext = yield* extractParent(options.propagator, options.parentCarrier);
+    const operationId = yield* options.id;
+    const startedAt = yield* options.clock;
+    const base = operationAttributes(options.input);
+    const span = yield* Effect.try({
+      try: () => options.tracer.startSpan(
+        "agentos.ai.operation",
+        { attributes: safeTelemetryAttributes({ ...base, "agentos.ai.operation.id": operationId }, "span") },
+        parentContext,
+      ),
+      catch: () => undefined,
+    });
+    if (span === undefined) return noopOperation;
+    const operationContext = yield* Effect.try({
+      try: () => trace.setSpan(parentContext, span),
+      catch: () => undefined,
+    });
+    if (operationContext === undefined) return noopOperation;
+    const ended = yield* Ref.make(false);
+    return {
+      id: operationId,
+      startProviderAttempt: (attemptInput) => startProviderAttempt({
+        attemptInput,
+        base,
+        clock: options.clock,
+        id: options.id,
+        instruments: options.instruments,
+        operationContext,
+        propagator: options.propagator,
+        tracer: options.tracer,
+      }),
+      end: (outcome = {}) => Effect.gen(function*() {
+        if (yield* Ref.getAndSet(ended, true)) return;
+        const final = outcomeAttributes(outcome);
+        yield* finishSpan(span, final);
+        const metricAttributes = safeTelemetryAttributes({ ...base, ...final }, "metric");
+        yield* record(() => options.instruments.operations.add(1, metricAttributes));
+        const endedAt = yield* options.clock;
+        yield* record(() => options.instruments.operationDuration.record(
+          elapsedSeconds(startedAt, endedAt),
+          metricAttributes,
+        ));
+      }),
+    } satisfies AgentOSOperation;
+  },
+);
+
+function startOperation(
+  options: Parameters<typeof startOperationCore>[0],
+) {
+  return startOperationCore(options).pipe(
+    Effect.catchCause(() => Effect.succeed(noopOperation)),
+  );
+}
+
+const startProviderAttemptCore = Effect.fn("agentos.telemetry.startProviderAttempt")(
+  function*(options: {
+    readonly attemptInput: AgentOSProviderAttemptInput;
+    readonly base: AgentOSTelemetryAttributes;
+    readonly clock: Effect.Effect<number>;
+    readonly id: Effect.Effect<string, unknown>;
+    readonly instruments: Instruments;
+    readonly operationContext: Context;
+    readonly propagator: TextMapPropagator;
+    readonly tracer: Tracer;
+  }) {
+    const attemptId = yield* options.id;
+    const startedAt = yield* options.clock;
     const initial = {
       ...options.base,
       "agentos.ai.request.attempt_id": attemptId,
       "agentos.ai.request.kind": options.attemptInput.requestKind,
       "agentos.ai.stream.mode": options.attemptInput.streamMode,
-      ...(options.attemptInput.compactionPath
-        ? {
-            "agentos.ai.compaction.path": options.attemptInput.compactionPath,
-          }
-        : {}),
-      ...(options.attemptInput.routeSlot
-        ? { "agentos.ai.route.slot": options.attemptInput.routeSlot }
-        : {}),
-      ...(options.attemptInput.retryCount !== undefined
-        ? { "agentos.ai.retry.count": options.attemptInput.retryCount }
-        : {}),
+      ...(options.attemptInput.compactionPath ? { "agentos.ai.compaction.path": options.attemptInput.compactionPath } : {}),
+      ...(options.attemptInput.routeSlot ? { "agentos.ai.route.slot": options.attemptInput.routeSlot } : {}),
+      ...(options.attemptInput.retryCount !== undefined ? { "agentos.ai.retry.count": options.attemptInput.retryCount } : {}),
     };
-    const span = options.tracer.startSpan(
-      "agentos.ai.provider.attempt",
-      { attributes: safeTelemetryAttributes(initial, "span") },
-      options.operationContext,
-    );
-    const attemptContext = trace.setSpan(options.operationContext, span);
-    let ended = false;
-
+    const span = yield* Effect.try({
+      try: () => options.tracer.startSpan(
+        "agentos.ai.provider.attempt",
+        { attributes: safeTelemetryAttributes(initial, "span") },
+        options.operationContext,
+      ),
+      catch: () => undefined,
+    });
+    if (span === undefined) return noopAttempt;
+    const attemptContext = yield* Effect.try({
+      try: () => trace.setSpan(options.operationContext, span),
+      catch: () => undefined,
+    });
+    if (attemptContext === undefined) return noopAttempt;
+    const ended = yield* Ref.make(false);
     return {
       id: attemptId,
-      inject(carrier) {
-        try {
-          const injected: Record<string, string> = {};
-          options.propagator.inject(attemptContext, injected, carrierSetter);
-          if (options.base["agentos.ai.route"] === "ai_gateway") {
-            injected["x-agentos-request-attempt-id"] = attemptId;
-            injected["x-agentos-runtime"] = String(
-              options.base["agentos.ai.runtime"] ?? "",
-            );
-            injected["x-agentos-request-kind"] =
-              options.attemptInput.requestKind;
-            injected["x-agentos-model-family"] = String(
-              options.base["agentos.ai.model.family"] ?? "other",
-            );
-            injected["x-agentos-stream-mode"] = options.attemptInput.streamMode;
-            injected["x-agentos-session-state"] = String(
-              options.base["agentos.ai.session.state"] ?? "fresh",
-            );
-          }
-          for (const [key, value] of Object.entries(injected)) {
-            if (carrier instanceof Headers) carrier.set(key, value);
-            else carrier[key] = value;
-          }
-        } catch {
-          // Correlation is optional; the provider call must still proceed.
+      inject: (carrier) => Effect.sync(() => {
+        const injected: Record<string, string> = {};
+        options.propagator.inject(attemptContext, injected, carrierSetter);
+        if (options.base["agentos.ai.route"] === "ai_gateway") {
+          injected["x-agentos-request-attempt-id"] = attemptId;
+          injected["x-agentos-runtime"] = String(options.base["agentos.ai.runtime"] ?? "");
+          injected["x-agentos-request-kind"] = options.attemptInput.requestKind;
+          injected["x-agentos-model-family"] = String(options.base["agentos.ai.model.family"] ?? "other");
+          injected["x-agentos-stream-mode"] = options.attemptInput.streamMode;
+          injected["x-agentos-session-state"] = String(options.base["agentos.ai.session.state"] ?? "fresh");
         }
-      },
-      end(outcome = {}) {
-        if (ended) return;
-        ended = true;
+        for (const [key, value] of Object.entries(injected)) {
+          if (carrier instanceof Headers) carrier.set(key, value);
+          else carrier[key] = value;
+        }
+      }).pipe(Effect.catchCause(() => Effect.void)),
+      end: (outcome = {}) => Effect.gen(function*() {
+        if (yield* Ref.getAndSet(ended, true)) return;
         const final = {
           ...outcomeAttributes(outcome),
-          ...(outcome.streamOutcome
-            ? { "agentos.ai.stream.outcome": outcome.streamOutcome }
-            : {}),
-          ...(outcome.providerRequestId
-            ? {
-                "agentos.ai.provider.request_id": outcome.providerRequestId,
-              }
-            : {}),
-          ...(outcome.chunks !== undefined
-            ? { "agentos.ai.stream.chunks": outcome.chunks }
-            : {}),
-          ...(outcome.bytes !== undefined
-            ? { "agentos.ai.stream.bytes": outcome.bytes }
-            : {}),
-          ...(outcome.inputTokens !== undefined
-            ? {
-                "agentos.ai.usage.input_tokens": outcome.inputTokens,
-              }
-            : {}),
-          ...(outcome.outputTokens !== undefined
-            ? {
-                "agentos.ai.usage.output_tokens": outcome.outputTokens,
-              }
-            : {}),
+          ...(outcome.streamOutcome ? { "agentos.ai.stream.outcome": outcome.streamOutcome } : {}),
+          ...(outcome.providerRequestId ? { "agentos.ai.provider.request_id": outcome.providerRequestId } : {}),
+          ...(outcome.chunks !== undefined ? { "agentos.ai.stream.chunks": outcome.chunks } : {}),
+          ...(outcome.bytes !== undefined ? { "agentos.ai.stream.bytes": outcome.bytes } : {}),
+          ...(outcome.inputTokens !== undefined ? { "agentos.ai.usage.input_tokens": outcome.inputTokens } : {}),
+          ...(outcome.outputTokens !== undefined ? { "agentos.ai.usage.output_tokens": outcome.outputTokens } : {}),
         };
-        finishSpan(span, final);
-        const metricAttributes = safeTelemetryAttributes(
-          { ...initial, ...final },
-          "metric",
-        );
-        record(() =>
-          options.instruments.providerAttempts.add(1, metricAttributes),
-        );
-        record(() =>
-          options.instruments.providerDuration.record(
-            elapsedSeconds(startedAt, options.clock()),
-            metricAttributes,
-          ),
-        );
-      },
-    };
-  } catch {
-    return noopAttempt;
-  }
+        yield* finishSpan(span, final);
+        const metricAttributes = safeTelemetryAttributes({ ...initial, ...final }, "metric");
+        yield* record(() => options.instruments.providerAttempts.add(1, metricAttributes));
+        const endedAt = yield* options.clock;
+        yield* record(() => options.instruments.providerDuration.record(
+          elapsedSeconds(startedAt, endedAt),
+          metricAttributes,
+        ));
+      }),
+    } satisfies AgentOSProviderAttempt;
+  },
+);
+
+function startProviderAttempt(
+  options: Parameters<typeof startProviderAttemptCore>[0],
+) {
+  return startProviderAttemptCore(options).pipe(
+    Effect.catchCause(() => Effect.succeed(noopAttempt)),
+  );
 }
 
 function createInstruments(meter: Meter): Instruments {
   return {
-    operations: meter.createCounter(AGENTOS_AI_METRICS.operations, {
-      unit: "{operation}",
-      description: "Completed AgentOS AI operations",
-    }),
-    providerAttempts: meter.createCounter(AGENTOS_AI_METRICS.providerAttempts, {
-      unit: "{attempt}",
-      description: "Completed AgentOS AI provider attempts",
-    }),
-    operationDuration: meter.createHistogram(
-      AGENTOS_AI_METRICS.operationDuration,
-      {
-        unit: "s",
-        description: "AgentOS AI operation duration",
-      },
-    ),
-    providerDuration: meter.createHistogram(
-      AGENTOS_AI_METRICS.providerDuration,
-      {
-        unit: "s",
-        description: "AgentOS AI provider-attempt duration",
-      },
-    ),
+    operations: meter.createCounter(AGENTOS_AI_METRICS.operations, { unit: "{operation}", description: "Completed AgentOS AI operations" }),
+    providerAttempts: meter.createCounter(AGENTOS_AI_METRICS.providerAttempts, { unit: "{attempt}", description: "Completed AgentOS AI provider attempts" }),
+    operationDuration: meter.createHistogram(AGENTOS_AI_METRICS.operationDuration, { unit: "s", description: "AgentOS AI operation duration" }),
+    providerDuration: meter.createHistogram(AGENTOS_AI_METRICS.providerDuration, { unit: "s", description: "AgentOS AI provider-attempt duration" }),
   };
 }
 
-function operationAttributes(
-  input: AgentOSOperationInput,
-): AgentOSTelemetryAttributes {
-  return safeTelemetryAttributes(
-    {
-      "agentos.telemetry.contract.version":
-        AGENTOS_AI_TELEMETRY_CONTRACT_VERSION,
-      "agentos.ai.runtime": input.runtime,
-      ...(input.runtimeVersion
-        ? { "agentos.ai.runtime.version": input.runtimeVersion }
-        : {}),
-      "agentos.ai.route": input.route,
-      "agentos.ai.session.state": input.sessionState,
-      "agentos.ai.model.family": input.modelFamily,
-      "agentos.ai.provider.family": input.providerFamily,
-    },
-    "span",
-  );
+function operationAttributes(input: AgentOSOperationInput): AgentOSTelemetryAttributes {
+  return safeTelemetryAttributes({
+    "agentos.telemetry.contract.version": AGENTOS_AI_TELEMETRY_CONTRACT_VERSION,
+    "agentos.ai.runtime": input.runtime,
+    ...(input.runtimeVersion ? { "agentos.ai.runtime.version": input.runtimeVersion } : {}),
+    "agentos.ai.route": input.route,
+    "agentos.ai.session.state": input.sessionState,
+    "agentos.ai.model.family": input.modelFamily,
+    "agentos.ai.provider.family": input.providerFamily,
+  }, "span");
 }
 
-function outcomeAttributes(
-  outcome: AgentOSOperationOutcome,
-): AgentOSTelemetryAttributes {
-  return safeTelemetryAttributes(
-    {
-      "agentos.ai.status_class": classifyAIStatus(
-        outcome.status,
-        outcome.error,
-      ),
-      "agentos.ai.error.class": classifyAIError(outcome.error, outcome.status),
-      ...(outcome.status !== undefined
-        ? { "http.response.status_code": outcome.status }
-        : {}),
-    },
-    "span",
-  );
+function outcomeAttributes(outcome: AgentOSOperationOutcome): AgentOSTelemetryAttributes {
+  return safeTelemetryAttributes({
+    "agentos.ai.status_class": classifyAIStatus(outcome.status, outcome.error),
+    "agentos.ai.error.class": classifyAIError(outcome.error, outcome.status),
+    ...(outcome.status !== undefined ? { "http.response.status_code": outcome.status } : {}),
+  }, "span");
 }
 
 function finishSpan(span: Span, attributes: Readonly<Record<string, unknown>>) {
-  record(() => {
+  return record(() => {
     const safe = safeTelemetryAttributes(attributes, "span");
     span.setAttributes(safe);
-    const statusClass = safe["agentos.ai.status_class"];
-    span.setStatus({
-      code:
-        statusClass === "success" ? SpanStatusCode.OK : SpanStatusCode.ERROR,
-    });
+    span.setStatus({ code: safe["agentos.ai.status_class"] === "success" ? SpanStatusCode.OK : SpanStatusCode.ERROR });
     span.end();
   });
 }
 
-function extractParent(
-  propagator: TextMapPropagator,
-  carrier?: AgentOSTraceCarrier,
-): Context {
-  if (!carrier) return context.active();
-  const safe: Record<string, string> = {};
-  for (const key of ["traceparent", "tracestate"] as const) {
-    const value =
-      carrier instanceof Headers
-        ? (carrier.get(key) ?? undefined)
-        : carrier[key];
-    const maximum = key === "traceparent" ? 55 : 512;
-    if (value && value.length <= maximum) safe[key] = value;
-  }
-  try {
-    return propagator.extract(context.active(), safe, carrierGetter);
-  } catch {
-    return context.active();
-  }
-}
+const extractParent = Effect.fn("agentos.telemetry.extractParent")(
+  function*(propagator: TextMapPropagator, carrier?: AgentOSTraceCarrier) {
+    if (!carrier) return context.active();
+    const safe: Record<string, string> = {};
+    for (const key of ["traceparent", "tracestate"] satisfies ReadonlyArray<string>) {
+      const value = carrier instanceof Headers ? (carrier.get(key) ?? undefined) : carrier[key];
+      const maximum = key === "traceparent" ? 55 : 512;
+      if (value && value.length <= maximum) safe[key] = value;
+    }
+    return yield* Effect.try({
+      try: () => propagator.extract(context.active(), safe, carrierGetter),
+      catch: () => context.active(),
+    });
+  },
+);
 
 function record(operation: () => void) {
-  try {
-    operation();
-  } catch {
-    // Instrumentation is a best-effort diagnostic side effect.
-  }
-}
-
-function monotonicMilliseconds(): number {
-  return performance.now();
+  return Effect.sync(operation).pipe(Effect.catchCause(() => Effect.void));
 }
 
 function elapsedSeconds(startedAt: number, endedAt: number): number {
   return Math.max(0, endedAt - startedAt) / 1_000;
 }
 
-async function initializeEnvironmentTelemetry(): Promise<AgentOSTelemetry> {
-  if (
-    process.env.OTEL_SDK_DISABLED?.trim().toLowerCase() === "true" ||
-    !hasExporterConfiguration(process.env)
-  ) {
-    return noopTelemetry;
-  }
-  try {
-    const { NodeSDK } = await import("@opentelemetry/sdk-node");
-    const sdk = new NodeSDK({ views: createAgentOSMetricViews() });
-    sdk.start();
-    return createAgentOSTelemetry({
-      enabled: true,
-      shutdown: () => sdk.shutdown(),
-    });
-  } catch {
-    return noopTelemetry;
-  }
-}
+type TelemetryEnvironment = Config.Success<typeof TelemetryEnvironmentConfig>;
 
-function hasExporterConfiguration(environment: NodeJS.ProcessEnv): boolean {
-  const exporters = [
-    environment.OTEL_TRACES_EXPORTER,
-    environment.OTEL_METRICS_EXPORTER,
-    environment.OTEL_LOGS_EXPORTER,
-  ]
-    .flatMap((value) => value?.split(",") ?? [])
+function hasExporterConfiguration(environment: TelemetryEnvironment): boolean {
+  const exporters = [environment.tracesExporter, environment.metricsExporter, environment.logsExporter]
+    .flatMap((value) => Option.getOrUndefined(value)?.split(",") ?? [])
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
-  if (exporters.length > 0 && exporters.every((value) => value === "none")) {
-    return false;
-  }
-  return Boolean(
-    environment.OTEL_EXPORTER_OTLP_ENDPOINT?.trim() ||
-    environment.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim() ||
-    environment.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT?.trim() ||
-    environment.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT?.trim(),
-  );
+  if (exporters.length > 0 && exporters.every((value) => value === "none")) return false;
+  return [environment.endpoint, environment.tracesEndpoint, environment.metricsEndpoint, environment.logsEndpoint]
+    .some((value) => Boolean(Option.getOrUndefined(value)?.trim()));
 }
 
 const noopAttempt: AgentOSProviderAttempt = Object.freeze({
   id: "",
-  inject() {},
-  end() {},
+  inject: () => Effect.void,
+  end: () => Effect.void,
 });
 
 const noopOperation: AgentOSOperation = Object.freeze({
   id: "",
-  startProviderAttempt() {
-    return noopAttempt;
-  },
-  end() {},
+  startProviderAttempt: () => Effect.succeed(noopAttempt),
+  end: () => Effect.void,
 });
 
 const noopTelemetry: AgentOSTelemetry = Object.freeze({
   enabled: false,
-  startOperation() {
-    return noopOperation;
-  },
-  async shutdown() {},
+  startOperation: () => Effect.succeed(noopOperation),
+  shutdown: Effect.void,
 });

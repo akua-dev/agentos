@@ -129,15 +129,7 @@ function defaultComplete(
 }
 
 function startTelemetry(input: RelevantSelectionInput, model: Model<Api>) {
-  return Effect.tryPromise({
-    try: () => startAgentOSAuxiliaryOperation(model, input.telemetry, "resumed"),
-    catch: (cause) =>
-      selectionError(
-        "telemetry_unavailable",
-        "Mate memory selector telemetry could not be started.",
-        cause,
-      ),
-  });
+  return startAgentOSAuxiliaryOperation(model, input.telemetry, "resumed");
 }
 
 export const selectRelevantTopics: RelevantTopicSelector = (input) =>
@@ -161,14 +153,12 @@ export const selectRelevantTopics: RelevantTopicSelector = (input) =>
       );
     }
     const operation = yield* startTelemetry(input, model);
-    const attempt = yield* Effect.sync(() =>
-      operation.startProviderAttempt({
-        requestKind: "extension",
-        streamMode: "non_streaming",
-      })
-    );
+    const attempt = yield* operation.startProviderAttempt({
+      requestKind: "extension",
+      streamMode: "non_streaming",
+    });
     const headers = { ...auth.headers };
-    yield* Effect.sync(() => attempt.inject(headers));
+    yield* attempt.inject(headers);
     const message = yield* relevantSelectionMessage(input);
     const timestamp = yield* input.now ?? Clock.currentTimeMillis;
     const provider = (input.completeImpl ?? defaultComplete)(
@@ -203,8 +193,7 @@ export const selectRelevantTopics: RelevantTopicSelector = (input) =>
       ),
       Effect.tap((response) => {
         const failure = safeAssistantFailure(response.stopReason);
-        return Effect.sync(() =>
-          attempt.end({
+        return attempt.end({
             status: 200,
             error: failure,
             streamOutcome: failure === undefined
@@ -214,13 +203,10 @@ export const selectRelevantTopics: RelevantTopicSelector = (input) =>
               : "upstream_error",
             inputTokens: safeTokenCount(response.usage.input),
             outputTokens: safeTokenCount(response.usage.output),
-          })
-        );
+          });
       }),
       Effect.tapError((error) =>
-        Effect.sync(() =>
-          attempt.end({ error, streamOutcome: "upstream_error" })
-        )
+        attempt.end({ error, streamOutcome: "upstream_error" })
       ),
     );
 
@@ -253,10 +239,8 @@ export const selectRelevantTopics: RelevantTopicSelector = (input) =>
       );
       return resolveRelevantTopicIds(decoded.ids, input.startup.inventory);
     }).pipe(
-      Effect.tap(() => Effect.sync(() => operation.end({ status: 200 }))),
-      Effect.tapError((error) =>
-        Effect.sync(() => operation.end({ error }))
-      ),
+      Effect.tap(() => operation.end({ status: 200 })),
+      Effect.tapError((error) => operation.end({ error })),
     );
     return selected;
   });

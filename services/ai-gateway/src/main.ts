@@ -131,15 +131,8 @@ const AIGatewayStatusClientLive = Layer.effect(
 
 function acquireAIGatewayTelemetry() {
   return Effect.acquireRelease(
-    Effect.tryPromise({
-      try: () => initializeAgentOSTelemetryFromEnvironment(),
-      catch: () => aiGatewayEntrypointError("telemetry_unavailable"),
-    }),
-    (telemetry) =>
-      Effect.tryPromise({
-        try: () => telemetry.shutdown(),
-        catch: () => aiGatewayEntrypointError("telemetry_unavailable"),
-      }).pipe(Effect.catchCause(() => Effect.void)),
+    initializeAgentOSTelemetryFromEnvironment(),
+    (telemetry) => telemetry.shutdown,
   ).pipe(
     Effect.map((telemetry) =>
       telemetry.enabled

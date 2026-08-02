@@ -526,6 +526,16 @@
       "status": "runtime-boundary"
     },
     {
+      "id": "agentos-telemetry-effect-tests",
+      "issue": 102,
+      "pattern": "^packages/agentos/src/telemetry/tests/(?:.*\\.effect\\.test\\.ts|fake-telemetry\\.ts)$",
+      "runtime": "bun-opentelemetry",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "clock", "crypto", "schema", "telemetry", "framework-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
       "id": "effect-test-conformance",
       "issue": 102,
       "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",
@@ -623,6 +633,16 @@
       "package": "github-broker",
       "io": ["config", "filesystem", "http", "process", "stream"],
       "migrationDependencies": [100, 101, 88],
+      "status": "migrated"
+    },
+    {
+      "id": "agentos-telemetry-runtime",
+      "issue": 104,
+      "pattern": "^packages/agentos/src/telemetry/(?!tests/)",
+      "runtime": "shared-bun-opentelemetry",
+      "package": "@akua-dev/agentos",
+      "io": ["config", "clock", "crypto", "schema", "telemetry", "framework-adapter"],
+      "migrationDependencies": [100, 101],
       "status": "migrated"
     },
     {
