@@ -542,33 +542,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/(home)/page.client.tsx under issue #99; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/app/api/search/route.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 2,
-      "digest": "da4f56da57a567e5470b0d4ffb142e3e3e92565a8fb2423cb8fab35560404f83",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/api/search/route.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/app/docs/[[...slug]]/page.tsx",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 5,
-      "digest": "b74003f4dbfeac1fa7b7f33da42b15c226774358dbe93dcf0982c845943d27f9",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/docs/[[...slug]]/page.tsx under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/app/sitemap.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 3,
-      "digest": "bd578ce6176b6f03ca0f83175331710932744d27a3c42efcd97ad5198ddd0eb5",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/sitemap.ts under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/components/landing-page.test.tsx",
       "slice": "effect-test-conformance",
       "issue": 102,
