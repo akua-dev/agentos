@@ -1,11 +1,19 @@
-import { learnSource, source } from '@/lib/source';
+import { Effect } from 'effect';
 import { getLLMText } from '@/lib/get-llm-text';
+import { runServerEffect } from '@/lib/effect/server-runtime';
+import { learnSource, source } from '@/lib/source';
 
-export const revalidate = false;
+const renderFullText = Effect.all(
+  [...source.getPages(), ...learnSource.getPages()].map(getLLMText),
+  { concurrency: 'unbounded' },
+).pipe(
+  Effect.map((pages) =>
+    new Response(pages.join('\n\n'), {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    })
+  ),
+);
 
-export async function GET() {
-  const scan = [...source.getPages(), ...learnSource.getPages()].map(getLLMText);
-  const scanned = await Promise.all(scan);
-
-  return new Response(scanned.join('\n\n'));
+export function GET(): Promise<Response> {
+  return runServerEffect(renderFullText);
 }

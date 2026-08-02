@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Effect, Schema } from 'effect';
 
 const repositoryUrl = 'https://github.com/akua-dev/agentos';
 const exactGitRevision = /^[0-9a-f]{40}$/;
@@ -11,7 +12,16 @@ export const canonicalSourceSchema = z.object({
 
 export type CanonicalSource = z.infer<typeof canonicalSourceSchema>;
 
-export function canonicalSourceUrl(path: string, revision = 'main'): URL {
+export class CanonicalSourceError extends
+  Schema.TaggedErrorClass<CanonicalSourceError>()('CanonicalSourceError', {
+    code: Schema.Literals(['invalid_path', 'invalid_revision']),
+    message: Schema.String,
+    cause: Schema.optional(Schema.Defect()),
+  }) {}
+
+export const canonicalSourceUrl = Effect.fn(
+  'agentos.website.canonicalSourceUrl',
+)(function*(path: string, revision = 'main') {
   if (
     path.length === 0 ||
     path.startsWith('/') ||
@@ -19,19 +29,36 @@ export function canonicalSourceUrl(path: string, revision = 'main'): URL {
     path.includes('\\') ||
     !safeRepositoryPath.test(path)
   ) {
-    throw new Error(`Invalid repository-relative canonical source path: ${JSON.stringify(path)}`);
+    return yield* new CanonicalSourceError({
+      code: 'invalid_path',
+      message: `Invalid repository-relative canonical source path: ${path}`,
+    });
   }
 
   const segments = path.split('/');
   if (segments.some((segment) => segment.length === 0 || segment === '.' || segment === '..')) {
-    throw new Error(`Invalid repository-relative canonical source path: ${JSON.stringify(path)}`);
+    return yield* new CanonicalSourceError({
+      code: 'invalid_path',
+      message: `Invalid repository-relative canonical source path: ${path}`,
+    });
   }
 
   if (revision !== 'main' && !exactGitRevision.test(revision)) {
-    throw new Error(`Invalid canonical source Git revision: ${JSON.stringify(revision)}`);
+    return yield* new CanonicalSourceError({
+      code: 'invalid_revision',
+      message: `Invalid canonical source Git revision: ${revision}`,
+    });
   }
 
   const leaf = segments.at(-1) ?? '';
   const kind = leaf.includes('.') ? 'blob' : 'tree';
-  return new URL(`${repositoryUrl}/${kind}/${revision}/${path}`);
-}
+  return yield* Effect.try({
+    try: () => new URL(`${repositoryUrl}/${kind}/${revision}/${path}`),
+    catch: (cause) =>
+      new CanonicalSourceError({
+        code: 'invalid_path',
+        message: `Could not build canonical source URL: ${path}`,
+        cause,
+      }),
+  });
+});
