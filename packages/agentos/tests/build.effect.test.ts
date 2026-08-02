@@ -1,25 +1,23 @@
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, FileSystem, Path, Stream } from "effect";
-import { ChildProcess } from "effect/unstable/process";
+import { Effect, FileSystem, Path } from "effect";
+
+import { buildAgentOS } from "../build.ts";
 
 describe("AgentOS package build", () => {
-  it.effect("compiles through the reviewed Effect build entrypoint", () =>
+  it.effect("compiles through the reviewed Effect build without mutating shared dist", () =>
     Effect.scoped(Effect.gen(function*() {
       const fileSystem = yield* FileSystem.FileSystem;
       const paths = yield* Path.Path;
-      const packageRoot = yield* paths.fromFileUrl(new URL("..", import.meta.url));
-      const child = yield* ChildProcess.make("bun", ["build.ts"], {
-        cwd: packageRoot,
-        stderr: "pipe",
-        stdout: "pipe",
+      const sandbox = yield* fileSystem.makeTempDirectoryScoped({
+        prefix: "agentos-build-contract-",
       });
-      const [exitCode, stderr] = yield* Effect.all([
-        child.exitCode.pipe(Effect.map(Number)),
-        child.stderr.pipe(Stream.decodeText(), Stream.mkString),
-        child.stdout.pipe(Stream.runDrain),
-      ], { concurrency: "unbounded" });
-      assert.strictEqual(exitCode, 0, stderr);
-      assert.isTrue(yield* fileSystem.exists(paths.join(packageRoot, "dist", "index.js")));
+      const outputDirectory = paths.join(sandbox, "dist");
+
+      yield* buildAgentOS({ outputDirectory });
+
+      assert.isTrue(
+        yield* fileSystem.exists(paths.join(outputDirectory, "index.js")),
+      );
     })).pipe(Effect.provide(BunServices.layer)));
 });

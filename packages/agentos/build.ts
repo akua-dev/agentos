@@ -16,7 +16,13 @@ export class AgentOSBuildError extends Schema.TaggedErrorClass<AgentOSBuildError
   override readonly [Runtime.errorExitCode] = this.exitCode ?? 1;
 }
 
-export const buildAgentOS = Effect.gen(function*() {
+export interface AgentOSBuildOptions {
+  readonly outputDirectory?: string;
+}
+
+const buildAgentOSProgram = Effect.fn("agentos.build")(function*(
+  options: AgentOSBuildOptions = {},
+) {
   const fileSystem = yield* FileSystem.FileSystem;
   const paths = yield* Path.Path;
   const packageRoot = yield* paths.fromFileUrl(
@@ -26,7 +32,8 @@ export const buildAgentOS = Effect.gen(function*() {
       new AgentOSBuildError({ operation: "resolve_root", cause })
     ),
   );
-  yield* fileSystem.remove(paths.join(packageRoot, "dist"), {
+  const outputDirectory = options.outputDirectory ?? paths.join(packageRoot, "dist");
+  yield* fileSystem.remove(outputDirectory, {
     recursive: true,
     force: true,
   }).pipe(
@@ -34,10 +41,14 @@ export const buildAgentOS = Effect.gen(function*() {
       new AgentOSBuildError({ operation: "clean", cause })
     ),
   );
-  const compiler = yield* ChildProcess.make("tsc", [
+  const compilerArguments = [
     "--project",
     paths.join(packageRoot, "tsconfig.build.json"),
-  ], {
+    ...(options.outputDirectory === undefined
+      ? []
+      : ["--outDir", outputDirectory]),
+  ];
+  const compiler = yield* ChildProcess.make("tsc", compilerArguments, {
     cwd: packageRoot,
     stderr: "inherit",
     stdin: "inherit",
@@ -54,8 +65,11 @@ export const buildAgentOS = Effect.gen(function*() {
       exitCode,
     });
   }
-}).pipe(Effect.scoped);
+});
+
+export const buildAgentOS = (options: AgentOSBuildOptions = {}) =>
+  buildAgentOSProgram(options).pipe(Effect.scoped);
 
 if (import.meta.main) {
-  BunRuntime.runMain(buildAgentOS.pipe(Effect.provide(BunServices.layer)));
+  BunRuntime.runMain(buildAgentOS().pipe(Effect.provide(BunServices.layer)));
 }
