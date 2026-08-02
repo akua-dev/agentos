@@ -83,15 +83,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/tests/postgres-upgrade-conformance.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "services/openfga/tests/release.effect.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 2,
-      "digest": "2321f59cbc425ada0db2bd574e4901416b291f4379f1131719e3f8eb6adc4bdc",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/openfga/tests/release.effect.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/otel-collector/tests/e2e.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
