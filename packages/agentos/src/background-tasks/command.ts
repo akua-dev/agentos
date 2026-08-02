@@ -1,161 +1,214 @@
+import {
+  Deferred,
+  Effect,
+  Option,
+  Result,
+} from "effect";
+
 import { BoundedTaskOutput } from "./output.ts";
 import { spawnTaskProcess } from "./subprocess.ts";
-import type {
-  BackgroundCommandRequest,
-  StartBackgroundCommand,
-  TaskHandle,
-  TaskTerminalResult,
+import type { TaskProcessResult } from "./subprocess.ts";
+import {
+  backgroundTaskFailure,
+  type BackgroundCommandRequest,
+  type StartBackgroundCommand,
+  type TaskTerminalResult,
 } from "./types.ts";
 
 const DEFAULT_READY_TIMEOUT_MS = 30_000;
 
-export const startBackgroundCommand: StartBackgroundCommand = async (
-  request,
-  context,
-): Promise<TaskHandle> => {
-  const output = await BoundedTaskOutput.open(context.outputPath, {
+type StopReason = "cancelled" | "timed_out";
+type ProcessOutcome =
+  | { readonly _tag: "natural"; readonly result: TaskProcessResult }
+  | { readonly _tag: "stop"; readonly reason: StopReason };
+
+export const startBackgroundCommand: StartBackgroundCommand = Effect.fn(
+  "agentos.backgroundTasks.command.start",
+)(function*(request, context) {
+  yield* assertSafeBackgroundRequest(request);
+  const output = yield* BoundedTaskOutput.open(context.outputPath, {
     tailBytes: context.tailBytes,
     maxBytes: context.maxOutputBytes,
-  });
-  let child: ReturnType<typeof spawnTaskProcess>;
-  try {
-    child = spawnTaskProcess(request.command, {
-      output,
-      cwd: request.cwd,
-      env: globalThis.process.env,
-      terminateGraceMs: context.terminateGraceMs,
-      readyOutput: request.readyOutput,
-    });
-  } catch (error) {
-    await output.close();
-    throw error;
-  }
-  let stopReason: "cancelled" | "timed_out" | undefined;
-  let stopPromise: Promise<TaskTerminalResult> | undefined;
-  let timeout: ReturnType<typeof setTimeout> | undefined;
+  }).pipe(
+    Effect.mapError((cause) =>
+      backgroundTaskFailure(
+        "io_failure",
+        `Failed to open background command output: ${cause.message}`,
+        cause,
+      )
+    ),
+  );
+  const child = yield* spawnTaskProcess(request.command, {
+    output,
+    cwd: request.cwd,
+    terminateGraceMs: context.terminateGraceMs,
+    readyOutput: request.readyOutput,
+  }).pipe(
+    Effect.mapError((cause) =>
+      backgroundTaskFailure(
+        "runtime_failure",
+        cause.message,
+        cause,
+      )
+    ),
+    Effect.tapError(() => output.close.pipe(Effect.ignore)),
+  );
+  const stopRequest = yield* Deferred.make<StopReason>();
+  const terminal = yield* Deferred.make<TaskTerminalResult>();
 
-  const completion = child.completion.then((result): TaskTerminalResult => {
-    if (timeout) clearTimeout(timeout);
-    context.signal.removeEventListener("abort", cancel);
-    if (stopReason === "cancelled") {
-      return {
-        state: "cancelled",
-        summary: "Background command killed",
-        exitCode: result.exitCode,
-        signal: result.signal,
-      };
-    }
-    if (stopReason === "timed_out") {
-      return {
-        state: "failed",
-        summary: "Background command timed out",
-        error: `Command exceeded ${request.timeout}ms`,
-        exitCode: result.exitCode,
-        signal: result.signal,
-      };
-    }
-    if (result.outputLimitReached) {
-      return {
-        state: "failed",
-        summary: "Background command output limit reached",
-        error: "Command output limit reached",
-        exitCode: result.exitCode,
-        signal: result.signal,
-      };
-    }
-    if (result.error) {
-      return {
-        state: "failed",
-        summary: "Background command failed",
-        error: result.error,
-        exitCode: result.exitCode,
-        signal: result.signal,
-      };
-    }
-    if (result.exitCode === 0) {
-      return {
-        state: "succeeded",
-        summary: "Background command completed",
-        exitCode: 0,
-        signal: result.signal,
-      };
-    }
-    return {
-      state: "failed",
-      summary: "Background command failed",
-      exitCode: result.exitCode,
-      signal: result.signal,
-      error: result.signal
-        ? `Command terminated by ${result.signal}`
-        : `Command exited with status ${result.exitCode ?? "unknown"}`,
-    };
-  });
+  const timeoutRequest = request.timeout !== undefined && request.timeout > 0
+    ? Effect.sleep(request.timeout).pipe(Effect.as<StopReason>("timed_out"))
+    : Effect.never;
+  const requestedStop = Effect.raceFirst(
+    Deferred.await(stopRequest),
+    Effect.raceFirst(
+      context.cancellation.pipe(Effect.as<StopReason>("cancelled")),
+      timeoutRequest,
+    ),
+  );
+  const supervise = Effect.raceFirst(
+    child.completion.pipe(
+      Effect.map((result): ProcessOutcome => ({ _tag: "natural", result })),
+    ),
+    requestedStop.pipe(
+      Effect.map((reason): ProcessOutcome => ({ _tag: "stop", reason })),
+    ),
+  ).pipe(
+    Effect.flatMap((outcome) => {
+      if (outcome._tag === "natural") {
+        return Effect.succeed(toTerminalResult(outcome.result));
+      }
+      return child.stop().pipe(
+        Effect.result,
+        Effect.flatMap((stopped) =>
+          Result.isSuccess(stopped)
+            ? Effect.succeed(toTerminalResult(
+                stopped.success,
+                outcome.reason,
+                request.timeout,
+              ))
+            : Effect.succeed<TaskTerminalResult>({
+                state: "failed",
+                summary: "Background command failed to stop",
+                error: stopped.failure.message,
+              })
+        ),
+      );
+    }),
+    Effect.flatMap((result) => Deferred.succeed(terminal, result)),
+    Effect.forkScoped({ startImmediately: true }),
+  );
+  yield* supervise;
 
-  function stop(reason: "cancelled" | "timed_out") {
-    stopReason ??= reason;
-    if (stopPromise) return stopPromise;
-    const stopping = child.stop().then(() => completion);
-    stopPromise = stopping;
-    return stopping;
-  }
-
-  function cancel() {
-    void stop("cancelled");
-  }
-
-  context.signal.addEventListener("abort", cancel, { once: true });
-  if (context.signal.aborted) cancel();
-  if (request.timeout !== undefined && request.timeout > 0) {
-    timeout = setTimeout(() => void stop("timed_out"), request.timeout);
-  }
+  const stop = () =>
+    Deferred.succeed(stopRequest, "cancelled").pipe(
+      Effect.andThen(Deferred.await(terminal)),
+    );
+  const handle = {
+    completion: Deferred.await(terminal),
+    processId: child.pid,
+    stop,
+  };
 
   if (request.readyOutput !== undefined) {
     const readyTimeout = request.readyTimeout ?? DEFAULT_READY_TIMEOUT_MS;
-    let readinessTimer: ReturnType<typeof setTimeout> | undefined;
-    const readiness = await Promise.race([
-      child.readiness.then<"ready" | "exited">((ready) =>
-        ready ? "ready" : "exited",
-      ),
-      new Promise<"timed_out">((resolve) => {
-        readinessTimer = setTimeout(() => resolve("timed_out"), readyTimeout);
-      }),
-    ]);
-    if (readinessTimer) clearTimeout(readinessTimer);
-
-    if (readiness === "timed_out") {
-      await child.stop();
-      await completion;
-      throw new Error(
+    const readiness = yield* child.readiness.pipe(
+      Effect.timeoutOption(readyTimeout),
+    );
+    if (Option.isNone(readiness)) {
+      yield* stop();
+      return yield* Effect.fail(backgroundTaskFailure(
+        "readiness_timeout",
         `Background command did not produce readiness output ${JSON.stringify(request.readyOutput)} within ${readyTimeout}ms`,
-      );
+      ));
     }
-    if (readiness === "exited") {
-      await completion;
-      throw new Error(
+    if (!readiness.value) {
+      yield* Deferred.await(terminal);
+      return yield* Effect.fail(backgroundTaskFailure(
+        "readiness_exited",
         `Background command exited before producing readiness output ${JSON.stringify(request.readyOutput)}`,
-      );
+      ));
     }
   }
 
-  return {
-    completion,
-    processId: child.pid,
-    stop: () => stop("cancelled"),
-  };
-};
+  return handle;
+});
 
 export function assertSafeBackgroundRequest(request: BackgroundCommandRequest) {
-  if (!request.command.trim()) throw new Error("command must be a non-empty string");
+  if (!request.command.trim()) {
+    return invalidRequest("command must be a non-empty string");
+  }
   if (!request.description.trim()) {
-    throw new Error("description must be a non-empty string");
+    return invalidRequest("description must be a non-empty string");
   }
   if (request.readyOutput !== undefined && request.readyOutput.length === 0) {
-    throw new Error("ready_output must be a non-empty string");
+    return invalidRequest("ready_output must be a non-empty string");
   }
-  if (
-    request.readyTimeout !== undefined &&
-    request.readyOutput === undefined
-  ) {
-    throw new Error("ready_timeout requires ready_output");
+  if (request.readyTimeout !== undefined && request.readyOutput === undefined) {
+    return invalidRequest("ready_timeout requires ready_output");
   }
+  return Effect.void;
+}
+
+function invalidRequest(message: string) {
+  return Effect.fail(backgroundTaskFailure("invalid_request", message));
+}
+
+function toTerminalResult(
+  result: TaskProcessResult,
+  stopReason?: StopReason,
+  timeoutMillis?: number,
+): TaskTerminalResult {
+  if (stopReason === "cancelled") {
+    return {
+      state: "cancelled",
+      summary: "Background command killed",
+      exitCode: result.exitCode,
+      signal: result.signal,
+    };
+  }
+  if (stopReason === "timed_out") {
+    return {
+      state: "failed",
+      summary: "Background command timed out",
+      error: `Command exceeded ${timeoutMillis ?? "its configured deadline"}ms`,
+      exitCode: result.exitCode,
+      signal: result.signal,
+    };
+  }
+  if (result.outputLimitReached) {
+    return {
+      state: "failed",
+      summary: "Background command output limit reached",
+      error: "Command output limit reached",
+      exitCode: result.exitCode,
+      signal: result.signal,
+    };
+  }
+  if (result.error !== undefined) {
+    return {
+      state: "failed",
+      summary: "Background command failed",
+      error: result.error,
+      exitCode: result.exitCode,
+      signal: result.signal,
+    };
+  }
+  if (result.exitCode === 0) {
+    return {
+      state: "succeeded",
+      summary: "Background command completed",
+      exitCode: 0,
+      signal: result.signal,
+    };
+  }
+  return {
+    state: "failed",
+    summary: "Background command failed",
+    exitCode: result.exitCode,
+    signal: result.signal,
+    error: result.signal !== null
+      ? `Command terminated by ${result.signal}`
+      : `Command exited with status ${result.exitCode ?? "unknown"}`,
+  };
 }
