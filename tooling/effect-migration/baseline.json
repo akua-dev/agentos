@@ -56,24 +56,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/workloads/tests/compiler-kustomize.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/artifact.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 36,
-      "digest": "240b02074dd34a5e9ee74267ccae512949e044a303bcf837115c03c34171e29c",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/artifact.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/tests/fake-pi.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 4,
-      "digest": "c68fe3b52ad030f161b53150abfcad3f1e3ed4d4e2f66a0247355cb4cddb1591",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/fake-pi.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/tests/fixtures/additive-package/registration.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
