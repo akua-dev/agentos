@@ -5,6 +5,7 @@ import {
 import { Effect, Schema } from "effect";
 
 import { loadExtensionFromFactory } from "../../../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/index.js";
+import { AgentOSValidationError } from "../src/shared/errors.ts";
 
 export class PiTestHarnessError extends Schema.TaggedErrorClass<PiTestHarnessError>()(
   "PiTestHarnessError",
@@ -27,6 +28,16 @@ function harnessError(
   return PiTestHarnessError.make({ operation, detail });
 }
 
+function handlerError(event: string, cause: unknown) {
+  const ownedDetail = cause instanceof AgentOSValidationError
+    ? `: ${cause.message}`
+    : "";
+  return harnessError(
+    "emit",
+    `Pi handler for ${event} failed${ownedDetail}; unowned failure details are redacted`,
+  );
+}
+
 const invokePiHandler = Effect.fn("test.pi.invokeHandler")(function*(
   event: string,
   handler: (...args: ReadonlyArray<unknown>) => Promise<unknown>,
@@ -35,18 +46,12 @@ const invokePiHandler = Effect.fn("test.pi.invokeHandler")(function*(
 ) {
   const outcome: unknown = yield* Effect.try({
     try: () => handler(value, context),
-    catch: () => harnessError(
-      "emit",
-      `Pi handler for ${event} failed; handler details are redacted`,
-    ),
+    catch: (cause) => handlerError(event, cause),
   });
   if (outcome instanceof Promise) {
     return yield* Effect.tryPromise({
       try: () => outcome,
-      catch: () => harnessError(
-        "emit",
-        `Pi handler for ${event} failed; handler details are redacted`,
-      ),
+      catch: (cause) => handlerError(event, cause),
     });
   }
   return outcome;

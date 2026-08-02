@@ -137,15 +137,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/lifecycle.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/startup.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 5,
-      "digest": "e40cd704e9701bf9c593d9b81406562236723ba8e8346b683d53b65fa72bc016",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/startup.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/agentgateway/tests/conformance.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
