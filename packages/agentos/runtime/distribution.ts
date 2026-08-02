@@ -1,14 +1,25 @@
-import { isAbsolute, join } from "node:path";
+import { Effect, Path, Schema } from "effect";
 
+export type DistributionEnvironment = Readonly<
+  Record<string, string | undefined>
+>;
 export type PersistentMateRole = "first_mate" | "second_mate";
 
 export type PersistentMateDistribution = {
-  distributionRoot: string;
-  role: PersistentMateRole;
-  roleDirectory: string;
+  readonly distributionRoot: string;
+  readonly role: PersistentMateRole;
+  readonly roleDirectory: string;
 };
 
-const roleDirectories: Record<PersistentMateRole, string> = {
+export class PersistentMateDistributionError extends Schema.TaggedErrorClass<PersistentMateDistributionError>()(
+  "PersistentMateDistributionError",
+  {
+    message: Schema.String,
+    variable: Schema.String,
+  },
+) {}
+
+const roleDirectories: Readonly<Record<PersistentMateRole, string>> = {
   first_mate: "firstmate",
   second_mate: "secondmate",
 };
@@ -16,56 +27,79 @@ const roleDirectories: Record<PersistentMateRole, string> = {
 export function isPersistentMateRole(
   role: string,
 ): role is PersistentMateRole {
-  return role in roleDirectories;
+  return role === "first_mate" || role === "second_mate";
 }
 
-export function resolvePersistentMateDistribution(
-  environment: NodeJS.ProcessEnv,
-): PersistentMateDistribution {
-  const role = requiredEnvironment(environment, "AGENTOS_AGENT_ROLE");
+export const resolvePersistentMateDistribution = Effect.fn(
+  "agentos.distribution.resolve",
+)(function*(environment: DistributionEnvironment) {
+  const paths = yield* Path.Path;
+  const role = yield* requiredEnvironment(environment, "AGENTOS_AGENT_ROLE");
   if (!isPersistentMateRole(role)) {
-    throw new Error(
-      `AGENTOS_AGENT_ROLE must select first_mate or second_mate, received ${role}`,
-    );
+    return yield* PersistentMateDistributionError.make({
+      message: `AGENTOS_AGENT_ROLE must select first_mate or second_mate, received ${role}`,
+      variable: "AGENTOS_AGENT_ROLE",
+    });
   }
 
-  const distributionRoot = requiredAbsoluteDirectory(
+  const distributionRoot = yield* requiredAbsoluteDirectory(
+    paths,
     environment,
     "AGENTOS_DISTRIBUTION_ROOT",
   );
-  const agentCwd = requiredAbsoluteDirectory(
+  const agentCwd = yield* requiredAbsoluteDirectory(
+    paths,
     environment,
     "AGENTOS_AGENT_CWD",
   );
-  const roleDirectory = join(
+  const roleDirectory = paths.join(
     distributionRoot,
     "resources",
     "roles",
     roleDirectories[role],
   );
   if (agentCwd !== roleDirectory) {
-    throw new Error(`AGENTOS_AGENT_CWD must equal ${roleDirectory}`);
+    return yield* PersistentMateDistributionError.make({
+      message: `AGENTOS_AGENT_CWD must equal ${roleDirectory}`,
+      variable: "AGENTOS_AGENT_CWD",
+    });
   }
 
-  return { distributionRoot, role, roleDirectory };
-}
+  return { distributionRoot, role, roleDirectory } satisfies PersistentMateDistribution;
+});
 
 function requiredAbsoluteDirectory(
-  environment: NodeJS.ProcessEnv,
+  paths: Path.Path,
+  environment: DistributionEnvironment,
   name: string,
-): string {
-  const value = withoutTrailingSlash(requiredEnvironment(environment, name));
-  if (!isAbsolute(value)) throw new Error(`${name} must be an absolute path`);
-  return value;
+) {
+  return Effect.gen(function*() {
+    const value = withoutTrailingSlash(
+      yield* requiredEnvironment(environment, name),
+    );
+    if (!paths.isAbsolute(value)) {
+      return yield* PersistentMateDistributionError.make({
+        message: `${name} must be an absolute path`,
+        variable: name,
+      });
+    }
+    return value;
+  });
 }
 
 function requiredEnvironment(
-  environment: NodeJS.ProcessEnv,
+  environment: DistributionEnvironment,
   name: string,
-): string {
+) {
   const value = environment[name]?.trim();
-  if (!value) throw new Error(`${name} must be explicitly configured`);
-  return value;
+  return value
+    ? Effect.succeed(value)
+    : Effect.fail(
+      PersistentMateDistributionError.make({
+        message: `${name} must be explicitly configured`,
+        variable: name,
+      }),
+    );
 }
 
 function withoutTrailingSlash(path: string): string {

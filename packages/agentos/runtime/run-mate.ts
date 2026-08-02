@@ -1,230 +1,307 @@
 #!/usr/bin/env bun
 
-import { $ } from "bun";
-import { join } from "node:path";
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import * as BunServices from "@effect/platform-bun/BunServices";
+import {
+  Cause,
+  Config,
+  Effect,
+  Exit,
+  Fiber,
+  Option,
+  Path,
+  Runtime,
+  Schema,
+  Stdio,
+  Stream,
+} from "effect";
+import * as ChildProcess from "effect/unstable/process/ChildProcess";
 
 import { resolvePersistentMateDistribution } from "./distribution.ts";
 import {
   findPreparedPiSessionRelocation,
   preparePiSessionRelocation,
   readPiSession,
+  type PiSessionEnvironment,
 } from "./pi-session.ts";
 
-type Agent = {
-  agent_session?: { kind?: unknown; value?: unknown };
-  cwd?: unknown;
-  name?: unknown;
-  pane_id?: unknown;
-};
-type AgentList = { result?: { agents?: Agent[] } };
+const Agent = Schema.Struct({
+  agent_session: Schema.optional(Schema.Struct({
+    kind: Schema.optional(Schema.Unknown),
+    value: Schema.optional(Schema.Unknown),
+  })),
+  cwd: Schema.optional(Schema.Unknown),
+  name: Schema.optional(Schema.Unknown),
+  pane_id: Schema.optional(Schema.Unknown),
+});
+type Agent = typeof Agent.Type;
+const AgentListJson = Schema.fromJsonString(Schema.Struct({
+  result: Schema.Struct({ agents: Schema.Array(Agent) }),
+}));
 
-const agentName = requiredEnvironment("AGENTOS_AGENT_NAME");
-const { roleDirectory: agentCwd } =
-  resolvePersistentMateDistribution(process.env);
-const session = process.env.HERDR_SESSION ?? `agentos-${agentName}`;
-process.env.NODE_PATH ||= join(
-  process.env.AGENTOS_RELEASE_ROOT ?? "/opt/agentos",
-  "node_modules",
-);
+export class MateRuntimeError extends Schema.TaggedErrorClass<MateRuntimeError>()(
+  "MateRuntimeError",
+  { cause: Schema.optional(Schema.Defect()), message: Schema.String },
+) {}
 
-let server: Bun.Subprocess | undefined;
-let observer: Bun.Subprocess | undefined;
-let stopping = false;
+const runtimeError = (message: string, cause?: unknown) =>
+  MateRuntimeError.make({ cause, message });
 
-process.on("SIGINT", () => void stop(0));
-process.on("SIGTERM", () => void stop(0));
+const RuntimeConfig = Config.all({
+  agentCwd: Config.string("AGENTOS_AGENT_CWD"),
+  agentName: Config.string("AGENTOS_AGENT_NAME"),
+  agentRole: Config.string("AGENTOS_AGENT_ROLE"),
+  distributionRoot: Config.string("AGENTOS_DISTRIBUTION_ROOT"),
+  fakeHerdrAgentKind: Config.option(Config.string("FAKE_HERDR_AGENT_KIND")),
+  fakeHerdrAgentStatus: Config.option(Config.string("FAKE_HERDR_AGENT_STATUS")),
+  fakeHerdrFailStart: Config.option(Config.string("FAKE_HERDR_FAIL_START")),
+  fakeHerdrState: Config.option(Config.string("FAKE_HERDR_STATE")),
+  fakePiExtension: Config.option(Config.string("FAKE_PI_EXTENSION")),
+  fakePiSession: Config.option(Config.string("FAKE_PI_SESSION")),
+  herdrSession: Config.option(Config.string("HERDR_SESSION")),
+  home: Config.option(Config.string("HOME")),
+  path: Config.option(Config.string("PATH")),
+  piAgentDirectory: Config.option(Config.string("PI_CODING_AGENT_DIR")),
+  piSessionDirectory: Config.option(Config.string("PI_CODING_AGENT_SESSION_DIR")),
+  releaseRoot: Config.option(Config.string("AGENTOS_RELEASE_ROOT")),
+});
 
-try {
-  server = Bun.spawn(["herdr", "server", "--session", session], {
-    env: process.env,
+type RuntimeConfiguration = Config.Success<typeof RuntimeConfig>;
+
+export const runMate = Effect.scoped(Effect.gen(function*() {
+  const config = yield* RuntimeConfig;
+  const paths = yield* Path.Path;
+  const environment = runtimeEnvironment(config);
+  const { roleDirectory: agentCwd } = yield* resolvePersistentMateDistribution(environment);
+  const session = Option.getOrUndefined(config.herdrSession) ?? `agentos-${config.agentName}`;
+  const releaseRoot = Option.getOrUndefined(config.releaseRoot) ?? "/opt/agentos";
+  const childEnvironment = {
+    ...environment,
+    NODE_PATH: paths.join(releaseRoot, "node_modules"),
+  };
+
+  const server = yield* ChildProcess.make("herdr", ["server", "--session", session], {
+    env: childEnvironment,
+    extendEnv: false,
     stderr: "inherit",
     stdout: "inherit",
-  });
+  }).pipe(Effect.mapError((cause) => runtimeError("Could not start the Herdr server.", cause)));
+  const serverExit = yield* server.exitCode.pipe(
+    Effect.map(Number),
+    Effect.forkScoped({ startImmediately: true }),
+  );
+  yield* waitUntilServerReady(serverExit, session, childEnvironment);
 
-  await waitUntilServerReady(server);
-  const agents = await listAgents();
-  const mates = agents.filter(({ name }) => name === agentName);
-  const agentCount = mates.length;
-
-  if (agentCount === 0) {
-    await startMate(
-      await findPreparedPiSessionRelocation(agentCwd, process.env),
+  const agents = yield* listAgents(session, childEnvironment);
+  const mates = agents.filter(({ name }) => name === config.agentName);
+  if (mates.length === 0) {
+    yield* startMate(
+      config.agentName,
+      agentCwd,
+      session,
+      childEnvironment,
+      yield* findPreparedPiSessionRelocation(agentCwd, environment),
     );
-  } else if (agentCount === 1) {
-    const mate = mates[0]!;
-    if (await mateRunsFromCheckout(mate)) {
-      await restoreMate(mate);
+  } else if (mates.length === 1) {
+    const mate = mates[0];
+    if (mate === undefined) return yield* runtimeError("Herdr returned an empty Mate record.");
+    if (yield* mateRunsFromCheckout(mate, agentCwd)) {
+      yield* restoreMate(mate, config.agentName, agentCwd, session, childEnvironment);
     } else {
-      await relocateMate(mate);
+      yield* relocateMate(mate, config.agentName, agentCwd, session, environment, childEnvironment);
     }
   } else {
-    throw new Error(
-      `Refusing to start: expected at most one Herdr agent named ${agentName}, found ${agentCount}.`,
+    return yield* runtimeError(
+      `Refusing to start: expected at most one Herdr agent named ${config.agentName}, found ${mates.length}.`,
     );
   }
 
-  const exitCode = await server.exited;
-  server = undefined;
-  process.exitCode = exitCode;
-} catch (error) {
-  await terminate(observer);
-  observer = undefined;
-  await terminate(server);
-  server = undefined;
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-}
-
-async function mateRunsFromCheckout(mate: Agent) {
-  if (mate.cwd !== agentCwd) return false;
-  const persistedSession = mate.agent_session?.value;
-  if (mate.agent_session?.kind !== "path" || typeof persistedSession !== "string") {
-    return false;
+  const exitCode = yield* Fiber.join(serverExit).pipe(
+    Effect.mapError((cause) => runtimeError("Herdr server failed.", cause)),
+  );
+  if (exitCode !== 0) {
+    return yield* runtimeError(`Herdr server exited with status ${exitCode}.`);
   }
-  const { header } = await readPiSession(persistedSession);
-  return header.cwd === agentCwd;
+}));
+
+function runtimeEnvironment(config: RuntimeConfiguration): PiSessionEnvironment {
+  return {
+    AGENTOS_AGENT_CWD: config.agentCwd,
+    AGENTOS_AGENT_NAME: config.agentName,
+    AGENTOS_AGENT_ROLE: config.agentRole,
+    AGENTOS_DISTRIBUTION_ROOT: config.distributionRoot,
+    AGENTOS_RELEASE_ROOT: Option.getOrUndefined(config.releaseRoot),
+    FAKE_HERDR_AGENT_KIND: Option.getOrUndefined(config.fakeHerdrAgentKind),
+    FAKE_HERDR_AGENT_STATUS: Option.getOrUndefined(config.fakeHerdrAgentStatus),
+    FAKE_HERDR_FAIL_START: Option.getOrUndefined(config.fakeHerdrFailStart),
+    FAKE_HERDR_STATE: Option.getOrUndefined(config.fakeHerdrState),
+    FAKE_PI_EXTENSION: Option.getOrUndefined(config.fakePiExtension),
+    FAKE_PI_SESSION: Option.getOrUndefined(config.fakePiSession),
+    HERDR_SESSION: Option.getOrUndefined(config.herdrSession),
+    HOME: Option.getOrUndefined(config.home),
+    PATH: Option.getOrUndefined(config.path),
+    PI_CODING_AGENT_DIR: Option.getOrUndefined(config.piAgentDirectory),
+    PI_CODING_AGENT_SESSION_DIR: Option.getOrUndefined(config.piSessionDirectory),
+  };
 }
 
-async function startMate(persistedSession?: string) {
-  const command = [
-    "herdr",
-    "agent",
-    "start",
-    agentName,
-    "--cwd",
-    agentCwd,
-    "--no-focus",
-    "--session",
-    session,
-    "--",
-    "pi",
-    "--no-context-files",
+const mateRunsFromCheckout = Effect.fn("agentos.mate.runsFromCheckout")(
+  function*(mate: Agent, agentCwd: string) {
+    if (mate.cwd !== agentCwd) return false;
+    const persistedSession = mate.agent_session?.value;
+    if (mate.agent_session?.kind !== "path" || typeof persistedSession !== "string") return false;
+    const { header } = yield* readPiSession(persistedSession);
+    return header.cwd === agentCwd;
+  },
+);
+
+const startMate = Effect.fn("agentos.mate.start")(function*(
+  agentName: string,
+  agentCwd: string,
+  session: string,
+  environment: PiSessionEnvironment,
+  persistedSession?: string,
+) {
+  yield* runCommand([
+    "herdr", "agent", "start", agentName, "--cwd", agentCwd, "--no-focus",
+    "--session", session, "--", "pi", "--no-context-files",
     ...(persistedSession ? ["--session", persistedSession] : ["--continue"]),
-  ];
-  await $`${command}`;
-}
+  ], environment, { inherit: true, requireSuccess: true });
+});
 
-async function relocateMate(mate: Agent) {
+const relocateMate = Effect.fn("agentos.mate.relocate")(function*(
+  mate: Agent,
+  agentName: string,
+  agentCwd: string,
+  session: string,
+  piEnvironment: PiSessionEnvironment,
+  childEnvironment: PiSessionEnvironment,
+) {
   const paneId = mate.pane_id;
   const persistedSession = mate.agent_session?.value;
-  if (
-    typeof paneId !== "string" ||
-    mate.agent_session?.kind !== "path" ||
-    typeof persistedSession !== "string"
-  ) {
-    throw new Error(
+  if (typeof paneId !== "string" || mate.agent_session?.kind !== "path" || typeof persistedSession !== "string") {
+    return yield* runtimeError(
       `Refusing to move ${agentName} from ${String(mate.cwd)} without a persisted Pi session path.`,
     );
   }
-
-  const relocatedSession = await preparePiSessionRelocation(
-    persistedSession,
-    agentCwd,
-  );
-  await $`herdr pane close ${paneId} --session ${session}`;
+  const relocatedSession = yield* preparePiSessionRelocation(persistedSession, agentCwd, piEnvironment);
+  yield* runCommand(["herdr", "pane", "close", paneId, "--session", session], childEnvironment, { requireSuccess: true });
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    if ((await mateStatus()) !== 0) {
-      await startMate(relocatedSession);
+    if ((yield* commandStatus(["herdr", "agent", "get", agentName, "--session", session], childEnvironment)) !== 0) {
+      yield* startMate(agentName, agentCwd, session, childEnvironment, relocatedSession);
       return;
     }
-    await Bun.sleep(100);
+    yield* Effect.sleep("100 millis");
   }
-  throw new Error(`Herdr did not release ${agentName} after closing pane ${paneId}.`);
-}
+  return yield* runtimeError(`Herdr did not release ${agentName} after closing pane ${paneId}.`);
+});
 
-async function waitUntilServerReady(serverProcess: Bun.Subprocess) {
+const waitUntilServerReady = Effect.fn("agentos.mate.waitForServer")(function*(
+  serverExit: Fiber.Fiber<number, unknown>,
+  session: string,
+  environment: PiSessionEnvironment,
+) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    if (serverProcess.exitCode !== null) {
-      throw new Error(`Herdr server exited with status ${serverProcess.exitCode}`);
+    const exit = yield* Fiber.join(serverExit).pipe(
+      Effect.timeoutOption("1 millis"),
+    );
+    if (Option.isSome(exit)) {
+      return yield* runtimeError(`Herdr server exited before session ${session} became ready.`);
     }
-    if ((await herdrStatus()) === 0) return;
-    await Bun.sleep(500);
+    if ((yield* commandStatus(["herdr", "status", "--json", "--session", session], environment)) === 0) return;
+    yield* Effect.sleep("500 millis");
   }
-  throw new Error(`Herdr session ${session} did not become ready within 30 seconds.`);
-}
+  return yield* runtimeError(`Herdr session ${session} did not become ready within 30 seconds.`);
+});
 
-async function listAgents(): Promise<Agent[]> {
-  const result = (await $`herdr agent list --session ${session}`.json()) as AgentList;
-  if (!Array.isArray(result.result?.agents)) {
-    throw new Error("Herdr returned an invalid agent list.");
-  }
-  return result.result.agents;
-}
+const listAgents = Effect.fn("agentos.mate.listAgents")(function*(
+  session: string,
+  environment: PiSessionEnvironment,
+) {
+  const result = yield* runCommand(["herdr", "agent", "list", "--session", session], environment, { requireSuccess: true });
+  const decoded = yield* Schema.decodeUnknownEffect(AgentListJson)(result.stdout).pipe(
+    Effect.mapError((cause) => runtimeError("Herdr returned an invalid agent list.", cause)),
+  );
+  return decoded.result.agents;
+});
 
-async function restoreMate(mate: Agent) {
+const restoreMate = Effect.fn("agentos.mate.restore")(function*(
+  mate: Agent,
+  agentName: string,
+  agentCwd: string,
+  session: string,
+  environment: PiSessionEnvironment,
+) {
   const paneId = mate.pane_id;
   if (typeof paneId !== "string") {
-    throw new Error(`Refusing to restore ${agentName} without a Herdr pane ID.`);
+    return yield* runtimeError(`Refusing to restore ${agentName} without a Herdr pane ID.`);
   }
-  observer = Bun.spawn(
-    [
-      "herdr",
-      "terminal",
-      "session",
-      "observe",
-      agentName,
-      "--cols",
-      "120",
-      "--rows",
-      "40",
-      "--session",
-      session,
-    ],
-    { env: process.env, stderr: "ignore", stdout: "ignore" },
+  const observer = yield* ChildProcess.make("herdr", [
+    "terminal", "session", "observe", agentName, "--cols", "120", "--rows", "40", "--session", session,
+  ], { env: { ...environment }, extendEnv: false, stderr: "ignore", stdout: "ignore" }).pipe(
+    Effect.mapError((cause) => runtimeError("Could not start the Herdr observer.", cause)),
   );
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    if ((await paneProcessStatus(paneId)) === 0) {
-      await terminate(observer);
-      observer = undefined;
+    if ((yield* commandStatus(["herdr", "pane", "process-info", "--pane", paneId, "--session", session], environment)) === 0) {
+      yield* observer.kill({ killSignal: "SIGTERM", forceKillAfter: 2_000 }).pipe(Effect.ignore);
       return;
     }
-    await Bun.sleep(100);
+    yield* Effect.sleep("100 millis");
   }
+  yield* observer.kill({ killSignal: "SIGTERM", forceKillAfter: 2_000 }).pipe(Effect.ignore);
+  yield* relocateMate(mate, agentName, agentCwd, session, environment, environment);
+});
 
-  await terminate(observer);
-  observer = undefined;
-  await relocateMate(mate);
-}
+const commandStatus = (arguments_: ReadonlyArray<string>, environment: PiSessionEnvironment) =>
+  runCommand(arguments_, environment, {}).pipe(Effect.map(({ exitCode }) => exitCode));
 
-async function herdrStatus(): Promise<number> {
-  return (
-    await $`herdr status --json --session ${session}`.quiet().nothrow()
-  ).exitCode;
-}
+const runCommand = Effect.fn("agentos.mate.command")(function*(
+  arguments_: ReadonlyArray<string>,
+  environment: PiSessionEnvironment,
+  options: { readonly inherit?: boolean; readonly requireSuccess?: boolean },
+) {
+  const [command, ...args] = arguments_;
+  if (command === undefined) return yield* runtimeError("Cannot run an empty command.");
+  return yield* Effect.scoped(Effect.gen(function*() {
+    const child = yield* ChildProcess.make(command, args, {
+      env: { ...environment },
+      extendEnv: false,
+      stderr: options.inherit ? "inherit" : "pipe",
+      stdout: options.inherit ? "inherit" : "pipe",
+    }).pipe(Effect.mapError((cause) => runtimeError(`Could not start ${command}.`, cause)));
+    const [exitCode, stderr, stdout] = yield* Effect.all([
+      child.exitCode.pipe(Effect.map(Number)),
+      options.inherit ? Effect.succeed("") : child.stderr.pipe(Stream.decodeText(), Stream.mkString),
+      options.inherit ? Effect.succeed("") : child.stdout.pipe(Stream.decodeText(), Stream.mkString),
+    ], { concurrency: "unbounded" }).pipe(
+      Effect.mapError((cause) => runtimeError(`Could not collect ${command} output.`, cause)),
+    );
+    if (options.requireSuccess && exitCode !== 0) {
+      return yield* runtimeError(`${arguments_.join(" ")} failed with status ${exitCode}${stderr.trim() ? `: ${stderr.trim()}` : "."}`);
+    }
+    return { exitCode, stderr, stdout };
+  }));
+});
 
-async function mateStatus(): Promise<number> {
-  return (
-    await $`herdr agent get ${agentName} --session ${session}`.quiet().nothrow()
-  ).exitCode;
-}
+const reportFailure = (error: unknown) => Effect.gen(function*() {
+  const stdio = yield* Stdio.Stdio;
+  const message = error instanceof Error ? error.message : String(error);
+  yield* Stream.make(`${message}\n`).pipe(Stream.run(stdio.stderr()), Effect.ignore);
+});
 
-async function paneProcessStatus(paneId: string): Promise<number> {
-  return (
-    await $`herdr pane process-info --pane ${paneId} --session ${session}`
-      .quiet()
-      .nothrow()
-  ).exitCode;
-}
-
-async function terminate(child: Bun.Subprocess | undefined) {
-  if (!child || child.exitCode !== null) return;
-  child.kill("SIGTERM");
-  await child.exited;
-}
-
-async function stop(exitCode: number) {
-  if (stopping) return;
-  stopping = true;
-  await terminate(observer);
-  observer = undefined;
-  await terminate(server);
-  server = undefined;
-  process.exit(exitCode);
-}
-
-function requiredEnvironment(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} must be configured for the Mate runtime`);
-  return value;
+if (import.meta.main) {
+  BunRuntime.runMain(
+    runMate.pipe(
+      Effect.tapError(reportFailure),
+      Effect.provide(BunServices.layer),
+    ),
+    {
+      disableErrorReporting: true,
+      teardown: (exit, onExit) =>
+        Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)
+          ? onExit(0)
+          : Runtime.defaultTeardown(exit, onExit),
+    },
+  );
 }
