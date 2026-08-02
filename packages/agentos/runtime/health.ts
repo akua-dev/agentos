@@ -136,6 +136,7 @@ export const makeSemanticHealthRuntime = Effect.gen(function*() {
   const paths = yield* Path.Path;
   const runtime: SemanticHealthRuntime = {
     basename: paths.basename,
+    isAbsolute: paths.isAbsolute,
     join: paths.join,
     parseToml: (source) =>
       Effect.try({
