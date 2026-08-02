@@ -59,7 +59,7 @@ export const baseUrl = liveMetadata.baseUrl;
 export interface AgentOSPageMetadata {
   title: string;
   description?: string;
-  path: `/${string}`;
+  path: string;
 }
 
 export function absoluteSiteUrl(path: string): string {

@@ -1,10 +1,12 @@
+import { Effect } from 'effect';
 import { learnSource } from '@/lib/source';
 import { buildCurriculum } from './curriculum';
 import { normalizeLearnPage } from './source';
 
-export function getCurriculum() {
-  return buildCurriculum(
-    learnSource.getPages().map((page) =>
+export const getCurriculum = Effect.gen(function*() {
+  const records = yield* Effect.forEach(
+    learnSource.getPages(),
+    (page) =>
       normalizeLearnPage({
         url: page.url,
         data: {
@@ -18,6 +20,6 @@ export function getCurriculum() {
           estimatedMinutes: page.data.estimatedMinutes,
         },
       }),
-    ),
   );
-}
+  return yield* buildCurriculum(records);
+}).pipe(Effect.withSpan('agentos.website.getCurriculum'));
