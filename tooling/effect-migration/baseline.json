@@ -20,15 +20,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/access-control-plane.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/atomic-acceptance.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 18,
-      "digest": "c4c6dfc8f93f80d186e90cec82d4b7618aef5831b462ef355e3a40da9f5a088b",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/atomic-acceptance.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/tests/current-mate-bearings.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
