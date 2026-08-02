@@ -2,7 +2,9 @@
 
 Issue: [#129](https://github.com/akua-dev/agentos/issues/129)
 
-Status: **frozen inputs; no observation in this document is a result**.
+Status: **completed frozen plan**. The observations and adoption decision are
+recorded in [`kagent-interop.md`](./kagent-interop.md); this document remains the
+unaltered pre-run contract.
 
 ## Boundary
 
