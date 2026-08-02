@@ -11,15 +11,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/resources/roles/secondmate/kubernetes/tests/domain-lifecycle.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/kubernetes/tests/secret-lifecycle.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 24,
-      "digest": "98acfd1565ce4f38fcf4b1666dd53d374affd1942be4e03793c60dc1500f66a5",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/kubernetes/tests/secret-lifecycle.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/agentgateway/tests/conformance.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
