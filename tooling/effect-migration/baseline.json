@@ -29,15 +29,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/atomic-acceptance.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/authorization.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 18,
-      "digest": "f0ceedbdf0218fa68f4312f86e3dba28acc01ba2e3af51f7e60d14f0c63c617d",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/authorization.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/tests/coordination-contracts.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
