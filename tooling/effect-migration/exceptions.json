@@ -111,6 +111,18 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "packages/agentos/runtime/create-image-seed.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The image-seed executable needs one reviewed Bun process entry boundary around its typed Effect filesystem, subprocess, and Stdio program.",
+      "ownerIssue": 104,
+      "test": "packages/agentos/runtime/tests/image-seed.effect.test.ts",
+      "removalCondition": "Retain only while image construction invokes image seeding as a standalone executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "packages/agentos/runtime/health.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",
