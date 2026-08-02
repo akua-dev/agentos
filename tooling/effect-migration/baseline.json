@@ -425,15 +425,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/kubernetes/tests/secret-lifecycle.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/pi-provider.ts",
-      "slice": "agentos-runtime",
-      "issue": 104,
-      "violationCount": 22,
-      "digest": "180b0021f7ee0fcaa9b2bb3d10e34d5497fabfd3d0c37804ac26ab8db20a4706",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/pi-provider.ts under issue #104; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/pi-session.ts",
       "slice": "agentos-runtime",
       "issue": 104,
@@ -504,15 +495,6 @@
       "digest": "d8e729362539ee1c46060f579bc4f01369d1cf6d15eaba9d7e4ae2f798e2590a",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/kubernetes.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/tests/pi-provider.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 26,
-      "digest": "f1b9ed6a42ed541e10c275a69b52f79184cbd0d46af959d32d06cc77532a2354",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/pi-provider.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/runtime/tests/prepare-home.test.ts",
