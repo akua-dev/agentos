@@ -38,15 +38,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/runtime.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/src/workloads/tests/compiler-kustomize.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 9,
-      "digest": "63090578ca3bbfac1801ca16d3863d4ef5f6ad12601fbf72ae406a50ef17e326",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/workloads/tests/compiler-kustomize.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/agentgateway/tests/conformance.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
