@@ -596,24 +596,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/kubernetes.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/tests/memory-activity.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 21,
-      "digest": "f561622ae3ab4b4929a2fc495acbac8f771d922e1d51cc882a2f6d626faa112e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/memory-activity.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/tests/memory-store.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 23,
-      "digest": "ec730dbd91cdce049ee31151d060603fb81edc083c9d39700b7f01e8678b2729",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/memory-store.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/tests/pi-provider.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -810,96 +792,6 @@
       "digest": "dd1306ee159ea0cfd15bf12e76696cb30dd3653fdc78b11a6fca15d05db36f3b",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/coordination-readiness/tests/extension.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/mate-memory/extension.ts",
-      "slice": "pi-memory-compaction",
-      "issue": 98,
-      "violationCount": 31,
-      "digest": "9d7bb0b6813347527b4ca22a1865f705e76bc0c2efbc7013eb513cd54454520e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/extension.ts under issue #98; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/mate-memory/maintenance.ts",
-      "slice": "pi-memory-compaction",
-      "issue": 98,
-      "violationCount": 44,
-      "digest": "25511e418444daaf42c55a2ff6c6d51ace90bc97ea2e2638fef62e253bfda942",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/maintenance.ts under issue #98; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/mate-memory/model.ts",
-      "slice": "pi-memory-compaction",
-      "issue": 98,
-      "violationCount": 7,
-      "digest": "f86e1081bfe034c1295e66a4e7899b90b388b4066688603aee3a2d7841203560",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/model.ts under issue #98; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/mate-memory/tests/extension.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 75,
-      "digest": "61b038768fbf2ec29e2152f9bb29d5fb986415b67bb242d1400dc9309afed7b3",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/tests/extension.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/mate-memory/tests/maintenance.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 66,
-      "digest": "77fa0dae522ec3562ebc9ad60d30edfc40e4cc927186aadca60f0af87cb3ca2e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/tests/maintenance.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/mate-memory/tests/model.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 8,
-      "digest": "914cee9f2bff714ee800319ce27ae6236afab9ad93eebb2609b79c4cdd1ccc67",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/mate-memory/tests/model.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/memory/activity.ts",
-      "slice": "pi-memory-compaction",
-      "issue": 98,
-      "violationCount": 77,
-      "digest": "2443e070e20b6102a792068e3c5ce05c75e2ab4e3b2cbfb518b4d151414286fa",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/memory/activity.ts under issue #98; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/memory/policy.ts",
-      "slice": "pi-memory-compaction",
-      "issue": 98,
-      "violationCount": 1,
-      "digest": "616be99744e2c71f88515d5faa8b6e9aebb1a545c9b2f1377becdb7aad5d1c65",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/memory/policy.ts under issue #98; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/memory/schema.ts",
-      "slice": "pi-memory-compaction",
-      "issue": 98,
-      "violationCount": 16,
-      "digest": "bdce90618b2054de0cbda97f8691807db72b65f27a4001e75dac27afe73423b4",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/memory/schema.ts under issue #98; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/src/memory/store.ts",
-      "slice": "pi-memory-compaction",
-      "issue": 98,
-      "violationCount": 54,
-      "digest": "92cfcd1d86dc7e98247b577054a60d62e5b7949a90f0e57872f3c3dda17ec0b1",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/src/memory/store.ts under issue #98; never refresh touched debt."
     },
     {
       "path": "packages/agentos/src/supervision-guard/extension.ts",

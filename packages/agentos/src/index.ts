@@ -372,12 +372,15 @@ export {
   type MateMemoryPolicy,
 } from "./memory/policy.ts";
 export {
-  createMateMemoryStore,
+  createMateMemoryStoreEffect,
   type MateMemoryStore,
   type StartupMemoryContext,
   type StoredTopic,
   type TopicWrite,
 } from "./memory/store.ts";
+export {
+  createMateMemoryStoreLegacy as createMateMemoryStore,
+} from "./shared/legacy.ts";
 export {
   createOpenAIServerCompactionExtension,
   type OpenAIServerCompactionDependencies,
