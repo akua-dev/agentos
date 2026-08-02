@@ -533,15 +533,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/tests/otlp-sink.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/app/(home)/learn/[...slug]/page.tsx",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 3,
-      "digest": "13f8990d42b1b55f78667bd0ddc194da5807482c924952bcdec374e74eb72194",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/(home)/learn/[...slug]/page.tsx under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/app/(home)/page.client.tsx",
       "slice": "website",
       "issue": 99,
@@ -630,33 +621,6 @@
       "digest": "38d549f913787fe19dfabb1c531c01400e90f39858df9a563ae704bb1f3012cd",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/instrumentation-client.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/lib/learn/curriculum.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 1,
-      "digest": "c85f9656ba26b66b62e104d94a6018ef043ea8aed1e59ff74dc568d35459d916",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/learn/curriculum.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/lib/learn/curriculum.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 10,
-      "digest": "76a3bfa37c8a4d826fe10075e7fe6e6fb4e94c8e19267fc290724dbb76351045",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/learn/curriculum.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/lib/learn/source.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 2,
-      "digest": "f6fb58dad497068f5b5969689e1ff3f0b8ef9955d648a2a90bc86f817497bb3d",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/learn/source.ts under issue #99; never refresh touched debt."
     },
     {
       "path": "website/apps/docs/lib/llms-index.test.ts",
