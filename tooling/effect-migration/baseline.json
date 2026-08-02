@@ -281,15 +281,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/kubernetes/tests/config.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "services/otel-collector/kubernetes/tests/manifests.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 10,
-      "digest": "149806f5d1212ac8778ba382fcd59077db0b4c3e70a2c514ad59c897afccd525",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in services/otel-collector/kubernetes/tests/manifests.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/otel-collector/tests/e2e.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
