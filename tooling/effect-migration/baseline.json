@@ -56,24 +56,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/current-mate-bearings.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "database/tests/fleet-initialization.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 15,
-      "digest": "fe1321c1b5deb73d6cf62e5dbb855891dcfdb8aefda7512bfd6540809ee78fb6",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/fleet-initialization.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "database/tests/package-unification-migration.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 4,
-      "digest": "835f2b8bd6994cc1144795e0224fc27bf8c853c8985df9f912016267ff3682c4",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in database/tests/package-unification-migration.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "database/tests/runtime-authorization.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
