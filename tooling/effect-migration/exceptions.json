@@ -147,6 +147,30 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "packages/agentos/runtime/prepare-home.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The retained-home preparation executable needs one reviewed Bun process boundary around its typed Effect configuration, filesystem, provider, and subprocess program.",
+      "ownerIssue": 104,
+      "test": "packages/agentos/runtime/tests/prepare-home.test.ts",
+      "removalCondition": "Retain only while Kubernetes invokes Mate home preparation as a standalone init-container executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "packages/agentos/runtime/run-mate.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The persistent Mate executable needs one reviewed Bun process boundary around its scoped Effect Herdr and Pi lifecycle program.",
+      "ownerIssue": 104,
+      "test": "packages/agentos/runtime/tests/runtime.test.ts",
+      "removalCondition": "Retain only while Kubernetes invokes the persistent Mate lifecycle as a standalone executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "services/github-broker/src/main.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",
