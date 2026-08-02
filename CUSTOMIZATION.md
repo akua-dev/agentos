@@ -64,20 +64,23 @@ Declare supported AgentOS and Pi versions as peers:
   "peerDependencies": {
     "@akua-dev/agentos": "^0.1.0",
     "@earendil-works/pi-ai": "0.81.1",
-    "@earendil-works/pi-coding-agent": "0.81.1"
+    "@earendil-works/pi-coding-agent": "0.81.1",
+    "effect": "4.0.0-beta.102"
   }
 }
 ```
 
-Registration functions receive Pi explicitly and remain ordinary TypeScript:
+Registration functions receive Pi explicitly and remain Effect programs:
 
 ```ts
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Effect } from "effect";
 import {
-  buildAgentOSStartupPrompt,
-  registerAgentOSInstructions,
-  registerAgentOSRuntime,
-  registerAgentOSStartup,
+  buildAgentOSStartupPromptEffect,
+  defineAgentOSPiCommandHandler,
+  defineAgentOSPiExtension,
+  registerAgentOSInstructionsEffect,
+  registerAgentOSRuntimeEffect,
+  registerAgentOSStartupEffect,
   type AgentOSRegistrationV1,
   type AgentOSStartupContributionV1,
 } from "@akua-dev/agentos";
@@ -91,11 +94,14 @@ const runtime: AgentOSRegistrationV1 = {
     messages: ["@acme/agentos:startup"],
   },
   register(pi) {
-    pi.registerCommand("acme-agentos-status", {
-      description: "Inspect the Acme customization",
-      async handler(_arguments, context) {
-        context.ui.notify("Acme AgentOS is active", "info");
-      },
+    return Effect.sync(() => {
+      pi.registerCommand("acme-agentos-status", {
+        description: "Inspect the Acme customization",
+        handler: defineAgentOSPiCommandHandler((_arguments, context) =>
+          Effect.sync(() =>
+            context.ui.notify("Acme AgentOS is active", "info")
+          )),
+      });
     });
   },
 };
@@ -107,23 +113,22 @@ const startup: AgentOSStartupContributionV1 = {
   instruction: "Inspect the reviewed Acme state through native tools.",
 };
 
-export function registerAcmeAgentOS(pi: ExtensionAPI) {
-  registerAgentOSInstructions(pi, [{
-    version: 1,
-    id: "@acme/agentos:instructions",
-    content: "Apply Acme's reviewed operating policy.",
-  }]);
-  registerAgentOSRuntime(pi, [runtime]);
-  registerAgentOSStartup(pi, {
-    customType: "@acme/agentos:startup",
-    prompt: buildAgentOSStartupPrompt([startup]),
-    requiredSkills: [startup.skill],
-  });
-
-  pi.on("tool_result", (_event) => {
-    // Ordinary Pi APIs remain available.
-  });
-}
+export default defineAgentOSPiExtension((pi) =>
+  Effect.gen(function*() {
+    yield* registerAgentOSInstructionsEffect(pi, [{
+      version: 1,
+      id: "@acme/agentos:instructions",
+      content: "Apply Acme's reviewed operating policy.",
+    }]);
+    yield* registerAgentOSRuntimeEffect(pi, [runtime]);
+    const prompt = yield* buildAgentOSStartupPromptEffect([startup]);
+    yield* registerAgentOSStartupEffect(pi, {
+      customType: "@acme/agentos:startup",
+      prompt,
+      requiredSkills: [startup.skill],
+    });
+  })
+);
 ```
 
 Choose one loading path for each behavior: select its standalone adapter, or

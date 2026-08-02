@@ -301,13 +301,19 @@ describe("Effect background-task extension runtime", () => {
           command: "quick",
           description: "Quick",
         });
+        const terminalEvent = yield* Deferred.make<void>();
+        const unsubscribe = yield* runtime.broker.onEvent((event) =>
+          event.type === "task_terminal" && event.task.id === started.details.id
+            ? Deferred.succeed(terminalEvent, undefined).pipe(Effect.asVoid)
+            : Effect.void
+        );
+        yield* Effect.addFinalizer(() => unsubscribe);
         yield* commands.complete("quick", {
           exitCode: 0,
           state: "succeeded",
           summary: "done",
         });
-        yield* Effect.yieldNow;
-        yield* Effect.sleep("1 millis");
+        yield* Deferred.await(terminalEvent);
         const output = yield* runtime.output({ task_id: started.details.id });
         yield* Effect.sleep("75 millis");
 

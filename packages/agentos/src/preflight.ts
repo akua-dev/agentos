@@ -12,7 +12,6 @@ import {
   decodeOrValidationError,
   makeValidationError as validationError,
 } from "./shared/errors.ts";
-import { runSyncLegacy } from "./shared/legacy.ts";
 
 export type { AgentOSNameClaimsV1 } from "./shared/contracts.ts";
 
@@ -20,7 +19,7 @@ export type AgentOSRegistrationV1 = {
   version: 1;
   id: string;
   names: AgentOSNameClaimsV1;
-  register(pi: ExtensionAPI): void | Promise<void>;
+  register(pi: ExtensionAPI): Effect.Effect<void, unknown>;
 };
 
 type ClaimKind = "tools" | "commands" | "skills" | "messages" | "entries";
@@ -152,61 +151,38 @@ export const registerAgentOSRuntimeEffect = Effect.fn(
 ) {
   yield* preflightAgentOSRegistrationsEffect(registrations);
   for (const registration of registrations) {
-    yield* Effect.tryPromise({
-      try: () => Promise.resolve(registration.register(pi)),
-      catch: () =>
+    yield* registration.register(pi).pipe(
+      Effect.mapError(() =>
         validationError(
           "registration_failed",
           "registration",
           "register",
           `AgentOS registration "${registration.id}" failed`,
-        ),
-    });
+        )
+      ),
+    );
   }
 });
-
-export function preflightAgentOSRegistrations(
-  registrations: readonly AgentOSRegistrationV1[],
-): void {
-  runLegacyValidation(preflightAgentOSRegistrationsEffect(registrations));
-}
 
 export function registerAgentOSRuntime(
   pi: ExtensionAPI,
   registrations: readonly AgentOSRegistrationV1[],
-): void | Promise<void> {
-  preflightAgentOSRegistrations(registrations);
-
-  let pending: Promise<void> | undefined;
-  for (const registration of registrations) {
-    if (pending) {
-      pending = pending.then(() => registration.register(pi));
-      continue;
-    }
-    const result = registration.register(pi);
-    if (result && typeof result.then === "function") {
-      pending = Promise.resolve(result);
-    }
-  }
-  return pending;
+): Effect.Effect<void, AgentOSValidationError> {
+  return registerAgentOSRuntimeEffect(pi, registrations);
 }
 
-export function assertQualifiedName(
+export function validateQualifiedName(
   value: unknown,
   label: string,
-): asserts value is string {
-  runLegacyValidation(
-    validateQualifiedNameEffect(value, label, "qualified_name", label),
-  );
+): Effect.Effect<string, AgentOSValidationError> {
+  return validateQualifiedNameEffect(value, label, "qualified_name", label);
 }
 
-export function assertPiSkillName(
+export function validatePiSkillName(
   value: unknown,
   label: string,
-): asserts value is string {
-  runLegacyValidation(
-    validatePiSkillNameEffect(value, label, "pi_skill_name", label),
-  );
+): Effect.Effect<string, AgentOSValidationError> {
+  return validatePiSkillNameEffect(value, label, "pi_skill_name", label);
 }
 
 const validateQualifiedNameEffect = Effect.fn(
@@ -263,9 +239,3 @@ const validateClaimNameEffect = Effect.fn(
     ),
   );
 });
-
-function runLegacyValidation<A>(
-  effect: Effect.Effect<A, AgentOSValidationError>,
-): A {
-  return runSyncLegacy(effect);
-}

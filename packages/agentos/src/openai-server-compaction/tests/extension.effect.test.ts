@@ -19,6 +19,7 @@ import {
 import {
   createOpenAIServerCompactionExtension,
   generateBestEffortLocalSummary,
+  registerOpenAIServerCompactionEffect,
   type LocalCompactionRequest,
   type LocalSummaryImplementations,
   type OpenAIServerCompactionDependencies,
@@ -34,7 +35,7 @@ import {
   type CompactionArtifact,
 } from "../schemas.ts";
 import { nativeCompactionDetails } from "../session.ts";
-import { runPromiseLegacy } from "../../shared/legacy.ts";
+import { runAgentOSPiProgram } from "../../pi-host-adapter.ts";
 import { createTelemetryRecorder } from "../../telemetry/tests/fake-telemetry.ts";
 import { makePiTestHarness } from "../../../tests/pi-test-harness.ts";
 
@@ -154,7 +155,7 @@ function harness(
       context: {
         model: state.model,
         modelRegistry: {
-          getApiKeyAndHeaders: () => runPromiseLegacy(Effect.succeed(auth)),
+          getApiKeyAndHeaders: () => runAgentOSPiProgram(Effect.succeed(auth)),
         },
         sessionManager: {
           getBranch: () => state.branch,
@@ -172,9 +173,7 @@ function harness(
       getActiveTools: () => [],
       getThinkingLevel: () => "high",
     });
-    yield* Effect.sync(() => {
-      createOpenAIServerCompactionExtension(dependencies)(fake.pi);
-    });
+    yield* registerOpenAIServerCompactionEffect(fake.pi, dependencies);
 
     const emit = (name: string, event: object) =>
       fake.emit(name, { ...event }).pipe(

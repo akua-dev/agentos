@@ -1,27 +1,28 @@
 import type { AgentOSRegistrationV1 } from "./preflight.ts";
+import { Effect } from "effect";
 import {
-  registerAgentosBackgroundTasks,
+  registerAgentosBackgroundTasksEffect,
   type AgentOSBackgroundTasksOptions,
 } from "./background-tasks/extension.ts";
 import {
-  registerMateMemoryExtension,
+  registerMateMemoryExtensionLiveEffect,
   type MateMemoryExtensionDependencies,
 } from "./mate-memory/extension.ts";
 import {
-  createOpenAIServerCompactionExtension,
+  registerOpenAIServerCompactionEffect,
   type OpenAIServerCompactionDependencies,
 } from "./openai-server-compaction/extension.ts";
 import {
-  registerAgentosSupervisionGuard,
+  registerAgentosSupervisionGuardEffect,
   type AgentOSSupervisionGuardOptions,
 } from "./supervision-guard/extension.ts";
-import { registerCoordinationReadiness } from "./coordination-readiness/extension.ts";
+import { registerCoordinationReadinessEffect } from "./coordination-readiness/extension.ts";
 import {
-  registerAgentOSObservability,
+  registerAgentOSObservabilityEffect,
   type AgentOSObservabilityDependencies,
 } from "./telemetry/pi-extension.ts";
 import {
-  registerPiWorkloadIdentity,
+  registerPiWorkloadIdentityEffect,
   type PiWorkloadIdentityOptions,
 } from "./access/pi-workload-identity.ts";
 
@@ -33,7 +34,7 @@ export function createAgentOSWorkloadIdentityRegistration(
     id: "@akua-dev/agentos:workload-identity",
     names: { version: 1 },
     register(pi) {
-      registerPiWorkloadIdentity(pi, options);
+      return registerPiWorkloadIdentityEffect(pi, options);
     },
   };
 }
@@ -46,7 +47,7 @@ export function createAgentOSObservabilityRegistration(
     id: "@akua-dev/agentos:observability",
     names: { version: 1 },
     register(pi) {
-      registerAgentOSObservability(pi, dependencies);
+      return registerAgentOSObservabilityEffect(pi, dependencies);
     },
   };
 }
@@ -72,8 +73,10 @@ export function createAgentOSBackgroundTasksRegistration(
       entries: ["agentos-background-command-lifecycle"],
     },
     register(pi) {
-      const broker = registerAgentosBackgroundTasks(pi, options);
-      registerCoordinationReadiness(pi, { broker });
+      return Effect.gen(function*() {
+        const broker = yield* registerAgentosBackgroundTasksEffect(pi, options);
+        yield* registerCoordinationReadinessEffect(pi, { broker });
+      });
     },
   };
 }
@@ -95,7 +98,9 @@ export function createAgentOSMateMemoryRegistration(
       ],
     },
     register(pi) {
-      registerMateMemoryExtension(pi, dependencies);
+      return registerMateMemoryExtensionLiveEffect(pi, dependencies).pipe(
+        Effect.asVoid,
+      );
     },
   };
 }
@@ -103,12 +108,11 @@ export function createAgentOSMateMemoryRegistration(
 export function createAgentOSOpenAIServerCompactionRegistration(
   dependencies?: OpenAIServerCompactionDependencies,
 ): AgentOSRegistrationV1 {
-  const registration = createOpenAIServerCompactionExtension(dependencies);
   return {
     version: 1,
     id: "@akua-dev/agentos:openai-server-compaction",
     names: { version: 1 },
-    register: registration,
+    register: (pi) => registerOpenAIServerCompactionEffect(pi, dependencies),
   };
 }
 
@@ -126,7 +130,7 @@ export function createAgentOSSupervisionGuardRegistration(
       ],
     },
     register(pi) {
-      registerAgentosSupervisionGuard(pi, options);
+      return registerAgentosSupervisionGuardEffect(pi, options);
     },
   };
 }

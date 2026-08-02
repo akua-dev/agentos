@@ -32,11 +32,8 @@ import {
   type StartupMemoryContext,
   type StoredTopic,
 } from "../memory/store.ts";
-import {
-  legacyEnvironmentConfigLayer,
-  runPromiseLegacy,
-  runSyncLegacy,
-} from "../shared/legacy.ts";
+import { environmentConfigLayer } from "../shared/platform.ts";
+import { runAgentOSPiProgram } from "../pi-host-adapter.ts";
 import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
 import {
   MateMemoryMaintenance,
@@ -125,10 +122,6 @@ function mapFailure(
 
 function defaultNow() {
   return Clock.currentTimeMillis.pipe(Effect.map((millis) => new Date(millis)));
-}
-
-function runExtensionEffect<A, E>(effect: Effect.Effect<A, E>): Promise<A> {
-  return runPromiseLegacy(effect);
 }
 
 function resolveAuth(context: ExtensionContext) {
@@ -225,7 +218,7 @@ export function registerMateMemoryExtensionEffect(
     });
 
     pi.on("session_start", (_event, context) =>
-      runExtensionEffect(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         yield* Effect.sync(() => {
           attached.clear();
           attachedBytes = 0;
@@ -246,7 +239,7 @@ export function registerMateMemoryExtensionEffect(
     );
 
     pi.on("input", (event, context) =>
-      runExtensionEffect(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         yield* Effect.sync(() =>
           maintenance.captureHumanInput(event.text, event.source)
         );
@@ -265,7 +258,7 @@ export function registerMateMemoryExtensionEffect(
     );
 
     pi.on("agent_settled", (_event, context) =>
-      runExtensionEffect(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         const maintenanceContext = {
           agentDir: paths.resolve(home, ".pi", "agent"),
           cwd: context.cwd,
@@ -284,7 +277,7 @@ export function registerMateMemoryExtensionEffect(
     );
 
     pi.on("agent_end", (event, context) =>
-      runExtensionEffect(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         const sessionId = context.sessionManager.getSessionId();
         const generation = pauseGeneration;
         const projection = Effect.gen(function*() {
@@ -324,7 +317,7 @@ export function registerMateMemoryExtensionEffect(
     );
 
     pi.on("session_shutdown", (_event, context) =>
-      runExtensionEffect(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         if (!paused) {
           const timestamp = yield* now;
           yield* activity.completeSession(
@@ -345,7 +338,7 @@ export function registerMateMemoryExtensionEffect(
     );
 
     pi.on("before_agent_start", (event, context) =>
-      runExtensionEffect(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         const generation = pauseGeneration;
         if (!isActiveGeneration(generation) || !store.policy.enabled) {
           return { systemPrompt: event.systemPrompt };
@@ -483,7 +476,7 @@ export function registerMateMemoryExtensionEffect(
       });
 
     pi.on("tool_call", (event, context) =>
-      runExtensionEffect(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         const generation = pauseGeneration;
         if (!paused) observedToolNames.add(event.toolName);
         if (!nativeFileTools.has(event.toolName)) return;
@@ -553,7 +546,7 @@ export function registerMateMemoryExtensionEffect(
     );
 
     pi.on("tool_result", (event) =>
-      runExtensionEffect(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         const generation = pauseGeneration;
         const pending = pendingWrites.get(event.toolCallId);
         if (pending === undefined) return;
@@ -600,7 +593,7 @@ export function registerMateMemoryExtensionEffect(
     pi.registerCommand("memory", {
       description: "Pause, resume, or inspect Mate memory for this Pi session",
       handler: (args, context) =>
-        runExtensionEffect(Effect.gen(function*() {
+        runAgentOSPiProgram(Effect.gen(function*() {
           const action = args.trim().toLowerCase() || "status";
           if (action === "pause") yield* setPaused(true);
           else if (action === "resume") yield* setPaused(false);
@@ -633,7 +626,7 @@ export function registerMateMemoryExtensionEffect(
         ]),
       }),
       execute: (_toolCallId, { action }) =>
-        runExtensionEffect(Effect.gen(function*() {
+        runAgentOSPiProgram(Effect.gen(function*() {
           if (action === "pause") yield* setPaused(true);
           else if (action === "resume") yield* setPaused(false);
           return {
@@ -660,7 +653,7 @@ export function registerMateMemoryExtensionEffect(
         }),
       }),
       execute: (_toolCallId, { path }) =>
-        runExtensionEffect(Effect.gen(function*() {
+        runAgentOSPiProgram(Effect.gen(function*() {
           const generation = pauseGeneration;
           yield* assertMemoryGeneration(generation);
           const relativePath = yield* canonicalTopicPath(path);
@@ -693,15 +686,26 @@ export function registerMateMemoryExtensionEffect(
   });
 }
 
+export const registerMateMemoryExtensionLiveEffect = Effect.fn(
+  "agentos.mateMemory.registerLive",
+)(function*(
+  pi: ExtensionAPI,
+  dependencies: MateMemoryExtensionDependencies = {},
+) {
+  return yield* (
+    registerMateMemoryExtensionEffect(pi, dependencies).pipe(
+      Effect.provide(platformLayer),
+      Effect.provide(environmentConfigLayer()),
+    )
+  );
+});
+
 export function registerMateMemoryExtension(
   pi: ExtensionAPI,
   dependencies: MateMemoryExtensionDependencies = {},
-): MateMemoryExtensionController | undefined {
-  return runSyncLegacy(
-    registerMateMemoryExtensionEffect(pi, dependencies).pipe(
-      Effect.provide(platformLayer),
-      Effect.provide(legacyEnvironmentConfigLayer()),
-    ),
+): Promise<MateMemoryExtensionController | undefined> {
+  return runAgentOSPiProgram(
+    registerMateMemoryExtensionLiveEffect(pi, dependencies),
   );
 }
 

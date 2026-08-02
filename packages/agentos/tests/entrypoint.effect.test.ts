@@ -14,6 +14,8 @@ import {
   registerDefaultAgentOSEntrypointEffect,
   type DefaultAgentOSRole,
 } from "../src/roles/default.ts";
+import { loadFirstMateSetupEffect } from "../src/roles/firstmate.ts";
+import { loadSecondMateSetupEffect } from "../src/roles/secondmate.ts";
 import { makePiTestHarness } from "./pi-test-harness.ts";
 import { roleSetupFixture } from "./role-setup-fixture.ts";
 
@@ -174,6 +176,23 @@ describe("default AgentOS entrypoint", () => {
         paths.join(roleDirectory, "skills"),
       ]);
     }).pipe(Effect.provide(platform()))));
+
+  it.effect("exposes packaged role loaders as Effect programs", () =>
+    Effect.gen(function*() {
+      const [firstMate, secondMate] = yield* Effect.all([
+        loadFirstMateSetupEffect,
+        loadSecondMateSetupEffect,
+      ]);
+
+      assert.strictEqual(
+        firstMate.instructions[0]?.id,
+        "@akua-dev/agentos:first_mate:identity",
+      );
+      assert.strictEqual(
+        secondMate.instructions[0]?.id,
+        "@akua-dev/agentos:second_mate:identity",
+      );
+    }).pipe(Effect.provide(platform())));
 
   const roles: ReadonlyArray<DefaultAgentOSRole> = [
     "first_mate",

@@ -10,7 +10,7 @@ import {
   Semaphore,
 } from "effect";
 
-import { runPromiseLegacy, runSyncLegacy } from "../shared/legacy.ts";
+import { runAgentOSPiProgram } from "../pi-host-adapter.ts";
 import {
   agentOSModelFamily,
   agentOSProviderFamily,
@@ -120,14 +120,14 @@ export const registerAgentOSObservabilityEffect = Effect.fn(
 
   yield* Effect.sync(() => {
     pi.on("before_agent_start", (_event, context) =>
-      runPromiseLegacy(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         if (Option.isSome(yield* Ref.get(operation))) yield* finishOperation();
         yield* ensureOperation(context);
       }))
     );
 
     pi.on("before_provider_headers", (event, context) =>
-      runPromiseLegacy(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         if (Option.isSome(yield* Ref.get(activeAttempt))) yield* finishAttempt();
         const currentOperation = yield* ensureOperation(context);
         const attempt = yield* currentOperation.startProviderAttempt({
@@ -144,7 +144,7 @@ export const registerAgentOSObservabilityEffect = Effect.fn(
     );
 
     pi.on("after_provider_response", (event) =>
-      runPromiseLegacy(Ref.update(activeAttempt, (current) =>
+      runAgentOSPiProgram(Ref.update(activeAttempt, (current) =>
         Option.map(current, ({ attempt }) => ({
           attempt,
           status: event.status,
@@ -155,12 +155,12 @@ export const registerAgentOSObservabilityEffect = Effect.fn(
 
     pi.on("message_end", (event) =>
       event.message.role === "assistant"
-        ? runPromiseLegacy(finishAttempt(event.message))
+        ? runAgentOSPiProgram(finishAttempt(event.message))
         : undefined
     );
 
-    pi.on("agent_settled", () => runPromiseLegacy(finishOperation()));
-    pi.on("session_shutdown", () => runPromiseLegacy(finishOperation()));
+    pi.on("agent_settled", () => runAgentOSPiProgram(finishOperation()));
+    pi.on("session_shutdown", () => runAgentOSPiProgram(finishOperation()));
   });
 });
 
@@ -168,7 +168,9 @@ export function registerAgentOSObservability(
   pi: ExtensionAPI,
   dependencies: AgentOSObservabilityDependencies = {},
 ) {
-  return runSyncLegacy(registerAgentOSObservabilityEffect(pi, dependencies));
+  return runAgentOSPiProgram(
+    registerAgentOSObservabilityEffect(pi, dependencies),
+  );
 }
 
 function sessionState(context: ExtensionContext) {

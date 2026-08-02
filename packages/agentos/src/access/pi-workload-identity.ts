@@ -9,10 +9,8 @@ import {
 } from "effect";
 
 import { AGENTOS_EGRESS_TOKEN_PATH } from "./identity.ts";
-import {
-  legacyEnvironmentConfigLayer,
-  runPromiseLegacy,
-} from "../shared/legacy.ts";
+import { runAgentOSPiProgram } from "../pi-host-adapter.ts";
+import { environmentConfigLayer } from "../shared/platform.ts";
 
 export const AGENTOS_EGRESS_TOKEN_FILE_ENV = "AGENTOS_EGRESS_TOKEN_FILE";
 
@@ -52,23 +50,34 @@ const PiWorkloadIdentityEnvironment = Config.all({
 
 const piWorkloadIdentityPlatform = Layer.merge(
   BunFileSystem.layer,
-  legacyEnvironmentConfigLayer(),
+  environmentConfigLayer(),
 );
+
+export const registerPiWorkloadIdentityEffect = Effect.fn(
+  "agentos.access.registerPiWorkloadIdentity",
+)(function*(
+  pi: ExtensionAPI,
+  options: PiWorkloadIdentityOptions = {},
+) {
+  yield* Effect.sync(() => {
+    pi.on("before_provider_headers", (event, context) =>
+      runAgentOSPiProgram(
+        resolvePiWorkloadIdentity(context.model, options).pipe(
+          Effect.tap((resolution) =>
+            Effect.sync(() => applyResolution(event.headers, resolution))
+          ),
+          Effect.asVoid,
+          Effect.provide(piWorkloadIdentityPlatform),
+        ),
+      ));
+  });
+});
 
 export function registerPiWorkloadIdentity(
   pi: ExtensionAPI,
   options: PiWorkloadIdentityOptions = {},
 ) {
-  pi.on("before_provider_headers", (event, context) =>
-    runPromiseLegacy(
-      resolvePiWorkloadIdentity(context.model, options).pipe(
-        Effect.tap((resolution) =>
-          Effect.sync(() => applyResolution(event.headers, resolution))
-        ),
-        Effect.asVoid,
-        Effect.provide(piWorkloadIdentityPlatform),
-      ),
-    ));
+  return runAgentOSPiProgram(registerPiWorkloadIdentityEffect(pi, options));
 }
 
 function usesAgentOSGateway(
