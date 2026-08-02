@@ -569,24 +569,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/docs/[[...slug]]/page.tsx under issue #99; never refresh touched debt."
     },
     {
-      "path": "website/apps/docs/app/llms-full.txt/route.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 1,
-      "digest": "81643d329444d5c2385bef90acdbaec9fb8d31269ed151720d003e8f765781d3",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/llms-full.txt/route.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/app/llms.mdx/[[...slug]]/route.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 1,
-      "digest": "991f0425da72e4b80df6f8c03ce3cd4aa95d5a841c5f258096f5dc534884f3be",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/app/llms.mdx/[[...slug]]/route.ts under issue #99; never refresh touched debt."
-    },
-    {
       "path": "website/apps/docs/app/sitemap.ts",
       "slice": "website",
       "issue": 99,
@@ -648,33 +630,6 @@
       "digest": "38d549f913787fe19dfabb1c531c01400e90f39858df9a563ae704bb1f3012cd",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/instrumentation-client.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/lib/content/canonical-source.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 2,
-      "digest": "74bb8059ff421c52634e316329cbf5237040706648e99560f32d0eeb9595765b",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/canonical-source.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/lib/content/canonical-source.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 3,
-      "digest": "9a58dd02f4f0f6bbb70b1af472b382b989296d23ac589984378e88520e415a9e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/content/canonical-source.ts under issue #99; never refresh touched debt."
-    },
-    {
-      "path": "website/apps/docs/lib/get-llm-text.ts",
-      "slice": "website",
-      "issue": 99,
-      "violationCount": 1,
-      "digest": "427ff9de9390b011aec884b209d370abde9ed006a8c9717ef1bb7e191d5d37d9",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in website/apps/docs/lib/get-llm-text.ts under issue #99; never refresh touched debt."
     },
     {
       "path": "website/apps/docs/lib/learn/curriculum.test.ts",
