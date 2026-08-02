@@ -7,6 +7,14 @@ export interface LearnProgress {
 
 export const learnProgressStorageKey = 'agentos.learn.progress.v1';
 
+export const LearnProgressSchema = Schema.Struct({
+  version: Schema.Literal(1),
+  completedLessonIds: Schema.Array(Schema.String),
+});
+export const LearnProgressFromString = Schema.fromJsonString(
+  LearnProgressSchema,
+);
+
 const LearnProgressInputSchema = Schema.Struct({
   version: Schema.Literal(1),
   completedLessonIds: Schema.Array(Schema.Unknown),

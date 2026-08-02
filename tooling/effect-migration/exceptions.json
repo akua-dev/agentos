@@ -3,6 +3,30 @@
   "exceptions": [
     {
       "kind": "outer-host-adapter",
+      "path": "website/apps/docs/lib/effect/browser-runtime.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runSync",
+      "maximumOccurrences": 1,
+      "reason": "React event callbacks require immediate state updates before returning control, so one domain-free adapter runs infallible synchronous browser Effects.",
+      "ownerIssue": 99,
+      "test": "website/apps/docs/lib/effect/browser-runtime.effect.test.ts",
+      "removalCondition": "Remove when React event callbacks accept Effect values directly.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "website/apps/docs/lib/effect/browser-runtime.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runPromise",
+      "maximumOccurrences": 1,
+      "reason": "Next.js dynamic modules and React Suspense require Promises, so one domain-free browser adapter enters Effect after module failures are typed.",
+      "ownerIssue": 99,
+      "test": "website/apps/docs/lib/effect/browser-runtime.effect.test.ts",
+      "removalCondition": "Remove when browser framework module callbacks accept Effect values directly.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "benchmarks/profiles/agentos/pi-session-adapter.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",

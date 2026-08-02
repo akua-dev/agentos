@@ -2,38 +2,48 @@
 
 import { Check, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Effect } from 'effect';
 import {
-  learnProgressStorageKey,
-  parseProgress,
   resetProgress,
   toggleLesson,
   type LearnProgress,
 } from '@/lib/learn/progress';
+import {
+  learnProgressStorageLayer,
+  loadLearnProgress,
+  saveLearnProgress,
+} from '@/lib/learn/progress-storage';
 import { cn } from '@/lib/cn';
+import {
+  runBrowserEffect,
+  runBrowserSync,
+} from '@/lib/effect/browser-runtime';
 
 export function useLearnProgress(validLessonIds: readonly string[], storage?: Storage) {
   const [progress, setProgress] = useState<LearnProgress>(resetProgress);
+  const storageLayer = useMemo(() => learnProgressStorageLayer(storage), [storage]);
 
   useEffect(() => {
-    try {
-      const target = storage ?? window.localStorage;
-      setProgress(parseProgress(target.getItem(learnProgressStorageKey)));
-    } catch {
-      setProgress(resetProgress());
-    }
-  }, [storage]);
+    return runBrowserEffect(
+      loadLearnProgress.pipe(
+        Effect.catch(() => Effect.succeed(resetProgress())),
+        Effect.tap((stored) => Effect.sync(() => setProgress(stored))),
+        Effect.provide(storageLayer),
+      ),
+    );
+  }, [storageLayer]);
 
   const validIds = useMemo(() => new Set(validLessonIds), [validLessonIds]);
   const completed = progress.completedLessonIds.filter((id) => validIds.has(id));
 
   function update(next: LearnProgress) {
-    setProgress(next);
-    try {
-      const target = storage ?? window.localStorage;
-      target.setItem(learnProgressStorageKey, JSON.stringify(next));
-    } catch {
-      // Local progress remains useful in memory when storage is unavailable.
-    }
+    runBrowserSync(
+      Effect.sync(() => setProgress(next)).pipe(
+        Effect.andThen(saveLearnProgress(next)),
+        Effect.catch(() => Effect.void),
+        Effect.provide(storageLayer),
+      ),
+    );
   }
 
   return { progress, completed, update };
