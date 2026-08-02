@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "conformance:model": "bun tests/live-model-conformance-main.ts",
-    "conformance:upgrade": "bun tests/postgres-upgrade-conformance.ts",
+    "conformance:upgrade": "bun tests/postgres-upgrade-conformance-main.ts",
     "model:generate": "bun scripts/generate-model.ts",
     "model:check": "bun scripts/generate-model.ts --check",
     "test": "vitest run tests"

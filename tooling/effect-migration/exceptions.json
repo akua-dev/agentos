@@ -39,6 +39,18 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "services/openfga/tests/postgres-upgrade-conformance-main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The disposable PostgreSQL upgrade/restore conformance executable enters one scoped Effect runtime around Docker children, typed files, health checks, cleanup, redacted failures, and schema-encoded output.",
+      "ownerIssue": 102,
+      "test": "services/openfga/tests/postgres-upgrade-conformance.ts",
+      "removalCondition": "Retain only while PostgreSQL upgrade and restore conformance is a standalone executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "website/apps/docs/lib/effect/browser-runtime.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
