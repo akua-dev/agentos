@@ -2,15 +2,6 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "path": "benchmarks/profiles/agentos/pi-session-adapter.ts",
-      "slice": "benchmarks",
-      "issue": 97,
-      "violationCount": 30,
-      "digest": "df8b67cac81d318b278c43609ab1f2508e40ad1d7b11fea436a4818e2ecfc1d0",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/profiles/agentos/pi-session-adapter.ts under issue #97; never refresh touched debt."
-    },
-    {
       "path": "benchmarks/run.ts",
       "slice": "benchmarks",
       "issue": 97,
@@ -36,15 +27,6 @@
       "digest": "4605b2e559d74769d5da26f0ba457895899cdeb5661952d048b74eb1dc44df43",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/tests/contracts.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "benchmarks/tests/pi-session-adapter.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 7,
-      "digest": "d08a007ed33ff47be85145067e5d0c75e8517214f3a98cc751761af264997c6a",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in benchmarks/tests/pi-session-adapter.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "benchmarks/tests/runner.test.ts",

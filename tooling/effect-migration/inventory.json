@@ -676,6 +676,16 @@
       "status": "pure"
     },
     {
+      "id": "benchmark-pi-session-adapter",
+      "issue": 97,
+      "pattern": "^benchmarks/profiles/agentos/pi-session-adapter\\.ts$",
+      "runtime": "bun-pi-session-entrypoint",
+      "package": "@agentos/root",
+      "io": ["crypto", "filesystem", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "benchmarks",
       "issue": 97,
       "pattern": "^benchmarks/",
