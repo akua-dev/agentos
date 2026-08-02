@@ -435,6 +435,26 @@
       "status": "migrated"
     },
     {
+      "id": "agentos-pi-provider-effect-tests",
+      "issue": 102,
+      "pattern": "^packages/agentos/runtime/tests/pi-provider\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "filesystem", "schema"],
+      "migrationDependencies": [100, 101, 104],
+      "status": "migrated"
+    },
+    {
+      "id": "agentos-pi-provider-runtime",
+      "issue": 104,
+      "pattern": "^packages/agentos/runtime/pi-provider\\.ts$",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": ["config", "filesystem", "foreign-promise", "schema"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
       "id": "agentos-readiness-entrypoints",
       "issue": 104,
       "pattern": "^packages/agentos/runtime/(?:capacity-preflight-main|health|readiness-state-main)\\.ts$",
