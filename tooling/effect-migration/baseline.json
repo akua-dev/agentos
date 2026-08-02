@@ -452,24 +452,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/startup.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "release/kubernetes/render.ts",
-      "slice": "database-and-clis",
-      "issue": 97,
-      "violationCount": 14,
-      "digest": "f468b100011ecf68aa7eeb217e1e47fe1641190124afade6b88742138aef3b8e",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in release/kubernetes/render.ts under issue #97; never refresh touched debt."
-    },
-    {
-      "path": "release/kubernetes/tests/release.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 7,
-      "digest": "05abbeffda10c8e7c45044c57ca7fe31ff9c0e7a9c3ec80803653a7b942a723f",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in release/kubernetes/tests/release.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "services/agentgateway/tests/conformance.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,

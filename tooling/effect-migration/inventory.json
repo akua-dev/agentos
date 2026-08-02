@@ -726,6 +726,16 @@
       "status": "runtime-boundary"
     },
     {
+      "id": "kubernetes-release-renderer",
+      "issue": 97,
+      "pattern": "^release/kubernetes/render\\.ts$",
+      "runtime": "bun-kubernetes-entrypoint",
+      "package": "@agentos/root",
+      "io": ["crypto", "filesystem", "kubernetes", "process", "schema", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "benchmarks",
       "issue": 97,
       "pattern": "^benchmarks/",

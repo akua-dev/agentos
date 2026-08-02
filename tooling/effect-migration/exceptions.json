@@ -87,6 +87,18 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "release/kubernetes/render.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The Kubernetes release renderer enters one scoped Effect runtime around typed arguments, temporary overlays, kubectl children, YAML schemas, manifest validation, atomic filesystem publication, and standard I/O.",
+      "ownerIssue": 97,
+      "test": "release/kubernetes/tests/release.effect.test.ts",
+      "removalCondition": "Retain only while Kubernetes release rendering remains a standalone CLI.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "database/drizzle.config.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
