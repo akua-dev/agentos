@@ -65,24 +65,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/artifact.test.ts under issue #102; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/tests/discovery.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 11,
-      "digest": "d778e15428fd235475b87b62a839ab6cffb54a4739c32c3076d479abbc2be135",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/discovery.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/tests/ecosystem.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 12,
-      "digest": "63d08287977a9f7c0f03629b88a3d75db472612230a1972145e311701eaad9be",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/tests/ecosystem.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/tests/fake-pi.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
