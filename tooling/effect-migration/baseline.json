@@ -443,15 +443,6 @@
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/run-mate.ts under issue #104; never refresh touched debt."
     },
     {
-      "path": "packages/agentos/runtime/tests/capacity-preflight.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 19,
-      "digest": "53cf26d0353c622ce16626d9bb5ef9173c1e6adefc1a85660c5abfe7f3240cd7",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/capacity-preflight.test.ts under issue #102; never refresh touched debt."
-    },
-    {
       "path": "packages/agentos/runtime/tests/codex-otel.test.ts",
       "slice": "effect-test-conformance",
       "issue": 102,
@@ -486,15 +477,6 @@
       "digest": "9dcf79e05670628bf8f632e30e1776488dc3b1d183ebda5ea9bbaeaaf7e7301f",
       "expiresOn": "2026-10-31",
       "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/prepare-home.test.ts under issue #102; never refresh touched debt."
-    },
-    {
-      "path": "packages/agentos/runtime/tests/readiness-state.test.ts",
-      "slice": "effect-test-conformance",
-      "issue": 102,
-      "violationCount": 21,
-      "digest": "f30cdea5d7f19dfff7a1e71cad359a262797fd13a53219ce84311d9c5c74737d",
-      "expiresOn": "2026-10-31",
-      "removalCondition": "Remove this entry only by migrating every Effect finding in packages/agentos/runtime/tests/readiness-state.test.ts under issue #102; never refresh touched debt."
     },
     {
       "path": "packages/agentos/runtime/tests/runtime.test.ts",

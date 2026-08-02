@@ -1,7 +1,16 @@
+import * as BunCrypto from "@effect/platform-bun/BunCrypto";
 import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
 import * as BunPath from "@effect/platform-bun/BunPath";
-import { createHash } from "node:crypto";
-import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
+import {
+  Crypto,
+  Effect,
+  Encoding,
+  FileSystem,
+  Layer,
+  Option,
+  Path,
+  Schema,
+} from "effect";
 
 import { AgentOSIdentifier } from "./shared/services.ts";
 
@@ -76,6 +85,7 @@ const privateDirectoryMode = 0o700;
 const privateFileMode = 0o600;
 
 const ReadinessStateLive = Layer.mergeAll(
+  BunCrypto.layer,
   BunFileSystem.layer,
   BunPath.layer,
   AgentOSIdentifier.layer,
@@ -119,9 +129,13 @@ const readOptionalText = Effect.fn("agentos.readinessState.readOptionalText")(
 const hashOptionalFile = Effect.fn("agentos.readinessState.hashOptionalFile")(
   function*(path: string) {
     const source = yield* readOptionalText(path, maximumConfigurationBytes);
-    return source === undefined
-      ? null
-      : createHash("sha256").update(source).digest("hex");
+    if (source === undefined) return null;
+    const crypto = yield* Crypto.Crypto;
+    return Encoding.encodeHex(
+      yield* crypto.digest("SHA-256", new TextEncoder().encode(source)).pipe(
+        Effect.mapError(() => stateError("hash", path)),
+      ),
+    );
   },
 );
 
