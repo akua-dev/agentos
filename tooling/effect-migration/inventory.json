@@ -395,6 +395,36 @@
       "status": "migrated"
     },
     {
+      "id": "agentos-readiness-effect-tests",
+      "issue": 102,
+      "pattern": "^packages/agentos/runtime/tests/(?:crewmate-readiness|health|readiness)\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "crypto", "filesystem", "process", "schema"],
+      "migrationDependencies": [100, 101, 104],
+      "status": "migrated"
+    },
+    {
+      "id": "agentos-readiness-entrypoints",
+      "issue": 104,
+      "pattern": "^packages/agentos/runtime/(?:capacity-preflight-main|health|readiness-state-main)\\.ts$",
+      "runtime": "bun-entrypoint",
+      "package": "@akua-dev/agentos",
+      "io": ["config", "crypto", "filesystem", "process", "runtime-adapter", "schema", "stream"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "agentos-readiness-runtime",
+      "issue": 104,
+      "pattern": "^packages/agentos/runtime/(?:crewmate-readiness|readiness)\\.ts$",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": ["crypto", "filesystem", "process", "schema"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
       "id": "effect-test-conformance",
       "issue": 102,
       "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",

@@ -1,93 +1,149 @@
 #!/usr/bin/env bun
 
-import { open } from "node:fs/promises";
-import { join } from "node:path";
-
-import { Effect } from "effect";
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import * as BunServices from "@effect/platform-bun/BunServices";
+import { CrewmateReadinessState } from "@akua-dev/agentos";
+import {
+  Config,
+  ConfigProvider,
+  Effect,
+  Option,
+  Path,
+  Result,
+  Runtime,
+  Schema,
+  Stdio,
+  Stream,
+} from "effect";
 
 import {
   confirmCrewmateReadiness,
   CrewmateConfirmationError,
-  type CrewmateConfirmationRuntime,
 } from "./crewmate-readiness";
+import { makeSemanticHealthRuntime } from "./health";
 
-function isMissingFile(cause: unknown): boolean {
-  return cause instanceof Error && "code" in cause && cause.code === "ENOENT";
+const confirmationEnvironmentKeys: ReadonlyArray<string> = [
+  "AGENTOS_AGENT_CWD",
+  "AGENTOS_AGENT_ID",
+  "AGENTOS_AGENT_NAME",
+  "AGENTOS_AGENT_ROLE",
+  "AGENTOS_ASSIGNMENT_ID",
+  "AGENTOS_BRIEF_PATH",
+  "AGENTOS_BRIEF_SHA256",
+  "AGENTOS_HARNESS",
+  "AGENTOS_TASK_ID",
+  "HERDR_SESSION",
+];
+
+const ConfirmationOutput = Schema.Struct({
+  state: CrewmateReadinessState,
+  status: Schema.Literal("confirmed"),
+  version: Schema.Literal(1),
+});
+const ConfirmationFailure = Schema.Struct({
+  reason: Schema.String,
+  status: Schema.Literal("failed"),
+  version: Schema.Literal(1),
+});
+
+class ReadinessStateUsageError extends Schema.TaggedErrorClass<ReadinessStateUsageError>()(
+  "ReadinessStateUsageError",
+  { message: Schema.String },
+) {
+  override readonly [Runtime.errorExitCode] = 2;
 }
 
-const runtime: CrewmateConfirmationRuntime = {
-  run: (args) =>
-    Effect.promise(async () => {
-      try {
-        const child = Bun.spawn([...args], {
-          env: process.env,
-          stderr: "ignore",
-          stdout: "pipe",
-        });
-        const [exitCode, stdout] = await Promise.all([
-          child.exited,
-          new Response(child.stdout).text(),
-        ]);
-        return { exitCode, stdout };
-      } catch {
-        return { exitCode: 1, stdout: "" };
-      }
-    }),
-  readText: (path, maximumBytes) =>
-    Effect.promise(async () => {
-      let handle;
-      try {
-        try {
-          handle = await open(path, "r");
-        } catch (cause) {
-          if (isMissingFile(cause)) return undefined;
-          throw cause;
-        }
-        const buffer = Buffer.alloc(maximumBytes + 1);
-        const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-        if (bytesRead > maximumBytes) return undefined;
-        return new TextDecoder("utf-8", { fatal: true }).decode(
-          buffer.subarray(0, bytesRead),
-        );
-      } catch {
-        return undefined;
-      } finally {
-        await handle?.close();
-      }
-    }),
-};
+class ReadinessStateConfirmationError extends Schema.TaggedErrorClass<ReadinessStateConfirmationError>()(
+  "ReadinessStateConfirmationError",
+  { message: Schema.String },
+) {}
 
-if (process.argv[2] !== "confirm-crewmate") {
-  process.stderr.write("Usage: readiness-state-main.ts confirm-crewmate\n");
-  process.exitCode = 2;
-} else {
-  const home = process.env.HOME?.trim();
-  if (!home) {
-    process.stderr.write(
-      '{"reason":"runtime_configuration_invalid","status":"failed","version":1}\n',
-    );
-    process.exitCode = 1;
-  } else {
-    try {
-      const state = await Effect.runPromise(
-        confirmCrewmateReadiness(
-          process.env,
-          runtime,
-          join(home, ".local", "state", "agentos"),
-        ),
-      );
-      process.stdout.write(
-        `${JSON.stringify({ status: "confirmed", state, version: 1 })}\n`,
-      );
-    } catch (cause) {
-      const reason =
-        cause instanceof CrewmateConfirmationError
-          ? cause.reason
-          : "confirmation_internal_error";
-      process.stderr.write(
-        `${JSON.stringify({ reason, status: "failed", version: 1 })}\n`,
-      );
-      process.exitCode = 1;
+const confirmationEnvironment = Effect.gen(function*() {
+  const values = yield* Config.all(
+    confirmationEnvironmentKeys.map((key) =>
+      Config.string(key).pipe(Config.option)
+    ),
+  );
+  const environment: Record<string, string | undefined> = {};
+  for (let index = 0; index < confirmationEnvironmentKeys.length; index += 1) {
+    const key = confirmationEnvironmentKeys[index];
+    const value = values[index];
+    if (key !== undefined && value !== undefined) {
+      environment[key] = Option.getOrUndefined(value);
     }
   }
+  return environment;
+});
+
+function write(output: "stderr" | "stdout", value: string) {
+  return Effect.gen(function*() {
+    const stdio = yield* Stdio.Stdio;
+    yield* Stream.make(value).pipe(
+      Stream.run(output === "stdout" ? stdio.stdout() : stdio.stderr()),
+    );
+  });
+}
+
+function encode<S extends Schema.Constraint>(schema: S, value: S["Type"]) {
+  return Schema.encodeEffect(Schema.fromJsonString(schema))(value);
+}
+
+const failConfirmation = Effect.fn("agentos.readinessStateMain.fail")(
+  function*(reason: string) {
+    const source = yield* encode(ConfirmationFailure, {
+      reason,
+      status: "failed",
+      version: 1,
+    });
+    yield* write("stderr", `${source}\n`);
+    return yield* ReadinessStateConfirmationError.make({ message: reason });
+  },
+);
+
+export const readinessStateMain = Effect.gen(function*() {
+  const stdio = yield* Stdio.Stdio;
+  const args = yield* stdio.args;
+  if (args[0] !== "confirm-crewmate") {
+    const message = "Usage: readiness-state-main.ts confirm-crewmate\n";
+    yield* write("stderr", message);
+    return yield* ReadinessStateUsageError.make({ message });
+  }
+  const home = Option.getOrUndefined(yield* Config.option(Config.string("HOME")))
+    ?.trim();
+  if (!home) return yield* failConfirmation("runtime_configuration_invalid");
+
+  const paths = yield* Path.Path;
+  const [environment, runtime] = yield* Effect.all([
+    confirmationEnvironment,
+    makeSemanticHealthRuntime,
+  ]);
+  const confirmation = yield* confirmCrewmateReadiness(
+    environment,
+    runtime,
+    paths.join(home, ".local", "state", "agentos"),
+  ).pipe(Effect.result);
+  if (Result.isFailure(confirmation)) {
+    const reason = confirmation.failure instanceof CrewmateConfirmationError
+      ? confirmation.failure.reason
+      : "confirmation_internal_error";
+    return yield* failConfirmation(reason);
+  }
+  const source = yield* encode(ConfirmationOutput, {
+    status: "confirmed",
+    state: confirmation.success,
+    version: 1,
+  });
+  yield* write("stdout", `${source}\n`);
+});
+
+if (import.meta.main) {
+  BunRuntime.runMain(
+    readinessStateMain.pipe(
+      Effect.provide(BunServices.layer),
+      Effect.provide(
+        ConfigProvider.layer(ConfigProvider.fromEnv()),
+      ),
+    ),
+    { disableErrorReporting: true },
+  );
 }

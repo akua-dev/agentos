@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
-import { describe, expect, test } from "bun:test";
-import { Effect } from "effect";
+import { describe, expect, it } from "@effect/vitest";
+import { Effect, Hash } from "effect";
 import {
   evaluateSemanticHealth,
   type HealthEnvironment,
@@ -11,6 +10,7 @@ type RuntimeOptions = {
   commands?: Readonly<Record<string, { exitCode: number; stdout: string }>>;
   files?: Readonly<Record<string, string>>;
   liveProcessIds?: ReadonlyArray<number>;
+  parseToml?: (source: string) => unknown | undefined;
   unavailableFiles?: ReadonlyArray<string>;
   unavailableTextFiles?: ReadonlyArray<string>;
 };
@@ -29,7 +29,8 @@ const coordinationState = `${home}/.local/state/agentos/readiness/coordination.j
 const egressTokenPath = "/var/run/secrets/agentos-egress/token";
 
 function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
+  const fragment = (Hash.string(value) >>> 0).toString(16).padStart(8, "0");
+  return fragment.repeat(8);
 }
 
 function commandKey(args: ReadonlyArray<string>): string {
@@ -41,6 +42,9 @@ function runtime(options: RuntimeOptions = {}): SemanticHealthRuntime {
   const unavailable = new Set(options.unavailableFiles ?? []);
   const unavailableText = new Set(options.unavailableTextFiles ?? []);
   return {
+    basename: (path) => path.split("/").at(-1) ?? path,
+    join: (...paths) => paths.join("/").replaceAll(/\/{2,}/g, "/"),
+    parseToml: (source) => Effect.succeed(options.parseToml?.(source)),
     run: (args) =>
       Effect.succeed(
         options.commands?.[commandKey(args)] ?? {
@@ -48,6 +52,7 @@ function runtime(options: RuntimeOptions = {}): SemanticHealthRuntime {
           stdout: "",
         },
       ),
+    sha256: (source) => Effect.succeed(sha256(source)),
     readText: (path, maximumBytes) =>
       Effect.succeed(
         unavailable.has(path) ||
@@ -189,35 +194,33 @@ function healthyMateRuntime(
   return runtime({ ...overrides, commands, files });
 }
 
-async function evaluate(
+function evaluate(
   environment: HealthEnvironment,
   mode: "live" | "ready",
   probeRuntime: SemanticHealthRuntime,
 ) {
-  return Effect.runPromise(
-    evaluateSemanticHealth(environment, mode, probeRuntime),
-  );
+  return evaluateSemanticHealth(environment, mode, probeRuntime);
 }
 
 function reasonCodes(
-  result: Awaited<ReturnType<typeof evaluate>>,
+  result: { readonly reasons: ReadonlyArray<{ readonly code: string }> },
 ): ReadonlyArray<string> {
   return result.reasons.map(({ code }) => code);
 }
 
 describe("semantic Agent readiness", () => {
-  test("fails readiness with a stable reason for an unknown runtime role", async () => {
-    const result = await evaluate(
+  it.effect("fails readiness with a stable reason for an unknown runtime role", () => Effect.gen(function*() {
+    const result = yield* evaluate(
       mateEnvironment({ AGENTOS_AGENT_ROLE: "unknown-role" }),
       "ready",
       healthyMateRuntime(),
     );
     expect(result).toMatchObject({ role: "unknown", status: "not_ready" });
     expect(reasonCodes(result)).toEqual(["runtime_configuration_invalid"]);
-  });
+  }));
 
-  test("keeps liveness narrow and emits stable diagnostic JSON data", async () => {
-    const result = await evaluate(
+  it.effect("keeps liveness narrow and emits stable diagnostic JSON data", () => Effect.gen(function*() {
+    const result = yield* evaluate(
       mateEnvironment(),
       "live",
       healthyMateRuntime(),
@@ -231,7 +234,7 @@ describe("semantic Agent readiness", () => {
       version: 1,
     });
 
-    const invalidStatus = await evaluate(
+    const invalidStatus = yield* evaluate(
       mateEnvironment(),
       "live",
       healthyMateRuntime({
@@ -248,10 +251,10 @@ describe("semantic Agent readiness", () => {
     );
     expect(invalidStatus.status).toBe("not_live");
     expect(reasonCodes(invalidStatus)).toEqual(["herdr_unavailable"]);
-  });
+  }));
 
-  test("reports a fully prepared Mate ready without reading auth contents", async () => {
-    const result = await evaluate(
+  it.effect("reports a fully prepared Mate ready without reading auth contents", () => Effect.gen(function*() {
+    const result = yield* evaluate(
       mateEnvironment(),
       "ready",
       healthyMateRuntime({ unavailableTextFiles: [piSession] }),
@@ -268,10 +271,10 @@ describe("semantic Agent readiness", () => {
       "database",
       "coordination",
     ]);
-  });
+  }));
 
-  test("distinguishes missing Agent, wrong harness, and invalid native session", async () => {
-    const missingAgent = await evaluate(
+  it.effect("distinguishes missing Agent, wrong harness, and invalid native session", () => Effect.gen(function*() {
+    const missingAgent = yield* evaluate(
       mateEnvironment(),
       "ready",
       healthyMateRuntime({
@@ -285,7 +288,7 @@ describe("semantic Agent readiness", () => {
     );
     expect(reasonCodes(missingAgent)).toEqual(["agent_missing"]);
 
-    const wrongHarness = await evaluate(
+    const wrongHarness = yield* evaluate(
       mateEnvironment(),
       "ready",
       healthyMateRuntime({
@@ -304,7 +307,7 @@ describe("semantic Agent readiness", () => {
     );
     expect(reasonCodes(wrongHarness)).toContain("harness_mismatch");
 
-    const wrongSession = await evaluate(
+    const wrongSession = yield* evaluate(
       mateEnvironment(),
       "ready",
       healthyMateRuntime({
@@ -314,10 +317,10 @@ describe("semantic Agent readiness", () => {
       }),
     );
     expect(reasonCodes(wrongSession)).toContain("session_cwd_mismatch");
-  });
+  }));
 
-  test("distinguishes provider drift from unavailable provider credentials", async () => {
-    const drifted = await evaluate(
+  it.effect("distinguishes provider drift from unavailable provider credentials", () => Effect.gen(function*() {
+    const drifted = yield* evaluate(
       mateEnvironment(),
       "ready",
       healthyMateRuntime({
@@ -326,7 +329,7 @@ describe("semantic Agent readiness", () => {
     );
     expect(reasonCodes(drifted)).toContain("provider_configuration_invalid");
 
-    const unavailable = await evaluate(
+    const unavailable = yield* evaluate(
       mateEnvironment(),
       "ready",
       healthyMateRuntime({ unavailableFiles: [authPath] }),
@@ -334,16 +337,16 @@ describe("semantic Agent readiness", () => {
     expect(reasonCodes(unavailable)).toContain(
       "provider_credential_unavailable",
     );
-  });
+  }));
 
-  test("requires the projected workload token in Gateway mode", async () => {
+  it.effect("requires the projected workload token in Gateway mode", () => Effect.gen(function*() {
     const environment = mateEnvironment({
       AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
       AGENTOS_PROVIDER_CREDENTIAL_KIND: "ai_gateway",
       AI_GATEWAY_URL:
         "http://agentgateway-openai.agentos.svc.cluster.local:8788",
     });
-    const ready = await evaluate(
+    const ready = yield* evaluate(
       environment,
       "ready",
       healthyMateRuntime({
@@ -355,15 +358,15 @@ describe("semantic Agent readiness", () => {
     ).toEqual({ component: "credential", status: "pass" });
     expect(reasonCodes(ready)).not.toContain("provider_credential_unavailable");
 
-    const missing = await evaluate(
+    const missing = yield* evaluate(
       environment,
       "ready",
       healthyMateRuntime(),
     );
     expect(reasonCodes(missing)).toContain("provider_credential_unavailable");
-  });
+  }));
 
-  test("distinguishes database identity, database credential, listener, and catch-up recovery", async () => {
+  it.effect("distinguishes database identity, database credential, listener, and catch-up recovery", () => Effect.gen(function*() {
     const databaseUrl =
       "postgresql://runtime_firstmate@postgres.agentos.svc:5432/agentos?sslmode=require";
     const pgpass = `${home}/.pgpass`;
@@ -374,7 +377,7 @@ describe("semantic Agent readiness", () => {
     });
     const baseFiles = { [pgpass]: "not-read-by-readiness" };
 
-    const missingConnection = await evaluate(
+    const missingConnection = yield* evaluate(
       mateEnvironment({
         AGENTOS_DATABASE_IDENTITY: undefined,
         AGENTOS_DATABASE_URL: undefined,
@@ -386,14 +389,14 @@ describe("semantic Agent readiness", () => {
       "database_identity_unconfigured",
     );
 
-    const wrongIdentity = await evaluate(
+    const wrongIdentity = yield* evaluate(
       { ...environment, AGENTOS_DATABASE_IDENTITY: "someone_else" },
       "ready",
       healthyMateRuntime({ files: baseFiles }),
     );
     expect(reasonCodes(wrongIdentity)).toContain("database_identity_mismatch");
 
-    const missingCredential = await evaluate(
+    const missingCredential = yield* evaluate(
       environment,
       "ready",
       healthyMateRuntime({ files: baseFiles, unavailableFiles: [pgpass] }),
@@ -402,7 +405,7 @@ describe("semantic Agent readiness", () => {
       "database_credential_unavailable",
     );
 
-    const missingListener = await evaluate(
+    const missingListener = yield* evaluate(
       environment,
       "ready",
       healthyMateRuntime({
@@ -414,7 +417,7 @@ describe("semantic Agent readiness", () => {
       "coordination_listener_missing",
     );
 
-    const listening = await evaluate(
+    const listening = yield* evaluate(
       environment,
       "ready",
       healthyMateRuntime({
@@ -434,7 +437,7 @@ describe("semantic Agent readiness", () => {
     );
     expect(reasonCodes(listening)).toContain("coordination_catchup_incomplete");
 
-    const staleListener = await evaluate(
+    const staleListener = yield* evaluate(
       environment,
       "ready",
       healthyMateRuntime({
@@ -457,7 +460,7 @@ describe("semantic Agent readiness", () => {
       "coordination_listener_missing",
     );
 
-    const recovered = await evaluate(
+    const recovered = yield* evaluate(
       environment,
       "ready",
       healthyMateRuntime({
@@ -477,10 +480,10 @@ describe("semantic Agent readiness", () => {
     );
     expect(recovered.status).toBe("ready");
     expect(recovered.reasons).toEqual([]);
-  });
+  }));
 
-  test("reports a human-blocked live Mate as degraded without failing readiness", async () => {
-    const result = await evaluate(
+  it.effect("reports a human-blocked live Mate as degraded without failing readiness", () => Effect.gen(function*() {
+    const result = yield* evaluate(
       mateEnvironment(),
       "ready",
       healthyMateRuntime({
@@ -499,9 +502,9 @@ describe("semantic Agent readiness", () => {
     );
     expect(result.status).toBe("degraded");
     expect(reasonCodes(result)).toContain("agent_blocked");
-  });
+  }));
 
-  test("distinguishes Crewmate harness, Assignment, brief, credential, and confirmation", async () => {
+  it.effect("distinguishes Crewmate harness, Assignment, brief, credential, and confirmation", () => Effect.gen(function*() {
     const crewCwd = "/workspace/assignment";
     const crewBrief = "# Complete brief\n";
     const briefPath = `${home}/brief.md`;
@@ -595,7 +598,7 @@ describe("semantic Agent readiness", () => {
       version: 1,
     })}\n`;
 
-    const ready = await evaluate(
+    const ready = yield* evaluate(
       crewEnvironment,
       "ready",
       runtime({
@@ -671,16 +674,23 @@ describe("semantic Agent readiness", () => {
       })}\n`,
       [egressTokenPath]: "header.payload.signature",
     };
-    const gatewayReady = await evaluate(
+    const gatewayReady = yield* evaluate(
       gatewayCrewEnvironment,
       "ready",
-      runtime({ commands: crewCommands, files: gatewayCrewFiles }),
+      runtime({
+        commands: crewCommands,
+        files: gatewayCrewFiles,
+        parseToml: () => ({
+          model_provider: "agentos-gateway",
+          model_providers: { "agentos-gateway": codexEntry },
+        }),
+      }),
     );
     expect(
       gatewayReady.checks.find(({ component }) => component === "provider"),
     ).toEqual({ component: "provider", status: "pass" });
 
-    const driftedGateway = await evaluate(
+    const driftedGateway = yield* evaluate(
       gatewayCrewEnvironment,
       "ready",
       runtime({
@@ -692,13 +702,22 @@ describe("semantic Agent readiness", () => {
             "unreviewed.example",
           ),
         },
+        parseToml: () => ({
+          model_provider: "agentos-gateway",
+          model_providers: {
+            "agentos-gateway": {
+              ...codexEntry,
+              base_url: "http://unreviewed.example:8788",
+            },
+          },
+        }),
       }),
     );
     expect(reasonCodes(driftedGateway)).toContain(
       "provider_configuration_invalid",
     );
 
-    const wrongDatabaseIdentity = await evaluate(
+    const wrongDatabaseIdentity = yield* evaluate(
       {
         ...crewEnvironment,
         AGENTOS_DATABASE_IDENTITY: "another_identity",
@@ -721,7 +740,7 @@ describe("semantic Agent readiness", () => {
       "database_identity_mismatch",
     );
 
-    const wrongHarness = await evaluate(
+    const wrongHarness = yield* evaluate(
       { ...crewEnvironment, AGENTOS_HARNESS: "claude" },
       "ready",
       runtime({
@@ -735,7 +754,7 @@ describe("semantic Agent readiness", () => {
     );
     expect(reasonCodes(wrongHarness)).toContain("harness_mismatch");
 
-    const staleBrief = await evaluate(
+    const staleBrief = yield* evaluate(
       crewEnvironment,
       "ready",
       runtime({
@@ -749,7 +768,7 @@ describe("semantic Agent readiness", () => {
     );
     expect(reasonCodes(staleBrief)).toContain("brief_digest_mismatch");
 
-    const unavailableCredential = await evaluate(
+    const unavailableCredential = yield* evaluate(
       crewEnvironment,
       "ready",
       runtime({
@@ -761,7 +780,7 @@ describe("semantic Agent readiness", () => {
       "provider_credential_unavailable",
     );
 
-    const unconfirmed = await evaluate(
+    const unconfirmed = yield* evaluate(
       crewEnvironment,
       "ready",
       runtime({
@@ -776,7 +795,7 @@ describe("semantic Agent readiness", () => {
       "crewmate_confirmation_missing",
     );
 
-    const invalidAssignment = await evaluate(
+    const invalidAssignment = yield* evaluate(
       { ...crewEnvironment, AGENTOS_ASSIGNMENT_ID: "not-a-uuid" },
       "ready",
       runtime({
@@ -791,5 +810,5 @@ describe("semantic Agent readiness", () => {
     expect(reasonCodes(invalidAssignment)).toContain(
       "assignment_identity_invalid",
     );
-  });
+  }));
 });

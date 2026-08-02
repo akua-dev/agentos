@@ -87,6 +87,42 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "packages/agentos/runtime/capacity-preflight-main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The capacity classifier executable needs one reviewed Bun process entry boundary around its typed stdin and schema program.",
+      "ownerIssue": 104,
+      "test": "packages/agentos/runtime/tests/capacity-preflight.test.ts",
+      "removalCondition": "Retain only while capacity preflight remains a standalone Bun executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "packages/agentos/runtime/health.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The semantic health executable needs one reviewed Bun process entry boundary around its scoped Effect runtime.",
+      "ownerIssue": 104,
+      "test": "packages/agentos/runtime/tests/health.effect.test.ts",
+      "removalCondition": "Retain only while semantic health remains a standalone Bun probe executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "packages/agentos/runtime/readiness-state-main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The crewmate confirmation executable needs one reviewed Bun process entry boundary around its typed Effect program.",
+      "ownerIssue": 104,
+      "test": "packages/agentos/runtime/tests/crewmate-readiness.effect.test.ts",
+      "removalCondition": "Retain only while readiness confirmation remains a standalone Bun executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "services/github-broker/src/main.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",

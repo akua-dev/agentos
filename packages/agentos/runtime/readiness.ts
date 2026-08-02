@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-import { basename, join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { Effect, Option, Schema } from "effect";
 
@@ -150,6 +148,11 @@ const CrewmateReadiness = Schema.Struct({
   taskId: Schema.String,
   version: Schema.Literal(1),
 });
+const PiSessionHeader = Schema.Struct({
+  cwd: Schema.String,
+  id: Schema.String,
+  type: Schema.Literal("session"),
+});
 
 type Diagnostic = typeof SemanticHealthDiagnostic.Type;
 type Role = typeof AgentRole.Type;
@@ -170,9 +173,13 @@ export type HealthFileMetadata = {
   readonly size: number;
 };
 export type SemanticHealthRuntime = {
+  readonly basename: (path: string) => string;
+  readonly join: (...paths: ReadonlyArray<string>) => string;
+  readonly parseToml: (source: string) => Effect.Effect<unknown | undefined>;
   readonly run: (
     args: ReadonlyArray<string>,
   ) => Effect.Effect<HealthCommandResult>;
+  readonly sha256: (source: string) => Effect.Effect<string>;
   readonly readText: (
     path: string,
     maximumBytes: number,
@@ -256,22 +263,6 @@ function diagnostic(
   };
 }
 
-function parseUnknownJson(source: string): unknown | undefined {
-  try {
-    return JSON.parse(source);
-  } catch {
-    return undefined;
-  }
-}
-
-function parseUnknownToml(source: string): unknown | undefined {
-  try {
-    return Bun.TOML.parse(source);
-  } catch {
-    return undefined;
-  }
-}
-
 function objectRecord(
   value: unknown,
 ): Readonly<Record<string, unknown>> | undefined {
@@ -285,13 +276,9 @@ function decodeSource<S extends Schema.ConstraintDecoder<unknown>>(
   source: string | undefined,
 ): S["Type"] | undefined {
   if (source === undefined) return undefined;
-  const parsed = parseUnknownJson(source);
-  if (parsed === undefined) return undefined;
-  return Option.getOrUndefined(Schema.decodeUnknownOption(schema)(parsed));
-}
-
-function sha256(source: string): string {
-  return createHash("sha256").update(source).digest("hex");
+  return Option.getOrUndefined(
+    Schema.decodeUnknownOption(Schema.fromJsonString(schema))(source),
+  );
 }
 
 function isPrivateRegularFile(
@@ -309,18 +296,9 @@ function sessionHeader(source: string | undefined) {
   if (source === undefined) return undefined;
   for (const line of source.split("\n")) {
     if (!line.trim()) continue;
-    const parsed = parseUnknownJson(line);
-    if (parsed === undefined) continue;
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      return undefined;
-    }
     const decoded = Schema.decodeUnknownOption(
-      Schema.Struct({
-        cwd: Schema.String,
-        id: Schema.String,
-        type: Schema.Literal("session"),
-      }),
-    )(parsed);
+      Schema.fromJsonString(PiSessionHeader),
+    )(line);
     return Option.getOrUndefined(decoded);
   }
   return undefined;
@@ -335,25 +313,26 @@ function expectedHarness(role: Role, environment: HealthEnvironment) {
 function foregroundProcess(
   processes: ReadonlyArray<ForegroundProcess>,
   harness: string,
+  probeRuntime: SemanticHealthRuntime,
 ): ForegroundProcess | undefined {
-  return processes.find(({ argv0 }) => basename(argv0) === harness);
+  return processes.find(({ argv0 }) =>
+    probeRuntime.basename(argv0) === harness
+  );
 }
 
 function gatewayMetadataValid(environment: HealthEnvironment): boolean {
   const rawUrl = requiredEnvironment(environment, "AI_GATEWAY_URL");
   if (rawUrl === undefined) return false;
-  try {
-    const url = new URL(rawUrl);
-    return (
-      (url.protocol === "http:" || url.protocol === "https:") &&
-      !url.username &&
-      !url.password &&
-      !url.search &&
-      !url.hash
-    );
-  } catch {
-    return false;
-  }
+  const decoded = Schema.decodeUnknownOption(Schema.URLFromString)(rawUrl);
+  const url = Option.getOrUndefined(decoded);
+  return (
+    url !== undefined &&
+    (url.protocol === "http:" || url.protocol === "https:") &&
+    !url.username &&
+    !url.password &&
+    !url.search &&
+    !url.hash
+  );
 }
 
 function isSecureProjectedToken(
@@ -378,8 +357,8 @@ const verifyProvider = Effect.fn("agentos.readiness.verifyProvider")(
   ) {
     const piDirectory =
       requiredEnvironment(environment, "PI_CODING_AGENT_DIR") ??
-      join(home, ".pi", "agent");
-    const statePath = join(
+      probeRuntime.join(home, ".pi", "agent");
+    const statePath = probeRuntime.join(
       home,
       ".local",
       "state",
@@ -405,14 +384,21 @@ const verifyProvider = Effect.fn("agentos.readiness.verifyProvider")(
       attestation.selectedThinking === selectedThinking;
 
     if (configurationValid && attestation !== undefined) {
-      const paths = [
-        ["settingsSha256", join(piDirectory, "settings.json")],
-        ["modelsSha256", join(piDirectory, "models.json")],
+      type ProviderFileKey = keyof typeof attestation.files;
+      const paths: ReadonlyArray<readonly [ProviderFileKey, string]> = [
+        ["settingsSha256", probeRuntime.join(piDirectory, "settings.json")],
+        ["modelsSha256", probeRuntime.join(piDirectory, "models.json")],
         [
           "markerSha256",
-          join(home, ".local", "state", "agentos", "pi-provider.json"),
+          probeRuntime.join(
+            home,
+            ".local",
+            "state",
+            "agentos",
+            "pi-provider.json",
+          ),
         ],
-      ] as const;
+      ];
       for (const [key, path] of paths) {
         const source = yield* probeRuntime.readText(
           path,
@@ -422,7 +408,8 @@ const verifyProvider = Effect.fn("agentos.readiness.verifyProvider")(
         if (
           (expected === null && source !== undefined) ||
           (expected !== null &&
-            (source === undefined || sha256(source) !== expected))
+            (source === undefined ||
+              (yield* probeRuntime.sha256(source)) !== expected))
         ) {
           configurationValid = false;
         }
@@ -464,16 +451,16 @@ const verifyCredential = Effect.fn("agentos.readiness.verifyCredential")(
     } else if (kind === "pi_auth") {
       const directory =
         requiredEnvironment(environment, "PI_CODING_AGENT_DIR") ??
-        join(home, ".pi", "agent");
+        probeRuntime.join(home, ".pi", "agent");
       available = isPrivateRegularFile(
-        yield* probeRuntime.metadata(join(directory, "auth.json")),
+        yield* probeRuntime.metadata(probeRuntime.join(directory, "auth.json")),
       );
     } else if (kind === "codex_auth") {
       const directory =
         requiredEnvironment(environment, "CODEX_HOME") ??
-        join(home, ".codex");
+        probeRuntime.join(home, ".codex");
       available = isPrivateRegularFile(
-        yield* probeRuntime.metadata(join(directory, "auth.json")),
+        yield* probeRuntime.metadata(probeRuntime.join(directory, "auth.json")),
       );
     } else {
       addCheck(evaluation, "credential", "fail", "provider_credential_unknown");
@@ -503,9 +490,10 @@ const verifyCodexGatewayProvider = Effect.fn(
     return;
   }
   const codexHome =
-    requiredEnvironment(environment, "CODEX_HOME") ?? join(home, ".codex");
-  const configPath = join(codexHome, "config.toml");
-  const markerPath = join(
+    requiredEnvironment(environment, "CODEX_HOME") ??
+    probeRuntime.join(home, ".codex");
+  const configPath = probeRuntime.join(codexHome, "config.toml");
+  const markerPath = probeRuntime.join(
     home,
     ".local",
     "state",
@@ -519,18 +507,25 @@ const verifyCodexGatewayProvider = Effect.fn(
   ]);
   const config = source === undefined
     ? undefined
-    : objectRecord(parseUnknownToml(source));
+    : objectRecord(yield* probeRuntime.parseToml(source));
   const providers = objectRecord(config?.model_providers);
   const entry = objectRecord(providers?.[CODEX_GATEWAY_PROVIDER_ID]);
   const marker = markerSource === undefined
     ? undefined
-    : objectRecord(parseUnknownJson(markerSource));
-  let expected: Readonly<Record<string, unknown>> | undefined;
-  try {
-    expected = codexGatewayProviderEntry(environment);
-  } catch {
-    expected = undefined;
-  }
+    : objectRecord(Option.getOrUndefined(
+        Schema.decodeUnknownOption(
+          Schema.fromJsonString(Schema.Unknown),
+        )(markerSource),
+      ));
+  const expected = yield* Effect.try({
+    try: () => codexGatewayProviderEntry(environment),
+    catch: () => undefined,
+  }).pipe(
+    Effect.match({
+      onFailure: () => undefined,
+      onSuccess: (value) => value,
+    }),
+  );
   const configurationValid =
     isPrivateRegularFile(metadata) &&
     config?.model_provider === CODEX_GATEWAY_PROVIDER_ID &&
@@ -583,12 +578,9 @@ const verifyDatabase = Effect.fn(
       "database_identity_unconfigured",
     );
   } else {
-    let parsed: URL | undefined;
-    try {
-      parsed = new URL(rawUrl);
-    } catch {
-      parsed = undefined;
-    }
+    const parsed = Option.getOrUndefined(
+      Schema.decodeUnknownOption(Schema.URLFromString)(rawUrl),
+    );
     if (
       parsed === undefined ||
       (parsed.protocol !== "postgresql:" && parsed.protocol !== "postgres:") ||
@@ -599,7 +591,8 @@ const verifyDatabase = Effect.fn(
       addCheck(evaluation, "database", "fail", "database_identity_mismatch");
     } else {
       const credentialPath =
-        requiredEnvironment(environment, "PGPASSFILE") ?? join(home, ".pgpass");
+        requiredEnvironment(environment, "PGPASSFILE") ??
+        probeRuntime.join(home, ".pgpass");
       const metadata = yield* probeRuntime.metadata(credentialPath);
       addCheck(
         evaluation,
@@ -622,7 +615,7 @@ const verifyCoordination = Effect.fn(
   processId: number,
   evaluation: Evaluation,
 ) {
-  const markerPath = join(
+  const markerPath = probeRuntime.join(
     home,
     ".local",
     "state",
@@ -712,7 +705,9 @@ const verifyCrewmate = Effect.fn("agentos.readiness.verifyCrewmate")(
         addCheck(evaluation, "brief", "fail", "brief_missing");
       } else {
         const source = yield* probeRuntime.readText(briefPath, maximumBriefBytes);
-        observedDigest = source === undefined ? undefined : sha256(source);
+        observedDigest = source === undefined
+          ? undefined
+          : yield* probeRuntime.sha256(source);
         addCheck(
           evaluation,
           "brief",
@@ -724,7 +719,7 @@ const verifyCrewmate = Effect.fn("agentos.readiness.verifyCrewmate")(
       }
     }
 
-    const markerPath = join(
+    const markerPath = probeRuntime.join(
       home,
       ".local",
       "state",
@@ -903,6 +898,7 @@ export const evaluateSemanticHealth = Effect.fn(
       : foregroundProcess(
           processInfo.result.process_info.foreground_processes,
           harness,
+          probeRuntime,
         );
   const harnessMatches =
     explanation !== undefined &&
