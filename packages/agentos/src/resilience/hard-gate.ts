@@ -58,6 +58,21 @@ const RunnerOperationSchema = Schema.Literals([
   "git_revision_after",
   "git_status_after",
 ]);
+const FailedAssertionSchema = Schema.Struct({
+  path: Schema.String,
+  title: Schema.String,
+  status: Schema.String,
+});
+const FailureReportSchema = Schema.Struct({
+  testResults: Schema.Array(Schema.Struct({
+    name: Schema.String,
+    status: Schema.String,
+    assertionResults: Schema.Array(Schema.Struct({
+      title: Schema.String,
+      status: Schema.String,
+    })),
+  })),
+});
 
 export class ResilienceHardGateRunnerError extends Schema.TaggedErrorClass<ResilienceHardGateRunnerError>()(
   "ResilienceHardGateRunnerError",
@@ -65,6 +80,9 @@ export class ResilienceHardGateRunnerError extends Schema.TaggedErrorClass<Resil
     code: RunnerErrorCodeSchema,
     operation: Schema.NullOr(RunnerOperationSchema),
     exitCode: Schema.NullOr(Schema.Number),
+    failures: Schema.Array(FailedAssertionSchema).pipe(
+      Schema.check(Schema.isMaxLength(32)),
+    ),
   },
 ) {}
 
@@ -74,9 +92,17 @@ const runnerError = (
   code: typeof RunnerErrorCodeSchema.Type,
   operation: RunnerOperation | null = null,
   exitCode: number | null = null,
-) => ResilienceHardGateRunnerError.make({ code, operation, exitCode });
+  failures: ReadonlyArray<typeof FailedAssertionSchema.Type> = [],
+) => ResilienceHardGateRunnerError.make({
+  code,
+  operation,
+  exitCode,
+  failures,
+});
 
-const runCommand = Effect.fn("agentos.resilience.hardGate.command")(function*(
+const runCommandResult = Effect.fn(
+  "agentos.resilience.hardGate.commandResult",
+)(function*(
   operation: RunnerOperation,
   executable: string,
   arguments_: ReadonlyArray<string>,
@@ -101,10 +127,47 @@ const runCommand = Effect.fn("agentos.resilience.hardGate.command")(function*(
   ], { concurrency: "unbounded" }).pipe(
     Effect.mapError(() => runnerError("process_failed", operation)),
   );
-  if (exitCode !== 0) {
-    return yield* runnerError("process_failed", operation, exitCode);
+  return { exitCode, stdout: stdout.trim() };
+});
+
+const runCommand = Effect.fn("agentos.resilience.hardGate.command")(function*(
+  operation: RunnerOperation,
+  executable: string,
+  arguments_: ReadonlyArray<string>,
+  options: {
+    readonly cwd: string;
+    readonly environment?: Readonly<Record<string, string>>;
+    readonly inheritStderr?: boolean;
+  },
+) {
+  const result = yield* runCommandResult(
+    operation,
+    executable,
+    arguments_,
+    options,
+  );
+  if (result.exitCode !== 0) {
+    return yield* runnerError("process_failed", operation, result.exitCode);
   }
-  return stdout.trim();
+  return result.stdout;
+});
+
+const failedAssertions = Effect.fn(
+  "agentos.resilience.hardGate.failedAssertions",
+)(function*(repositoryRoot: string, report: unknown) {
+  const paths = yield* Path.Path;
+  const decoded = yield* Schema.decodeUnknownEffect(FailureReportSchema)(
+    report,
+  ).pipe(Effect.mapError(() => runnerError("report_invalid")));
+  return decoded.testResults.flatMap((result) => {
+    const relative = paths.relative(repositoryRoot, paths.resolve(result.name));
+    const assertions = result.assertionResults
+      .filter(({ status }) => status !== "passed")
+      .map(({ title, status }) => ({ path: relative, title, status }));
+    return assertions.length > 0 || result.status === "passed"
+      ? assertions
+      : [{ path: relative, title: "<suite>", status: result.status }];
+  }).slice(0, 32);
 });
 
 function executionFiles() {
@@ -153,7 +216,7 @@ export const runAgentOSResilienceHardGate = Effect.fn(
     temporary,
     "protocol-evidence.json",
   );
-  yield* runCommand(
+  const testExecution = yield* runCommandResult(
     "test_execution",
     config.bunExecutable,
     [
@@ -184,6 +247,14 @@ export const runAgentOSResilienceHardGate = Effect.fn(
   )(reportSource).pipe(
     Effect.mapError(() => runnerError("report_invalid")),
   );
+  if (testExecution.exitCode !== 0) {
+    return yield* runnerError(
+      "process_failed",
+      "test_execution",
+      testExecution.exitCode,
+      yield* failedAssertions(repositoryRoot, report),
+    );
+  }
   const [workloadEvidenceSource, protocolEvidenceSource] = yield* Effect.all([
     fileSystem.readFileString(workloadEvidencePath),
     fileSystem.readFileString(protocolEvidencePath),
