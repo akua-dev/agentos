@@ -177,12 +177,14 @@ delegation or database intake from this Skill.
    persistent Mate that will supervise its own children. Reject placeholder
    values, public endpoints, mutable remote images and ownership conflicts.
    Compute the rendered file's SHA-256. After all required authority is present
-   and before the first external mutation, use `$agentos-database` to begin one
-   stable runtime operation for this Agent, owner, optional Assignment,
-   namespace, workload and retained-resource set. Use action `provision` for a
-   new runtime and `recover` for repair of the existing one. Reuse the same
-   caller-selected operation UUID on retry; a conflict or another active
-   operation is a hard stop, not a reason to mint another identity.
+   and before the first external mutation, use `$agentos-database` to call
+   `agentos.begin_workload_runtime_operation` for this Agent, owner, optional
+   Assignment, namespace, workload and retained-resource set. Bind spec version
+   `1`, the exact compiler spec and overlay digests, and the canonical rendered
+   resource digest. Use action `provision` for a new runtime and `recover` for
+   repair of the existing one. Reuse the same caller-selected operation UUID on
+   retry; any changed digest, identity, owner or active operation is a hard stop,
+   not a reason to mint another identity.
 6. Before apply, collect fresh native Kubernetes observations without copying
    them into Fleet state: domain ResourceQuota status, domain Pods and PVCs,
    and the Nodes, cluster Pods, StorageClasses and PVs the current identity is
@@ -281,7 +283,8 @@ delegation or database intake from this Skill.
    Never create a duplicate Agent to race the scheduler.
    Complete the runtime operation only after the locator transaction and
    harness-ready evidence agree. A terminal failure remains audit evidence; a
-   changed desired render must atomically supersede it with one linked
+   changed typed spec, generated overlay, desired render, or recovery strategy
+   must use `agentos.supersede_workload_runtime_operation` to bind one linked
    replacement operation rather than rewriting the prior row.
 
 ## Resolve tools with Mise

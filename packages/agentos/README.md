@@ -31,6 +31,10 @@ then returns deterministic ordinary Kustomize files, spec/overlay digests and a
 credential-free review summary. It performs no filesystem, Kubernetes or
 database operation; the runtime operation boundary owns canonical path
 resolution, exact file writes and native `kubectl` dry-run/diff/apply/verify.
+Before the first Kubernetes mutation it binds the compiler's exact spec and
+overlay digests plus the canonical rendered-resource digest through the typed
+workload-operation journal. A changed spec is a conflict even when it happens
+to render identically; recovery must supersede it explicitly.
 
 Provider access uses the same inert, Effect-native boundary. The public root
 exports separate policy-enforcement, policy-decision, and credential-delivery

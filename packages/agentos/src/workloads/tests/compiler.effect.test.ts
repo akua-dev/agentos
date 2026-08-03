@@ -208,6 +208,95 @@ function planFile(
 }
 
 describe("AgentWorkloadSpec compiler", () => {
+  it.effect("holds byte-identical plans across deterministic canonical-input permutations", () =>
+    Effect.gen(function*() {
+      const base = interactiveSpec();
+      const tolerations = [
+        ...base.scheduling.tolerations,
+        {
+          effect: "NoExecute",
+          key: "workload.agentos.akua.dev/evictable",
+          operator: "Exists",
+          value: null,
+        },
+      ];
+      const expected = yield* compileAgentWorkloadSpec({
+        ...base,
+        home: { ...base.home, size: "20Gi" },
+        resources: {
+          ...base.resources,
+          agent: {
+            requests: { cpu: "250m", memory: "512Mi" },
+            limits: { cpu: "2", memory: "4Gi" },
+          },
+        },
+        scheduling: { ...base.scheduling, tolerations },
+      });
+
+      yield* Effect.forEach(Array.from({ length: 16 }, (_, index) => index),
+        (index) => {
+          const reverseProfiles = (index & 1) !== 0;
+          const reverseSelectors = (index & 2) !== 0;
+          const reverseTolerations = (index & 4) !== 0;
+          const alternateUnits = (index & 8) !== 0;
+          const providerAccessProfiles = reverseProfiles
+            ? [...base.providerAccessProfiles].reverse()
+            : [...base.providerAccessProfiles];
+          const nodeSelector = reverseSelectors
+            ? {
+                "kubernetes.io/os": "linux",
+                "topology.kubernetes.io/zone": "zone-a",
+              }
+            : {
+                "topology.kubernetes.io/zone": "zone-a",
+                "kubernetes.io/os": "linux",
+              };
+          const candidateTolerations = reverseTolerations
+            ? [...tolerations].reverse()
+            : tolerations;
+          return compileAgentWorkloadSpec({
+            protocols: base.protocols,
+            readiness: base.readiness,
+            brief: base.brief,
+            providerAccessProfiles,
+            database: base.database,
+            scheduling: {
+              tolerations: candidateTolerations,
+              nodeSelector,
+            },
+            resources: {
+              ...base.resources,
+              agent: {
+                requests: { cpu: "250m", memory: "512Mi" },
+                limits: {
+                  cpu: alternateUnits ? "2000m" : "2",
+                  memory: alternateUnits ? "4096Mi" : "4Gi",
+                },
+              },
+            },
+            home: {
+              ...base.home,
+              size: alternateUnits ? "20480Mi" : "20Gi",
+            },
+            harness: base.harness,
+            image: base.image,
+            ownerServiceAccount: base.ownerServiceAccount,
+            names: base.names,
+            identity: base.identity,
+            namespace: base.namespace,
+            fleet: base.fleet,
+            profile: base.profile,
+            overlayRoot: base.overlayRoot,
+            distributionRoot: base.distributionRoot,
+            version: base.version,
+          }).pipe(Effect.tap((candidate) => Effect.sync(() => {
+            assert.strictEqual(candidate.specDigest, expected.specDigest);
+            assert.strictEqual(candidate.overlayDigest, expected.overlayDigest);
+            assert.deepStrictEqual(candidate.files, expected.files);
+          })));
+        }, { concurrency: "unbounded", discard: true });
+    }));
+
   it.effect("canonicalizes equivalent inputs into byte-identical overlays and digests", () =>
     Effect.gen(function*() {
       const first = yield* compileAgentWorkloadSpec(interactiveSpec());
@@ -424,5 +513,61 @@ describe("AgentWorkloadSpec compiler", () => {
       ).pipe(Effect.flip);
       assert.strictEqual(duplicate.code, "duplicate_reference");
       assert.strictEqual(duplicate.field, "$.providerAccessProfiles");
+    }));
+
+  it.effect("rejects storage, ServiceAccount, and protocol boundary violations at exact safe fields", () =>
+    Effect.gen(function*() {
+      const base = interactiveSpec();
+      const cases: ReadonlyArray<{
+        readonly code: AgentWorkloadSpecError["code"];
+        readonly field: string;
+        readonly input: unknown;
+      }> = [
+        {
+          code: "resource_limit",
+          field: "$.home.size",
+          input: { ...base, home: { ...base.home, size: "512Mi" } },
+        },
+        {
+          code: "invalid_relationship",
+          field: "$.names.serviceAccount",
+          input: {
+            ...base,
+            names: {
+              ...base.names,
+              serviceAccount: base.ownerServiceAccount.name,
+            },
+          },
+        },
+        {
+          code: "invalid_field",
+          field: "$.protocols.acp",
+          input: {
+            ...base,
+            protocols: { ...base.protocols, acp: "v2" },
+          },
+        },
+        {
+          code: "invalid_field",
+          field: "$.protocols.credential",
+          input: {
+            ...base,
+            protocols: {
+              ...base.protocols,
+              credential: "must-not-leak",
+            },
+          },
+        },
+      ];
+
+      yield* Effect.forEach(cases, ({ code, field, input }) =>
+        compileAgentWorkloadSpec(input).pipe(
+          Effect.flip,
+          Effect.tap((error) => Effect.sync(() => {
+            assert.strictEqual(error.code, code);
+            assert.strictEqual(error.field, field);
+            assert.notInclude(JSON.stringify(error), "must-not-leak");
+          })),
+        ), { discard: true });
     }));
 });

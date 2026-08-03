@@ -17,6 +17,8 @@ const ids = {
   operationB: "75000000-0000-4000-8000-000000000002",
   operationC: "75000000-0000-4000-8000-000000000003",
   operationD: "75000000-0000-4000-8000-000000000004",
+  operationE: "75000000-0000-4000-8000-000000000005",
+  operationF: "75000000-0000-4000-8000-000000000006",
   project: "35000000-0000-4000-8000-000000000001",
   secondA: "25000000-0000-4000-8000-000000000002",
   secondB: "25000000-0000-4000-8000-000000000004",
@@ -25,7 +27,11 @@ const ids = {
 };
 const digests = {
   initial: "a".repeat(64),
+  overlayInitial: "d".repeat(64),
+  overlayReplacement: "e".repeat(64),
   replacement: "b".repeat(64),
+  specInitial: "f".repeat(64),
+  specReplacement: "0".repeat(64),
   teardown: "c".repeat(64),
 };
 const retainedA = JSON.stringify([
@@ -129,6 +135,103 @@ const beginOperationA = Effect.fn("test.runtimeJournal.beginA")(function*() {
 });
 
 layer(databaseLayer)("SQL-backed runtime operation journal", (it) => {
+  it.effect("rejects a changed workload spec even when its rendered manifest is identical", () =>
+    Effect.gen(function*() {
+      const database = yield* PGliteTestDatabase;
+      const countsBefore = yield* durableIdentityCounts();
+
+      yield* asLogin("journal_second_a", Effect.gen(function*() {
+        const begin = () => database.query<{ readonly id: string }>(`
+          SELECT agentos.begin_workload_runtime_operation(
+            '${ids.operationE}', '${ids.crewA}', '${ids.assignmentA}',
+            'agentos-domain-a', 'runtime-crew-a', 'rollout',
+            1, '${digests.specInitial}', '${digests.overlayInitial}',
+            '${digests.initial}', '${retainedA}'::jsonb
+          )::text AS id
+        `);
+        assert.deepStrictEqual(yield* begin(), [{ id: ids.operationE }]);
+        assert.deepStrictEqual(yield* begin(), [{ id: ids.operationE }]);
+
+        const staleSpec = yield* Effect.flip(database.query(`
+          SELECT agentos.begin_workload_runtime_operation(
+            '${ids.operationE}', '${ids.crewA}', '${ids.assignmentA}',
+            'agentos-domain-a', 'runtime-crew-a', 'rollout',
+            1, '${digests.specReplacement}', '${digests.overlayReplacement}',
+            '${digests.initial}', '${retainedA}'::jsonb
+          )
+        `));
+        assert.include(
+          staleSpec.detail,
+          "conflicts with the existing workload runtime operation",
+        );
+
+        yield* database.query(`
+          SELECT agentos.fail_runtime_operation(
+            '${ids.operationE}', 'desired_spec_changed'
+          )
+        `);
+        const replace = () => database.query<{ readonly id: string }>(`
+          SELECT agentos.supersede_workload_runtime_operation(
+            '${ids.operationE}', '${ids.operationF}',
+            1, '${digests.specReplacement}', '${digests.overlayReplacement}',
+            '${digests.initial}', '${retainedA}'::jsonb,
+            'replace_desired_spec'
+          )::text AS id
+        `);
+        assert.deepStrictEqual(yield* replace(), [{ id: ids.operationF }]);
+        assert.deepStrictEqual(yield* replace(), [{ id: ids.operationF }]);
+
+        const staleReplacement = yield* Effect.flip(database.query(`
+          SELECT agentos.supersede_workload_runtime_operation(
+            '${ids.operationE}', '${ids.operationF}',
+            1, '${digests.specInitial}', '${digests.overlayReplacement}',
+            '${digests.initial}', '${retainedA}'::jsonb,
+            'replace_desired_spec'
+          )
+        `));
+        assert.include(
+          staleReplacement.detail,
+          "conflicts with the replacement workload runtime operation",
+        );
+        yield* database.query(`
+          SELECT agentos.fail_runtime_operation(
+            '${ids.operationF}', 'typed_provenance_proven'
+          )
+        `);
+      }));
+
+      const operations = yield* database.query<{
+        readonly id: string;
+        readonly render_digest: string;
+        readonly workload_overlay_digest: string;
+        readonly workload_spec_digest: string;
+        readonly workload_spec_version: number;
+      }>(`
+        SELECT id::text, workload_spec_version, workload_spec_digest,
+               workload_overlay_digest, render_digest
+          FROM agentos.runtime_operations
+         WHERE id IN ('${ids.operationE}', '${ids.operationF}')
+         ORDER BY id
+      `);
+      assert.deepStrictEqual(operations, [
+        {
+          id: ids.operationE,
+          render_digest: digests.initial,
+          workload_overlay_digest: digests.overlayInitial,
+          workload_spec_digest: digests.specInitial,
+          workload_spec_version: 1,
+        },
+        {
+          id: ids.operationF,
+          render_digest: digests.initial,
+          workload_overlay_digest: digests.overlayReplacement,
+          workload_spec_digest: digests.specReplacement,
+          workload_spec_version: 1,
+        },
+      ]);
+      assert.deepStrictEqual(yield* durableIdentityCounts(), countsBefore);
+    }));
+
   it.effect("begins one hierarchy-owned operation and fails closed on conflicts", () =>
     Effect.gen(function*() {
       const database = yield* PGliteTestDatabase;
