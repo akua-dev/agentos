@@ -122,13 +122,13 @@ and uses only pinned public fixture images and canary credentials that have no
 provider value.
 
 It proves real projected-token audience/rotation/revocation, Pod and
-ServiceAccount UID binding, denial before the canary adapter, one bounded
-revocation/hot-reload load probe, unrelated-subject continuity, native GitHub
-transport semantics against a credential-free fixture, and ungoverned outbound
-connectivity while the governed access services are unavailable. It records a
-Schema-encoded artifact containing bounded booleans, durations, digests, and
-counts only. Effect finalizers remove every generated resource on success,
-failure, or interruption.
+ServiceAccount UID binding, one bounded Kubernetes RBAC reload/revocation load
+probe, unrelated-subject continuity, and ungoverned outbound connectivity while
+the governed access services are unavailable. A second hard-mode Effect runs
+the actual locked Linux `gh`, installed `gh-axi`, and host `git` against a
+credential-free local TLS fixture. Together they record only bounded booleans,
+durations, and counts. Effect finalizers remove every generated namespace,
+temporary file, TLS key, and Docker volume on success, failure, or interruption.
 
 PostgreSQL/OpenFGA policy transitions remain authoritative in their existing
 PGlite/model tests. The live program does not create a shadow authorization

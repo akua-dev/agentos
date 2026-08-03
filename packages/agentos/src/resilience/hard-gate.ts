@@ -2,6 +2,7 @@ import { Config, Effect, FileSystem, Path, Schema, Stream } from "effect";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 
 import {
+  AccessHardGateEvidenceV1Schema,
   AGENTOS_RESILIENCE_EXECUTION_REFERENCES,
   ProtocolHardGateEvidenceV1Schema,
   WorkloadHardGateEvidenceV1Schema,
@@ -216,6 +217,10 @@ export const runAgentOSResilienceHardGate = Effect.fn(
     temporary,
     "protocol-evidence.json",
   );
+  const accessEvidencePath = paths.join(
+    temporary,
+    "access-evidence.json",
+  );
   const testExecution = yield* runCommandResult(
     "test_execution",
     config.bunExecutable,
@@ -235,6 +240,7 @@ export const runAgentOSResilienceHardGate = Effect.fn(
         AGENTOS_DISPOSABLE_FLEET_APPROVAL: config.approvalReference,
         AGENTOS_RESILIENCE_WORKLOAD_EVIDENCE_PATH: workloadEvidencePath,
         AGENTOS_RESILIENCE_PROTOCOL_EVIDENCE_PATH: protocolEvidencePath,
+        AGENTOS_RESILIENCE_ACCESS_EVIDENCE_PATH: accessEvidencePath,
       },
       inheritStderr: true,
     },
@@ -255,19 +261,24 @@ export const runAgentOSResilienceHardGate = Effect.fn(
       yield* failedAssertions(repositoryRoot, report),
     );
   }
-  const [workloadEvidenceSource, protocolEvidenceSource] = yield* Effect.all([
+  const [workloadEvidenceSource, protocolEvidenceSource, accessEvidenceSource] =
+    yield* Effect.all([
     fileSystem.readFileString(workloadEvidencePath),
     fileSystem.readFileString(protocolEvidencePath),
+    fileSystem.readFileString(accessEvidencePath),
   ], { concurrency: "unbounded" }).pipe(
     Effect.mapError(() => runnerError("artifact_unavailable")),
   );
-  const [workloadEvidence, protocolEvidence] = yield* Effect.all([
+  const [workloadEvidence, protocolEvidence, accessEvidence] = yield* Effect.all([
     Schema.decodeUnknownEffect(
       Schema.fromJsonString(WorkloadHardGateEvidenceV1Schema),
     )(workloadEvidenceSource),
     Schema.decodeUnknownEffect(
       Schema.fromJsonString(ProtocolHardGateEvidenceV1Schema),
     )(protocolEvidenceSource),
+    Schema.decodeUnknownEffect(
+      Schema.fromJsonString(AccessHardGateEvidenceV1Schema),
+    )(accessEvidenceSource),
   ], { concurrency: "unbounded" }).pipe(
     Effect.mapError(() => runnerError("artifact_invalid")),
   );
@@ -275,7 +286,9 @@ export const runAgentOSResilienceHardGate = Effect.fn(
     workloadEvidence.context !== config.context ||
     workloadEvidence.approvalReference !== config.approvalReference ||
     protocolEvidence.context !== config.context ||
-    protocolEvidence.approvalReference !== config.approvalReference
+    protocolEvidence.approvalReference !== config.approvalReference ||
+    accessEvidence.context !== config.context ||
+    accessEvidence.approvalReference !== config.approvalReference
   ) return yield* runnerError("artifact_drift");
 
   const namespaces = yield* runCommand(
@@ -293,7 +306,8 @@ export const runAgentOSResilienceHardGate = Effect.fn(
   if (
     namespaces.split("\n").some((namespace) =>
       namespace.includes("agentos-workload-") ||
-      namespace.includes("agentos-protocol-")
+      namespace.includes("agentos-protocol-") ||
+      namespace.includes("agentos-access-")
     )
   ) {
     return yield* runnerError(
@@ -344,6 +358,7 @@ export const runAgentOSResilienceHardGate = Effect.fn(
     workloadSpecDigest: workloadEvidence.interactiveSpecDigest,
     renderDigest: workloadEvidence.interactiveRenderDigest,
     protocolRevocationMillis: protocolEvidence.revocationMillis,
+    accessEvidence,
     report,
   });
   return {

@@ -7,6 +7,8 @@ import {
 } from "effect";
 import { ChildProcess } from "effect/unstable/process";
 
+import { isValidGitHubHost } from "./github-host.ts";
+
 const TokenPattern = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const MAX_TOKEN_BYTES = 16 * 1_024;
 const MAX_CREDENTIAL_INPUT_BYTES = 16 * 1_024;
@@ -30,6 +32,7 @@ export interface GitHubWorkloadClientConfiguration {
   readonly ghBinary?: string;
   readonly home: string;
   readonly host: string;
+  readonly path: string;
   readonly tokenFile: string;
 }
 
@@ -170,6 +173,7 @@ const runNativeClient = Effect.fn(
       GH_TOKEN: undefined,
       GITHUB_ENTERPRISE_TOKEN: undefined,
       GITHUB_TOKEN: undefined,
+      PATH: `${paths.dirname(ghBinary)}:${configuration.path}`,
       SSL_CERT_FILE: configuration.caFile,
     },
     extendEnv: true,
@@ -190,6 +194,7 @@ const runNativeClient = Effect.fn(
 function parseCredentialRequest(source: string) {
   return Effect.gen(function*() {
     const result: Record<string, string> = {};
+    const scalarKeys = new Set(["protocol", "host", "path", "username"]);
     for (const line of source.split(/\r?\n/)) {
       if (line === "") break;
       const separator = line.indexOf("=");
@@ -197,6 +202,7 @@ function parseCredentialRequest(source: string) {
         return yield* clientError("invalid_credential_request");
       }
       const key = line.slice(0, separator);
+      if (!scalarKeys.has(key)) continue;
       if (result[key] !== undefined) {
         return yield* clientError("invalid_credential_request");
       }
@@ -209,15 +215,13 @@ function parseCredentialRequest(source: string) {
 function validateConfiguration(
   configuration: GitHubWorkloadClientConfiguration,
 ) {
-  const validHost =
-    /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(configuration.host) &&
-    configuration.host.length <= 253;
   const validPaths = [
     configuration.caFile,
     configuration.home,
+    configuration.path,
     configuration.tokenFile,
   ].every((value) => value.length > 0);
-  return validHost && validPaths
+  return isValidGitHubHost(configuration.host) && validPaths
     ? Effect.void
     : Effect.fail(clientError("invalid_configuration"));
 }

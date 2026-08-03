@@ -83,7 +83,7 @@ describe("GitHub workload client helper", () => {
       const output = yield* Ref.make("");
       const io = GitHubWorkloadClientIo.of({
         readInput: Effect.succeed(
-          "protocol=https\nhost=github.agentos.test\npath=akua-dev/agentos.git\n\n",
+          "protocol=https\nhost=github.agentos.test\npath=akua-dev/agentos.git\nwwwauth[]=Basic realm=github\nwwwauth[]=Bearer realm=github\n\n",
         ),
         writeOutput: (value) => Ref.set(output, value),
       });
@@ -93,6 +93,7 @@ describe("GitHub workload client helper", () => {
           caFile: "/var/run/config/agentos-github/ca.pem",
           home: directory,
           host: "github.agentos.test",
+          path: "/usr/bin:/bin",
           tokenFile,
         },
       ).pipe(Effect.provideService(GitHubWorkloadClientIo, io));
@@ -117,6 +118,7 @@ describe("GitHub workload client helper", () => {
             caFile: "/var/run/config/agentos-github/ca.pem",
             home: directory,
             host: "github.agentos.test",
+            path: "/usr/bin:/bin",
             tokenFile,
           },
         ).pipe(

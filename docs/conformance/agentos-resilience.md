@@ -4,8 +4,8 @@ Issue: [#84](https://github.com/akua-dev/agentos/issues/84)
 
 Status: **implemented as an Effect-native executable hard gate**. A resilience
 claim is ineligible unless one clean revision passes the complete parent matrix,
-the ACP/A2A child gate, both approved disposable Kubernetes proofs, exact source
-attestation, namespace teardown, and revision continuity.
+the ACP/A2A and provider-access child gates, all approved disposable proofs,
+exact source attestation, namespace teardown, and revision continuity.
 
 ## Non-negotiable invariants
 
@@ -82,21 +82,28 @@ The 42 ACP/A2A scenarios are composed without translation through the
 [protocol child gate](./acp-a2a-resilience.md). A passing parent fixture cannot
 replace a failed or incomplete child run.
 
+The 38 identity, authorization, dependency, credential, transport, native
+GitHub, Internet-independence, and audit scenarios are composed through the
+[provider-access child gate](./access-plane-resilience.md). Its real
+TokenReview/RBAC proof and `git`/`gh`/`gh-axi` proof are mandatory in hard mode.
+
 ## Executed evidence, not claimed evidence
 
 `AGENTOS_RESILIENCE_EXECUTION_REFERENCES` freezes two distinct Effect regression
 references for every parent scenario. The execution attestor requires each
 exact repository-relative file and exact `it.effect` title to occur once with
 status `passed` in the Vitest JSON report. It also requires the source-verifier,
-protocol-child, parent-gate, and explicit hard-mode sentinel assertions.
+protocol-child, access-child, audit and telemetry privacy controls, parent-gate,
+and explicit hard-mode sentinel assertions.
 
 The caller cannot supply scenario observations. The attestor generates them
-only after the executed references pass. The workload and protocol live Effects
-write separate Schema-encoded, sanitized artifacts into the runner's scoped
-temporary directory. Those artifacts contribute the actual plan/render
-digests, replacement/retention/quota/Secret-mode results, protocol revocation
-time, and teardown result. The temporary directory is finalized by Effect and
-is not a durable evidence store.
+only after the executed references pass. The workload, protocol, and access
+live Effects write separate Schema-encoded, sanitized artifacts into the
+runner's scoped temporary directory. Those artifacts contribute the actual
+plan/render digests, replacement/retention/quota/Secret-mode results, protocol
+and access revocation times, authorization-reload time, load count,
+Internet-independence result, and teardown result. The temporary directory is
+finalized by Effect and is not a durable evidence store.
 
 The gate rejects:
 
@@ -123,12 +130,14 @@ export AGENTOS_REPOSITORY_ROOT="$(pwd)"
 export AGENTOS_KUBERNETES_TEST_CONTEXT="kind-agentos-resilience-84"
 export AGENTOS_DISPOSABLE_FLEET_APPROVAL="approval:issue-84-${revision}"
 export AGENTOS_RESILIENCE_AGENTOS_IMAGE_DIGEST="sha256:<64-hex>"
+export AGENTOS_RESILIENCE_AGENTOS_IMAGE="agentos:dev"
 export AGENTOS_RESILIENCE_AGENTGATEWAY_IMAGE_DIGEST="sha256:<64-hex>"
 export AGENTOS_RESILIENCE_OPENFGA_IMAGE_DIGEST="sha256:<64-hex>"
 export AGENTOS_RESILIENCE_POSTGRESQL_IMAGE_DIGEST="sha256:<64-hex>"
 export AGENTOS_RESILIENCE_KUBERNETES_NODE_IMAGE_DIGEST="sha256:<64-hex>"
 export AGENTOS_BUN_EXECUTABLE="/absolute/path/to/bun"
 export AGENTOS_KUBECTL_EXECUTABLE="/absolute/path/to/kubectl"
+export AGENTOS_DOCKER_EXECUTABLE="/absolute/path/to/docker"
 bun run resilience:hard-gate
 ```
 

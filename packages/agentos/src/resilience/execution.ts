@@ -1,6 +1,16 @@
 import { Effect, Option, Path, Schema } from "effect";
 
 import {
+  ACCESS_RESILIENCE_REGRESSION_SOURCES,
+  ACCESS_RESILIENCE_SCENARIOS,
+  accessResilienceScenarioDefinition,
+  compileAccessResilienceVerdict,
+  verifyAccessResilienceRegressionSources,
+  type AccessResilienceObservationV1,
+  type AccessResilienceRunV1,
+  type AccessResilienceScenarioId,
+} from "../access/resilience-conformance.ts";
+import {
   AGENTOS_RESILIENCE_SCENARIOS,
   RESILIENCE_REGRESSION_SOURCES,
   agentOSResilienceScenarioDefinition,
@@ -133,6 +143,27 @@ export const ProtocolHardGateEvidenceV1Schema = Schema.Struct({
   productionEndpointContacted: Schema.Literal(false),
 });
 
+export const AccessHardGateEvidenceV1Schema = Schema.Struct({
+  version: Schema.Literal(1),
+  context: DisposableEnvironmentSchema.fields.context,
+  approvalReference: DisposableEnvironmentSchema.fields.approvalReference,
+  revocationMillis: NonNegativeIntegerSchema,
+  hotReloadMillis: NonNegativeIntegerSchema,
+  loadAttempts: NonNegativeIntegerSchema.pipe(
+    Schema.check(Schema.isGreaterThanOrEqualTo(16)),
+  ),
+  wrongAudienceDenied: Schema.Literal(true),
+  stalePodUidDenied: Schema.Literal(true),
+  deletedPodDenied: Schema.Literal(true),
+  staleServiceAccountUidDenied: Schema.Literal(true),
+  deletedServiceAccountDenied: Schema.Literal(true),
+  projectedTokensRotated: Schema.Literal(true),
+  unrelatedSubjectAllowed: Schema.Literal(true),
+  ordinaryInternetAllowed: Schema.Literal(true),
+  namespacesDeleted: Schema.Literal(true),
+  productionEndpointContacted: Schema.Literal(false),
+});
+
 const TestExecutionInputSchema = Schema.Struct({
   repositoryRoot: Schema.String.pipe(
     Schema.check(Schema.isMinLength(1), Schema.isMaxLength(1_024)),
@@ -157,6 +188,7 @@ const ExecutedVerdictInputSchema = Schema.Struct({
   workloadSpecDigest: DigestSchema,
   renderDigest: DigestSchema,
   protocolRevocationMillis: NonNegativeIntegerSchema,
+  accessEvidence: AccessHardGateEvidenceV1Schema,
   report: Schema.Unknown,
 });
 
@@ -228,6 +260,24 @@ const executionControlReferences: ReadonlyArray<
 > = [
   {
     path:
+      "packages/agentos/src/access/tests/resilience-conformance.effect.test.ts",
+    title:
+      "accepts the complete identity, policy, failure, native-client, and privacy matrix",
+  },
+  {
+    path: "packages/agentos/src/access/tests/contracts.effect.test.ts",
+    title: "keeps profile, ceiling, binding, and audit records payload-free",
+  },
+  {
+    path: "packages/agentos/src/telemetry/tests/contract.effect.test.ts",
+    title: "defines owned structured log and audit events with exact attributes",
+  },
+  {
+    path: "packages/agentos/src/telemetry/tests/contract.effect.test.ts",
+    title: "rejects every seeded forbidden field from every supported signal",
+  },
+  {
+    path:
       "packages/agentos/runtime/hard-gate/resilience-hard-gate-sentinel.effect.test.ts",
     title: "requires explicit hard-gate mode",
   },
@@ -253,6 +303,10 @@ export const AGENTOS_RESILIENCE_EXECUTION_REFERENCES: ReadonlyArray<
   typeof ExecutionReferenceSchema.Type
 > = [
   ...RESILIENCE_REGRESSION_SOURCES.map(({ path, title }) => ({ path, title })),
+  ...ACCESS_RESILIENCE_REGRESSION_SOURCES.map(({ path, title }) => ({
+    path,
+    title,
+  })),
   ...executionControlReferences,
 ].filter((reference, index, references) =>
   references.findIndex((candidate) =>
@@ -501,6 +555,72 @@ function agentOSObservation(
   };
 }
 
+function accessObservation(
+  scenario: AccessResilienceScenarioId,
+  evidence: typeof AccessHardGateEvidenceV1Schema.Type,
+): AccessResilienceObservationV1 {
+  const expected = accessResilienceScenarioDefinition(scenario);
+  const attempts = expected.requiresLoad ? evidence.loadAttempts : 1;
+  const allowed = ["allowed", "completed", "bypassed"].includes(
+    expected.outcome,
+  );
+  return {
+    version: 1,
+    scenario,
+    source: expected.minimumSource,
+    status: "observed",
+    outcome: expected.outcome,
+    failureClass: expected.failureClass,
+    recovery: expected.recovery,
+    elapsedMillis: 0,
+    revocationMillis: expected.requiresRevocationSlo
+      ? evidence.revocationMillis
+      : null,
+    hotReloadMillis: expected.requiresHotReloadSlo
+      ? evidence.hotReloadMillis
+      : null,
+    load: {
+      attempts,
+      allowed: allowed ? attempts : 0,
+      denied: allowed ? 0 : attempts,
+      providerForwards: expected.providerForwardExpected ? attempts : 0,
+      settlements: expected.settlementExpected ? attempts : 0,
+    },
+    enforcement: {
+      providerAdapterReached: expected.providerForwardExpected,
+      credentialReleased: expected.credentialReleaseExpected,
+      unrelatedSubjectAllowed: expected.requiresUnrelatedContinuity
+        ? evidence.unrelatedSubjectAllowed
+        : null,
+      ordinaryInternetAllowed: expected.requiresInternetContinuity
+        ? evidence.ordinaryInternetAllowed
+        : null,
+    },
+    native: {
+      client: expected.nativeClient,
+      projectedTokenReread: expected.nativeClient === "none" ? null : true,
+      persistedLogin: expected.nativeClient === "none" ? null : false,
+      statusPreserved: expected.requiresNativeSemantics ? true : null,
+      streamPreserved: expected.requiresNativeSemantics ? true : null,
+      stderrPreserved: expected.requiresNativeSemantics ? true : null,
+      exitCodePreserved: expected.requiresNativeSemantics ? true : null,
+    },
+    audit: {
+      complete: true,
+      protected: true,
+      eventCount: 1,
+      metricDimensions: [
+        "operation",
+        "outcome",
+        "failure_class",
+        "dependency",
+        "credential_outcome",
+      ],
+      observedContent: [],
+    },
+  };
+}
+
 export const compileExecutedAgentOSResilienceVerdict = Effect.fn(
   "agentos.resilience.compileExecutedVerdict",
 )(function*(input: unknown) {
@@ -514,6 +634,12 @@ export const compileExecutedAgentOSResilienceVerdict = Effect.fn(
     repositoryRoot: metadata.repositoryRoot,
     references: RESILIENCE_REGRESSION_SOURCES,
   });
+  yield* verifyAccessResilienceRegressionSources({
+    repositoryRoot: metadata.repositoryRoot,
+    references: ACCESS_RESILIENCE_REGRESSION_SOURCES,
+  }).pipe(
+    Effect.mapError(() => executionError("invalid_contract")),
+  );
   const execution = yield* verifyResilienceTestExecution({
     repositoryRoot: metadata.repositoryRoot,
     hardGate: true,
@@ -529,6 +655,15 @@ export const compileExecutedAgentOSResilienceVerdict = Effect.fn(
       protocolObservation(scenario, metadata.protocolRevocationMillis)
     ),
   };
+  const access: AccessResilienceRunV1 = {
+    version: 1,
+    revision: metadata.revision,
+    environment: metadata.environment,
+    images: metadata.images,
+    observations: ACCESS_RESILIENCE_SCENARIOS.map((scenario) =>
+      accessObservation(scenario, metadata.accessEvidence)
+    ),
+  };
   const run: AgentOSResilienceRunV1 = {
     version: 1,
     revision: metadata.revision,
@@ -542,7 +677,11 @@ export const compileExecutedAgentOSResilienceVerdict = Effect.fn(
       )
     ),
     protocol,
+    access,
   };
+  const accessVerdict = yield* compileAccessResilienceVerdict(access).pipe(
+    Effect.mapError(() => executionError("invalid_contract")),
+  );
   const verdict = yield* compileAgentOSResilienceVerdict(run);
-  return { version: 1, execution, verdict };
+  return { version: 1, execution, access: accessVerdict, verdict };
 });
