@@ -113,18 +113,20 @@ const resolvePinnedCodex = Effect.fn("test.codexNativeOtel.resolvePinnedCodex")(
         "AgentOS-pinned Codex 0.144.5 is unavailable through Mise",
       );
     }
-    const executable = paths.join(
-      location.stdout.trim(),
-      "bin",
-      "codex",
-    );
-    if (!(yield* fileSystem.exists(executable))) {
-      return yield* testError(
-        "process",
-        "AgentOS-pinned Codex 0.144.5 is not installed through Mise",
-      );
+    const installRoot = location.stdout.trim();
+    const candidates = [
+      paths.join(installRoot, "node_modules", ".bin", "codex"),
+      paths.join(installRoot, "bin", "codex"),
+    ];
+    for (const executable of candidates) {
+      if (yield* fileSystem.exists(executable)) {
+        return executable;
+      }
     }
-    return executable;
+    return yield* testError(
+      "process",
+      "AgentOS-pinned Codex 0.144.5 is not installed through Mise",
+    );
   },
 );
 
