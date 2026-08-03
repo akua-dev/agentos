@@ -220,6 +220,44 @@ describe("Mate memory Effect maintenance", () => {
     }),
   );
 
+  it.effect("distinguishes consolidation model steps from extraction", () =>
+    Effect.gen(function*() {
+      const recorded = createTelemetryRecorder();
+      const result = yield* runIsolatedMaintenanceAgent({
+        ...baseContext(),
+        kind: "dream",
+        pauseGeneration: 0,
+        mutationEpoch: 0,
+        systemPrompt: "SEED_PROMPT private consolidation system prompt",
+        prompt: "SEED_PROMPT private consolidation body",
+        tools: [],
+        telemetry: recorded.telemetry,
+        completeImpl: () => Effect.succeed(completion('{"action":"done"}')),
+      });
+
+      expect(result).toEqual({
+        summary: "maintenance completed",
+        touchedPaths: [],
+      });
+      expect(recorded.operations[0]?.attempts).toEqual([
+        {
+          input: {
+            requestKind: "memory_consolidate",
+            streamMode: "non_streaming",
+          },
+          outcome: {
+            inputTokens: 8,
+            outputTokens: 3,
+            status: 200,
+            streamOutcome: "completed",
+          },
+        },
+      ]);
+      const encoded = yield* Schema.encodeEffect(Json)(recorded.operations);
+      expect(encoded).not.toContain("SEED_PROMPT");
+    }),
+  );
+
   it.effect("accepts only direct substantive input and exposes memory-scoped validated tools", () =>
     run(Effect.gen(function*() {
       expect(isEligibleHumanInput("remember this please", "interactive")).toBe(
