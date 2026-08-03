@@ -7,7 +7,7 @@ import {
   registerPiWorkloadIdentity,
   resolvePiWorkloadIdentity,
 } from "../pi-workload-identity.ts";
-import { createFakePi } from "../../../tests/fake-pi.ts";
+import { makePiTestHarness } from "../../../tests/pi-test-harness.ts";
 
 const gatewayUrl =
   "http://agentgateway-openai.agentos.svc.cluster.local:8788";
@@ -29,16 +29,13 @@ class PiIdentityTestBoundaryError extends Data.TaggedError(
 )<{}> {}
 
 function emit(
-  fake: ReturnType<typeof createFakePi>,
+  fake: Effect.Success<ReturnType<typeof makePiTestHarness>>,
   headers: Record<string, string | null>,
 ) {
-  return Effect.tryPromise({
-    try: () => fake.emit("before_provider_headers", {
-      type: "before_provider_headers",
-      headers,
-    }),
-    catch: () => new PiIdentityTestBoundaryError(),
-  });
+  return fake.emit("before_provider_headers", {
+    type: "before_provider_headers",
+    headers,
+  }).pipe(Effect.mapError(() => new PiIdentityTestBoundaryError()));
 }
 
 describe("Effect Pi projected workload identity", () => {
@@ -51,8 +48,9 @@ describe("Effect Pi projected workload identity", () => {
           prefix: "agentos-pi-identity-",
         });
         const tokenFile = path.join(directory, "token");
-        const fake = createFakePi();
-        Object.assign(fake.context, { model: gatewayModel });
+        const fake = yield* makePiTestHarness({
+          context: { model: gatewayModel },
+        });
         registerPiWorkloadIdentity(fake.pi, { environment, tokenFile });
 
         yield* fileSystem.writeFileString(

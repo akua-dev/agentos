@@ -36,7 +36,7 @@ import {
 import { nativeCompactionDetails } from "../session.ts";
 import { runPromiseLegacy } from "../../shared/legacy.ts";
 import { createTelemetryRecorder } from "../../telemetry/tests/fake-telemetry.ts";
-import { createFakePi } from "../../../tests/fake-pi.ts";
+import { makePiTestHarness } from "../../../tests/pi-test-harness.ts";
 
 const enabledConfig = Effect.succeed({ enabled: true });
 const fileSystemLayer = Layer.merge(BunFileSystem.layer, BunPath.layer);
@@ -138,55 +138,60 @@ function harness(
   dependencies: OpenAIServerCompactionDependencies,
   options: HarnessOptions = {},
 ) {
-  const fake = createFakePi({ systemPrompt: "system" });
-  const state = {
-    branch: options.branch ?? defaultBranch,
-    model: options.model ?? codexModel(),
-    sessionId: options.sessionId ?? "session-1",
-  };
-  const auth = options.auth ?? {
-    ok: true,
-    apiKey: "token",
-    headers: {},
-  };
-  Object.assign(fake.pi, {
-    getAllTools: () => [],
-    getActiveTools: () => [],
-    getThinkingLevel: () => "high",
-  });
-  Object.assign(fake.context, {
-    model: state.model,
-    modelRegistry: {
-      getApiKeyAndHeaders: () => runPromiseLegacy(Effect.succeed(auth)),
-    },
-    sessionManager: {
-      getBranch: () => state.branch,
-      getSessionId: () => state.sessionId,
-    },
-    getSystemPrompt: () => "system",
-    hasUI: true,
-    ui: {
-      notify: (message: string) => options.notify?.(message),
-    },
-  });
-  createOpenAIServerCompactionExtension(dependencies)(fake.pi);
-
-  const emit = (name: string, event: object) =>
-    Effect.tryPromise({
-      try: () => fake.emit(name, { ...event }),
-      catch: (cause) => cause,
-    }).pipe(Effect.map((results) => results[0]));
-  const setModel = (model: OpenAICompactionModel) =>
-    Effect.sync(() => {
-      state.model = model;
-      Object.assign(fake.context, { model });
+  return Effect.gen(function*() {
+    const state = {
+      branch: options.branch ?? defaultBranch,
+      model: options.model ?? codexModel(),
+      sessionId: options.sessionId ?? "session-1",
+    };
+    const auth = options.auth ?? {
+      ok: true,
+      apiKey: "token",
+      headers: {},
+    };
+    const fake = yield* makePiTestHarness({
+      systemPrompt: "system",
+      context: {
+        model: state.model,
+        modelRegistry: {
+          getApiKeyAndHeaders: () => runPromiseLegacy(Effect.succeed(auth)),
+        },
+        sessionManager: {
+          getBranch: () => state.branch,
+          getSessionId: () => state.sessionId,
+        },
+        getSystemPrompt: () => "system",
+        hasUI: true,
+        ui: {
+          notify: (message: string) => options.notify?.(message),
+        },
+      },
     });
-  const setSessionId = (sessionId: string) =>
-    Effect.sync(() => {
-      state.sessionId = sessionId;
+    Object.assign(fake.pi, {
+      getAllTools: () => [],
+      getActiveTools: () => [],
+      getThinkingLevel: () => "high",
+    });
+    yield* Effect.sync(() => {
+      createOpenAIServerCompactionExtension(dependencies)(fake.pi);
     });
 
-  return { emit, fake, setModel, setSessionId };
+    const emit = (name: string, event: object) =>
+      fake.emit(name, { ...event }).pipe(
+        Effect.map((results) => results[0]),
+      );
+    const setModel = (model: OpenAICompactionModel) =>
+      Effect.sync(() => {
+        state.model = model;
+        Object.assign(fake.context, { model });
+      });
+    const setSessionId = (sessionId: string) =>
+      Effect.sync(() => {
+        state.sessionId = sessionId;
+      });
+
+    return { emit, fake, setModel, setSessionId };
+  });
 }
 
 function dependencies(
@@ -224,7 +229,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
   it.effect("attributes portable and native attempts and persists combined usage", () =>
     Effect.gen(function*() {
       const recorded = createTelemetryRecorder();
-      const runtime = harness(dependencies({
+      const runtime = yield* harness(dependencies({
         telemetry: recorded.telemetry,
         remote: () =>
           Effect.succeed({
@@ -319,7 +324,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
   it.effect("records non-streaming native attribution for direct OpenAI", () =>
     Effect.gen(function*() {
       const recorded = createTelemetryRecorder();
-      const runtime = harness(
+      const runtime = yield* harness(
         dependencies({ telemetry: recorded.telemetry }),
         { model: directModel() },
       );
@@ -336,7 +341,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
     Effect.gen(function*() {
       const recorded = createTelemetryRecorder();
       const warnings: string[] = [];
-      const runtime = harness(
+      const runtime = yield* harness(
         dependencies({
           telemetry: recorded.telemetry,
           remote: () => Effect.fail(new OpenAICompactionHttpError(503)),
@@ -366,7 +371,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
 
   it.effect("lets Pi own compaction when the portable path fails", () =>
     Effect.gen(function*() {
-      const runtime = harness(dependencies({
+      const runtime = yield* harness(dependencies({
         local: () => Effect.fail("local failed"),
       }));
 
@@ -392,7 +397,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
           Authorization: "Bearer configured-token",
         },
       };
-      const runtime = harness(
+      const runtime = yield* harness(
         dependencies({
           telemetry: recorded.telemetry,
           local: (request) =>
@@ -456,7 +461,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
         const remoteRequest = yield* Ref.make<Option.Option<ServerCompactionRequest>>(
           Option.none(),
         );
-        const runtime = harness(
+        const runtime = yield* harness(
           dependencies({
             workloadIdentity: {
               environment: {
@@ -542,7 +547,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
       const captured = yield* Ref.make<Option.Option<ServerCompactionRequest>>(
         Option.none(),
       );
-      const runtime = harness(
+      const runtime = yield* harness(
         dependencies({
           remote: (request) =>
             Ref.set(captured, Option.some(request)).pipe(
@@ -582,7 +587,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
   it.effect("reuses validated request shape only for its session and model", () =>
     Effect.gen(function*() {
       const requests = yield* Ref.make<ReadonlyArray<ServerCompactionRequest>>([]);
-      const runtime = harness(dependencies({
+      const runtime = yield* harness(dependencies({
         remote: (request) =>
           Ref.update(requests, (values) => [...values, request]).pipe(
             Effect.as({
@@ -657,7 +662,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
           const captured = yield* Ref.make<Option.Option<ServerCompactionRequest>>(
             Option.none(),
           );
-          const runtime = harness(dependencies({
+          const runtime = yield* harness(dependencies({
             remote: (request) =>
               Ref.set(captured, Option.some(request)).pipe(
                 Effect.as({
@@ -718,7 +723,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
           message: { role: "user", content: "new", timestamp: 2 },
         },
       ];
-      const runtime = harness(
+      const runtime = yield* harness(
         dependencies({
           local: () => Ref.update(providerCalls, (value) => value + 1).pipe(
             Effect.as(local),
@@ -732,10 +737,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
 
       expect(yield* Ref.get(providerCalls)).toBe(0);
       expect(
-        runtime.fake.registrations
-          .filter(({ kind }) => kind === "handler")
-          .map(({ name }) => name)
-          .sort(),
+        [...runtime.fake.extension.handlers.keys()].sort(),
       ).toEqual([
         "before_provider_request",
         "model_select",
@@ -938,7 +940,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
   it.effect("records failed portable completion separately from Pi fallback", () =>
     Effect.gen(function*() {
       const recorded = createTelemetryRecorder();
-      const runtime = harness(dependencies({
+      const runtime = yield* harness(dependencies({
         telemetry: recorded.telemetry,
         local: (request) =>
           generateBestEffortLocalSummary(request, {

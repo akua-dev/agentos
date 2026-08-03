@@ -31,7 +31,7 @@ import {
   registerAgentOSRuntimeEffect,
   type AgentOSRegistrationV1,
 } from "../../preflight.ts";
-import { createFakePi } from "../../../tests/fake-pi.ts";
+import { makePiTestHarness } from "../../../tests/pi-test-harness.ts";
 import { buildAgentOSInstructionsEffect } from "../../instructions.ts";
 import * as BunPath from "@effect/platform-bun/BunPath";
 import { resolveAgentOSResourcesEffect } from "../../resources.ts";
@@ -219,7 +219,7 @@ describe("AgentOS shared Effect foundation", () => {
 
   it.effect("registers mixed synchronous and asynchronous adapters in order", () =>
     Effect.gen(function*() {
-      const fake = createFakePi();
+      const fake = yield* makePiTestHarness();
       const order: string[] = [];
       const registrations: readonly AgentOSRegistrationV1[] = [
         {

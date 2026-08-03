@@ -1,9 +1,6 @@
 import * as BunCrypto from "@effect/platform-bun/BunCrypto";
 import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
 import * as BunPath from "@effect/platform-bun/BunPath";
-import type {
-  ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "@effect/vitest";
 import {
   Crypto,
@@ -27,7 +24,7 @@ import {
   type MateMemoryStore,
 } from "../../memory/store.ts";
 import type { TopicMetadata } from "../../memory/schema.ts";
-import { createFakePi } from "../../../tests/fake-pi.ts";
+import { makePiTestHarness } from "../../../tests/pi-test-harness.ts";
 import {
   registerMateMemoryExtensionEffect,
   type MateMemoryExtensionController,
@@ -118,32 +115,23 @@ function harness(
   options: HarnessOptions = {},
 ) {
   return Effect.gen(function*() {
-    const fake = createFakePi();
-    const tools = new Map<string, ToolDefinition>();
-    const entries: Array<{ customType: string; data: unknown }> = [];
     const notifications: string[] = [];
     const state = {
       branch: options.branch ?? [],
       sessionId: options.sessionId ?? "session-1",
     };
-    Object.assign(fake.pi, {
-      appendEntry(customType: string, data: unknown) {
-        entries.push({ customType, data });
-      },
-      registerTool(tool: ToolDefinition) {
-        tools.set(tool.name, tool);
-      },
-    });
-    Object.assign(fake.context, {
-      cwd: "/workspace",
-      model: undefined,
-      sessionManager: {
-        getBranch: () => state.branch,
-        getSessionId: () => state.sessionId,
-      },
-      signal: undefined,
-      ui: {
-        notify: (message: string) => notifications.push(message),
+    const fake = yield* makePiTestHarness({
+      context: {
+        cwd: "/workspace",
+        model: undefined,
+        sessionManager: {
+          getBranch: () => state.branch,
+          getSessionId: () => state.sessionId,
+        },
+        signal: undefined,
+        ui: {
+          notify: (message: string) => notifications.push(message),
+        },
       },
     });
     const controller = yield* registerMateMemoryExtensionEffect(
@@ -154,29 +142,22 @@ function harness(
       return yield* Effect.die("Mate memory unexpectedly disabled in test.");
     }
     const emit = (name: string, event: Readonly<Record<string, unknown>> = {}) =>
-      Effect.tryPromise({
-        try: () => fake.emit(name, { type: name, ...event }),
-        catch: (cause) => cause,
-      }).pipe(Effect.map((results) => results[0]));
+      fake.emit(name, { type: name, ...event }).pipe(
+        Effect.map((results) => results[0]),
+      );
     const executeTool = (
       name: string,
       toolCallId: string,
       input: Readonly<Record<string, unknown>>,
     ) => {
-      const tool = tools.get(name);
-      return tool === undefined
-        ? Effect.die(`Missing Pi tool ${name}.`)
-        : Effect.tryPromise({
-          try: () =>
-            tool.execute(
-              toolCallId,
-              input,
-              undefined,
-              undefined,
-              fake.context,
-            ),
-          catch: (cause) => cause,
-        });
+      return fake.executeTool(
+        name,
+        toolCallId,
+        input,
+        undefined,
+        undefined,
+        fake.context,
+      );
     };
     const setPaused = (paused: boolean) =>
       executeTool(
@@ -187,12 +168,12 @@ function harness(
     return {
       controller,
       emit,
-      entries,
+      entries: fake.entries,
       executeTool,
       notifications,
       setPaused,
       state,
-      tools,
+      tools: fake.extension.tools,
     };
   });
 }
