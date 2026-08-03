@@ -82,6 +82,24 @@ function metadata(root: string) {
     workloadSpecDigest: `sha256:${"f".repeat(64)}`,
     renderDigest: `sha256:${"0".repeat(64)}`,
     protocolRevocationMillis: 15_000,
+    accessEvidence: {
+      version: 1,
+      context: "kind-agentos-resilience-84",
+      approvalReference: "approval:issue-84",
+      revocationMillis: 1_250,
+      hotReloadMillis: 900,
+      loadAttempts: 32,
+      wrongAudienceDenied: true,
+      stalePodUidDenied: true,
+      deletedPodDenied: true,
+      staleServiceAccountUidDenied: true,
+      deletedServiceAccountDenied: true,
+      projectedTokensRotated: true,
+      unrelatedSubjectAllowed: true,
+      ordinaryInternetAllowed: true,
+      namespacesDeleted: true,
+      productionEndpointContacted: false,
+    },
     report: completeExecutionReport(root),
   };
 }
@@ -198,6 +216,8 @@ layer(platform)("resilience execution attestation", (it) => {
       const root = paths.resolve(yield* paths.fromFileUrl(repositoryRootUrl));
       const result = yield* compileExecutedAgentOSResilienceVerdict(metadata(root));
       assert.strictEqual(result.verdict.eligible, true);
+      assert.strictEqual(result.access.eligible, true);
+      assert.strictEqual(result.access.scenarioCount, 38);
       assert.strictEqual(result.verdict.revision, "a".repeat(40));
       assert.strictEqual(
         result.execution.passedAssertionCount,

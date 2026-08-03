@@ -50,7 +50,16 @@ Only successful normalized identities are cached. The key is a SHA-256 digest of
 
 The JWT payload is decoded only after TokenReview succeeds and only to shorten cache validity; its contents never establish authenticity. Authentication, lookup, ambiguity, lifecycle, and dependency failures are never cached.
 
-The published revocation SLO is 60 seconds, matching Kubernetes' documented upper deletion grace for bound ServiceAccount-token authentication. AgentOS' 15-second positive TTL stays inside that limit. Control-plane operations that delete/recreate a Pod or ServiceAccount, retire an Agent, end an Assignment, or change an identity binding must additionally call the authenticator's explicit Pod UID, ServiceAccount UID, Agent ID, Assignment ID, or global invalidation operation before acknowledging the mutation. #89 owns wiring those mutation acknowledgements to invalidation.
+The published revocation SLO is 60 seconds, matching Kubernetes' documented
+upper deletion grace for bound ServiceAccount-token authentication. AgentOS'
+15-second positive TTL stays inside that limit. Control-plane operations that
+delete/recreate a Pod or ServiceAccount, retire an Agent, end an Assignment, or
+change an identity binding must additionally call the authenticator's explicit
+Pod UID, ServiceAccount UID, Agent ID, Assignment ID, or global invalidation
+operation before acknowledging the mutation. The released #89 control plane
+performs invalidation before it acknowledges a profile/binding mutation; the
+#92 hard gate independently proves bound-object deletion and replacement
+against a real API server.
 
 ## Failure taxonomy
 

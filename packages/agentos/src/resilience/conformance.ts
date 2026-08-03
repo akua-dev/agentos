@@ -1,6 +1,10 @@
 import { Effect, FileSystem, Path, Schema } from "effect";
 
 import {
+  AccessResilienceRunV1Schema,
+  compileAccessResilienceVerdict,
+} from "../access/resilience-conformance.ts";
+import {
   compileProtocolResilienceVerdict,
   ProtocolResilienceRunV1Schema,
 } from "../protocol/resilience-conformance.ts";
@@ -234,6 +238,7 @@ export const AgentOSResilienceRunV1Schema = Schema.Struct({
     Schema.check(Schema.isMaxLength(AGENTOS_RESILIENCE_SCENARIOS.length + 1)),
   ),
   protocol: ProtocolResilienceRunV1Schema,
+  access: AccessResilienceRunV1Schema,
 });
 
 export type AgentOSResilienceScenarioId =
@@ -288,6 +293,7 @@ const GateErrorCodeSchema = Schema.Literals([
   "image_pin_missing",
   "child_evidence_drift",
   "protocol_gate_failed",
+  "access_gate_failed",
   "scenario_missing",
   "scenario_duplicate",
   "scenario_unobserved",
@@ -1162,6 +1168,9 @@ export const compileAgentOSResilienceVerdict = Effect.fn(
   yield* compileProtocolResilienceVerdict(run.protocol).pipe(
     Effect.mapError(() => gateError("protocol_gate_failed", null)),
   );
+  yield* compileAccessResilienceVerdict(run.access).pipe(
+    Effect.mapError(() => gateError("access_gate_failed", null)),
+  );
   for (const scenario of AGENTOS_RESILIENCE_SCENARIOS) {
     const matches = run.observations.filter((item) => item.scenario === scenario);
     if (matches.length === 0) {
@@ -1233,7 +1242,8 @@ export const compileAgentOSResilienceVerdict = Effect.fn(
     version: 1,
     eligible: true,
     scenarioCount:
-      run.observations.length + run.protocol.observations.length,
+      run.observations.length + run.protocol.observations.length +
+      run.access.observations.length,
     revision: run.revision,
     workAuthority: "postgresql",
     sessionAuthority: "provider_native",
@@ -1296,14 +1306,23 @@ function definition(
 
 function hasMatchingChildEvidence(run: AgentOSResilienceRunV1) {
   return run.protocol.revision === run.revision &&
+    run.access.revision === run.revision &&
     run.protocol.environment.context === run.environment.context &&
+    run.access.environment.context === run.environment.context &&
     run.protocol.environment.approvalReference ===
+      run.environment.approvalReference &&
+    run.access.environment.approvalReference ===
       run.environment.approvalReference &&
     run.protocol.environment.productionEndpointContacted ===
       run.environment.productionEndpointContacted &&
+    run.access.environment.productionEndpointContacted ===
+      run.environment.productionEndpointContacted &&
     run.protocol.environment.destroyedAfterRun ===
       run.environment.destroyedAfterRun &&
-    sameImages(run.images, run.protocol.images);
+    run.access.environment.destroyedAfterRun ===
+      run.environment.destroyedAfterRun &&
+    sameImages(run.images, run.protocol.images) &&
+    sameImages(run.images, run.access.images);
 }
 
 function sameImages(
