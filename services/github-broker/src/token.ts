@@ -1,4 +1,4 @@
-import { createSign } from "node:crypto";
+import { createHash, createPublicKey, createSign } from "node:crypto";
 import {
   Clock,
   Effect,
@@ -31,6 +31,7 @@ export interface GitHubInstallationTokenLease {
 }
 
 export interface GitHubInstallationTokenProvider {
+  readonly check: Effect.Effect<void, GitHubBrokerError>;
   readonly acquire: (
     scope: GitHubInstallationTokenScope,
   ) => Effect.Effect<GitHubInstallationTokenLease, GitHubBrokerError>;
@@ -47,17 +48,24 @@ export interface TokenProviderOptions {
   readonly installationOwner?: string;
   readonly now?: Effect.Effect<number>;
   readonly refreshBeforeMillis?: number;
+  readonly readinessRefreshMillis?: number;
 }
 
 const InstallationTokenResponse = Schema.Struct({
   token: Schema.String,
   expires_at: Schema.String,
 });
+const InstallationReadinessResponse = Schema.Struct({
+  id: Schema.Number,
+  account: Schema.Struct({ login: Schema.String }),
+  suspended_at: Schema.NullOr(Schema.String),
+});
 
 const TOKEN_RESPONSE_MAX_BYTES = 64 * 1_024;
 const TOKEN_MAX_BYTES = 16 * 1_024;
 const PRIVATE_KEY_MAX_BYTES = 1024 * 1_024;
 const DEFAULT_REFRESH_BEFORE_MILLIS = 5 * 60_000;
+const DEFAULT_READINESS_REFRESH_MILLIS = 60_000;
 
 export const makeGitHubInstallationTokenProvider = Effect.fn(
   "agentos.githubBroker.makeInstallationTokenProvider",
@@ -66,22 +74,7 @@ export const makeGitHubInstallationTokenProvider = Effect.fn(
   const http = yield* GitHubProviderHttp;
   yield* validatePositiveInteger(options.appId);
   yield* validatePositiveInteger(options.installationId);
-  const privateKeyMetadata = yield* fileSystem.stat(options.privateKeyFile).pipe(
-    Effect.mapError(() => githubBrokerError("credential_unavailable")),
-  );
-  if (
-    privateKeyMetadata.type !== "File" ||
-    privateKeyMetadata.size <= FileSystem.Size(0) ||
-    privateKeyMetadata.size > FileSystem.Size(PRIVATE_KEY_MAX_BYTES) ||
-    (privateKeyMetadata.mode & 0o022) !== 0
-  ) {
-    return yield* githubBrokerError("credential_unavailable");
-  }
-  const startupKey = yield* fileSystem
-    .readFileString(options.privateKeyFile)
-    .pipe(
-      Effect.mapError(() => githubBrokerError("credential_unavailable")),
-    );
+  const startupKey = yield* loadPrivateKey(fileSystem, options.privateKeyFile);
   yield* createAppJwt(
     options.appId,
     startupKey,
@@ -91,9 +84,23 @@ export const makeGitHubInstallationTokenProvider = Effect.fn(
     new Map<string, GitHubInstallationTokenLease>(),
   );
   const mintLock = yield* Semaphore.make(1);
+  const readinessLock = yield* Semaphore.make(1);
+  const lastRemoteReadiness = yield* Ref.make<{
+    readonly checkedAtMillis: number;
+    readonly keyIdentity: string;
+  } | null>(null);
   const now = options.now ?? Clock.currentTimeMillis;
   const refreshBeforeMillis = options.refreshBeforeMillis ??
     DEFAULT_REFRESH_BEFORE_MILLIS;
+  const readinessRefreshMillis = options.readinessRefreshMillis ??
+    DEFAULT_READINESS_REFRESH_MILLIS;
+  if (
+    !Number.isSafeInteger(refreshBeforeMillis) || refreshBeforeMillis <= 0 ||
+    !Number.isSafeInteger(readinessRefreshMillis) ||
+    readinessRefreshMillis <= 0
+  ) {
+    return yield* githubBrokerError("invalid_configuration");
+  }
 
   const mint = Effect.fn("agentos.githubBroker.mintInstallationToken")(
     function*(scope: GitHubInstallationTokenScope) {
@@ -101,11 +108,10 @@ export const makeGitHubInstallationTokenProvider = Effect.fn(
       yield* validatePositiveInteger(options.appId);
       yield* validatePositiveInteger(options.installationId);
       const currentTime = yield* now;
-      const privateKey = yield* fileSystem
-        .readFileString(options.privateKeyFile)
-        .pipe(
-          Effect.mapError(() => githubBrokerError("credential_unavailable")),
-        );
+      const privateKey = yield* loadPrivateKey(
+        fileSystem,
+        options.privateKeyFile,
+      );
       const jwt = yield* createAppJwt(
         options.appId,
         privateKey,
@@ -158,6 +164,70 @@ export const makeGitHubInstallationTokenProvider = Effect.fn(
     },
   );
 
+  const check = Effect.fn("agentos.githubBroker.checkInstallation")(
+    function*() {
+      const currentTime = yield* now;
+      const privateKey = yield* loadPrivateKey(
+        fileSystem,
+        options.privateKeyFile,
+      );
+      const jwt = yield* createAppJwt(
+        options.appId,
+        privateKey,
+        Math.floor(currentTime / 1_000),
+      );
+      const keyIdentity = yield* privateKeyIdentity(privateKey);
+      yield* readinessLock.withPermit(Effect.gen(function*() {
+        const lastReady = yield* Ref.get(lastRemoteReadiness);
+        if (
+          lastReady !== null &&
+          lastReady.keyIdentity === keyIdentity &&
+          currentTime >= lastReady.checkedAtMillis &&
+          currentTime - lastReady.checkedAtMillis < readinessRefreshMillis
+        ) {
+          return;
+        }
+        const endpoint = yield* installationEndpoint(options);
+        const request = yield* Effect.try({
+          try: () =>
+            new Request(endpoint.toString(), {
+              method: "GET",
+              headers: {
+                accept: "application/vnd.github+json",
+                authorization: `Bearer ${jwt}`,
+                "user-agent": "agentos-github-broker",
+                "x-github-api-version": "2022-11-28",
+              },
+            }),
+          catch: () => githubBrokerError("invalid_configuration"),
+        });
+        const response = yield* http.execute(request);
+        const source = yield* readBoundedResponse(response);
+        if (!response.ok) {
+          return yield* githubBrokerError("credential_unavailable");
+        }
+        const installation = yield* Schema.decodeUnknownEffect(
+          Schema.fromJsonString(InstallationReadinessResponse),
+        )(source).pipe(
+          Effect.mapError(() => githubBrokerError("credential_unavailable")),
+        );
+        if (
+          installation.id !== Number(options.installationId) ||
+          installation.suspended_at !== null ||
+          (options.installationOwner !== undefined &&
+            installation.account.login.toLowerCase() !==
+              options.installationOwner.toLowerCase())
+        ) {
+          return yield* githubBrokerError("credential_unavailable");
+        }
+        yield* Ref.set(lastRemoteReadiness, {
+          checkedAtMillis: currentTime,
+          keyIdentity,
+        });
+      }));
+    },
+  )();
+
   const acquire = Effect.fn("agentos.githubBroker.acquireInstallationToken")(
     function*(scope: GitHubInstallationTokenScope) {
       yield* validateScope(scope, options.installationOwner);
@@ -189,6 +259,7 @@ export const makeGitHubInstallationTokenProvider = Effect.fn(
   );
 
   return {
+    check,
     acquire,
     invalidate: (scope) =>
       Ref.update(cache, (current) => {
@@ -234,6 +305,19 @@ function createAppJwt(appId: string, privateKey: string, nowSeconds: number) {
   });
 }
 
+function privateKeyIdentity(privateKey: string) {
+  return Effect.try({
+    try: () => {
+      const publicKey = createPublicKey(privateKey).export({
+        type: "spki",
+        format: "der",
+      });
+      return createHash("sha256").update(publicKey).digest("hex");
+    },
+    catch: () => githubBrokerError("credential_unavailable"),
+  });
+}
+
 function validateScope(
   scope: GitHubInstallationTokenScope,
   installationOwner: string | undefined,
@@ -263,9 +347,32 @@ function scopeKey(scope: GitHubInstallationTokenScope): string {
 }
 
 function validatePositiveInteger(value: string) {
-  return /^[1-9][0-9]*$/.test(value)
+  const number = Number(value);
+  return /^[1-9][0-9]*$/.test(value) && Number.isSafeInteger(number)
     ? Effect.void
     : Effect.fail(githubBrokerError("invalid_configuration"));
+}
+
+function loadPrivateKey(
+  fileSystem: FileSystem.FileSystem,
+  path: string,
+) {
+  return Effect.gen(function*() {
+    const metadata = yield* fileSystem.stat(path).pipe(
+      Effect.mapError(() => githubBrokerError("credential_unavailable")),
+    );
+    if (
+      metadata.type !== "File" ||
+      metadata.size <= FileSystem.Size(0) ||
+      metadata.size > FileSystem.Size(PRIVATE_KEY_MAX_BYTES) ||
+      (metadata.mode & 0o022) !== 0
+    ) {
+      return yield* githubBrokerError("credential_unavailable");
+    }
+    return yield* fileSystem.readFileString(path).pipe(
+      Effect.mapError(() => githubBrokerError("credential_unavailable")),
+    );
+  });
 }
 
 function installationTokenEndpoint(options: TokenProviderOptions) {
@@ -273,6 +380,17 @@ function installationTokenEndpoint(options: TokenProviderOptions) {
     try: () =>
       new URL(
         `/app/installations/${options.installationId}/access_tokens`,
+        `${options.apiUrl.replace(/\/+$/, "")}/`,
+      ),
+    catch: () => githubBrokerError("invalid_configuration"),
+  });
+}
+
+function installationEndpoint(options: TokenProviderOptions) {
+  return Effect.try({
+    try: () =>
+      new URL(
+        `/app/installations/${options.installationId}`,
         `${options.apiUrl.replace(/\/+$/, "")}/`,
       ),
     catch: () => githubBrokerError("invalid_configuration"),

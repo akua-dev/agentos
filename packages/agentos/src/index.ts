@@ -179,6 +179,7 @@ export {
 export {
   AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL,
   ProviderBudgetSettlementHttpError,
+  ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReceiptV1Schema,
   ProviderBudgetSettlementReporter,
   makeProviderBudgetSettlementHttpLayer,

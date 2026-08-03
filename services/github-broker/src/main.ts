@@ -7,6 +7,7 @@ import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import {
   AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL,
   AGENTOS_PROVIDER_BUDGET_SETTLEMENT_TOKEN_PATH,
+  ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
   makeProviderBudgetSettlementHttpLayer,
 } from "@akua-dev/agentos";
@@ -51,6 +52,12 @@ const BrokerConfig = Config.all({
   port: Config.int("GITHUB_BROKER_LISTEN_PORT").pipe(
     Config.withDefault(8789),
   ),
+  readinessRefreshMillis: Config.int(
+    "GITHUB_BROKER_READINESS_REFRESH_MILLIS",
+  ).pipe(Config.withDefault(60_000)),
+  readinessTimeoutMillis: Config.int(
+    "GITHUB_BROKER_READINESS_TIMEOUT_MILLIS",
+  ).pipe(Config.withDefault(2_000)),
   privateKeyFile: Config.string("GITHUB_APP_PRIVATE_KEY_FILE"),
   settlementBaseUrl: Config.url(
     "AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL",
@@ -68,13 +75,19 @@ const BrokerConfig = Config.all({
   ).pipe(Config.withDefault(AGENTOS_PROVIDER_BUDGET_SETTLEMENT_TOKEN_PATH)),
 });
 
-function makeGitHubBrokerRoutesLayer(handler: GitHubBrokerHandler) {
+function makeGitHubBrokerRoutesLayer(
+  handler: GitHubBrokerHandler,
+  readiness: {
+    readonly check: Effect.Effect<void, unknown>;
+    readonly timeoutMillis: number;
+  },
+) {
   return Layer.effectDiscard(Effect.gen(function*() {
     const router = yield* HttpRouter.HttpRouter;
     yield* router.add("*", "/*", (request) =>
       HttpServerRequest.toWeb(request).pipe(
         Effect.flatMap((webRequest) =>
-          serveGitHubBrokerRequest(handler, webRequest)
+          serveGitHubBrokerRequest(handler, readiness, webRequest)
         ),
         Effect.map(HttpServerResponse.fromWeb),
       ));
@@ -87,6 +100,8 @@ const startup = Effect.gen(function*() {
     config.port < 1 || config.port > 65_535 ||
     config.hostname.length === 0 || config.hostname.length > 253 ||
     config.gracefulShutdownMillis <= 0 ||
+    config.readinessRefreshMillis <= 0 ||
+    config.readinessTimeoutMillis <= 0 ||
     config.settlementMaximumResponseBytes <= 0 ||
     config.settlementTimeoutMillis <= 0 ||
     config.settlementTokenPath.length === 0 ||
@@ -100,23 +115,33 @@ const startup = Effect.gen(function*() {
     installationId: config.installationId,
     installationOwner: config.installationOwner.toLowerCase(),
     privateKeyFile: config.privateKeyFile,
+    readinessRefreshMillis: config.readinessRefreshMillis,
   });
-  const settlements = yield* ProviderBudgetSettlementReporter.pipe(
-    Effect.provide(makeProviderBudgetSettlementHttpLayer({
-      baseUrl: config.settlementBaseUrl.toString(),
-      tokenPath: config.settlementTokenPath,
-      timeoutMillis: config.settlementTimeoutMillis,
-      maximumResponseBytes: config.settlementMaximumResponseBytes,
-    })),
-  );
+  const settlementLayer = makeProviderBudgetSettlementHttpLayer({
+    baseUrl: config.settlementBaseUrl.toString(),
+    tokenPath: config.settlementTokenPath,
+    timeoutMillis: config.settlementTimeoutMillis,
+    maximumResponseBytes: config.settlementMaximumResponseBytes,
+  });
+  const settlementServices = yield* Effect.all({
+    readiness: ProviderBudgetSettlementReadiness,
+    reporter: ProviderBudgetSettlementReporter,
+  }).pipe(Effect.provide(settlementLayer));
   const handler = yield* makeGitHubBrokerHandler({
     tokens,
     apiUrl: config.apiUrl.toString(),
     gitUrl: config.gitUrl.toString(),
-    settlements,
+    settlements: settlementServices.reporter,
   });
+  const readiness = {
+    check: Effect.all([
+      tokens.check,
+      settlementServices.readiness.check,
+    ], { concurrency: 2, discard: true }),
+    timeoutMillis: config.readinessTimeoutMillis,
+  };
   const application = HttpRouter.serve(
-    makeGitHubBrokerRoutesLayer(handler),
+    makeGitHubBrokerRoutesLayer(handler, readiness),
     { disableListenLog: true },
   ).pipe(
     Layer.provide(BunHttpServer.layer({

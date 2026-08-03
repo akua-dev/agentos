@@ -7,6 +7,7 @@ import {
 } from "effect/unstable/http";
 
 import {
+  ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
   makeProviderBudgetSettlementHttpLayer,
 } from "../provider-budget-settlement-http.ts";
@@ -78,6 +79,80 @@ function decodeRequestBody(request: HttpClientRequest.HttpClientRequest) {
 }
 
 describe("provider budget settlement HTTP client", () => {
+  it.effect("proves its rotated Pod identity against authenticated settlement readiness", () =>
+    Effect.gen(function*() {
+      const tokens = yield* Ref.make<ReadonlyArray<string>>([
+        "projected-readiness-token",
+        "rotated-readiness-token",
+      ]);
+      const requests = yield* Ref.make<ReadonlyArray<{
+        readonly authorization: string | undefined;
+        readonly method: string;
+        readonly url: string;
+      }>>([]);
+      const layer = clientLayer(
+        (request) =>
+          Ref.update(requests, (current) => [...current, {
+            authorization: request.headers.authorization,
+            method: request.method,
+            url: request.url.toString(),
+          }]).pipe(
+            Effect.as(Response.json({ status: "ready" })),
+          ),
+        tokens,
+      );
+      yield* ProviderBudgetSettlementReadiness.pipe(
+        Effect.flatMap((readiness) => readiness.check),
+        Effect.provide(layer),
+      );
+      yield* ProviderBudgetSettlementReadiness.pipe(
+        Effect.flatMap((readiness) => readiness.check),
+        Effect.provide(layer),
+      );
+      assert.deepStrictEqual(yield* Ref.get(requests), [{
+        authorization: "Bearer projected-readiness-token",
+        method: "GET",
+        url:
+          "http://agentos-egress-authz.agentos.svc.cluster.local:9001/readyz/settlement",
+      }, {
+        authorization: "Bearer rotated-readiness-token",
+        method: "GET",
+        url:
+          "http://agentos-egress-authz.agentos.svc.cluster.local:9001/readyz/settlement",
+      }]);
+    }));
+
+  it.effect("fails settlement readiness closed for unusable identity and response state", () =>
+    Effect.gen(function*() {
+      const cases = [
+        { token: "", status: 200, body: { status: "ready" }, code: "credential_unavailable" },
+        { token: "token", status: 401, body: {}, code: "unauthorized" },
+        { token: "token", status: 403, body: {}, code: "forbidden" },
+        { token: "token", status: 503, body: {}, code: "dependency_unavailable" },
+        { token: "token", status: 200, body: { status: "not_ready" }, code: "invalid_response" },
+        {
+          token: "token",
+          status: 200,
+          body: { status: "ready", padding: "x".repeat(2_048) },
+          code: "response_too_large",
+        },
+      ];
+      for (const testCase of cases) {
+        const tokens = yield* Ref.make<ReadonlyArray<string>>([testCase.token]);
+        const failure = yield* ProviderBudgetSettlementReadiness.pipe(
+          Effect.flatMap((readiness) => readiness.check),
+          Effect.provide(clientLayer(
+            () => Effect.succeed(Response.json(testCase.body, {
+              status: testCase.status,
+            })),
+            tokens,
+          )),
+          Effect.flip,
+        );
+        assert.strictEqual(failure.code, testCase.code);
+      }
+    }));
+
   it.effect("rereads the rotated Pod token and sends only the closed report", () =>
     Effect.gen(function*() {
       const tokens = yield* Ref.make<ReadonlyArray<string>>([
