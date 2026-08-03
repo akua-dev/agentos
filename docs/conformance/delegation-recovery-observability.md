@@ -70,8 +70,9 @@ and records only bounded digests and booleans.
 The parent [AgentOS resilience hard gate](./agentos-resilience.md) attests this
 suite together with the exact gateway, access, journal, supervision, runtime,
 and ACP/A2A regressions from one clean revision. Its live artifacts add separate
-Mate/Crewmate replacement, retained-PVC/node-affinity, worktree, projected
-`0440` Secret mode, and CPU/memory quota evidence without reading a credential.
+Mate/Crewmate replacement, retained-PVC/node-affinity, worktree, declared
+`0440`/observed `65535:65535` `0640` projected-token modes, read-only write
+denial, and CPU/memory quota evidence without reading a credential.
 
 The in-memory PostgreSQL companion drives the same typed operation through
 render, apply, rollout, Herdr-launch and locator-update interruption codes. It

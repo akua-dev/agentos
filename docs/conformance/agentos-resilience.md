@@ -151,6 +151,13 @@ generated namespaces and admission resources even on interruption; retained
 PVC behavior is proven before that teardown. No resilience verdict is eligible
 when cleanup is absent.
 
+The token projection declares `defaultMode: 0440`. Kubernetes' atomic writer
+exposes a `0777` symlink and, under the workload's UID/GID `65535`, a
+dereferenced target at `0640` owned by `65535:65535`. The live gate records and
+checks both the declared and observed forms, verifies world permissions remain
+zero, then attempts a write from both Mate and Crewmate and requires denial by
+the read-only projected-volume mount. It never reads the token.
+
 ## Privacy and observability
 
 Proof artifacts and output contain digests and bounded booleans only. They must
