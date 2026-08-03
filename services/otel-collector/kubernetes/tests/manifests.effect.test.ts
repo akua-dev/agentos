@@ -1,7 +1,6 @@
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
-import { fileURLToPath } from "node:url";
+import { Effect, Path, Schema } from "effect";
 
 import { renderKustomize } from "../../../../tooling/testing/kubernetes.ts";
 
@@ -43,9 +42,15 @@ const CollectorStatefulSet = Schema.Struct({
           name: Schema.String,
           image: Schema.String,
           args: Schema.Array(Schema.String),
-          ports: Schema.Unknown,
+          env: Schema.Array(Schema.Unknown),
+          ports: Schema.Array(Schema.Struct({
+            containerPort: Schema.Number,
+            name: Schema.String,
+            protocol: Schema.String,
+          })),
           livenessProbe: Schema.Struct({ httpGet: Schema.Unknown }),
           readinessProbe: Schema.Struct({ httpGet: Schema.Unknown }),
+          resources: Schema.Unknown,
           securityContext: Schema.Unknown,
           volumeMounts: Schema.Unknown,
         })),
@@ -109,12 +114,17 @@ function containsText(value: unknown, text: string): boolean {
   return Object.values(value).some((item) => containsText(item, text));
 }
 
-const kubernetesDirectory = fileURLToPath(new URL("..", import.meta.url));
-const baseDirectory = `${kubernetesDirectory}/base`;
-const remoteDirectory = `${kubernetesDirectory}/overlays/remote`;
-const localDirectory = `${kubernetesDirectory}/overlays/local-diagnostics`;
-const render = Effect.fn("test.otelManifest.render")(function*(directory: string) {
-  const documents = yield* renderKustomize(directory);
+const kubernetesUrl = new URL("..", import.meta.url);
+const baseDirectory = "base";
+const remoteDirectory = "overlays/remote";
+const remoteGrpcDirectory = "overlays/remote-grpc";
+const localDirectory = "overlays/local-diagnostics";
+const render = Effect.fn("test.otelManifest.render")(function*(relativeDirectory: string) {
+  const paths = yield* Path.Path;
+  const kubernetesDirectory = yield* paths.fromFileUrl(kubernetesUrl);
+  const documents = yield* renderKustomize(
+    paths.join(kubernetesDirectory, relativeDirectory),
+  );
   return yield* Schema.decodeUnknownEffect(Resources)(documents);
 });
 
@@ -151,6 +161,18 @@ describe("Fleet OpenTelemetry Collector", () => {
               port: 4318,
               protocol: "TCP",
               targetPort: "otlp-http",
+            },
+            {
+              name: "metrics",
+              port: 8888,
+              protocol: "TCP",
+              targetPort: "metrics",
+            },
+            {
+              name: "health",
+              port: 13133,
+              protocol: "TCP",
+              targetPort: "health",
             },
           ],
         },
@@ -194,15 +216,28 @@ describe("Fleet OpenTelemetry Collector", () => {
       assert.deepStrictEqual(collector.ports, [
         { containerPort: 4317, name: "otlp-grpc", protocol: "TCP" },
         { containerPort: 4318, name: "otlp-http", protocol: "TCP" },
+        { containerPort: 8888, name: "metrics", protocol: "TCP" },
         { containerPort: 13133, name: "health", protocol: "TCP" },
       ]);
+      for (const port of collector.ports) {
+        assert.isAtMost(port.name.length, 15);
+      }
       assert.deepStrictEqual(collector.livenessProbe.httpGet, {
-        path: "/",
+        path: "/healthz",
         port: "health",
       });
       assert.deepStrictEqual(collector.readinessProbe.httpGet, {
-        path: "/",
+        path: "/healthz",
         port: "health",
+      });
+      assert.deepInclude(collector.env, {
+        name: "AGENTOS_OTEL_TRACE_SAMPLING_PERCENTAGE",
+        value: "100",
+      });
+      assert.deepInclude(collector.env, {
+        name: "OTEL_RESOURCE_ATTRIBUTES",
+        value:
+          "agentos.fleet.name=default,deployment.environment.name=development,agentos.telemetry.contract.version=1",
       });
       assert.deepStrictEqual(collector.securityContext, {
         allowPrivilegeEscalation: false,
@@ -265,6 +300,18 @@ describe("Fleet OpenTelemetry Collector", () => {
               { port: 4317, protocol: "TCP" },
               { port: 4318, protocol: "TCP" },
             ],
+          }, {
+            from: [{
+              podSelector: {
+                matchLabels: {
+                  "agentos.akua.dev/observability-admin": "true",
+                },
+              },
+            }],
+            ports: [
+              { port: 8888, protocol: "TCP" },
+              { port: 13133, protocol: "TCP" },
+            ],
           }],
         },
       );
@@ -281,6 +328,9 @@ describe("Fleet OpenTelemetry Collector", () => {
       const collectorConfig = yield* config(resources);
       assert.include(collectorConfig, "otlp_http/remote:");
       assert.include(collectorConfig, "storage: file_storage/queue");
+      assert.include(collectorConfig, "sizer: requests");
+      assert.include(collectorConfig, "wait_for_result: false");
+      assert.include(collectorConfig, "block_on_overflow: false");
       assert.notInclude(collectorConfig, "file/local:");
       const statefulSet = yield* collectorStatefulSet(resources);
       const collector = yield* required(
@@ -306,7 +356,20 @@ describe("Fleet OpenTelemetry Collector", () => {
       });
     }).pipe(Effect.provide(BunServices.layer)));
 
-  it.effect("enables a bounded local archive only in its explicit overlay", () =>
+  it.effect("provides a Secret-backed OTLP/gRPC remote mode without image rebuilds", () =>
+    Effect.gen(function*() {
+      const resources = yield* render(remoteGrpcDirectory);
+      const collectorConfig = yield* config(resources);
+      assert.include(collectorConfig, "otlp_grpc/remote:");
+      assert.notInclude(collectorConfig, "otlp_http/remote:");
+      assert.include(collectorConfig, "storage: file_storage/queue");
+      assert.isTrue(containsText(resources, "OTEL_EXPORTER_OTLP_ENDPOINT"));
+      assert.isTrue(containsText(resources, "headers.yaml"));
+      assert.isFalse(containsText(resources, "Bearer "));
+      assert.isFalse(containsText(resources, "api-key"));
+    }).pipe(Effect.provide(BunServices.layer)));
+
+  it.effect("enables a separately provisioned bounded local archive only in its explicit overlay", () =>
     Effect.gen(function*() {
       const [base, local] = yield* Effect.all([
         render(baseDirectory),
@@ -318,5 +381,43 @@ describe("Fleet OpenTelemetry Collector", () => {
       assert.include(localConfig, "max_megabytes: 32");
       assert.include(localConfig, "max_backups: 8");
       assert.include(localConfig, "max_days: 1");
+      const diagnostics = yield* resource(
+        local,
+        "PersistentVolumeClaim",
+        "agentos-otel-diagnostics",
+      );
+      assert.deepStrictEqual(diagnostics.spec, {
+        accessModes: ["ReadWriteOnce"],
+        resources: { requests: { storage: "512Mi" } },
+      });
+      const statefulSet = yield* collectorStatefulSet(local);
+      const collector = yield* required(
+        statefulSet.spec.template.spec.containers[0],
+        "Missing Collector",
+      );
+      assert.deepInclude(collector.volumeMounts, {
+        mountPath: "/var/lib/otelcol-diagnostics",
+        name: "diagnostics",
+      });
+      assert.deepInclude(statefulSet.spec.template.spec.volumes, {
+        name: "diagnostics",
+        persistentVolumeClaim: { claimName: "agentos-otel-diagnostics" },
+      });
+    }).pipe(Effect.provide(BunServices.layer)));
+
+  it.effect("publishes safe operational status without coupling serving readiness", () =>
+    Effect.gen(function*() {
+      const resources = yield* render(baseDirectory);
+      const collectorConfig = yield* config(resources);
+      assert.include(collectorConfig, "path: /healthz");
+      assert.include(collectorConfig, 'healthy: \'{\"status\":\"ok\"}\'');
+      assert.include(
+        collectorConfig,
+        'unhealthy: \'{\"status\":\"unavailable\"}\'',
+      );
+      assert.include(collectorConfig, "host: 0.0.0.0");
+      assert.include(collectorConfig, "port: 8888");
+      assert.notInclude(collectorConfig, "authorization:");
+      assert.notInclude(collectorConfig, "api_key:");
     }).pipe(Effect.provide(BunServices.layer)));
 });

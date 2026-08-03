@@ -1,0 +1,403 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentos-otel-collector
+data:
+  collector.yaml: |
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+        path: /healthz
+        response_body:
+          healthy: '{"status":"ok"}'
+          unhealthy: '{"status":"unavailable"}'
+      pprof:
+        endpoint: 127.0.0.1:1777
+      file_storage/queue:
+        directory: /var/lib/otelcol/storage
+        create_directory: true
+        timeout: 1s
+        max_size: 536870912
+        fsync: true
+        recreate: true
+        compaction:
+          directory: /var/lib/otelcol/storage
+          on_start: true
+          on_rebound: true
+          cleanup_on_start: true
+          rebound_needed_threshold_mib: 256
+          rebound_trigger_threshold_mib: 64
+          check_interval: 5s
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+            max_recv_msg_size_mib: 8
+          http:
+            endpoint: 0.0.0.0:4318
+            max_request_body_size: 8388608
+            read_timeout: 10s
+            read_header_timeout: 5s
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 192
+        spike_limit_mib: 48
+      k8sattributes:
+        auth_type: serviceAccount
+        passthrough: false
+        filter:
+          node_from_env_var: K8S_NODE_NAME
+        pod_association:
+          - sources:
+              - from: connection
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.uid
+        extract:
+          metadata:
+            - k8s.namespace.name
+            - k8s.deployment.name
+            - k8s.statefulset.name
+            - k8s.daemonset.name
+            - k8s.replicaset.name
+            - k8s.pod.name
+            - k8s.container.name
+            - service.namespace
+            - service.name
+            - service.version
+      resource_detection/fleet:
+        detectors:
+          - env
+        timeout: 2s
+        override: false
+      probabilistic_sampler/fleet:
+        mode: proportional
+        sampling_percentage: ${env:AGENTOS_OTEL_TRACE_SAMPLING_PERCENTAGE}
+        fail_closed: true
+        sampling_precision: 4
+      resource/privacy:
+        attributes:
+          - key: k8s.pod.uid
+            action: delete
+          - key: process.command_args
+            action: delete
+          - key: process.command_line
+            action: delete
+          - key: process.environment
+            action: delete
+          - key: user.email
+            action: delete
+          - key: enduser.id
+            action: delete
+          - key: authorization
+            action: delete
+          - key: cookie
+            action: delete
+          - key: http.request.body
+            action: delete
+          - key: http.response.body
+            action: delete
+          - key: http.request.header.authorization
+            action: delete
+          - key: http.request.header.cookie
+            action: delete
+          - key: http.response.header.set_cookie
+            action: delete
+          - key: gen_ai.prompt
+            action: delete
+          - key: gen_ai.completion
+            action: delete
+          - key: gen_ai.input.messages
+            action: delete
+          - key: gen_ai.output.messages
+            action: delete
+          - key: tool.arguments
+            action: delete
+          - key: tool.result
+            action: delete
+          - key: error.message
+            action: delete
+          - key: exception.message
+            action: delete
+          - key: exception.stacktrace
+            action: delete
+          - key: provider.account.id
+            action: delete
+          - key: provider.account.email
+            action: delete
+          - key: db.query.text
+            action: delete
+          - key: db.statement
+            action: delete
+          - key: gen_ai.system_instructions
+            action: delete
+          - key: agentos.assignment.brief
+            action: delete
+          - key: agentos.inbox.body
+            action: delete
+          - key: agentos.memory.body
+            action: delete
+          - key: agentos.memory.embedding
+            action: delete
+          - key: agentos.memory.query
+            action: delete
+          - key: agentos.memory.snippet
+            action: delete
+          - key: agentos.provider.credential
+            action: delete
+          - key: agentos.provider.identity
+            action: delete
+          - key: agentos.provider.resource_id
+            action: delete
+          - key: agentos.repository.name
+            action: delete
+          - key: agentos.session.transcript
+            action: delete
+          - key: agentos.tool.arguments
+            action: delete
+          - key: agentos.tool.result
+            action: delete
+      attributes/privacy:
+        actions:
+          - key: authorization
+            action: delete
+          - key: cookie
+            action: delete
+          - key: http.request.body
+            action: delete
+          - key: http.response.body
+            action: delete
+          - key: http.request.header.authorization
+            action: delete
+          - key: http.request.header.cookie
+            action: delete
+          - key: http.response.header.set_cookie
+            action: delete
+          - key: gen_ai.prompt
+            action: delete
+          - key: gen_ai.completion
+            action: delete
+          - key: gen_ai.input.messages
+            action: delete
+          - key: gen_ai.output.messages
+            action: delete
+          - key: tool.arguments
+            action: delete
+          - key: tool.result
+            action: delete
+          - key: error.message
+            action: delete
+          - key: exception.message
+            action: delete
+          - key: exception.stacktrace
+            action: delete
+          - key: provider.account.id
+            action: delete
+          - key: provider.account.email
+            action: delete
+          - key: db.query.text
+            action: delete
+          - key: db.statement
+            action: delete
+          - key: gen_ai.system_instructions
+            action: delete
+          - key: agentos.assignment.brief
+            action: delete
+          - key: agentos.inbox.body
+            action: delete
+          - key: agentos.memory.body
+            action: delete
+          - key: agentos.memory.embedding
+            action: delete
+          - key: agentos.memory.query
+            action: delete
+          - key: agentos.memory.snippet
+            action: delete
+          - key: agentos.provider.credential
+            action: delete
+          - key: agentos.provider.identity
+            action: delete
+          - key: agentos.provider.resource_id
+            action: delete
+          - key: agentos.repository.name
+            action: delete
+          - key: agentos.session.transcript
+            action: delete
+          - key: agentos.tool.arguments
+            action: delete
+          - key: agentos.tool.result
+            action: delete
+      attributes/metric_cardinality:
+        actions:
+          - key: agentos.ai.operation.id
+            action: delete
+          - key: agentos.ai.provider.request_id
+            action: delete
+          - key: agentos.ai.request.attempt_id
+            action: delete
+          - key: agentos.ai.route.slot
+            action: delete
+          - key: agentos.authz.decision_ref
+            action: delete
+          - key: agentos.authz.profile_id
+            action: delete
+          - key: agentos.authz.profile_version
+            action: delete
+          - key: agentos.identity.agent_id
+            action: delete
+          - key: agentos.identity.assignment_id
+            action: delete
+          - key: agentos.identity.task_id
+            action: delete
+          - key: agentos.memory.index.version
+            action: delete
+          - key: agentos.memory.topic_id
+            action: delete
+          - key: agentos.operation.id
+            action: delete
+          - key: agentos.request.id
+            action: delete
+          - key: agentos.resilience.operation.id
+            action: delete
+          - key: agentos.resilience.pod.uid
+            action: delete
+          - key: agentos.resilience.protocol.id
+            action: delete
+          - key: agentos.resilience.pvc.uid
+            action: delete
+          - key: agentos.resilience.session.id
+            action: delete
+          - key: agentos.resilience.topology.proposal_id
+            action: delete
+          - key: agentos.resilience.workload.overlay_digest
+            action: delete
+          - key: agentos.resilience.workload.render_digest
+            action: delete
+          - key: agentos.resilience.workload.spec_digest
+            action: delete
+          - key: agentos.runtime.session.id
+            action: delete
+          - key: agentos.trace.id
+            action: delete
+      transform/contract_allowlist:
+        error_mode: propagate
+        trace_statements:
+          - statements:
+              - >-
+                keep_keys(resource.attributes, ["agentos.ai.runtime", "agentos.ai.runtime.version", "agentos.fleet.name", "agentos.telemetry.contract.version", "deployment.environment.name", "k8s.cluster.name", "k8s.container.name", "k8s.namespace.name", "k8s.pod.name", "k8s.workload.name", "service.name", "service.namespace", "service.version"])
+          - statements:
+              - delete_matching_keys(scope.attributes, ".*")
+          - statements:
+              - >-
+                keep_keys(span.attributes, ["agentos.access.cache.result", "agentos.access.credential.outcome", "agentos.access.decision", "agentos.access.dependency", "agentos.access.operation", "agentos.access.reason", "agentos.ai.budget.state", "agentos.ai.compaction.path", "agentos.ai.cost.source", "agentos.ai.error.class", "agentos.ai.model.family", "agentos.ai.operation.id", "agentos.ai.provider.family", "agentos.ai.provider.request_id", "agentos.ai.quota.stale", "agentos.ai.request.attempt_id", "agentos.ai.request.kind", "agentos.ai.retry.count", "agentos.ai.route", "agentos.ai.route.slot", "agentos.ai.runtime", "agentos.ai.runtime.version", "agentos.ai.session.state", "agentos.ai.status_class", "agentos.ai.stream.bytes", "agentos.ai.stream.chunks", "agentos.ai.stream.mode", "agentos.ai.stream.outcome", "agentos.ai.token.type", "agentos.ai.usage.input_tokens", "agentos.ai.usage.output_tokens", "agentos.authz.decision_ref", "agentos.authz.profile_id", "agentos.authz.profile_version", "agentos.authz.rate_class", "agentos.identity.agent_id", "agentos.identity.assignment_id", "agentos.identity.task_id", "agentos.memory.degradation.class", "agentos.memory.index.state", "agentos.memory.index.version", "agentos.memory.method", "agentos.memory.operation", "agentos.memory.outcome", "agentos.memory.topic_id", "agentos.operation.id", "agentos.protocol.fallback", "agentos.protocol.name", "agentos.protocol.operation", "agentos.protocol.outcome", "agentos.readiness.component", "agentos.readiness.outcome", "agentos.request.id", "agentos.resilience.attempt", "agentos.resilience.cause", "agentos.resilience.evidence", "agentos.resilience.failure.class", "agentos.resilience.journal.phase", "agentos.resilience.operation.id", "agentos.resilience.outcome", "agentos.resilience.phase", "agentos.resilience.pod.uid", "agentos.resilience.protocol", "agentos.resilience.protocol.id", "agentos.resilience.pvc.uid", "agentos.resilience.recovery", "agentos.resilience.runtime.action", "agentos.resilience.session.id", "agentos.resilience.source", "agentos.resilience.topology.action", "agentos.resilience.topology.proposal_id", "agentos.resilience.topology.reason", "agentos.resilience.workload.overlay_digest", "agentos.resilience.workload.profile", "agentos.resilience.workload.render_digest", "agentos.resilience.workload.spec_digest", "agentos.resilience.workload.spec_version", "agentos.runtime.session.id", "agentos.telemetry.contract.version", "agentos.telemetry.outcome", "agentos.telemetry.reason", "agentos.telemetry.signal", "agentos.telemetry.stage", "agentos.topology.action", "agentos.topology.reason", "agentos.trace.id", "http.response.status_code"])
+          - statements:
+              - delete_matching_keys(spanevent.attributes, ".*")
+        metric_statements:
+          - statements:
+              - >-
+                keep_keys(resource.attributes, ["agentos.ai.runtime", "agentos.ai.runtime.version", "agentos.fleet.name", "agentos.telemetry.contract.version", "deployment.environment.name", "k8s.cluster.name", "k8s.container.name", "k8s.namespace.name", "k8s.pod.name", "k8s.workload.name", "service.name", "service.namespace", "service.version"])
+          - statements:
+              - delete_matching_keys(scope.attributes, ".*")
+          - statements:
+              - >-
+                keep_keys(datapoint.attributes, ["agentos.access.credential.outcome", "agentos.access.decision", "agentos.access.dependency", "agentos.access.operation", "agentos.access.reason", "agentos.ai.budget.state", "agentos.ai.compaction.path", "agentos.ai.cost.source", "agentos.ai.error.class", "agentos.ai.model.family", "agentos.ai.quota.stale", "agentos.ai.request.kind", "agentos.ai.route", "agentos.ai.runtime", "agentos.ai.status_class", "agentos.ai.stream.outcome", "agentos.ai.token.type", "agentos.memory.degradation.class", "agentos.memory.index.state", "agentos.memory.method", "agentos.memory.operation", "agentos.memory.outcome", "agentos.protocol.fallback", "agentos.protocol.name", "agentos.protocol.operation", "agentos.protocol.outcome", "agentos.readiness.component", "agentos.readiness.outcome", "agentos.resilience.cause", "agentos.resilience.evidence", "agentos.resilience.outcome", "agentos.resilience.phase", "agentos.resilience.recovery", "agentos.resilience.source", "agentos.telemetry.outcome", "agentos.telemetry.reason", "agentos.telemetry.signal", "agentos.telemetry.stage", "agentos.topology.action", "agentos.topology.reason"])
+          - statements:
+              - delete_matching_keys(exemplar.filtered_attributes, ".*")
+        log_statements:
+          - statements:
+              - >-
+                keep_keys(resource.attributes, ["agentos.ai.runtime", "agentos.ai.runtime.version", "agentos.fleet.name", "agentos.telemetry.contract.version", "deployment.environment.name", "k8s.cluster.name", "k8s.container.name", "k8s.namespace.name", "k8s.pod.name", "k8s.workload.name", "service.name", "service.namespace", "service.version"])
+          - statements:
+              - delete_matching_keys(scope.attributes, ".*")
+          - statements:
+              - >-
+                keep_keys(log.attributes, ["agentos.access.credential.outcome", "agentos.access.decision", "agentos.access.dependency", "agentos.access.operation", "agentos.access.reason", "agentos.ai.compaction.path", "agentos.ai.error.class", "agentos.ai.operation.id", "agentos.ai.provider.request_id", "agentos.ai.request.attempt_id", "agentos.ai.request.kind", "agentos.ai.route", "agentos.ai.runtime", "agentos.ai.status_class", "agentos.ai.stream.outcome", "agentos.authz.decision_ref", "agentos.authz.profile_id", "agentos.authz.profile_version", "agentos.identity.agent_id", "agentos.identity.assignment_id", "agentos.memory.degradation.class", "agentos.memory.index.state", "agentos.memory.index.version", "agentos.memory.method", "agentos.memory.operation", "agentos.memory.outcome", "agentos.memory.topic_id", "agentos.protocol.fallback", "agentos.protocol.name", "agentos.protocol.operation", "agentos.protocol.outcome", "agentos.readiness.component", "agentos.readiness.outcome", "agentos.resilience.cause", "agentos.resilience.evidence", "agentos.resilience.operation.id", "agentos.resilience.outcome", "agentos.resilience.phase", "agentos.resilience.protocol.id", "agentos.resilience.recovery", "agentos.resilience.source", "agentos.resilience.topology.proposal_id", "agentos.telemetry.contract.version", "agentos.telemetry.outcome", "agentos.telemetry.reason", "agentos.telemetry.signal", "agentos.telemetry.stage", "agentos.topology.action", "agentos.topology.reason"])
+          - statements:
+              - set(log.body, "")
+      batch:
+        send_batch_size: 512
+        send_batch_max_size: 1024
+        timeout: 1s
+
+    exporters:
+      otlp_grpc/remote:
+        endpoint: ${env:OTEL_EXPORTER_OTLP_ENDPOINT}
+        compression: gzip
+        timeout: 10s
+        retry_on_failure:
+          enabled: true
+          initial_interval: 1s
+          max_interval: 30s
+          max_elapsed_time: 0s
+        sending_queue:
+          enabled: true
+          num_consumers: 4
+          sizer: requests
+          queue_size: 2048
+          wait_for_result: false
+          block_on_overflow: false
+          storage: file_storage/queue
+
+    service:
+      extensions:
+        - health_check
+        - pprof
+        - file_storage/queue
+      telemetry:
+        logs:
+          level: info
+          encoding: json
+        metrics:
+          level: normal
+          readers:
+            - pull:
+                exporter:
+                  prometheus:
+                    host: 0.0.0.0
+                    port: 8888
+      pipelines:
+        traces:
+          receivers:
+            - otlp
+          processors:
+            - memory_limiter
+            - k8sattributes
+            - resource_detection/fleet
+            - resource/privacy
+            - attributes/privacy
+            - transform/contract_allowlist
+            - probabilistic_sampler/fleet
+            - batch
+          exporters:
+            - otlp_grpc/remote
+        metrics:
+          receivers:
+            - otlp
+          processors:
+            - memory_limiter
+            - k8sattributes
+            - resource_detection/fleet
+            - resource/privacy
+            - attributes/privacy
+            - attributes/metric_cardinality
+            - transform/contract_allowlist
+            - batch
+          exporters:
+            - otlp_grpc/remote
+        logs:
+          receivers:
+            - otlp
+          processors:
+            - memory_limiter
+            - k8sattributes
+            - resource_detection/fleet
+            - resource/privacy
+            - attributes/privacy
+            - transform/contract_allowlist
+            - batch
+          exporters:
+            - otlp_grpc/remote

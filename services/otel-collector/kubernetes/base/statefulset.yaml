@@ -42,6 +42,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: AGENTOS_OTEL_TRACE_SAMPLING_PERCENTAGE
+              value: "100"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: agentos.fleet.name=default,deployment.environment.name=development,agentos.telemetry.contract.version=1
           ports:
             - name: otlp-grpc
               containerPort: 4317
@@ -49,18 +53,21 @@ spec:
             - name: otlp-http
               containerPort: 4318
               protocol: TCP
+            - name: metrics
+              containerPort: 8888
+              protocol: TCP
             - name: health
               containerPort: 13133
               protocol: TCP
           livenessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: health
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: health
             initialDelaySeconds: 2
             periodSeconds: 5

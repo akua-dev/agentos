@@ -25,6 +25,15 @@ spec:
           port: 4317
         - protocol: TCP
           port: 4318
+    - from:
+        - podSelector:
+            matchLabels:
+              agentos.akua.dev/observability-admin: "true"
+      ports:
+        - protocol: TCP
+          port: 8888
+        - protocol: TCP
+          port: 13133
   egress:
     - to:
         - namespaceSelector:
