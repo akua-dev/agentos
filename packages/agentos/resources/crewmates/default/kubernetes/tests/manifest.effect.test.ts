@@ -155,6 +155,8 @@ describe("Crewmate Kubernetes base", () => {
           "agentos.akua.dev/agent": "crewmate",
           "agentos.akua.dev/agent-id":
             "00000000-0000-4000-8000-000000000003",
+          "agentos.akua.dev/ai-runtime": "codex",
+          "agentos.akua.dev/ai-runtime-version": "0.144.5",
           "agentos.akua.dev/assignment-id":
             "00000000-0000-4000-8000-000000000005",
           "agentos.akua.dev/github-client": "true",
@@ -240,6 +242,9 @@ describe("Crewmate Kubernetes base", () => {
       const variables = environment(
         yield* required(container.env, "Missing Crewmate environment"),
       );
+      const prepareVariables = environment(
+        yield* required(prepare.env, "Missing prepare-home environment"),
+      );
       assert.deepInclude(variables, {
         AGENTOS_AGENT_CWD:
           "/opt/agentos/packages/agentos/resources/crewmates/default",
@@ -266,6 +271,18 @@ describe("Crewmate Kubernetes base", () => {
         variables.OTEL_EXPORTER_OTLP_ENDPOINT,
         "http://agentos-otel-collector.agentos.svc.cluster.local:4318",
       );
+      for (const name of [
+        "AGENTOS_VERSION",
+        "K8S_NAMESPACE",
+        "K8S_POD_NAME",
+        ...Object.keys(variables).filter((name) => name.startsWith("OTEL_")),
+      ]) {
+        assert.deepStrictEqual(
+          prepareVariables[name],
+          variables[name],
+          `${name} must reach prepare-home before Codex starts`,
+        );
+      }
       assert.isUndefined(variables.PI_CODING_AGENT_DIR);
       assert.deepStrictEqual(container.command, ["herdr"]);
       assert.deepStrictEqual(container.args, [

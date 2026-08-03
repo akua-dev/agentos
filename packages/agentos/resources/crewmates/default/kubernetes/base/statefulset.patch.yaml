@@ -22,6 +22,8 @@ spec:
       labels:
         agentos.akua.dev/agent: crewmate
         agentos.akua.dev/agent-id: 00000000-0000-4000-8000-000000000003
+        agentos.akua.dev/ai-runtime: codex
+        agentos.akua.dev/ai-runtime-version: 0.144.5
         agentos.akua.dev/assignment-id: 00000000-0000-4000-8000-000000000005
         agentos.akua.dev/owner-agent-id: 00000000-0000-4000-8000-000000000002
         agentos.akua.dev/task-id: 00000000-0000-4000-8000-000000000004

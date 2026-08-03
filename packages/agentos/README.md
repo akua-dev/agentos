@@ -88,8 +88,12 @@ ordinary extension discovery for a controlled comparison.
 Fleet workloads use the standard `OTEL_*` environment surface. Crewmate home
 preparation maps those variables into the pinned Codex CLI's native `[otel]`
 configuration, preserves unrelated Codex settings, and forces
-`log_user_prompt = false`. Collector/backend failure does not affect inference
-readiness.
+`log_user_prompt = false`. The Fleet Collector enriches the native resource,
+normalizes bounded API-attempt evidence, and removes raw content/error/auth
+fields before export. All three exporters are configured explicitly, avoiding
+Codex's default Statsig metrics exporter. Collector/backend failure does not
+affect inference readiness. See the
+[pinned Codex compatibility record](../../docs/conformance/codex-native-otel.md).
 
 Use the released `agentos-observability` Skill for trace interpretation,
 extension/session control trials, dashboards, alerts, and incident runbooks.

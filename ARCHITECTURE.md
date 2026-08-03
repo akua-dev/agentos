@@ -777,14 +777,34 @@ Workloads consume the official OpenTelemetry environment surface:
 are sourced from Secrets and never rendered in ConfigMaps or diagnostics.
 Codex does not enable exporters from these variables by itself, so AgentOS
 atomically reconciles its native `[otel]` configuration from the same surface
-and forces `log_user_prompt=false`.
+and forces `log_user_prompt=false`. The rendered Crewmate gives the complete
+surface to both `prepare-home` and the long-running runtime container; this is
+required because preparation writes the native config before Codex starts.
 Compatibility is verified against the Fleet-pinned `codex-cli 0.144.5` and
-reviewed upstream source commit
-`9a46fd33a0ac62e7d700f2667e1b643c50c4970a`. Codex continues to own its native
+the peeled `rust-v0.144.5` upstream source commit
+`87db9bc18ba5bc82c1cb4e4381b44f693ee35623`. Codex continues to own its native
 spans, metrics, logs and W3C propagation; AgentOS does not fork or wrap its
 provider client. The bridge preserves unrelated user configuration and maps
 `OTEL_SDK_DISABLED=true` to `none` for all three native exporters, including
-the otherwise default analytics metrics path.
+the otherwise default Statsig metrics path. It always writes the metrics
+exporter explicitly, so Codex never falls back to that default. AgentOS leaves
+Codex's separate `[analytics]` product preference untouched: pinned `0.144.5`
+uses that preference as the gate for every metrics exporter, so an operator's
+explicit `analytics.enabled=false` also deliberately disables native Codex
+metrics while logs and traces continue. This coupling is a pinned-upstream
+compatibility limitation, not an AgentOS fork point.
+
+Native Codex resources do not honor the complete generic resource string.
+The Collector therefore extracts deployment-controlled runtime/version labels,
+adds Fleet/cluster/namespace/Pod/container identity, maps the owning Kubernetes
+controller to `k8s.workload.name`, and only then applies privacy and contract
+allowlists. Before raw `codex.api_request` attributes are discarded, the
+Collector projects bounded request kind, status class, sanitized error class,
+HTTP status and a capped upstream request ID. Duration remains available in
+Codex's native request-duration metric. Raw errors, prompts, message bodies,
+tool payloads, credentials and exporter headers never cross the sink boundary.
+The pinned support matrix and executable evidence are recorded in
+[`docs/conformance/codex-native-otel.md`](docs/conformance/codex-native-otel.md).
 
 Collector persistent sending queues retain accepted batches only until remote
 delivery or bounded queue eviction. The optional local diagnostic archive is

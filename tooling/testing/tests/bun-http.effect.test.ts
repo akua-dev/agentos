@@ -3,7 +3,10 @@ import { assert, layer } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { HttpClient } from "effect/unstable/http";
 
-import { acquireBunTestServer } from "../bun-http.ts";
+import {
+  acquireBunTestServer,
+  allocateBunTestPort,
+} from "../bun-http.ts";
 
 layer(Layer.merge(BunHttpClient.layer, Layer.empty))(
   "Bun HTTP test host adapter",
@@ -19,6 +22,19 @@ layer(Layer.merge(BunHttpClient.layer, Layer.empty))(
         );
         assert.strictEqual(response.status, 200);
         assert.strictEqual(yield* response.text, "/effect-host");
+      })));
+
+    it.effect("binds an explicitly selected integration port", () =>
+      Effect.scoped(Effect.gen(function*() {
+        const port = yield* allocateBunTestPort();
+        const server = yield* acquireBunTestServer(
+          () => Effect.succeed(new Response("bound")),
+          { port },
+        );
+        const client = yield* HttpClient.HttpClient;
+        const response = yield* client.get(`http://127.0.0.1:${port}/`);
+        assert.strictEqual(server.port, port);
+        assert.strictEqual(yield* response.text, "bound");
       })));
   },
 );

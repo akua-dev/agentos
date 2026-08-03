@@ -41,7 +41,7 @@ const gunzip = Effect.fn("test.otlpSink.gunzip")((encoded: Uint8Array) =>
 );
 
 export const acquireOtlpTestSink = Effect.fn("test.otlpSink.acquire")(
-  function*() {
+  function*(port?: number) {
     const status = yield* Ref.make(503);
     const requests = yield* Ref.make<ReadonlyArray<OtlpSinkRequest>>([]);
     const server = yield* acquireBunTestServer((request) =>
@@ -63,7 +63,7 @@ export const acquireOtlpTestSink = Effect.fn("test.otlpSink.acquire")(
         }]);
         return new Response(null, { status: responseStatus });
       }),
-      { hostname: "0.0.0.0" },
+      { hostname: "0.0.0.0", port },
     );
     return {
       requests: Ref.get(requests),

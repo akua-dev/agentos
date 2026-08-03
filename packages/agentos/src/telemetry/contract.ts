@@ -1250,6 +1250,7 @@ export const AGENTOS_TELEMETRY_EVENT_DEFINITIONS: Readonly<
       "agentos.ai.operation.id",
       "agentos.ai.request.attempt_id",
       "agentos.ai.provider.request_id",
+      "http.response.status_code",
     ],
     "bounded_gateway_failure",
   ),

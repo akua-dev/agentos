@@ -187,7 +187,7 @@ function startCollector(options: {
     "-e",
     "AGENTOS_OTEL_TRACE_SAMPLING_PERCENTAGE=100",
     "-e",
-    "OTEL_RESOURCE_ATTRIBUTES=agentos.fleet.name=test,deployment.environment.name=test,agentos.telemetry.contract.version=1",
+    "OTEL_RESOURCE_ATTRIBUTES=agentos.fleet.name=test,deployment.environment.name=test,agentos.telemetry.contract.version=1,k8s.cluster.name=agentos",
     "-v",
     `${options.configPath}:/etc/otelcol/collector.yaml:ro`,
     "-v",
@@ -425,6 +425,122 @@ function seedLog() {
   } satisfies typeof LogPayload.Type;
 }
 
+function nativeCodexTrace() {
+  return JSON.stringify({
+    resourceSpans: [{
+      resource: { attributes: [
+        { key: "service.name", value: { stringValue: "codex_exec" } },
+        { key: "service.version", value: { stringValue: "0.144.5" } },
+        { key: "agentos.ai.runtime", value: { stringValue: "codex" } },
+        { key: "agentos.ai.runtime.version", value: { stringValue: "0.144.5" } },
+        { key: "k8s.statefulset.name", value: { stringValue: "agentos-crewmate" } },
+      ] },
+      scopeSpans: [{
+        scope: { name: "codex_exec" },
+        spans: [{
+          traceId: "00000000000000000000000000000061",
+          spanId: "0000000000000061",
+          name: "codex.turn",
+          kind: 1,
+          startTimeUnixNano: "1000000000",
+          endTimeUnixNano: "2000000000",
+          attributes: [
+            { key: "gen_ai.prompt", value: { stringValue: "CODEX_NATIVE_PRIVATE_PROMPT" } },
+            { key: "tool.arguments", value: { stringValue: "CODEX_NATIVE_PRIVATE_TOOL_ARGUMENTS" } },
+          ],
+          events: [{
+            timeUnixNano: "1500000000",
+            name: "codex.api_request",
+            attributes: [{
+              key: "error.message",
+              value: { stringValue: "CODEX_NATIVE_PRIVATE_SPAN_EVENT_ERROR" },
+            }],
+          }],
+          status: { code: 1 },
+        }],
+      }],
+    }],
+  });
+}
+
+function nativeCodexMetrics() {
+  const resource = { attributes: [
+    { key: "service.name", value: { stringValue: "codex_exec" } },
+    { key: "service.version", value: { stringValue: "0.144.5" } },
+    { key: "agentos.ai.runtime", value: { stringValue: "codex" } },
+    { key: "agentos.ai.runtime.version", value: { stringValue: "0.144.5" } },
+    { key: "k8s.statefulset.name", value: { stringValue: "agentos-crewmate" } },
+  ] };
+  const attributes = [
+    { key: "status", value: { stringValue: "503" } },
+    { key: "success", value: { stringValue: "false" } },
+    { key: "authorization", value: { stringValue: "Bearer CODEX_NATIVE_PRIVATE_METRIC_CREDENTIAL" } },
+  ];
+  return JSON.stringify({
+    resourceMetrics: [{
+      resource,
+      scopeMetrics: [{
+        scope: { name: "codex_exec" },
+        metrics: [
+          {
+            name: "codex.api_request",
+            unit: "{request}",
+            sum: {
+              aggregationTemporality: 2,
+              isMonotonic: true,
+              dataPoints: [{ attributes, timeUnixNano: "2000000000", asInt: "1" }],
+            },
+          },
+          {
+            name: "codex.api_request.duration_ms",
+            unit: "ms",
+            gauge: {
+              dataPoints: [{ attributes, timeUnixNano: "2000000000", asDouble: 42 }],
+            },
+          },
+        ],
+      }],
+    }],
+  });
+}
+
+function nativeCodexLog() {
+  return JSON.stringify({
+    resourceLogs: [{
+      resource: { attributes: [
+        { key: "service.name", value: { stringValue: "codex_exec" } },
+        { key: "service.version", value: { stringValue: "0.144.5" } },
+        { key: "agentos.ai.runtime", value: { stringValue: "codex" } },
+        { key: "agentos.ai.runtime.version", value: { stringValue: "0.144.5" } },
+        { key: "k8s.statefulset.name", value: { stringValue: "agentos-crewmate" } },
+      ] },
+      scopeLogs: [{
+        scope: { name: "codex_otel.log_only" },
+        logRecords: [{
+          timeUnixNano: "2000000000",
+          observedTimeUnixNano: "2000000000",
+          severityNumber: 17,
+          severityText: "ERROR",
+          traceId: "00000000000000000000000000000061",
+          spanId: "0000000000000061",
+          eventName: "codex.api_request",
+          body: { stringValue: "CODEX_NATIVE_PRIVATE_RESPONSE" },
+          attributes: [
+            { key: "event.name", value: { stringValue: "codex.api_request" } },
+            { key: "duration_ms", value: { stringValue: "42" } },
+            { key: "http.response.status_code", value: { intValue: "503" } },
+            { key: "error.message", value: { stringValue: "CODEX_NATIVE_PRIVATE_ERROR" } },
+            { key: "auth.request_id", value: { stringValue: "req_agentos_codex_otel_61" } },
+            { key: "gen_ai.prompt", value: { stringValue: "CODEX_NATIVE_PRIVATE_LOG_PROMPT" } },
+            { key: "http.request.header.authorization", value: { stringValue: "Bearer CODEX_NATIVE_PRIVATE_LOG_CREDENTIAL" } },
+            { key: "tool.result", value: { stringValue: "CODEX_NATIVE_PRIVATE_TOOL_RESULT" } },
+          ],
+        }],
+      }],
+    }],
+  });
+}
+
 function seedTraceBatch(count: number) {
   const source = seedTrace();
   const resource = source.resourceSpans[0]!;
@@ -521,6 +637,97 @@ const acquireCollectorFixture = Effect.fn("test.otelE2e.fixture")(function*(
 layer(platform, { excludeTestServices: true })(
   "OpenTelemetry Collector outage conformance",
   (it) => {
+    it.effect(
+      "normalizes pinned Codex native signals before the privacy boundary",
+      () => Effect.scoped(Effect.gen(function*() {
+        if (!(yield* liveE2eEnabled())) return;
+        const fixture = yield* acquireCollectorFixture({ overlay: "remote" });
+        const sink = yield* acquireOtlpTestSink();
+        yield* sink.setAvailable(true);
+        const port = yield* allocateBunTestPort();
+        const name =
+          `agentos-otel-codex-${Math.abs(yield* Random.nextInt).toString(36)}`;
+        const collector = yield* startCollector({
+          ...fixture,
+          name,
+          port,
+          remoteEndpoint: sink.remoteEndpoint,
+        });
+        yield* Effect.gen(function*() {
+          yield* waitFor(
+            "codex_receiver_start",
+            Effect.option(postTrace(port, '{"resourceSpans":[]}')).pipe(
+              Effect.map((response) =>
+                Option.isSome(response) && response.value.status === 200
+              ),
+            ),
+          );
+          assert.strictEqual((yield* postTrace(port, nativeCodexTrace())).status, 200);
+          assert.strictEqual((yield* postMetrics(port, nativeCodexMetrics())).status, 200);
+          assert.strictEqual((yield* postLogs(port, nativeCodexLog())).status, 200);
+          yield* waitFor(
+            "codex_signals_exported",
+            sink.requests.pipe(Effect.map((requests) =>
+              ["/v1/logs", "/v1/metrics", "/v1/traces"].every((path) =>
+                requests.some((request) => request.path === path && request.accepted)
+              )
+            )),
+          );
+          const accepted = (yield* sink.requests).filter(({ accepted }) => accepted);
+          const serialized = accepted
+            .map(({ body }) => new TextDecoder().decode(body))
+            .join("\n");
+          for (const expected of [
+            "codex.api_request",
+            "codex.api_request.duration_ms",
+            "agentos.ai.request.kind",
+            "main",
+            "agentos.ai.status_class",
+            "server_error",
+            "agentos.ai.error.class",
+            "overload",
+            "agentos.ai.provider.request_id",
+            "req_agentos_codex_otel_61",
+            "http.response.status_code",
+            "agentos.ai.runtime",
+            "codex",
+            "agentos.ai.runtime.version",
+            "0.144.5",
+            "agentos.fleet.name",
+            "k8s.cluster.name",
+            "k8s.workload.name",
+            "agentos-crewmate",
+          ]) {
+            assert.include(serialized, expected);
+          }
+          for (const forbidden of [
+            "auth.request_id",
+            "error.message",
+            "gen_ai.prompt",
+            "http.request.header.authorization",
+            "k8s.statefulset.name",
+            "tool.arguments",
+            "tool.result",
+            "CODEX_NATIVE_PRIVATE_PROMPT",
+            "CODEX_NATIVE_PRIVATE_TOOL_ARGUMENTS",
+            "CODEX_NATIVE_PRIVATE_SPAN_EVENT_ERROR",
+            "CODEX_NATIVE_PRIVATE_METRIC_CREDENTIAL",
+            "CODEX_NATIVE_PRIVATE_RESPONSE",
+            "CODEX_NATIVE_PRIVATE_ERROR",
+            "CODEX_NATIVE_PRIVATE_LOG_PROMPT",
+            "CODEX_NATIVE_PRIVATE_LOG_CREDENTIAL",
+            "CODEX_NATIVE_PRIVATE_TOOL_RESULT",
+          ]) {
+            assert.notInclude(serialized, forbidden);
+          }
+        }).pipe(
+          Effect.ensuring(removeCollector(name).pipe(Effect.ignore)),
+          Effect.ensuring(collector.exitCode.pipe(Effect.ignore)),
+        );
+      })),
+      60_000,
+    );
+
     it.effect(
       "persists a privacy-filtered batch across remote outage and Collector restart",
       () => Effect.scoped(Effect.gen(function*() {
