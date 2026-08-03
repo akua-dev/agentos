@@ -160,6 +160,10 @@ export const AccessHardGateEvidenceV1Schema = Schema.Struct({
   projectedTokensRotated: Schema.Literal(true),
   unrelatedSubjectAllowed: Schema.Literal(true),
   ordinaryInternetAllowed: Schema.Literal(true),
+  rollingUpgradeObserved: Schema.Literal(true),
+  failedRevisionWithheld: Schema.Literal(true),
+  rollingRollbackObserved: Schema.Literal(true),
+  unrelatedWorkloadAvailableDuringRollback: Schema.Literal(true),
   namespacesDeleted: Schema.Literal(true),
   productionEndpointContacted: Schema.Literal(false),
 });

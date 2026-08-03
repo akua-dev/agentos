@@ -101,8 +101,17 @@ load. AgentOS profile, ceiling, OpenFGA-consistency, budget, and journal
 semantics remain proven by their exact PGlite/model regressions; the live test
 does not create a shadow authorization authority.
 
+The same namespace also exercises provider rollout custody. A two-replica
+probe Deployment holds both previous replicas Ready while an intentionally
+unready revision is withheld, remains reachable from the unrelated workload,
+rolls back through native retained ReplicaSet history, and later completes one
+good upgrade. The hard-gate evidence Schema requires all four rollout facts to
+be true. Cross-authority acknowledgement is separately compiled by the closed
+Effect `compileProviderAccessRolloutVerdict`; no configuration, policy,
+credential or budget mismatch can be reported verified.
+
 The artifact contains only the context and approval reference, revocation and
-reload milliseconds, load count, bounded booleans, and cleanup result. Tokens
+reload milliseconds, load count, rollout booleans, and cleanup result. Tokens
 remain `Redacted` in memory and are never encoded, logged, or persisted.
 Effect finalizers delete the namespace on success, failure, or interruption.
 
