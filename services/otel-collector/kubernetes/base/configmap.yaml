@@ -10,14 +10,27 @@ data:
     extensions:
       health_check:
         endpoint: 0.0.0.0:13133
+        path: /healthz
+        response_body:
+          healthy: '{"status":"ok"}'
+          unhealthy: '{"status":"unavailable"}'
       pprof:
         endpoint: 127.0.0.1:1777
       file_storage/queue:
         directory: /var/lib/otelcol/storage
         create_directory: true
+        timeout: 1s
+        max_size: 536870912
+        fsync: true
+        recreate: true
         compaction:
           directory: /var/lib/otelcol/storage
           on_start: true
+          on_rebound: true
+          cleanup_on_start: true
+          rebound_needed_threshold_mib: 256
+          rebound_trigger_threshold_mib: 64
+          check_interval: 5s
 
     receivers:
       otlp:
@@ -27,6 +40,9 @@ data:
             max_recv_msg_size_mib: 8
           http:
             endpoint: 0.0.0.0:4318
+            max_request_body_size: 8388608
+            read_timeout: 10s
+            read_header_timeout: 5s
 
     processors:
       memory_limiter:
@@ -56,6 +72,16 @@ data:
             - service.namespace
             - service.name
             - service.version
+      resource_detection/fleet:
+        detectors:
+          - env
+        timeout: 2s
+        override: false
+      probabilistic_sampler/fleet:
+        mode: proportional
+        sampling_percentage: ${env:AGENTOS_OTEL_TRACE_SAMPLING_PERCENTAGE}
+        fail_closed: true
+        sampling_precision: 4
       resource/privacy:
         attributes:
           - key: k8s.pod.uid
@@ -318,7 +344,7 @@ data:
             - pull:
                 exporter:
                   prometheus:
-                    host: 127.0.0.1
+                    host: 0.0.0.0
                     port: 8888
       pipelines:
         traces:
@@ -327,9 +353,11 @@ data:
           processors:
             - memory_limiter
             - k8sattributes
+            - resource_detection/fleet
             - resource/privacy
             - attributes/privacy
             - transform/contract_allowlist
+            - probabilistic_sampler/fleet
             - batch
           exporters:
             - nop
@@ -339,6 +367,7 @@ data:
           processors:
             - memory_limiter
             - k8sattributes
+            - resource_detection/fleet
             - resource/privacy
             - attributes/privacy
             - attributes/metric_cardinality
@@ -352,6 +381,7 @@ data:
           processors:
             - memory_limiter
             - k8sattributes
+            - resource_detection/fleet
             - resource/privacy
             - attributes/privacy
             - transform/contract_allowlist
