@@ -1,12 +1,18 @@
+import { classifyAIError } from "@akua-dev/agentos";
 import { Context, Effect, Layer, Schema, Stream } from "effect";
 import {
   HttpClient,
+  HttpClientError,
   HttpClientRequest,
 } from "effect/unstable/http";
 
 const AIProviderHttpErrorCode = Schema.Literals([
   "request_invalid",
   "provider_unavailable",
+  "provider_timeout",
+  "provider_transport_failed",
+  "provider_protocol_failed",
+  "provider_decode_failed",
   "provider_stream_failed",
 ]);
 
@@ -41,15 +47,15 @@ export const AIProviderHttpLive = Layer.effect(
           catch: () => providerHttpError("request_invalid"),
         });
         const response = yield* client.execute(clientRequest).pipe(
-          Effect.mapError(() => providerHttpError("provider_unavailable")),
+          Effect.mapError((error) => providerHttpError(httpErrorCode(error))),
         );
         const hasNoBody = request.method === "HEAD" ||
           response.status === 204 || response.status === 304;
         const body: AIProviderResponse["body"] = hasNoBody
           ? null
           : response.stream.pipe(
-            Stream.mapError(() =>
-              providerHttpError("provider_stream_failed")
+            Stream.mapError((error) =>
+              providerHttpError(streamErrorCode(error))
             ),
           );
         return {
@@ -65,4 +71,36 @@ export const AIProviderHttpLive = Layer.effect(
 
 function providerHttpError(code: AIProviderHttpError["code"]) {
   return AIProviderHttpError.make({ code });
+}
+
+function httpErrorCode(
+  error: HttpClientError.HttpClientError,
+): AIProviderHttpError["code"] {
+  switch (error.reason._tag) {
+    case "EncodeError":
+    case "InvalidUrlError":
+      return "request_invalid";
+    case "DecodeError":
+    case "EmptyBodyError":
+      return "provider_decode_failed";
+    case "StatusCodeError":
+      return "provider_protocol_failed";
+    case "TransportError": {
+      const failure = classifyAIError(error.reason.cause);
+      if (failure === "timeout") return "provider_timeout";
+      if (failure === "protocol") return "provider_protocol_failed";
+      if (failure === "decode") return "provider_decode_failed";
+      if (failure === "transport") return "provider_transport_failed";
+      return "provider_unavailable";
+    }
+  }
+}
+
+function streamErrorCode(
+  error: HttpClientError.HttpClientError,
+): AIProviderHttpError["code"] {
+  return error.reason._tag === "DecodeError" ||
+      error.reason._tag === "EmptyBodyError"
+    ? "provider_decode_failed"
+    : "provider_stream_failed";
 }

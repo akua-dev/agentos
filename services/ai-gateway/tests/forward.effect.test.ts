@@ -8,7 +8,7 @@ import {
   type ProviderBudgetSettlementReceiptV1,
   type ProviderBudgetSettlementReportV1,
 } from "@akua-dev/agentos";
-import { Effect, Fiber, Layer, Ref, Stream } from "effect";
+import { Effect, Fiber, Layer, Metric, Ref, Stream, Tracer } from "effect";
 import { TestClock } from "effect/testing";
 
 import {
@@ -23,6 +23,7 @@ import {
 import {
   AIGatewayTelemetry,
   type AIGatewayRequestTelemetry,
+  makeAIGatewayTelemetry,
   noopAIGatewayTelemetry,
 } from "../src/observability.ts";
 
@@ -135,7 +136,6 @@ const makeTelemetryRecorder = Effect.fn(
   const append = (event: unknown) =>
     Ref.update(events, (current) => [...current, event]);
   const requestTelemetry: AIGatewayRequestTelemetry = {
-    attemptId: "attempt-safe",
     authenticate: (authenticated, authorization, failureStatus) =>
       append({
         authenticated,
@@ -148,6 +148,8 @@ const makeTelemetryRecorder = Effect.fn(
       append({ failed: error !== undefined, kind: "route_ended", outcome }),
     quotaObservation: (ageSeconds, stale) =>
       append({ ageSeconds, kind: "quota", stale }),
+    quotaRefresh: (outcome) =>
+      append({ kind: "quota_refresh", outcome }),
     upstreamStarted: (headers) =>
       Effect.sync(() => {
         headers.set("x-client-request-id", "attempt-safe");
@@ -233,6 +235,61 @@ describe("Effect AI Gateway forwarding", () => {
           },
         },
       ]);
+    }));
+
+  it.effect("traces a successful non-streaming response through lease release", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const settlement = yield* makeSettlementRecorder();
+      const spans: Array<Tracer.NativeSpan> = [];
+      const tracer = Tracer.make({
+        span(options) {
+          const span = new Tracer.NativeSpan(options);
+          spans.push(span);
+          return span;
+        },
+      });
+      const telemetry = yield* makeAIGatewayTelemetry();
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: () => Effect.succeed(route.lease),
+        provider: AIProviderHttp.of({
+          execute: () => Effect.succeed({
+            status: 200,
+            headers: { "content-type": "application/json" },
+            body: Stream.make(encoder.encode('{"id":"response-safe"}')),
+          }),
+        }),
+        settlements: settlement.settlements,
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      }).pipe(Effect.provideService(AIGatewayTelemetry, telemetry));
+      const base = gatewayRequest();
+      const headers = new Headers(base.headers);
+      headers.set("x-agentos-stream-mode", "non_streaming");
+      const request = new Request(base.url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ model: "gpt-test", stream: false }),
+      });
+      const response = yield* handler(request).pipe(Effect.withTracer(tracer));
+      assert.strictEqual(
+        yield* Effect.tryPromise(() => response.text()),
+        '{"id":"response-safe"}',
+      );
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+      assert.include(spans.map(({ name }) => name), "ai-gateway.route.release");
+      assert.strictEqual(
+        spans.find(({ name }) => name === "ai-gateway.request")
+          ?.attributes.get("agentos.ai.stream.mode"),
+        "non_streaming",
+      );
+      assert.strictEqual(
+        spans.find(({ name }) => name === "ai-gateway.stream")
+          ?.attributes.get("agentos.ai.stream.outcome"),
+        "completed",
+      );
     }));
 
   it.effect("ends telemetry at authentication rejection without starting a route", () =>
@@ -631,10 +688,20 @@ describe("Effect AI Gateway forwarding", () => {
       { status: 401, failure: "authentication", retryAfter: null },
       { status: 429, failure: "rate_limit", retryAfter: "7" },
       { status: 503, failure: "overload", retryAfter: "3" },
+      { status: 500, failure: "server_error", retryAfter: null },
     ], ({ status, failure, retryAfter }) =>
       Effect.gen(function*() {
         const route = yield* makeLease();
         const settlement = yield* makeSettlementRecorder();
+        const spans: Array<Tracer.NativeSpan> = [];
+        const tracer = Tracer.make({
+          span(options) {
+            const span = new Tracer.NativeSpan(options);
+            spans.push(span);
+            return span;
+          },
+        });
+        const telemetry = yield* makeAIGatewayTelemetry();
         const headers: Readonly<Record<string, string>> = retryAfter === null
           ? { "content-type": "application/json" }
           : {
@@ -655,8 +722,12 @@ describe("Effect AI Gateway forwarding", () => {
           now: Effect.succeed(now),
           heartbeatMillis: 40_000,
           maximumUsageEventBytes: 4_096,
-        });
-        const response = yield* handler(gatewayRequest());
+        }).pipe(
+          Effect.provideService(AIGatewayTelemetry, telemetry),
+        );
+        const response = yield* handler(gatewayRequest()).pipe(
+          Effect.withTracer(tracer),
+        );
         assert.strictEqual(response.status, status);
         assert.strictEqual(response.headers.get("retry-after"), retryAfter);
         assert.strictEqual(
@@ -664,6 +735,14 @@ describe("Effect AI Gateway forwarding", () => {
           `{"error":"${failure}"}`,
         );
         assert.strictEqual(yield* Ref.get(route.releases), 1);
+        assert.include(
+          spans.map(({ name }) => name),
+          "ai-gateway.route.acquire",
+        );
+        assert.include(
+          spans.map(({ name }) => name),
+          "ai-gateway.route.release",
+        );
         assert.deepStrictEqual(yield* Ref.get(settlement.reports), [{
           schemaVersion: 1,
           decisionRef,
@@ -673,7 +752,23 @@ describe("Effect AI Gateway forwarding", () => {
           cachedInputTokens: 0,
           spendMicros: 0,
         }]);
-      }), { discard: true }));
+      }), { discard: true }).pipe(Effect.andThen(Effect.gen(function*() {
+        const metrics = yield* Metric.snapshot;
+        for (const name of [
+          "agentos.ai.streams.active",
+          "agentos.ai.route.reservations.active",
+        ]) {
+          const metric = metrics.find(({ id }) => id === name);
+          assert.isDefined(metric, name);
+          assert.strictEqual(
+            metric !== undefined && "count" in metric.state
+              ? metric.state.count
+              : undefined,
+            0,
+            name,
+          );
+        }
+      }))));
 
   it.effect("ends telemetry after a valid upstream response without a body", () =>
     Effect.gen(function*() {

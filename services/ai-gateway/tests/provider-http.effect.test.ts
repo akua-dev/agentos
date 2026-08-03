@@ -24,6 +24,26 @@ function providerLayer(
   );
 }
 
+interface TransportCase {
+  readonly cause: unknown;
+  readonly expected: AIProviderHttpError["code"];
+}
+
+const transportCases: ReadonlyArray<TransportCase> = [
+  {
+    cause: { name: "TimeoutError", message: "private timeout" },
+    expected: "provider_timeout",
+  },
+  {
+    cause: { code: "ECONNRESET", message: "private reset" },
+    expected: "provider_transport_failed",
+  },
+  {
+    cause: new Error("private failure"),
+    expected: "provider_unavailable",
+  },
+];
+
 describe("AI provider HTTP adapter", () => {
   it.effect("preserves the provider response while keeping transport inside Effect", () =>
     Effect.gen(function*() {
@@ -77,23 +97,23 @@ describe("AI provider HTTP adapter", () => {
     }));
 
   it.effect("maps request construction and transport failures to closed typed errors", () =>
-    Effect.gen(function*() {
-      const transportLayer = providerLayer((request) => Effect.fail(
-        new HttpClientError.HttpClientError({
-          reason: new HttpClientError.TransportError({
-            request,
-            description: "private failure",
+    Effect.forEach(transportCases, ({ cause, expected }) =>
+      Effect.gen(function*() {
+        const transportLayer = providerLayer((request) => Effect.fail(
+          new HttpClientError.HttpClientError({
+            reason: new HttpClientError.TransportError({ request, cause }),
           }),
-        }),
-      ));
-      const transport = yield* Effect.gen(function*() {
-        const provider = yield* AIProviderHttp;
-        return yield* Effect.flip(provider.execute(
-          new Request("https://api.openai.test/v1/responses"),
         ));
-      }).pipe(Effect.provide(transportLayer));
-      assert.instanceOf(transport, AIProviderHttpError);
-      assert.strictEqual(transport.code, "provider_unavailable");
+        const transport = yield* Effect.gen(function*() {
+          const provider = yield* AIProviderHttp;
+          return yield* Effect.flip(provider.execute(
+            new Request("https://api.openai.test/v1/responses"),
+          ));
+        }).pipe(Effect.provide(transportLayer));
+        assert.instanceOf(transport, AIProviderHttpError);
+        assert.strictEqual(transport.code, expected);
+        assert.notInclude(String(transport), "private");
+      }), { discard: true }).pipe(Effect.andThen(Effect.gen(function*() {
 
       const provider = yield* AIProviderHttp.pipe(
         Effect.provide(AIProviderHttpLive),
@@ -110,7 +130,7 @@ describe("AI provider HTTP adapter", () => {
       const invalid = yield* Effect.flip(provider.execute(invalidRequest));
       assert.instanceOf(invalid, AIProviderHttpError);
       assert.strictEqual(invalid.code, "request_invalid");
-    }));
+    }))));
 
   it.effect("keeps provider stream defects typed and payload-free", () =>
     Effect.gen(function*() {
@@ -134,7 +154,7 @@ describe("AI provider HTTP adapter", () => {
         Stream.runDrain(response.body ?? Stream.empty),
       );
       assert.instanceOf(failure, AIProviderHttpError);
-      assert.strictEqual(failure.code, "provider_stream_failed");
+      assert.strictEqual(failure.code, "provider_decode_failed");
       assert.notInclude(String(failure), "private provider payload");
     }));
 });

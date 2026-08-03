@@ -61,12 +61,15 @@ native Pi/Codex configuration.
 
 ## OpenTelemetry
 
-The Gateway initializes fail-open OpenTelemetry only when the standard
-`OTEL_*` workload environment selects a configured exporter. It emits bounded
-request, authentication, route-acquisition, route-release, upstream, and stream
-spans plus the contract-v1 metrics documented in
+The Gateway uses Effect's native tracer, logger, metrics, and scoped OTLP/HTTP
+protobuf layers. Standard `OTEL_*` configuration selects asynchronous bounded
+batch export; `OTEL_SDK_DISABLED=true` selects the inert Effect service. It
+emits bounded request, authentication, route-acquisition, quota-refresh,
+route-release, upstream, and stream spans plus the contract-v1 metrics documented in
 [`ARCHITECTURE.md`](../../ARCHITECTURE.md#ai-telemetry-contract-v1).
-Readiness never depends on telemetry export.
+Exporter work runs outside the request lifecycle. Export failures temporarily
+disable the affected exporter and are never part of Gateway readiness or
+provider response semantics.
 
 Validated inbound `traceparent` and `tracestate` continue the runtime trace.
 Every provider attempt receives a fresh `x-client-request-id`; inbound
@@ -74,6 +77,14 @@ Every provider attempt receives a fresh `x-client-request-id`; inbound
 before OpenAI. Provider request IDs appear only on protected spans and
 correlated failure logs. Metrics never contain request, trace, span, operation,
 attempt, session, route-slot, provider-account, or provider-request IDs.
+
+The checked-in load regression runs 300 complete request lifecycles after
+warm-up and compares telemetry enabled with the inert service on the same live
+Effect clock. The budget is less than 750 microseconds average incremental CPU
+wall time per lifecycle, including two cryptographic request IDs, seven spans,
+the full bounded metric set, and aggregate stream accounting. This is a local
+process budget rather than a provider or Collector latency SLO; CI fails if the
+average exceeds it.
 
 Use the released `agentos-observability` Skill for the controlled
 default-extension versus `-ne -e observability` matrix, portable dashboards,
