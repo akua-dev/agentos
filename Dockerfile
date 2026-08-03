@@ -116,6 +116,7 @@ RUN bun install \
       --filter @agentos/github-app-token \
       --filter @agentos/pg-listen \
       --filter @agentos/a2a \
+      --filter @agentos/agentgateway \
       --filter @agentos/ai-gateway \
       --filter @agentos/egress-authz \
       --filter @agentos/github-broker \
@@ -185,6 +186,9 @@ COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/a2a/node_modules/ \
   /opt/agentos/services/a2a/node_modules/
 COPY --from=agentos-runtime-dependencies \
+  /tmp/agentos-dependencies/services/agentgateway/node_modules/ \
+  /opt/agentos/services/agentgateway/node_modules/
+COPY --from=agentos-runtime-dependencies \
   /tmp/agentos-dependencies/services/ai-gateway/node_modules/ \
   /opt/agentos/services/ai-gateway/node_modules/
 COPY --from=agentos-runtime-dependencies \
@@ -219,6 +223,7 @@ RUN chmod 0644 \
     /opt/agentos/packages/agentos/runtime/run-mate.ts \
     /opt/agentos/packages/agentos/runtime/health.ts \
     /opt/agentos/services/a2a/src/main.ts \
+    /opt/agentos/services/agentgateway/src/readiness-main.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \
     /opt/agentos/services/egress-authz/src/main.ts \
     /opt/agentos/services/github-broker/src/main.ts \
@@ -236,6 +241,9 @@ RUN chmod 0644 \
   && ln -s \
     /opt/agentos/services/a2a/src/main.ts \
     /usr/local/bin/agentos-a2a \
+  && ln -s \
+    /opt/agentos/services/agentgateway/src/readiness-main.ts \
+    /usr/local/bin/agentos-agentgateway-readiness \
   && ln -s \
     /opt/agentos/services/ai-gateway/src/main.ts \
     /usr/local/bin/ai-gateway \

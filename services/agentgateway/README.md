@@ -168,15 +168,42 @@ AgentOS keeps Kustomize as the deployment source of truth. [`kubernetes/values.y
 
 The pinned chart's read-only mode, ConfigMap checksum, security context, probes, ClusterIP override, resource settings and immutable image override are useful. The exact render also proves that the chart does **not** set `automountServiceAccountToken: false`, create an AgentOS NetworkPolicy or PodDisruptionBudget, express Fleet topology spreading, or expose AgentOS' semantic readiness condition. Its optional monitoring mode emits a `PodMonitor`, while AgentOS uses its existing OpenTelemetry collector and must not acquire a Prometheus Operator dependency just for this service.
 
-The production implementation in [#96](https://github.com/akua-dev/agentos/issues/96) therefore owns reviewed Kustomize manifests and compares every upgrade against this pinned chart. Upgrade means: pin the new release/digests, rerun the semantic suite, render and diff the new chart, update owned manifests, canary one credential domain, then roll forward. Rollback means reapply the prior immutable Kustomize revision and last-known-good config. No database migration is involved because AgentOS omits agentgateway's request-log database.
+The production implementation in [`kubernetes`](./kubernetes) owns separate
+OpenAI and GitHub Kustomize workloads. Render both with:
+
+```bash
+kubectl kustomize services/agentgateway/kubernetes
+```
+
+Each credential domain has two replicas, an ingress-only NetworkPolicy, a
+PodDisruptionBudget, topology spreading, a dedicated tokenless ServiceAccount,
+and an immutable hash-named ConfigMap. The PEP mounts no provider credential;
+the GitHub instance mounts only its server TLS identity. The Service exposes
+only the governed listener, while admin, metrics and readiness listeners stay
+inside the Pod. There is deliberately no `Egress` NetworkPolicy, so this does
+not make ordinary Agent Internet access depend on agentgateway.
+
+An AgentOS Effect sidecar makes Kubernetes readiness semantic: it requires
+both `/healthz/ready` and one unambiguous `config_synchronized == 1` metric,
+bounds the metrics response, times out closed and emits no response content.
+Liveness remains process-only so a rejected reload can be repaired without a
+restart loop. Production configuration changes use a new immutable ConfigMap
+name and a zero-unavailable rollout rather than mutating a mounted route file.
+
+Every upgrade compares the owned manifests against the pinned chart. Upgrade
+means: pin the new release/digests, rerun the semantic suite, render and diff
+the new chart, update owned manifests, canary one credential domain, then roll
+forward. Rollback means reapply the prior immutable Kustomize revision and
+last-known-good config. No database migration is involved because AgentOS
+omits agentgateway's request-log database.
 
 ## Operations and observability gaps
 
-- `/healthz/ready` reports process/config startup readiness, but a rejected hot reload keeps the last good config and leaves readiness healthy. Kubernetes readiness must combine `/healthz/ready` with `agentgateway_config_synchronized == 1`, implemented in [#96](https://github.com/akua-dev/agentos/issues/96).
+- `/healthz/ready` reports process/config startup readiness, while the owned semantic sidecar combines it with `config_synchronized == 1` for Kubernetes readiness.
 - The admin UI remains loopback-only and is not an Agent or operator mutation surface. Production policy changes flow through reviewed configuration/OpenFGA state.
 - AgentOS omits `config.database`. This avoids a request database and its full span-attribute blob; cost dashboards that require it are deliberately unavailable. The official docs confirm that request logging is disabled when the database field is omitted: [request-log storage](https://agentgateway.dev/docs/standalone/latest/integrations/observability/database/).
 - Native OTLP and Prometheus support are accepted, but the Fleet collector must continue removing content-bearing attributes. See the official [tracing](https://agentgateway.dev/docs/standalone/latest/reference/observability/traces/) and [metrics](https://agentgateway.dev/docs/reference/observability/metrics/) documentation.
-- Dynamic route reload is accepted. Static listener/admin/process configuration still requires a rollout. The pinned source keeps the previous state after a failed reload and publishes the synchronization metric: [state manager at v1.4.1](https://github.com/agentgateway/agentgateway/blob/163ea2146acb7b82082acea30ed691b29079095f/crates/agentgateway/src/state_manager.rs).
+- Dynamic route reload remains a proven binary capability, but production route files are immutable and roll by ConfigMap hash. The pinned source keeps the previous state after a failed reload and publishes the synchronization metric: [state manager at v1.4.1](https://github.com/agentgateway/agentgateway/blob/163ea2146acb7b82082acea30ed691b29079095f/crates/agentgateway/src/state_manager.rs).
 
 ## Shipped features versus architectural material
 

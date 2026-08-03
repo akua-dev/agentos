@@ -261,6 +261,26 @@
       "status": "migrated"
     },
     {
+      "id": "agentgateway-readiness-entrypoint",
+      "issue": 96,
+      "pattern": "^services/agentgateway/src/readiness-main\\.ts$",
+      "runtime": "bun-entrypoint",
+      "package": "@agentos/agentgateway",
+      "io": ["config", "http", "stream", "runtime-adapter"],
+      "migrationDependencies": [100, 101, 88, 90],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "agentgateway-readiness-runtime",
+      "issue": 96,
+      "pattern": "^services/agentgateway/src/(?!readiness-main\\.ts$)",
+      "runtime": "bun-kubernetes",
+      "package": "@agentos/agentgateway",
+      "io": ["http", "stream", "telemetry"],
+      "migrationDependencies": [100, 101, 88, 90],
+      "status": "migrated"
+    },
+    {
       "id": "egress-authorizer-effect-tests",
       "issue": 96,
       "pattern": "^services/egress-authz/tests/.*\\.effect\\.test\\.ts$",

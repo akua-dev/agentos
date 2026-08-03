@@ -456,6 +456,18 @@
       "test": "services/a2a/tests/main.effect.test.ts",
       "removalCondition": "Retain only while the A2A adapter remains a standalone Bun service and keep all domain behavior inside Effect.",
       "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "services/agentgateway/src/readiness-main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The AgentGateway semantic readiness executable needs one reviewed Bun process entry around its typed, bounded Effect HTTP probe and server program.",
+      "ownerIssue": 96,
+      "test": "services/agentgateway/tests/readiness.effect.test.ts",
+      "removalCondition": "Retain only while Kubernetes runs semantic AgentGateway readiness as a standalone sidecar service and keep all probe behavior inside Effect.",
+      "expiresOn": null
     }
   ]
 }
