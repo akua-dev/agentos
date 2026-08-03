@@ -1,6 +1,10 @@
 import { assert, describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
 import {
+  AGENTOS_ACCESS_ADAPTERS,
+  AGENTOS_ACCESS_METRICS,
+  AGENTOS_ACCESS_PROVIDER_OUTCOMES,
+  AGENTOS_ACCESS_ROUTES,
   AGENTOS_AI_COMPACTION_PATHS,
   AGENTOS_AI_ERROR_CLASSES,
   AGENTOS_AI_METRICS,
@@ -34,6 +38,56 @@ import {
 } from "../privacy.ts";
 
 describe("AgentOS Fleet telemetry contract v1", () => {
+  it.effect("keeps provider-access correlation finite on metrics and detailed on spans", () =>
+    Effect.sync(() => {
+      assert.deepStrictEqual(AGENTOS_ACCESS_ROUTES, [
+        "openai_responses",
+        "openai_compaction",
+        "github_rest",
+        "github_graphql",
+        "github_git",
+        "unknown",
+      ]);
+      assert.includeMembers([...AGENTOS_ACCESS_ADAPTERS], [
+        "egress_authz",
+        "agentgateway_openai",
+        "agentgateway_github",
+        "ai_gateway",
+        "github_broker",
+      ]);
+      assert.deepStrictEqual(AGENTOS_ACCESS_PROVIDER_OUTCOMES, [
+        "unobserved",
+        "not_forwarded",
+        "completed",
+        "provider_rejected",
+        "transport_failed",
+        "cancelled",
+      ]);
+      const input = {
+        "agentos.access.route": "github_rest",
+        "agentos.access.adapter": "github_broker",
+        "agentos.access.provider": "github",
+        "agentos.access.provider.outcome": "completed",
+        "agentos.identity.agent_id":
+          "10000000-0000-4000-8000-000000000001",
+        "agentos.identity.assignment_id":
+          "20000000-0000-4000-8000-000000000001",
+        "agentos.authz.decision_ref":
+          "decision_22222222222222222222222222222222",
+        "agentos.authz.profile_id": "github-maintainer",
+      };
+      assert.deepStrictEqual(
+        safeMetricAttributes(AGENTOS_ACCESS_METRICS.providerOperations, input),
+        {
+          "agentos.access.adapter": "github_broker",
+          "agentos.access.provider": "github",
+          "agentos.access.provider.outcome": "completed",
+          "agentos.access.route": "github_rest",
+        },
+      );
+      assert.deepStrictEqual(safeTelemetryAttributes(input, "span"), input);
+    }));
+
   it.effect("publishes the complete bounded vocabulary", () => Effect.sync(() => {
     expect(AGENTOS_AI_TELEMETRY_CONTRACT_VERSION).toBe(1);
     expect(AGENTOS_AI_RUNTIMES).toEqual(["pi", "codex"]);

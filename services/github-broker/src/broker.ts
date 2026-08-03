@@ -1,8 +1,12 @@
 import {
+  noopProviderAccessTelemetry,
   PROVIDER_AUTHORIZATION_GRANT_HEADERS,
   ProviderAuthorizationError,
   decodeProviderAuthorizationGrantHeaders,
   type ProviderBudgetSettlementReporter,
+  type ProviderAccessTelemetry,
+  type ProviderAccessTelemetryEnd,
+  type ProviderAccessTelemetryOperation,
   type ProviderAuthorizationGrantV1,
 } from "@akua-dev/agentos";
 import { Cause, Clock, Effect, Exit, Option, Stream } from "effect";
@@ -19,6 +23,7 @@ export interface GitHubBrokerOptions {
   readonly apiUrl: string;
   readonly gitUrl: string;
   readonly settlements: ProviderBudgetSettlementReporter["Service"];
+  readonly telemetry?: ProviderAccessTelemetry["Service"];
   readonly now?: Effect.Effect<number>;
 }
 
@@ -51,79 +56,100 @@ export const makeGitHubBrokerHandler = Effect.fn(
 )(function*(options: GitHubBrokerOptions) {
   const http = yield* GitHubProviderHttp;
   const now = options.now ?? Clock.currentTimeMillis;
+  const telemetry = options.telemetry ?? noopProviderAccessTelemetry;
 
   const handler: GitHubBrokerHandler = Effect.fn(
     "agentos.githubBroker.forward",
   )(function*(request: Request) {
-    const url = yield* Effect.try({
-      try: () => new URL(request.url),
-      catch: () => githubBrokerError("unsupported_route"),
+    const access = yield* telemetry.start({
+      request,
+      operation: "credential",
+      route: githubAccessRoute(request.url),
+      adapter: "github_broker",
+      provider: "github",
     });
-    const body = url.pathname === "/api/graphql"
-      ? yield* readBoundedAuthorizationBody(request)
-      : undefined;
-    const currentTime = yield* now;
-    const grant = yield* decodeProviderAuthorizationGrantHeaders(
-      request.headers,
-      {
-        method: request.method,
-        path: `${url.pathname}${url.search}`,
-        nowMillis: currentTime,
-        body,
-      },
-    );
-    if (
-      grant.credentialDomain !== "github" ||
-      grant.resource.kind !== "github_repository"
-    ) {
-      return yield* githubBrokerError("invalid_grant");
-    }
-    const scope = yield* tokenScopeForGrant(grant);
-    const upstreamUrl = yield* resolveUpstreamUrl(
-      url,
-      options.apiUrl,
-      options.gitUrl,
-    );
-    const lease = yield* options.tokens.acquire(scope);
-    const headers = upstreamHeaders(request.headers);
-    headers.set(
-      "authorization",
-      isGitSmartPath(url.pathname)
-        ? `Basic ${Buffer.from(`x-access-token:${lease.token}`).toString("base64")}`
-        : `Bearer ${lease.token}`,
-    );
-    const upstreamRequest = yield* Effect.try({
-      try: () => {
-        const init: RequestInit & { readonly duplex: "half" } = {
+    return yield* Effect.gen(function*() {
+      const url = yield* Effect.try({
+        try: () => new URL(request.url),
+        catch: () => githubBrokerError("unsupported_route"),
+      });
+      const body = url.pathname === "/api/graphql"
+        ? yield* readBoundedAuthorizationBody(request)
+        : undefined;
+      const currentTime = yield* now;
+      const grant = yield* decodeProviderAuthorizationGrantHeaders(
+        request.headers,
+        {
           method: request.method,
-          headers,
-          body: request.method === "GET" || request.method === "HEAD"
-            ? undefined
-            : request.body,
-          redirect: "manual",
-          signal: request.signal,
-          duplex: "half",
-        };
-        return new Request(upstreamUrl.toString(), init);
-      },
-      catch: () => githubBrokerError("provider_unavailable"),
-    });
-    const upstream = yield* http.execute(upstreamRequest).pipe(
-      Effect.tapError(() =>
-        reportSettlement(
-          options.settlements,
-          grant.decisionRef,
-          "transport_failed",
+          path: `${url.pathname}${url.search}`,
+          nowMillis: currentTime,
+          body,
+        },
+      );
+      if (
+        grant.credentialDomain !== "github" ||
+        grant.resource.kind !== "github_repository"
+      ) {
+        return yield* githubBrokerError("invalid_grant");
+      }
+      yield* access.correlate(grant);
+      const scope = yield* tokenScopeForGrant(grant);
+      const upstreamUrl = yield* resolveUpstreamUrl(
+        url,
+        options.apiUrl,
+        options.gitUrl,
+      );
+      const lease = yield* options.tokens.acquire(scope).pipe(
+        Effect.tap(() => access.credential("released")),
+        Effect.tapError(() => access.credential("failed")),
+      );
+      const headers = upstreamHeaders(request.headers);
+      headers.set(
+        "authorization",
+        isGitSmartPath(url.pathname)
+          ? `Basic ${Buffer.from(`x-access-token:${lease.token}`).toString("base64")}`
+          : `Bearer ${lease.token}`,
+      );
+      const upstreamRequest = yield* Effect.try({
+        try: () => {
+          const init: RequestInit & { readonly duplex: "half" } = {
+            method: request.method,
+            headers,
+            body: request.method === "GET" || request.method === "HEAD"
+              ? undefined
+              : request.body,
+            redirect: "manual",
+            signal: request.signal,
+            duplex: "half",
+          };
+          return new Request(upstreamUrl.toString(), init);
+        },
+        catch: () => githubBrokerError("provider_unavailable"),
+      });
+      const upstream = yield* http.execute(upstreamRequest).pipe(
+        Effect.tapError(() =>
+          reportSettlement(
+            options.settlements,
+            grant.decisionRef,
+            "transport_failed",
+          )
+        ),
+      );
+      if (upstream.status === 401) {
+        yield* options.tokens.invalidate(scope);
+      }
+      return yield* copyProviderResponse(
+        upstream,
+        grant.decisionRef,
+        options.settlements,
+        access,
+      );
+    }).pipe(
+      Effect.tapError((error) =>
+        access.credential(githubErrorCredentialOutcome(error)).pipe(
+          Effect.andThen(access.end(githubErrorTelemetry(error))),
         )
       ),
-    );
-    if (upstream.status === 401) {
-      yield* options.tokens.invalidate(scope);
-    }
-    return yield* copyProviderResponse(
-      upstream,
-      grant.decisionRef,
-      options.settlements,
     );
   });
   return handler;
@@ -269,6 +295,16 @@ function isGitSmartPath(path: string): boolean {
   );
 }
 
+function githubAccessRoute(
+  source: string,
+): "github_rest" | "github_graphql" | "github_git" | "unknown" {
+  if (!URL.canParse(source)) return "unknown";
+  const path = new URL(source).pathname;
+  if (path === "/api/graphql") return "github_graphql";
+  if (path.startsWith("/api/v3/")) return "github_rest";
+  return isGitSmartPath(path) ? "github_git" : "unknown";
+}
+
 function upstreamHeaders(source: Headers): Headers {
   const headers = new Headers();
   for (const [name, value] of source) {
@@ -288,6 +324,7 @@ const copyProviderResponse = Effect.fn(
   response: Response,
   decisionRef: string,
   settlements: ProviderBudgetSettlementReporter["Service"],
+  telemetry: ProviderAccessTelemetryOperation,
 ) {
   const headers = new Headers();
   for (const [name, value] of response.headers) {
@@ -299,6 +336,10 @@ const copyProviderResponse = Effect.fn(
   const responseBody = response.body;
   if (responseBody === null) {
     yield* reportSettlement(settlements, decisionRef, terminalOutcome);
+    yield* telemetry.end(githubProviderTelemetry(
+      terminalOutcome,
+      response.status,
+    ));
     return new Response(null, {
       status: response.status,
       statusText: response.statusText,
@@ -312,11 +353,17 @@ const copyProviderResponse = Effect.fn(
       releaseLockOnEnd: true,
     }).pipe(
       Stream.onExit((exit) =>
-        reportSettlement(
-          settlements,
-          decisionRef,
-          streamSettlementOutcome(exit, terminalOutcome),
-        )
+        Effect.all([
+          reportSettlement(
+            settlements,
+            decisionRef,
+            streamSettlementOutcome(exit, terminalOutcome),
+          ),
+          telemetry.end(githubProviderTelemetry(
+            streamSettlementOutcome(exit, terminalOutcome),
+            response.status,
+          )),
+        ], { concurrency: 2, discard: true })
       ),
     );
   const body = yield* Stream.toReadableStreamEffect(bodyStream);
@@ -326,6 +373,73 @@ const copyProviderResponse = Effect.fn(
     headers,
   });
 });
+
+function githubProviderTelemetry(
+  outcome: "completed" | "cancelled" | "provider_rejected" | "transport_failed",
+  status?: number,
+): ProviderAccessTelemetryEnd {
+  return {
+    decision: "allow",
+    reason: "allowed",
+    dependency: outcome === "transport_failed" ? "provider" : "none",
+    providerOutcome: outcome,
+    ...(status === undefined ? {} : { status }),
+  };
+}
+
+function githubErrorCredentialOutcome(
+  error: ProviderAuthorizationError | GitHubBrokerError,
+): "withheld" | "failed" {
+  return error instanceof GitHubBrokerError &&
+      (error.code === "credential_unavailable" ||
+        error.code === "invalid_configuration")
+    ? "failed"
+    : "withheld";
+}
+
+function githubErrorTelemetry(
+  error: ProviderAuthorizationError | GitHubBrokerError,
+): ProviderAccessTelemetryEnd {
+  if (error instanceof ProviderAuthorizationError) {
+    return {
+      decision: "deny",
+      reason: error.code === "assignment_mismatch"
+        ? "assignment_inactive"
+        : "identity_invalid",
+      dependency: "none",
+      providerOutcome: "not_forwarded",
+      status: errorResponse(error).status,
+    };
+  }
+  if (error.code === "provider_unavailable") {
+    return {
+      decision: "error",
+      reason: "dependency_unavailable",
+      dependency: "provider",
+      providerOutcome: "transport_failed",
+      status: 502,
+    };
+  }
+  if (
+    error.code === "credential_unavailable" ||
+    error.code === "invalid_configuration"
+  ) {
+    return {
+      decision: "error",
+      reason: "dependency_unavailable",
+      dependency: "credential_adapter",
+      providerOutcome: "not_forwarded",
+      status: 503,
+    };
+  }
+  return {
+    decision: "deny",
+    reason: "unknown",
+    dependency: "none",
+    providerOutcome: "not_forwarded",
+    status: 403,
+  };
+}
 
 function streamSettlementOutcome(
   exit: Exit.Exit<unknown, GitHubBrokerError>,

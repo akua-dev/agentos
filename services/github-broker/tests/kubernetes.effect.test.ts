@@ -69,6 +69,15 @@ describe("GitHub broker Kubernetes boundary", () => {
       assert.include(rendered, '"secretName":"agentos-github-app"');
       assert.include(rendered, '"GITHUB_APP_PRIVATE_KEY_FILE"');
       assert.include(rendered, '"automountServiceAccountToken":false');
+      assert.include(rendered, '"agentos.akua.dev/otel-client":"true"');
+      assert.include(rendered, '"name":"OTEL_SERVICE_NAME","value":"agentos-github-broker"');
+      assert.include(
+        rendered,
+        '"name":"OTEL_EXPORTER_OTLP_ENDPOINT","value":"http://agentos-otel-collector.agentos.svc.cluster.local:4318"',
+      );
+      assert.include(rendered, '"name":"OTEL_RESOURCE_ATTRIBUTES"');
+      assert.include(rendered, "agentos.fleet.name=default");
+      assert.include(rendered, "k8s.workload.name=github-broker");
       assert.include(
         rendered,
         '"AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL"',

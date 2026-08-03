@@ -93,6 +93,22 @@ describe("native Effect AI Gateway telemetry", () => {
           name === "ai-gateway.upstream"
         );
         assert.strictEqual(requestSpan?.traceId, "11111111111111111111111111111111");
+        assert.strictEqual(
+          requestSpan?.attributes.get("agentos.access.route"),
+          "openai_responses",
+        );
+        assert.strictEqual(
+          requestSpan?.attributes.get("agentos.access.adapter"),
+          "ai_gateway",
+        );
+        assert.strictEqual(
+          requestSpan?.attributes.get("agentos.access.credential.outcome"),
+          "released",
+        );
+        assert.strictEqual(
+          requestSpan?.attributes.get("agentos.access.provider.outcome"),
+          "completed",
+        );
         assert.strictEqual(upstreamSpan?.traceId, requestSpan?.traceId);
         assert.strictEqual(
           upstreamSpan?.attributes.get("agentos.ai.provider.request_id"),
@@ -118,6 +134,8 @@ describe("native Effect AI Gateway telemetry", () => {
           "agentos.ai.streams.active",
           "agentos.ai.stream.chunks",
           "agentos.ai.stream.bytes",
+          "agentos.access.credential.releases",
+          "agentos.access.provider.operations",
         ]) {
           assert.isDefined(metrics.find(({ id }) => id === name), name);
         }

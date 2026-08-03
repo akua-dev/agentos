@@ -27,6 +27,7 @@ routes:
         failureMode: deny
         includeRequestHeaders:
           - authorization
+          - traceparent
           - x-agentos-assignment-id
         includeRequestBody:
           maxRequestBytes: 262144
@@ -72,6 +73,7 @@ routes:
         failureMode: deny
         includeRequestHeaders:
           - authorization
+          - traceparent
           - x-agentos-assignment-id
         protocol:
           http:

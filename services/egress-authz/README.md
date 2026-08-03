@@ -44,6 +44,23 @@ authorization observes current PostgreSQL and OpenFGA state. The
 workload-identity cache remains bounded by the shorter of the projected-token
 expiry and 15 seconds.
 
+## OpenTelemetry
+
+The authorizer exports Effect-native spans and metrics through the Fleet OTLP
+Collector. A valid inbound `traceparent` continues the AgentGateway trace. The
+authorization span records only finite route, adapter, decision, reason and
+dependency values; a typed identity-store, Kubernetes or OpenFGA failure is
+classified before the public response is reduced to its content-free envelope.
+Successful spans add the validated Mate, optional Assignment, decision
+reference and immutable profile version. Those identifiers are explicitly
+excluded from metric labels.
+
+Telemetry is fail-open and does not participate in authorization, readiness or
+budget enforcement. The runtime never observes a token value, arbitrary
+header, request body, policy document or provider payload. Kubernetes supplies
+Fleet and workload resource correlation, while the Collector enforces the
+contract allowlist again before local or remote export.
+
 Rate limits, exhausted token/spend budgets and binding-local effective-zero
 kill switches are enforced by one atomic reservation function that revalidates
 the current PostgreSQL policy. They survive Pod and process restarts and do not

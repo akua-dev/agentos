@@ -1,5 +1,6 @@
 import type { ProviderAuthorizationGrantV1 } from "@akua-dev/agentos";
 import {
+  AGENTOS_ACCESS_METRICS,
   AGENTOS_AI_DURATION_BUCKETS_SECONDS,
   AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
   AGENTOS_AI_METRICS,
@@ -174,6 +175,14 @@ const quotaObservationAge = Metric.histogram(
 const quotaRefreshes = Metric.counter(AGENTOS_AI_METRICS.quotaRefreshes, {
   incremental: true,
 });
+const accessCredentialReleases = Metric.counter(
+  AGENTOS_ACCESS_METRICS.credentialReleases,
+  { incremental: true },
+);
+const accessProviderOperations = Metric.counter(
+  AGENTOS_ACCESS_METRICS.providerOperations,
+  { incremental: true },
+);
 
 export const makeAIGatewayTelemetry = Effect.fn(
   "agentos.aiGateway.makeTelemetry",
@@ -185,7 +194,7 @@ export const makeAIGatewayTelemetry = Effect.fn(
   const startRequest = (request: Request) =>
     Effect.gen(function*() {
       const operationId = yield* nextId;
-      const base = requestAttributes(request.headers, operationId);
+      const base = requestAttributes(request, operationId);
       const parent = traceParent(request.headers);
       const requestStartedAt = yield* Clock.currentTimeNanos;
       const requestSpan = yield* Effect.makeSpan(
@@ -453,17 +462,24 @@ function requestTelemetry(
           return Effect.gen(function*() {
             const attemptId = yield* nextId;
             const startedAt = yield* Clock.currentTimeNanos;
+            const base = safeTelemetryAttributes({
+              ...current.base,
+              "agentos.access.credential.outcome": "released",
+            }, "span");
             const span = yield* Effect.makeSpan(
               AGENTOS_TELEMETRY_SPANS.aiGatewayUpstream,
               {
                 attributes: safeTelemetryAttributes({
-                  ...current.base,
+                  ...base,
                   "agentos.ai.request.attempt_id": attemptId,
                 }, "span"),
                 kind: "client",
                 parent: current.requestSpan,
               },
             );
+            yield* setSpanAttributes(current.requestSpan, {
+              "agentos.access.credential.outcome": "released",
+            });
             yield* Effect.sync(() => {
               headers.set(
                 "traceparent",
@@ -476,6 +492,7 @@ function requestTelemetry(
             }).pipe(Effect.catchCause(() => Effect.void));
             return stateTransition(undefined, {
               ...current,
+              base,
               upstream: { attemptId, span, startedAt },
             });
           });
@@ -670,6 +687,7 @@ function finishRequest(
     const endedAt = yield* Clock.currentTimeNanos;
     const final = {
       ...outcomeAttributes(outcome.status, outcome.error),
+      ...providerAccessOutcome(claimed, outcome),
       "agentos.ai.stream.outcome": outcome.streamOutcome,
     };
     const operations: Array<Effect.Effect<void>> = [];
@@ -763,6 +781,18 @@ function finishRequest(
           providerDuration,
           AGENTOS_AI_METRICS.providerDuration,
           elapsedSeconds(claimed.upstream.startedAt, endedAt),
+          { ...claimed.base, ...final },
+        ),
+        updateCounter(
+          accessCredentialReleases,
+          AGENTOS_ACCESS_METRICS.credentialReleases,
+          1,
+          { ...claimed.base, ...final },
+        ),
+        updateCounter(
+          accessProviderOperations,
+          AGENTOS_ACCESS_METRICS.providerOperations,
+          1,
           { ...claimed.base, ...final },
         ),
       );
@@ -903,9 +933,16 @@ function metricAttributes(
 }
 
 function requestAttributes(
-  headers: Headers,
+  request: Request,
   operationId: string,
 ): AgentOSTelemetryAttributes {
+  const headers = request.headers;
+  const path = URL.canParse(request.url) ? new URL(request.url).pathname : "";
+  const accessRoute = path === "/v1/responses"
+    ? "openai_responses"
+    : path === "/v1/responses/compact"
+    ? "openai_compaction"
+    : "unknown";
   return safeTelemetryAttributes({
     "agentos.telemetry.contract.version":
       AGENTOS_AI_TELEMETRY_CONTRACT_VERSION,
@@ -916,6 +953,9 @@ function requestAttributes(
       inferRuntime(headers),
     ),
     "agentos.ai.route": "ai_gateway",
+    "agentos.access.route": accessRoute,
+    "agentos.access.adapter": "ai_gateway",
+    "agentos.access.provider": "openai",
     "agentos.ai.provider.family": "openai",
     "agentos.ai.request.kind": boundedHeader<AgentOSAIRequestKind>(
       headers,
@@ -955,6 +995,9 @@ function authorizationAttributes(
   authorization: ProviderAuthorizationGrantV1,
 ): AgentOSTelemetryAttributes {
   return safeTelemetryAttributes({
+    "agentos.access.decision": "allow",
+    "agentos.access.reason": "allowed",
+    "agentos.access.dependency": "none",
     "agentos.identity.agent_id": authorization.identity.agentId,
     ...(authorization.identity.assignmentId === null
       ? {}
@@ -966,6 +1009,34 @@ function authorizationAttributes(
     "agentos.authz.profile_id": authorization.profile.profileId,
     "agentos.authz.profile_version": authorization.profile.profileVersion,
     "agentos.authz.rate_class": authorization.rateClass,
+  }, "span");
+}
+
+function providerAccessOutcome(
+  state: RequestState,
+  outcome: GatewayRequestOutcome,
+): AgentOSTelemetryAttributes {
+  if (state.upstream === undefined) {
+    return safeTelemetryAttributes({
+      "agentos.access.provider.outcome": "not_forwarded",
+      "agentos.access.dependency": "none",
+    }, "span");
+  }
+  const cancelled = outcome.streamOutcome === "client_disconnect" ||
+    outcome.streamOutcome === "aborted";
+  const status = outcome.status ?? state.upstream.status;
+  const providerOutcome = cancelled
+    ? "cancelled"
+    : outcome.error !== undefined
+    ? "transport_failed"
+    : status !== undefined && status >= 400
+    ? "provider_rejected"
+    : "completed";
+  return safeTelemetryAttributes({
+    "agentos.access.provider.outcome": providerOutcome,
+    "agentos.access.dependency": providerOutcome === "transport_failed"
+      ? "provider"
+      : "none",
   }, "span");
 }
 
