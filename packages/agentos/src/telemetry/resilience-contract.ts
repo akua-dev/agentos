@@ -4,6 +4,7 @@ import {
   SecondMateTopologyActionV1Schema,
   SecondMateTopologyReasonV1Schema,
 } from "../topology/second-mate.ts";
+import { ASSIGNMENT_EXECUTION_FAILURE_CLASSES } from "../supervision/retry-recovery.ts";
 import { AgentWorkloadProfileIdSchema } from "../workloads/profiles.ts";
 import type { AgentOSTelemetryAttributes } from "./privacy.ts";
 
@@ -61,6 +62,9 @@ export const RESILIENCE_CAUSES = values(
   "retry_exhausted",
 );
 
+export const RESILIENCE_FAILURE_CLASSES =
+  ASSIGNMENT_EXECUTION_FAILURE_CLASSES;
+
 export const RESILIENCE_OUTCOMES = values(
   "pending",
   "succeeded",
@@ -74,6 +78,7 @@ export const RESILIENCE_OUTCOMES = values(
 export const RESILIENCE_RECOVERY_CLASSES = values(
   "not_required",
   "retry",
+  "awaiting_supervisor",
   "repair_forward",
   "native_session_resume",
   "postgresql_listener_then_herdr_wake",
@@ -140,6 +145,7 @@ export const ResilienceObservationV1Schema = Schema.Struct({
   evidence: Schema.Literals(["observed", "unobserved"]),
   outcome: Schema.Literals(RESILIENCE_OUTCOMES),
   cause: Schema.Literals(RESILIENCE_CAUSES),
+  failureClass: Schema.NullOr(Schema.Literals(RESILIENCE_FAILURE_CLASSES)),
   recovery: Schema.Literals(RESILIENCE_RECOVERY_CLASSES),
   attempt: BoundedAttemptSchema,
   topologyAction: Schema.NullOr(SecondMateTopologyActionV1Schema),
@@ -167,6 +173,8 @@ export type ResilienceProtectedCorrelationV1 =
 export type ResilienceSource = ResilienceObservationV1["source"];
 export type ResiliencePhase = ResilienceObservationV1["phase"];
 export type ResilienceCause = ResilienceObservationV1["cause"];
+export type ResilienceFailureClass =
+  NonNullable<ResilienceObservationV1["failureClass"]>;
 export type ResilienceOutcome = ResilienceObservationV1["outcome"];
 export type ResilienceRecoveryClass = ResilienceObservationV1["recovery"];
 export type RuntimeOperationJournalPhase =
@@ -175,6 +183,7 @@ export type RuntimeOperationJournalPhase =
 const ResilienceTelemetryContractErrorCodeSchema = Schema.Literals([
   "invalid_contract",
   "inconsistent_evidence",
+  "inconsistent_failure_class",
   "missing_phase_evidence",
 ]);
 
@@ -196,6 +205,7 @@ export const decodeResilienceObservation = Effect.fn(
     Effect.mapError(() => contractError("invalid_contract", "$")),
   );
   yield* validateEvidence(observation);
+  yield* validateFailureClass(observation);
   yield* validatePhaseEvidence(observation);
   return observation;
 });
@@ -210,6 +220,9 @@ export function resilienceMetricAttributes(
     "agentos.resilience.evidence": observation.evidence,
     "agentos.resilience.outcome": observation.outcome,
     "agentos.resilience.cause": observation.cause,
+    ...(observation.failureClass === null
+      ? {}
+      : { "agentos.resilience.failure.class": observation.failureClass }),
     "agentos.resilience.recovery": observation.recovery,
     "agentos.resilience.attempt": observation.attempt,
     ...(observation.topologyAction === null
@@ -378,6 +391,20 @@ const validatePhaseEvidence = Effect.fn(
     }
   } else if (observation.protocol !== null) {
     return yield* contractError("missing_phase_evidence", "$.protocol");
+  }
+});
+
+const validateFailureClass = Effect.fn(
+  "agentos.resilienceTelemetry.validateFailureClass",
+)(function*(observation: ResilienceObservationV1) {
+  if (
+    (observation.cause === "retry_exhausted") !==
+      (observation.failureClass !== null)
+  ) {
+    return yield* contractError(
+      "inconsistent_failure_class",
+      "$.failureClass",
+    );
   }
 });
 

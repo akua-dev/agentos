@@ -319,6 +319,21 @@ needed to apply and verify that choice through native interfaces.
 - Reconcile a stopped worker against its recorded Assignment and Treehouse
   worktree before resume. Preserve same-task work and refuse a fresh workspace
   while ownership is ambiguous.
+- Query the active Assignment execution epoch before attaching or retrying.
+  Preserve the exact Agent, Assignment, Pod/PVC, worktree, runtime operation,
+  and provider-native session. On bounded retry exhaustion, verify the closed
+  failure class and current native evidence, then leave the epoch visibly
+  exhausted until its supervising Mate records one `resume`, `reassign`, or
+  `stop` transition. Never make an unjournaled extra provider attempt.
+- For overload, transport, protocol, stream, provider, harness, or runtime
+  recovery, prove a changed provider/harness boundary and resume with its
+  bounded `boundary:<opaque>` reference. Authentication or policy exhaustion
+  requires explicit repaired authority recorded as `authority:<opaque>`.
+  Capacity exhaustion requires a different runtime operation for the same
+  Agent and Assignment, action `rollout` or `recover`, observed at
+  `harness_ready` or `completed`; a new Pod name or hopeful scheduler retry is
+  not evidence. Reattach the recorded native session after the released
+  database transition and verify there is still one writer.
 - Query the target Agent's nonterminal runtime operation before repair. Record
   `recovery_required` when a partial native boundary is ambiguous, then inspect
   exact Kubernetes, Herdr, PVC and worktree truth and advance that same

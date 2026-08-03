@@ -195,6 +195,26 @@ runtime logins receive no Fleet rows. Apply hierarchy only to mutation policies.
   the same Agent. A teardown requires ended Assignments and explicit
   disposition for the recorded PVC. The Functions create no Agent, Task,
   Assignment, Kubernetes resource or worktree and replace no native tool.
+- Before a harness/provider execution attempt, call
+  `agentos.begin_assignment_execution_epoch` with a stable epoch UUID, the
+  active Assignment, its matching runtime-operation UUID when one exists, and
+  the bounded native-session reference. Reuse those exact arguments after an
+  ambiguous database result. Record success with
+  `complete_assignment_execution_epoch`. When the closed class-specific retry
+  ceiling is reached, call `exhaust_assignment_execution_epoch` with exactly
+  that derived count; do not store terminal text or provider output as the
+  failure class.
+- After exhaustion, the supervising Mate must choose exactly one released
+  transition. Use `resume_assignment_execution_epoch` with the same Agent,
+  Assignment and session plus `boundary:<opaque>` for transient recovery,
+  `authority:<opaque>` after authentication/policy repair, or a distinct
+  matching rollout/recover runtime operation at `harness_ready`/`completed`
+  after capacity repair. Use `reassign_assignment_execution_epoch` to invoke
+  the atomic Assignment handoff, or `stop_assignment_execution_epoch` to end
+  the same Assignment with its report. Retry only the exact same arguments;
+  any changed successor, authority, destination, brief, report, or status is a
+  conflict. Never directly update an execution epoch or create a duplicate
+  Task, Assignment, Agent, session, PVC, or worktree to bypass exhaustion.
 - First Mate administers all Fleet work. A Second Mate may accept work only for
   its managed Agent subtree. A Task without Assignment history is deliberate
   backlog, not accepted execution. For a new accepted outcome call

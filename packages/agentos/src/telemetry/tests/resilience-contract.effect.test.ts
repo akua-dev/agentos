@@ -24,6 +24,7 @@ const validObservation: ResilienceObservationV1 = {
   evidence: "observed",
   outcome: "degraded",
   cause: "conflicting_workload_plan",
+  failureClass: null,
   recovery: "repair_forward",
   attempt: 2,
   topologyAction: null,
@@ -137,6 +138,12 @@ describe("delegation and recovery telemetry contract", () => {
         { ...validObservation, prompt: "SEED_PRIVATE_PROMPT" },
         { ...validObservation, secret: "sk-seeded-secret" },
         { ...validObservation, cause: "arbitrary-provider-error-body" },
+        { ...validObservation, failureClass: "transport" },
+        {
+          ...validObservation,
+          cause: "retry_exhausted",
+          failureClass: null,
+        },
         { ...validObservation, attempt: 33 },
         {
           ...validObservation,

@@ -28,8 +28,9 @@ memory content.
 ## Cardinality and protection
 
 Metrics expose only the closed source, phase, evidence, outcome, cause,
-recovery, attempt, topology action/reason, runtime action, workload profile/spec
-version, journal phase, and protocol attributes. Agent, Assignment, proposal,
+failure class, recovery, attempt, topology action/reason, runtime action,
+workload profile/spec version, journal phase, and protocol attributes. Agent,
+Assignment, proposal,
 operation, Pod, PVC, session, and protocol IDs and all spec/overlay/render
 digests are permitted only on protected spans or equally protected diagnostic
 logs.
@@ -49,6 +50,7 @@ caught and discarded at the telemetry boundary after best-effort span cleanup.
 | Readiness | semantic health diagnostic decoded by Effect Schema | bounded status and cause class; raw reason code is not emitted |
 | Session | native session availability contract | available, resumed, unavailable, or explicitly unobserved |
 | Protocol | released ACP/A2A conformance observation | bounded outcome, cause, fallback, and protected protocol correlation |
+| Assignment execution | durable SQL execution epoch | bounded failure/attempt, visibly blocked exhaustion, and resume/reassign/stop outcome |
 
 Every external input is decoded with a closed Effect Schema before projection.
 Contradictory journal states are rejected rather than silently normalized.
@@ -71,6 +73,20 @@ proves exact retry, rejects a changed spec with an identical render, preserves
 Agent/Task/Assignment counts and joins the one operation ID and three digests
 only on protected trace attributes. Metrics receive none of those identities
 or digests.
+
+The same disposable-workload test now creates a fresh PostgreSQL execution
+authority while the interactive Crewmate Pod is live. It exhausts a transient
+provider epoch, resumes the exact Agent/Assignment/runtime/native-session tuple,
+and proves the Pod UID, PVC UID, worktree marker, native-session marker, and
+single-writer replica count did not change. A held-out authentication case is
+denied without `authority:` evidence, and a held-out capacity case is denied
+until a distinct matching runtime operation reaches a verified ready phase.
+The deterministic companion runs without a cluster in CI; the opt-in live gate
+runs this transition inside the same explicitly approved local Kind lifecycle
+as the admission, RBAC, readiness-failure, repair, Pod-replacement, retained-PVC,
+and cleanup proof. Workload and protocol disposable suites accept the shared
+`kind-agentos-resilience-*` context so #127, #130, and retry recovery can be run
+against one disposable cluster without contacting a production endpoint.
 
 ## Operator contract
 

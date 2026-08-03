@@ -346,3 +346,30 @@ Agent/Task/Assignment identities, and retained-resource custody. The published
 history suite also requires every ordered SQL file to occur exactly once at a
 contiguous journal index, preventing an executable migration from silently
 falling outside the journal.
+
+`0025_assignment_execution_epochs.sql` records bounded execution attempts
+separately from the Assignment. `begin_assignment_execution_epoch` binds one
+active epoch to the exact Agent, Assignment, optional matching runtime
+operation, and bounded provider-native session reference. The table stores no
+brief, report, prompt, transcript, terminal output, provider payload,
+credential, Kubernetes status, or Herdr status. Every registered Agent retains
+Fleet-wide read visibility; only the assigned Agent or supervising Mate can
+begin, exhaust, or complete, and only the supervising Mate can resume,
+reassign, or stop.
+
+Retry ceilings are derived from the closed failure class: overload/transport
+5, stream 3, protocol/provider/harness/runtime 2, and
+authentication/policy/capacity 1. `exhaust_assignment_execution_epoch` accepts
+only the exact ceiling. Transient recovery requires `boundary:<opaque>`;
+authentication and policy require `authority:<opaque>`; capacity requires a
+different matching rollout/recover runtime operation already observed at
+`harness_ready` or `completed`. `resume_assignment_execution_epoch` preserves
+the Agent, Assignment, native session and ordinary runtime identity while
+linking exactly one successor epoch. `reassign_assignment_execution_epoch`
+delegates atomically to `handoff_task_assignment`;
+`stop_assignment_execution_epoch` ends the same Assignment and keeps its
+durable report there rather than in the epoch table. Every transition is
+row-locked, exact-retry idempotent, and terminal history is immutable. The
+Effect projection exposes only a closed failure class, recovery class and
+attempt as metric dimensions; Agent, Assignment, operation, and session
+correlations remain protected telemetry.
