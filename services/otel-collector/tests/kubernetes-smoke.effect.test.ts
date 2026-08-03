@@ -568,7 +568,7 @@ layer(platform, { excludeTestServices: true })(
           }),
           { hostname: "0.0.0.0" },
         );
-        const sink = yield* acquireOtlpTestSink();
+        const sink = yield* acquireOtlpTestSink(4317);
         yield* sink.setAvailable(true);
         const providerEndpoint = `http://host.docker.internal:${provider.port}`;
         const kind = yield* Config.string("AGENTOS_KIND_BIN").pipe(

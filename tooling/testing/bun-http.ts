@@ -18,13 +18,16 @@ function serverError(
 /** One-way adapter from Effect request programs into Bun's Promise HTTP ABI. */
 export function acquireBunTestServer<E>(
   program: (request: Request) => Effect.Effect<Response, E>,
-  options: { readonly hostname?: string } = {},
+  options: {
+    readonly hostname?: string;
+    readonly port?: number;
+  } = {},
 ) {
   return Effect.acquireRelease(
     Effect.try({
       try: () => Bun.serve({
         hostname: options.hostname ?? "127.0.0.1",
-        port: 0,
+        port: options.port ?? 0,
         fetch: (request) => Effect.runPromise(program(request)),
       }),
       catch: () => serverError("start", "Bun test server failed to start"),
