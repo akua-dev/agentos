@@ -6,11 +6,13 @@ import {
   type ProviderBudgetSettlementReportV1,
   type ProviderAuthorizationGrantV1,
 } from "@akua-dev/agentos";
-import { Effect, Ref } from "effect";
+import { Effect, Fiber, Ref } from "effect";
+import { TestClock } from "effect/testing";
 
 import {
   handleGitHubBrokerRequest,
   makeGitHubBrokerHandler,
+  serveGitHubBrokerRequest,
 } from "../src/broker.ts";
 import { GitHubProviderHttp } from "../src/http.ts";
 import type {
@@ -89,6 +91,7 @@ const makeTokenProvider = Effect.fn("test.githubBroker.makeTokenProvider")(
     >>([]);
     const index = yield* Ref.make(0);
     const provider: GitHubInstallationTokenProvider = {
+      check: Effect.void,
       acquire: (scope) =>
         Effect.gen(function*() {
           yield* Ref.update(acquired, (current) => [...current, scope]);
@@ -112,6 +115,53 @@ const makeTokenProvider = Effect.fn("test.githubBroker.makeTokenProvider")(
 );
 
 describe("GitHub workload broker", () => {
+  it.effect("keeps liveness independent while semantic readiness fails closed", () =>
+    Effect.gen(function*() {
+      const handler = (_request: Request) =>
+        Effect.succeed(Response.json({ unexpected: true }));
+      const live = yield* serveGitHubBrokerRequest(
+        handler,
+        {
+          check: Effect.fail(githubBrokerError("credential_unavailable")),
+          timeoutMillis: 100,
+        },
+        new Request("http://github-broker.test/livez"),
+      );
+      assert.strictEqual(live.status, 200);
+
+      const ready = yield* serveGitHubBrokerRequest(
+        handler,
+        { check: Effect.void, timeoutMillis: 100 },
+        new Request("http://github-broker.test/readyz"),
+      );
+      assert.strictEqual(ready.status, 200);
+
+      const unavailable = yield* serveGitHubBrokerRequest(
+        handler,
+        {
+          check: Effect.fail(githubBrokerError("credential_unavailable")),
+          timeoutMillis: 100,
+        },
+        new Request("http://github-broker.test/readyz"),
+      );
+      assert.strictEqual(unavailable.status, 503);
+      assert.deepStrictEqual(
+        yield* Effect.tryPromise(() => unavailable.json()),
+        { status: "not_ready" },
+      );
+
+      const timed = yield* Effect.forkChild(
+        serveGitHubBrokerRequest(
+          handler,
+          { check: Effect.never, timeoutMillis: 100 },
+          new Request("http://github-broker.test/readyz"),
+        ),
+        { startImmediately: true },
+      );
+      yield* TestClock.adjust(100);
+      assert.strictEqual((yield* Fiber.join(timed)).status, 503);
+    }));
+
   it.effect("forwards an allowed REST call with only an exact scoped installation token", () =>
     Effect.gen(function*() {
       const tokens = yield* makeTokenProvider();

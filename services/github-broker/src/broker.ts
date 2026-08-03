@@ -5,7 +5,7 @@ import {
   type ProviderBudgetSettlementReporter,
   type ProviderAuthorizationGrantV1,
 } from "@akua-dev/agentos";
-import { Cause, Clock, Effect, Exit, Stream } from "effect";
+import { Cause, Clock, Effect, Exit, Option, Stream } from "effect";
 
 import { GitHubProviderHttp } from "./http.ts";
 import {
@@ -40,6 +40,11 @@ const GRAPHQL_AUTHORIZATION_BODY_MAX_BYTES = 256 * 1_024;
 export type GitHubBrokerHandler = (
   request: Request,
 ) => Effect.Effect<Response, ProviderAuthorizationError | GitHubBrokerError>;
+
+export interface GitHubBrokerReadinessOptions {
+  readonly check: Effect.Effect<void, unknown>;
+  readonly timeoutMillis: number;
+}
 
 export const makeGitHubBrokerHandler = Effect.fn(
   "agentos.githubBroker.makeHandler",
@@ -135,6 +140,7 @@ export function handleGitHubBrokerRequest(
 
 export function serveGitHubBrokerRequest(
   handler: GitHubBrokerHandler,
+  readiness: GitHubBrokerReadinessOptions,
   request: Request,
 ) {
   return Effect.gen(function*() {
@@ -142,11 +148,19 @@ export function serveGitHubBrokerRequest(
       try: () => new URL(request.url),
       catch: () => githubBrokerError("unsupported_route"),
     });
-    if (
-      request.method === "GET" &&
-      (url.pathname === "/livez" || url.pathname === "/readyz")
-    ) {
-      return Response.json({ status: "ready" });
+    if (request.method === "GET" && url.pathname === "/livez") {
+      return Response.json({ status: "alive" });
+    }
+    if (request.method === "GET" && url.pathname === "/readyz") {
+      const result = yield* readiness.check.pipe(
+        Effect.timeoutOption(readiness.timeoutMillis),
+        Effect.option,
+      );
+      const ready = Option.isSome(result) && Option.isSome(result.value);
+      return Response.json(
+        { status: ready ? "ready" : "not_ready" },
+        { status: ready ? 200 : 503 },
+      );
     }
     return yield* handleGitHubBrokerRequest(handler, request);
   }).pipe(
