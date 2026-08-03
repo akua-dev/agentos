@@ -152,6 +152,22 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
       }),
     ));
 
+  const handleSettlementReadiness = Effect.fn(
+    "agentos.egressAuthz.handleSettlementReadiness",
+  )((request: Request) => {
+    const bearerToken = settlementBearerToken(request.headers);
+    if (bearerToken === null) return Effect.succeed(unauthorizedResponse());
+    return settlementCallers.authenticate(bearerToken).pipe(
+      Effect.flatMap(() => readiness.check),
+      Effect.map(readinessResponse),
+      Effect.catch((error) =>
+        Effect.succeed(responseForSettlementReadinessFailure(error))
+      ),
+      Effect.timeoutOption(limits.readinessTimeoutMillis),
+      Effect.map(Option.getOrElse(() => readinessResponse(false))),
+    );
+  });
+
   const handler: EgressAuthorizerRequestHandler = Effect.fn(
     "agentos.egressAuthz.handleRequest",
   )(function*(request: Request) {
@@ -170,10 +186,14 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
       );
       const ready = Option.isSome(result) &&
         Option.isSome(result.value) && result.value.value;
-      return Response.json(
-        { status: ready ? "ready" : "not_ready" },
-        { status: ready ? 200 : 503 },
-      );
+      return readinessResponse(ready);
+    }
+    if (url.pathname === "/readyz/settlement") {
+      if (request.method !== "GET") return methodNotAllowedResponse();
+      if (!headersWithinLimits(request.headers, limits)) {
+        return invalidRequestResponse();
+      }
+      return yield* handleSettlementReadiness(request);
     }
     if (url.pathname === "/authorize" || url.pathname === "/settle") {
       if (request.method !== "POST") return methodNotAllowedResponse();
@@ -257,6 +277,13 @@ function unavailableResponse(): Response {
   );
 }
 
+function readinessResponse(ready: boolean): Response {
+  return Response.json(
+    { status: ready ? "ready" : "not_ready" },
+    { status: ready ? 200 : 503 },
+  );
+}
+
 const readSettlementReport = Effect.fn(
   "agentos.egressAuthz.readSettlementReport",
 )(function*(request: Request, maximumBytes: number) {
@@ -333,4 +360,18 @@ function responseForSettlementFailure(error: unknown): Response {
     return invalidRequestResponse();
   }
   return unavailableResponse();
+}
+
+function responseForSettlementReadinessFailure(error: unknown): Response {
+  if (error instanceof ProviderBudgetSettlementCallerAuthenticationError) {
+    switch (error.outcome) {
+      case "unauthorized":
+        return unauthorizedResponse();
+      case "forbidden":
+        return forbiddenResponse();
+      case "dependency_unavailable":
+        return readinessResponse(false);
+    }
+  }
+  return readinessResponse(false);
 }

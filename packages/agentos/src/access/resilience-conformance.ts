@@ -959,11 +959,6 @@ const GitHubRest = regressionTest(
   "forwards an allowed REST call with only an exact scoped installation token",
   "#94",
 );
-const GitHubDenied = regressionTest(
-  "services/github-broker/tests/broker.effect.test.ts",
-  "never acquires a credential for a missing or route-mismatched grant",
-  "#94",
-);
 const GitHubSmartHttp = regressionTest(
   "services/github-broker/tests/broker.effect.test.ts",
   "uses Basic installation auth for smart HTTP and preserves native failures",
@@ -998,6 +993,16 @@ const GitHubTokenCache = regressionTest(
   "services/github-broker/tests/token-cache.effect.test.ts",
   "mints one exact repository token for concurrent requests and refreshes before expiry",
   "#94",
+);
+const GitHubSemanticReadiness = regressionTest(
+  "services/github-broker/tests/broker.effect.test.ts",
+  "keeps liveness independent while semantic readiness fails closed",
+  "#96",
+);
+const SettlementIdentityReadiness = regressionTest(
+  "packages/agentos/src/access/tests/provider-budget-settlement-http.effect.test.ts",
+  "proves its rotated Pod identity against authenticated settlement readiness",
+  "#96",
 );
 const GitHubCredentialHelper = regressionTest(
   "packages/agentos/runtime/tests/github-workload-auth.effect.test.ts",
@@ -1050,9 +1055,9 @@ export const ACCESS_RESILIENCE_REGRESSION_SOURCES: ReadonlyArray<
   ...regressionPair("dependency.openfga_outage", PolicyOpenFgaFailure, AuthorizerReadiness),
   ...regressionPair("dependency.authorizer_outage", HttpDependency, AuthorizerReadiness),
   ...regressionPair("dependency.agentgateway_outage", Agentgateway, AgentgatewayTopology),
-  ...regressionPair("dependency.provider_adapter_outage", GitHubTransport, GitHubDenied),
+  ...regressionPair("dependency.provider_adapter_outage", GitHubTransport, GitHubSemanticReadiness),
   ...regressionPair("credential.provider_expiry_refresh", GitHubTokenCache, GitHubRefresh),
-  ...regressionPair("credential.projected_token_rotation", AccessLive, KubernetesRotation),
+  ...regressionPair("credential.projected_token_rotation", KubernetesRotation, SettlementIdentityReadiness),
   ...regressionPair("transport.bounded_retry", GitHubTokenCache, DatabaseBudgetRetry),
   ...regressionPair("transport.stream_completion", GitHubSettlement, Agentgateway),
   ...regressionPair("transport.cancellation", GitHubCancellation, GitHubSettlement),

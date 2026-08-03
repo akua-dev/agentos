@@ -25,6 +25,99 @@ function privateKey() {
 }
 
 describe("GitHub installation-token provider", () => {
+  it.effect("proves the exact unsuspended installation without minting a broad token", () =>
+    Effect.scoped(Effect.gen(function*() {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const directory = yield* fileSystem.makeTempDirectoryScoped({
+        prefix: "agentos-github-broker-",
+      });
+      const keyFile = `${directory}/private-key.pem`;
+      yield* fileSystem.writeFileString(keyFile, privateKey(), { mode: 0o600 });
+      const requests = yield* Ref.make<ReadonlyArray<Request>>([]);
+      const http = GitHubProviderHttp.of({
+        execute: (request) =>
+          Ref.update(requests, (current) => [...current, request]).pipe(
+            Effect.as(Response.json({
+              id: 456,
+              account: { login: "akua-dev" },
+              suspended_at: null,
+            })),
+          ),
+      });
+      const provider = yield* makeGitHubInstallationTokenProvider({
+        apiUrl: "https://api.github.test",
+        appId: "123",
+        installationId: "456",
+        installationOwner: "akua-dev",
+        privateKeyFile: keyFile,
+        now: Effect.succeed(Date.parse("2026-08-01T12:00:00Z")),
+        readinessRefreshMillis: 60_000,
+      }).pipe(Effect.provideService(GitHubProviderHttp, http));
+      yield* provider.check;
+      yield* provider.check;
+      const observed = yield* Ref.get(requests);
+      assert.strictEqual(observed.length, 1);
+      assert.strictEqual(
+        observed[0]?.url,
+        "https://api.github.test/app/installations/456",
+      );
+      assert.strictEqual(observed[0]?.method, "GET");
+      assert.match(
+        observed[0]?.headers.get("authorization") ?? "",
+        /^Bearer /,
+      );
+      assert.isNull(observed[0]?.body ?? null);
+
+      yield* fileSystem.writeFileString(keyFile, privateKey(), { mode: 0o600 });
+      yield* provider.check;
+      assert.strictEqual((yield* Ref.get(requests)).length, 2);
+
+      yield* fileSystem.writeFileString(keyFile, "not-a-private-key", {
+        mode: 0o600,
+      });
+      const failure = yield* provider.check.pipe(Effect.flip);
+      assert.strictEqual(failure.code, "credential_unavailable");
+      assert.strictEqual((yield* Ref.get(requests)).length, 2);
+    }).pipe(Effect.provide(BunFileSystem.layer))));
+
+  it.effect("rejects a mismatched or suspended installation without exposing the response", () =>
+    Effect.scoped(Effect.gen(function*() {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const directory = yield* fileSystem.makeTempDirectoryScoped({
+        prefix: "agentos-github-broker-",
+      });
+      const keyFile = `${directory}/private-key.pem`;
+      yield* fileSystem.writeFileString(keyFile, privateKey(), { mode: 0o600 });
+      for (const body of [
+        {
+          id: 456,
+          account: { login: "different-owner" },
+          suspended_at: null,
+          secret: "must-not-leak",
+        },
+        {
+          id: 456,
+          account: { login: "akua-dev" },
+          suspended_at: "2026-08-01T11:00:00Z",
+          secret: "must-not-leak",
+        },
+      ]) {
+        const provider = yield* makeGitHubInstallationTokenProvider({
+          apiUrl: "https://api.github.test",
+          appId: "123",
+          installationId: "456",
+          installationOwner: "akua-dev",
+          privateKeyFile: keyFile,
+          now: Effect.succeed(Date.parse("2026-08-01T12:00:00Z")),
+        }).pipe(Effect.provideService(GitHubProviderHttp, GitHubProviderHttp.of({
+          execute: () => Effect.succeed(Response.json(body)),
+        })));
+        const failure = yield* provider.check.pipe(Effect.flip);
+        assert.strictEqual(failure.code, "credential_unavailable");
+        assert.notInclude(JSON.stringify(failure), "must-not-leak");
+      }
+    }).pipe(Effect.provide(BunFileSystem.layer))));
+
   it.effect("mints one exact repository token for concurrent requests and refreshes before expiry", () =>
     Effect.scoped(Effect.gen(function*() {
       const fileSystem = yield* FileSystem.FileSystem;

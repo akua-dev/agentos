@@ -218,6 +218,63 @@ describe("Effect egress authorization HTTP application", () => {
       })),
     ));
 
+  it.effect("authenticates provider identity before acknowledging settlement readiness", () =>
+    Effect.gen(function*() {
+      const handler = yield* makeHandler;
+      const response = yield* handler(request("/readyz/settlement", "GET"));
+      assert.strictEqual(response.status, 200);
+      assert.deepStrictEqual(yield* Effect.tryPromise(() => response.json()), {
+        status: "ready",
+      });
+
+      const missing = request("/readyz/settlement", "GET");
+      missing.headers.delete("authorization");
+      assert.strictEqual((yield* handler(missing)).status, 401);
+    }).pipe(Effect.provide(services())));
+
+  it.effect("fails authenticated settlement readiness closed for identity and dependency failure", () =>
+    Effect.gen(function*() {
+      const forbiddenHandler = yield* makeHandler.pipe(
+        Effect.provide(services({
+          authenticateSettlement: () =>
+            Effect.fail(
+              ProviderBudgetSettlementCallerAuthenticationError.make({
+                outcome: "forbidden",
+              }),
+            ),
+        })),
+      );
+      const identityUnavailableHandler = yield* makeHandler.pipe(
+        Effect.provide(services({
+          authenticateSettlement: () =>
+            Effect.fail(
+              ProviderBudgetSettlementCallerAuthenticationError.make({
+                outcome: "dependency_unavailable",
+              }),
+            ),
+        })),
+      );
+      const dependencyUnavailableHandler = yield* makeHandler.pipe(
+        Effect.provide(services({ ready: Effect.succeed(false) })),
+      );
+      assert.strictEqual(
+        (yield* forbiddenHandler(request("/readyz/settlement", "GET"))).status,
+        403,
+      );
+      assert.strictEqual(
+        (yield* identityUnavailableHandler(
+          request("/readyz/settlement", "GET"),
+        )).status,
+        503,
+      );
+      assert.strictEqual(
+        (yield* dependencyUnavailableHandler(
+          request("/readyz/settlement", "GET"),
+        )).status,
+        503,
+      );
+    }));
+
   it.effect("rejects oversized request metadata before authenticating", () =>
     Effect.gen(function*() {
       const calls = yield* Ref.make(0);

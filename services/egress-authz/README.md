@@ -33,11 +33,16 @@ are interruptible, bounded by an immediate concurrency permit and timeout, and
 release their permit when the client disconnects or the fiber is interrupted.
 
 `GET /livez` proves only that the HTTP process is alive. `GET /readyz` requires
-both PostgreSQL and the health tuple in the pinned OpenFGA model. Authorization
-fails closed while either dependency is unavailable. There is no independent
-policy-decision cache: each authorization observes current PostgreSQL and
-OpenFGA state. The workload-identity cache remains bounded by the shorter of
-the projected-token expiry and 15 seconds.
+the exact PostgreSQL function privileges needed for identity, policy,
+reservation and provider settlement plus the health tuple in the pinned
+OpenFGA model. `GET /readyz/settlement` additionally requires the caller's
+current `agentos-provider-budget-settlement` Pod token to pass TokenReview and
+live Pod/ServiceAccount lookup before returning ready. It performs no budget
+mutation. Authorization and settlement fail closed while any required
+dependency is unavailable. There is no independent policy-decision cache: each
+authorization observes current PostgreSQL and OpenFGA state. The
+workload-identity cache remains bounded by the shorter of the projected-token
+expiry and 15 seconds.
 
 Rate limits, exhausted token/spend budgets and binding-local effective-zero
 kill switches are enforced by one atomic reservation function that revalidates

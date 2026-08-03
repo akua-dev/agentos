@@ -109,7 +109,37 @@ export function makeEgressAuthorizerLiveLayer(
     const authorization = yield* OpenFgaAuthorizationApi;
     return makeEgressAuthorizerReadinessLayer({
       postgresql: sql<{ readonly ready: number }>`SELECT 1 AS ready`.pipe(
-        Effect.map((rows) => rows.length === 1 && rows[0]?.ready === 1),
+        Effect.flatMap(() =>
+          sql<{ readonly ready: boolean }>`
+            SELECT
+              has_function_privilege(
+                current_user,
+                'agentos.read_egress_workload_agents(text,text)',
+                'EXECUTE'
+              )
+              AND has_function_privilege(
+                current_user,
+                'agentos.read_egress_assignments(uuid)',
+                'EXECUTE'
+              )
+              AND has_function_privilege(
+                current_user,
+                'agentos.read_egress_policy_snapshots(jsonb)',
+                'EXECUTE'
+              )
+              AND has_function_privilege(
+                current_user,
+                'agentos.reserve_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,bigint)',
+                'EXECUTE'
+              )
+              AND has_function_privilege(
+                current_user,
+                'agentos.settle_provider_budget_for_provider(text,text,text,text,bigint,bigint,bigint,bigint,bigint)',
+                'EXECUTE'
+              ) AS ready
+          `
+        ),
+        Effect.map((rows) => rows.length === 1 && rows[0]?.ready === true),
       ),
       openFga: authorization.check({
         ...config.openFgaDeployment,
