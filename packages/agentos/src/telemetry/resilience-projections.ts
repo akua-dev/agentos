@@ -1,6 +1,10 @@
 import { Effect, Schema } from "effect";
 
 import type { ProtocolResilienceObservationV1 } from "../protocol/resilience-conformance.ts";
+import {
+  decodeAssignmentExecutionEpochObservation,
+  type AssignmentExecutionEpochObservationV1,
+} from "../supervision/retry-recovery.ts";
 import type { CompiledSecondMateTopologyPlanV1 } from "../topology/second-mate.ts";
 import type { AgentWorkloadPlanSummaryV1 } from "../workloads/compiler.ts";
 import {
@@ -333,6 +337,28 @@ export const projectNativeSessionObservation = Effect.fn(
   });
 });
 
+export const projectAssignmentExecutionObservation = Effect.fn(
+  "agentos.resilienceTelemetry.projectAssignmentExecution",
+)(function*(input: unknown) {
+  const decoded = yield* decodeAssignmentExecutionEpochObservation(input);
+  const mapped = assignmentExecutionOutcome(decoded);
+  return yield* decodeResilienceObservation({
+    ...baseObservation(protectedCorrelation({
+      agentId: decoded.agentId,
+      assignmentId: decoded.assignmentId,
+      operationId: decoded.operationId,
+      sessionId: decoded.nativeSessionRef,
+    })),
+    source: "assignment",
+    phase: "outcome",
+    outcome: mapped.outcome,
+    cause: mapped.cause,
+    failureClass: decoded.failureClass,
+    recovery: mapped.recovery,
+    attempt: decoded.attemptsObserved ?? 0,
+  });
+});
+
 export const projectProtocolResilienceObservation = Effect.fn(
   "agentos.resilienceTelemetry.projectProtocol",
 )(function*(
@@ -371,6 +397,7 @@ function baseObservation(
     evidence: "observed",
     outcome: "pending",
     cause: "none",
+    failureClass: null,
     recovery: "not_required",
     attempt: 0,
     topologyAction: null,
@@ -385,6 +412,49 @@ function baseObservation(
     protocol: null,
     protected: protectedCorrelation,
   } satisfies ResilienceObservationV1;
+}
+
+function assignmentExecutionOutcome(
+  observation: AssignmentExecutionEpochObservationV1,
+): Pick<ResilienceObservationV1, "outcome" | "cause" | "recovery"> {
+  switch (observation.state) {
+    case "active":
+      return {
+        outcome: "pending",
+        cause: "none",
+        recovery: "not_required",
+      };
+    case "completed":
+      return {
+        outcome: "succeeded",
+        cause: "none",
+        recovery: "not_required",
+      };
+    case "exhausted":
+      return {
+        outcome: "blocked",
+        cause: "retry_exhausted",
+        recovery: "awaiting_supervisor",
+      };
+    case "resumed":
+      return {
+        outcome: "recovered",
+        cause: "retry_exhausted",
+        recovery: "native_session_resume",
+      };
+    case "reassigned":
+      return {
+        outcome: "recovered",
+        cause: "retry_exhausted",
+        recovery: "reassigned",
+      };
+    case "stopped":
+      return {
+        outcome: "blocked",
+        cause: "retry_exhausted",
+        recovery: "stopped",
+      };
+  }
 }
 
 function protectedCorrelation(input: {
