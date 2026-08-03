@@ -511,6 +511,55 @@ const waitForReplacement = Effect.fn(
   );
 });
 
+const retainedPvcScheduling = Effect.fn(
+  "test.workloadDisposable.retainedPvcScheduling",
+)(function*(
+  context: string,
+  namespace: string,
+  pod: string,
+  pvc: string,
+) {
+  const [podUid, pvcUid, node, volume] = yield* Effect.all([
+    requireKubectl(context, [
+      "--namespace",
+      namespace,
+      "get",
+      `pod/${pod}`,
+      "--output=jsonpath={.metadata.uid}",
+    ]),
+    requireKubectl(context, [
+      "--namespace",
+      namespace,
+      "get",
+      `persistentvolumeclaim/${pvc}`,
+      "--output=jsonpath={.metadata.uid}",
+    ]),
+    requireKubectl(context, [
+      "--namespace",
+      namespace,
+      "get",
+      `pod/${pod}`,
+      "--output=jsonpath={.spec.nodeName}",
+    ]),
+    requireKubectl(context, [
+      "--namespace",
+      namespace,
+      "get",
+      `persistentvolumeclaim/${pvc}`,
+      "--output=jsonpath={.spec.volumeName}",
+    ]),
+  ], { concurrency: "unbounded" });
+  const nodeAffinity = yield* requireKubectl(context, [
+    "get",
+    `persistentvolume/${volume}`,
+    "--output=jsonpath={.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]}",
+  ]);
+  if ([podUid, pvcUid, node, volume, nodeAffinity].some((value) => value === "")) {
+    return yield* proofError("resource", `${namespace}/${pvc}`);
+  }
+  return { podUid, pvcUid, node, volume, nodeAffinity };
+});
+
 function invalidImageStatefulSet(
   workload: typeof StatefulSetSchema.Type,
 ) {
@@ -530,6 +579,38 @@ function invalidImageStatefulSet(
           ),
         },
       },
+    },
+  };
+}
+
+function quotaProbePod(name: string, cpu: string, memory: string) {
+  return {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: { name },
+    spec: {
+      automountServiceAccountToken: false,
+      restartPolicy: "Never",
+      securityContext: {
+        runAsNonRoot: true,
+        runAsUser: 65_535,
+        runAsGroup: 65_535,
+        seccompProfile: { type: "RuntimeDefault" },
+      },
+      containers: [{
+        name: "quota-probe",
+        image: busyboxImage,
+        command: ["sh", "-c", "sleep 60"],
+        resources: {
+          requests: { cpu, memory },
+          limits: { cpu, memory },
+        },
+        securityContext: {
+          allowPrivilegeEscalation: false,
+          readOnlyRootFilesystem: true,
+          capabilities: { drop: ["ALL"] },
+        },
+      }],
     },
   };
 }
@@ -763,7 +844,7 @@ layer(platform)("disposable typed workload recovery", (it) => {
       );
     }));
 
-  it.effect("proves dry-run, admission, apply repair, Herdr readiness, replacement, and retained PVC", () =>
+  it.effect("proves fresh and retained Mate/Crewmate lifecycle, quota, affinity, Secret modes, and repair", () =>
     Effect.gen(function*() {
       const configured = yield* LiveConfig;
       if (
@@ -908,6 +989,103 @@ layer(platform)("disposable typed workload recovery", (it) => {
           "--timeout=180s",
         ]);
 
+        const firstMateIdentity =
+          `system:serviceaccount:${core}:agentos-firstmate`;
+        const matePod = "agentos-workload-mate-0";
+        const matePvc = "home-agentos-workload-mate-0";
+        const mateBefore = yield* retainedPvcScheduling(
+          options.context,
+          alpha,
+          matePod,
+          matePvc,
+        );
+        assert.strictEqual(mateBefore.nodeAffinity, mateBefore.node);
+        assert.isTrue(yield* canI(
+          options.context,
+          firstMateIdentity,
+          alpha,
+          "delete",
+          "pods",
+        ));
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${matePod}`,
+            "--container=agentos",
+            "--",
+            "cat",
+            "/home/agent/native-session",
+          ]),
+          "agentos-workload-mate",
+        );
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${matePod}`,
+            "--container=agentos",
+            "--",
+            "stat",
+            "-c",
+            "%a",
+            "/var/run/secrets/agentos-egress/token",
+          ]),
+          "440",
+        );
+        yield* requireKubectl(options.context, [
+          "--namespace",
+          alpha,
+          "exec",
+          `pod/${matePod}`,
+          "--container=agentos",
+          "--",
+          "sh",
+          "-c",
+          "printf '%s' 'worktree:agentos-workload-mate' > /home/agent/worktree-id",
+        ]);
+        yield* requireKubectl(options.context, [
+          "--namespace",
+          alpha,
+          "--as",
+          firstMateIdentity,
+          "delete",
+          `pod/${matePod}`,
+          "--wait=true",
+        ]);
+        yield* waitForReplacement(
+          options.context,
+          alpha,
+          matePod,
+          mateBefore.podUid,
+        );
+        const mateAfter = yield* retainedPvcScheduling(
+          options.context,
+          alpha,
+          matePod,
+          matePvc,
+        );
+        assert.notStrictEqual(mateAfter.podUid, mateBefore.podUid);
+        assert.strictEqual(mateAfter.pvcUid, mateBefore.pvcUid);
+        assert.strictEqual(mateAfter.volume, mateBefore.volume);
+        assert.strictEqual(mateAfter.nodeAffinity, mateBefore.nodeAffinity);
+        assert.strictEqual(mateAfter.node, mateBefore.node);
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${matePod}`,
+            "--container=agentos",
+            "--",
+            "cat",
+            "/home/agent/worktree-id",
+          ]),
+          "worktree:agentos-workload-mate",
+        );
+
         const secondMateIdentity =
           `system:serviceaccount:${alpha}:agentos-workload-mate`;
         assert.isTrue(yield* canI(
@@ -985,6 +1163,31 @@ layer(platform)("disposable typed workload recovery", (it) => {
           "--timeout=180s",
         ]);
 
+        yield* requireFailure(
+          options.context,
+          [
+            "--namespace",
+            alpha,
+            "create",
+            "--dry-run=server",
+            "--filename=-",
+          ],
+          "exceeded quota: agentos-domain-capacity",
+          yield* encodeJson(quotaProbePod("cpu-quota-overflow", "2", "64Mi")),
+        );
+        yield* requireFailure(
+          options.context,
+          [
+            "--namespace",
+            alpha,
+            "create",
+            "--dry-run=server",
+            "--filename=-",
+          ],
+          "exceeded quota: agentos-domain-capacity",
+          yield* encodeJson(quotaProbePod("memory-quota-overflow", "25m", "2Gi")),
+        );
+
         const pod = "agentos-workload-crew-0";
         const pvc = "home-agentos-workload-crew-0";
         const podUid = yield* requireKubectl(options.context, [
@@ -1001,6 +1204,30 @@ layer(platform)("disposable typed workload recovery", (it) => {
           `persistentvolumeclaim/${pvc}`,
           "--output=jsonpath={.metadata.uid}",
         ]);
+        const crewBefore = yield* retainedPvcScheduling(
+          options.context,
+          alpha,
+          pod,
+          pvc,
+        );
+        assert.strictEqual(crewBefore.podUid, podUid);
+        assert.strictEqual(crewBefore.pvcUid, pvcUid);
+        assert.strictEqual(crewBefore.nodeAffinity, crewBefore.node);
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${pod}`,
+            "--container=crewmate",
+            "--",
+            "stat",
+            "-c",
+            "%a",
+            "/var/run/secrets/agentos-egress/token",
+          ]),
+          "440",
+        );
         assert.strictEqual(
           yield* requireKubectl(options.context, [
             "--namespace",
@@ -1184,6 +1411,17 @@ layer(platform)("disposable typed workload recovery", (it) => {
           ]),
           pvcUid,
         );
+        const crewAfter = yield* retainedPvcScheduling(
+          options.context,
+          alpha,
+          pod,
+          pvc,
+        );
+        assert.strictEqual(crewAfter.podUid, replacementUid);
+        assert.strictEqual(crewAfter.pvcUid, crewBefore.pvcUid);
+        assert.strictEqual(crewAfter.volume, crewBefore.volume);
+        assert.strictEqual(crewAfter.nodeAffinity, crewBefore.nodeAffinity);
+        assert.strictEqual(crewAfter.node, crewBefore.node);
         assert.strictEqual(
           yield* requireKubectl(options.context, [
             "--namespace",
@@ -1252,6 +1490,15 @@ layer(platform)("disposable typed workload recovery", (it) => {
           interactiveSpecDigest: plans.interactive.plan.specDigest,
           interactiveOverlayDigest: plans.interactive.plan.overlayDigest,
           interactiveRenderDigest: plans.interactive.renderDigest,
+          matePodReplaced: true,
+          matePvcRetained: true,
+          mateWorktreeRetained: true,
+          crewmatePodReplaced: true,
+          crewmatePvcRetained: true,
+          retainedPvcNodeAffinity: true,
+          projectedSecretMode: "0440",
+          cpuQuotaDenied: true,
+          memoryQuotaDenied: true,
           podReplaced: true,
           pvcRetained: true,
           retryExhaustionResumed: recoveryEvidence.transientResumeCompleted,

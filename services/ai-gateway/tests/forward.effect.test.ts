@@ -626,6 +626,55 @@ describe("Effect AI Gateway forwarding", () => {
       }]);
     }));
 
+  it.effect("preserves distinct provider 401, 429, and overload responses", () =>
+    Effect.forEach([
+      { status: 401, failure: "authentication", retryAfter: null },
+      { status: 429, failure: "rate_limit", retryAfter: "7" },
+      { status: 503, failure: "overload", retryAfter: "3" },
+    ], ({ status, failure, retryAfter }) =>
+      Effect.gen(function*() {
+        const route = yield* makeLease();
+        const settlement = yield* makeSettlementRecorder();
+        const headers: Readonly<Record<string, string>> = retryAfter === null
+          ? { "content-type": "application/json" }
+          : {
+            "content-type": "application/json",
+            "retry-after": retryAfter,
+          };
+        const handler = yield* makeAIForwardHandler({
+          authentication: { kind: "workload_identity" },
+          acquire: () => Effect.succeed(route.lease),
+          provider: AIProviderHttp.of({
+            execute: () => Effect.succeed({
+              status,
+              headers,
+              body: Stream.make(encoder.encode(`{"error":"${failure}"}`)),
+            }),
+          }),
+          settlements: settlement.settlements,
+          now: Effect.succeed(now),
+          heartbeatMillis: 40_000,
+          maximumUsageEventBytes: 4_096,
+        });
+        const response = yield* handler(gatewayRequest());
+        assert.strictEqual(response.status, status);
+        assert.strictEqual(response.headers.get("retry-after"), retryAfter);
+        assert.strictEqual(
+          yield* Effect.tryPromise(() => response.text()),
+          `{"error":"${failure}"}`,
+        );
+        assert.strictEqual(yield* Ref.get(route.releases), 1);
+        assert.deepStrictEqual(yield* Ref.get(settlement.reports), [{
+          schemaVersion: 1,
+          decisionRef,
+          forwardOutcome: "provider_rejected",
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedInputTokens: 0,
+          spendMicros: 0,
+        }]);
+      }), { discard: true }));
+
   it.effect("ends telemetry after a valid upstream response without a body", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
