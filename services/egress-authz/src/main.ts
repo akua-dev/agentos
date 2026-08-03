@@ -11,6 +11,7 @@ import {
   Effect,
   Layer,
 } from "effect";
+import { makeProviderAccessTelemetry } from "@akua-dev/agentos";
 import { HttpRouter } from "effect/unstable/http";
 
 import { makeEgressAuthorizerRoutesLayer } from "./app.ts";
@@ -19,9 +20,11 @@ import {
   safeEgressAuthorizerEntrypointFailure,
 } from "./config.ts";
 import { makeEgressAuthorizerLiveLayer } from "./layers.ts";
+import { EgressAuthorizerOtlpLive } from "./otlp.ts";
 
 const startup = Effect.gen(function*() {
   const config = yield* loadEgressAuthorizerConfig();
+  const telemetry = yield* makeProviderAccessTelemetry();
   const live = makeEgressAuthorizerLiveLayer(config);
   const routes = makeEgressAuthorizerRoutesLayer({
     maximumConcurrentRequests: config.maximumConcurrentRequests,
@@ -31,6 +34,7 @@ const startup = Effect.gen(function*() {
     maximumHeaderBytes: config.maximumHeaderBytes,
     maximumHeaderValueBytes: config.maximumHeaderValueBytes,
     maximumSettlementBodyBytes: config.maximumSettlementBodyBytes,
+    telemetry,
   }).pipe(Layer.provide(live));
   const application = HttpRouter.serve(routes, {
     disableListenLog: true,
@@ -63,6 +67,7 @@ if (import.meta.main) {
         ...safeEgressAuthorizerEntrypointFailure(error),
       }))
     ),
+    Effect.provide(EgressAuthorizerOtlpLive),
     Effect.provide(platform),
   ));
 }

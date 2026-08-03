@@ -75,6 +75,7 @@ config:
           failureMode: deny
           includeRequestHeaders:
             - authorization
+            - traceparent
             - x-agentos-assignment-id
           includeRequestBody:
             maxRequestBytes: 262144
@@ -120,6 +121,7 @@ config:
           failureMode: deny
           includeRequestHeaders:
             - authorization
+            - traceparent
             - x-agentos-assignment-id
           protocol:
             http:

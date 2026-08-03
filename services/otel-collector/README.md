@@ -90,6 +90,13 @@ for every signal without replacing attributes already supplied by a workload.
 AgentOS workloads use the complete standard `OTEL_*` SDK environment contract
 from `ARCHITECTURE.md`.
 
+The governed provider plane adds `agentos-egress-authz` and `github-broker` as
+selected OTLP clients. Access spans may retain protected Mate, Assignment,
+decision and profile correlation, while access metrics are restricted to the
+finite route, adapter, provider, decision, dependency, credential and terminal
+outcome vocabularies. The Collector drops those protected identifiers from
+metrics even if a faulty producer attempts to attach them.
+
 ## Storage and failure behavior
 
 `file_storage/queue` lives at `/var/lib/otelcol/storage` on the Collector PVC.

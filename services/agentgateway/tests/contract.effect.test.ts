@@ -181,6 +181,7 @@ const ValuesSchema = Schema.Struct({
             includeRequestHeaders: Schema.Array(
               Schema.Literals([
                 "authorization",
+                "traceparent",
                 "x-agentos-assignment-id",
               ]),
             ),
