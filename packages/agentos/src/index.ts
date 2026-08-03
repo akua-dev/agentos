@@ -652,6 +652,24 @@ export {
   type ProtocolResilienceScenarioId,
 } from "./protocol/resilience-conformance.ts";
 export {
+  AGENTOS_RESILIENCE_SCENARIOS,
+  RESILIENCE_REGRESSION_SOURCES,
+  AgentOSResilienceGateError,
+  AgentOSResilienceObservationV1Schema,
+  AgentOSResilienceRunV1Schema,
+  AgentOSResilienceScenarioIdSchema,
+  ResilienceRegressionSourceError,
+  ResilienceRegressionSourceV1Schema,
+  agentOSResilienceScenarioDefinition,
+  compileAgentOSResilienceVerdict,
+  verifyResilienceRegressionSources,
+  type AgentOSResilienceObservationV1,
+  type AgentOSResilienceRunV1,
+  type AgentOSResilienceScenarioDefinition,
+  type AgentOSResilienceScenarioId,
+  type ResilienceRegressionSourceV1,
+} from "./resilience/conformance.ts";
+export {
   CompiledSecondMateTopologyPlanV1Schema,
   ExistingSecondMateTopologyDestinationV1,
   NewSecondMateTopologyDestinationV1,
