@@ -5,8 +5,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "bun ../../node_modules/vitest/vitest.mjs run tests/contract.effect.test.ts tests/a2a-v1.effect.test.ts",
+    "test": "bun ../../node_modules/vitest/vitest.mjs run tests/contract.effect.test.ts tests/kubernetes.effect.test.ts tests/readiness.effect.test.ts tests/a2a-v1.effect.test.ts",
     "a2a:conformance": "bun ../../node_modules/vitest/vitest.mjs run tests/a2a-v1.effect.test.ts",
     "conformance": "bun test tests/conformance.test.ts"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.0-beta.102",
+    "effect": "4.0.0-beta.102"
   }
 }

@@ -112,6 +112,10 @@
     "services/agentgateway": {
       "name": "@agentos/agentgateway",
       "version": "0.0.0",
+      "dependencies": {
+        "@effect/platform-bun": "4.0.0-beta.102",
+        "effect": "4.0.0-beta.102",
+      },
     },
     "services/ai-gateway": {
       "name": "@agentos/ai-gateway",

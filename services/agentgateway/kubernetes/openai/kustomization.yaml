@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: agentos
+resources:
+  - resources.yaml
+configMapGenerator:
+  - name: agentgateway-openai-config
+    files:
+      - config.yaml
+generatorOptions:
+  immutable: true
+  labels:
+    app.kubernetes.io/name: agentgateway-openai
+    app.kubernetes.io/component: policy-enforcement-point
+    app.kubernetes.io/part-of: agentos
+    app.kubernetes.io/version: 1.4.1
+    agentos.akua.dev/credential-domain: openai
+labels:
+  - pairs:
+      app.kubernetes.io/name: agentgateway-openai
+      app.kubernetes.io/component: policy-enforcement-point
+      app.kubernetes.io/part-of: agentos
+      app.kubernetes.io/version: 1.4.1
+      agentos.akua.dev/credential-domain: openai
+    includeSelectors: false
+    includeTemplates: true
