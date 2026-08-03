@@ -79,11 +79,11 @@ See the repository's `CUSTOMIZATION.md` and released
 
 ## OpenTelemetry
 
-The package exports the versioned privacy-safe AI telemetry contract, a
-fail-open JS runtime, and Pi observability registration. The standalone
-`extensions/agentos-observability.ts` entrypoint is intentionally loadable with
-`pi -ne -e` so an operator can keep telemetry while disabling ordinary
-extension discovery for a controlled comparison.
+The package exports the versioned privacy-safe Fleet telemetry contract,
+Effect-native fail-open runtimes, and Pi observability registration. The
+standalone `extensions/agentos-observability.ts` entrypoint is intentionally
+loadable with `pi -ne -e` so an operator can keep telemetry while disabling
+ordinary extension discovery for a controlled comparison.
 
 Fleet workloads use the standard `OTEL_*` environment surface. Crewmate home
 preparation maps those variables into the pinned Codex CLI's native `[otel]`
@@ -95,4 +95,4 @@ Use the released `agentos-observability` Skill for trace interpretation,
 extension/session control trials, dashboards, alerts, and incident runbooks.
 The canonical field, privacy, propagation, retention, and compatibility
 contract remains in
-[`ARCHITECTURE.md`](../../ARCHITECTURE.md#ai-telemetry-contract-v1).
+[`ARCHITECTURE.md`](../../ARCHITECTURE.md#fleet-telemetry-privacy-and-cardinality-contract-v1).

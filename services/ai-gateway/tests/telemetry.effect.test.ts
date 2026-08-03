@@ -259,6 +259,9 @@ describe("AI Gateway telemetry", () => {
       assert.notInclude(metricPayload, "gateway-2");
       assert.notInclude(metricPayload, "req_safe_provider_1");
       assert.notInclude(metricPayload, authorization.identity.agentId);
+      assert.notInclude(metricPayload, "agentos.ai.session.state");
+      assert.notInclude(metricPayload, "agentos.ai.provider.family");
+      assert.notInclude(metricPayload, "agentos.authz.profile_id");
       if (authorization.identity.assignmentId !== null) {
         assert.notInclude(metricPayload, authorization.identity.assignmentId);
       }

@@ -2,6 +2,10 @@ import { Crypto, Effect, Encoding, Schema } from "effect";
 
 import { NonBlankStringSchema } from "../shared/contracts.ts";
 
+const values = <const Values extends ReadonlyArray<string>>(
+  ...entries: Values
+) => entries;
+
 const Uuid = Schema.String.pipe(
   Schema.check(
     Schema.isPattern(
@@ -27,16 +31,19 @@ const Digest = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
 );
 
-export const SecondMateTopologyActionV1Schema = Schema.Literals([
+export const SECOND_MATE_TOPOLOGY_ACTIONS = values(
   "expand",
   "modify",
   "shrink",
   "split",
   "merge",
   "retire",
-]);
+);
+export const SecondMateTopologyActionV1Schema = Schema.Literals(
+  SECOND_MATE_TOPOLOGY_ACTIONS,
+);
 
-export const SecondMateTopologyReasonV1Schema = Schema.Literals([
+export const SECOND_MATE_TOPOLOGY_REASONS = values(
   "persistent_load",
   "routing_ambiguity",
   "charter_overlap",
@@ -48,7 +55,10 @@ export const SecondMateTopologyReasonV1Schema = Schema.Literals([
   "durable_idle",
   "delivery_degradation",
   "captain_direction",
-]);
+);
+export const SecondMateTopologyReasonV1Schema = Schema.Literals(
+  SECOND_MATE_TOPOLOGY_REASONS,
+);
 
 export const SecondMateTopologySignalAuthorityV1Schema = Schema.Literals([
   "postgresql",

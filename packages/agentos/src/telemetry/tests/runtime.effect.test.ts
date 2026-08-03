@@ -140,6 +140,10 @@ describe("AgentOS fail-open telemetry runtime", () => {
       expect(metricPayload).not.toContain("attempt-2");
       expect(metricPayload).not.toContain("attempt-3");
       expect(metricPayload).not.toContain("req_safe_1");
+      expect(metricPayload).not.toContain("agentos.ai.session.state");
+      expect(metricPayload).not.toContain("agentos.ai.provider.family");
+      expect(metricPayload).not.toContain("agentos.ai.stream.mode");
+      expect(metricPayload).not.toContain("agentos.ai.retry.count");
       expect((metricPayload.match(/agentos.ai.provider.attempts/g) ?? []).length).toBe(1);
       const durationNames = new Set<string>([
         AGENTOS_AI_METRICS.operationDuration,

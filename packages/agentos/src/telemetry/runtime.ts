@@ -31,6 +31,7 @@ import {
   AGENTOS_AI_DURATION_BUCKETS_SECONDS,
   AGENTOS_AI_METRICS,
   AGENTOS_AI_TELEMETRY_CONTRACT_VERSION,
+  AGENTOS_TELEMETRY_SPANS,
   type AgentOSAICompactionPath,
   type AgentOSAIModelFamily,
   type AgentOSAIProviderFamily,
@@ -44,6 +45,7 @@ import {
 import {
   classifyAIError,
   classifyAIStatus,
+  safeMetricAttributes,
   safeTelemetryAttributes,
   type AgentOSTelemetryAttributes,
 } from "./privacy.ts";
@@ -272,7 +274,7 @@ const startOperationCore = Effect.fn("agentos.telemetry.startOperation")(
     const base = operationAttributes(options.input);
     const span = yield* Effect.try({
       try: () => options.tracer.startSpan(
-        "agentos.ai.operation",
+        AGENTOS_TELEMETRY_SPANS.aiOperation,
         { attributes: safeTelemetryAttributes({ ...base, "agentos.ai.operation.id": operationId }, "span") },
         parentContext,
       ),
@@ -301,12 +303,18 @@ const startOperationCore = Effect.fn("agentos.telemetry.startOperation")(
         if (yield* Ref.getAndSet(ended, true)) return;
         const final = outcomeAttributes(outcome);
         yield* finishSpan(span, final);
-        const metricAttributes = safeTelemetryAttributes({ ...base, ...final }, "metric");
-        yield* record(() => options.instruments.operations.add(1, metricAttributes));
+        const metricInput = { ...base, ...final };
+        yield* record(() => options.instruments.operations.add(
+          1,
+          safeMetricAttributes(AGENTOS_AI_METRICS.operations, metricInput),
+        ));
         const endedAt = yield* options.clock;
         yield* record(() => options.instruments.operationDuration.record(
           elapsedSeconds(startedAt, endedAt),
-          metricAttributes,
+          safeMetricAttributes(
+            AGENTOS_AI_METRICS.operationDuration,
+            metricInput,
+          ),
         ));
       }),
     } satisfies AgentOSOperation;
@@ -345,7 +353,7 @@ const startProviderAttemptCore = Effect.fn("agentos.telemetry.startProviderAttem
     };
     const span = yield* Effect.try({
       try: () => options.tracer.startSpan(
-        "agentos.ai.provider.attempt",
+        AGENTOS_TELEMETRY_SPANS.aiProviderAttempt,
         { attributes: safeTelemetryAttributes(initial, "span") },
         options.operationContext,
       ),
@@ -388,12 +396,21 @@ const startProviderAttemptCore = Effect.fn("agentos.telemetry.startProviderAttem
           ...(outcome.outputTokens !== undefined ? { "agentos.ai.usage.output_tokens": outcome.outputTokens } : {}),
         };
         yield* finishSpan(span, final);
-        const metricAttributes = safeTelemetryAttributes({ ...initial, ...final }, "metric");
-        yield* record(() => options.instruments.providerAttempts.add(1, metricAttributes));
+        const metricInput = { ...initial, ...final };
+        yield* record(() => options.instruments.providerAttempts.add(
+          1,
+          safeMetricAttributes(
+            AGENTOS_AI_METRICS.providerAttempts,
+            metricInput,
+          ),
+        ));
         const endedAt = yield* options.clock;
         yield* record(() => options.instruments.providerDuration.record(
           elapsedSeconds(startedAt, endedAt),
-          metricAttributes,
+          safeMetricAttributes(
+            AGENTOS_AI_METRICS.providerDuration,
+            metricInput,
+          ),
         ));
       }),
     } satisfies AgentOSProviderAttempt;

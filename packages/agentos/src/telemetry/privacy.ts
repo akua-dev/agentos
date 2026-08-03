@@ -1,21 +1,16 @@
-import {
-  AGENTOS_AI_COMPACTION_PATHS,
-  AGENTOS_AI_ERROR_CLASSES,
-  AGENTOS_AI_MODEL_FAMILIES,
-  AGENTOS_AI_PROVIDER_FAMILIES,
-  AGENTOS_AI_REQUEST_KINDS,
-  AGENTOS_AI_ROUTES,
-  AGENTOS_AI_RUNTIMES,
-  AGENTOS_AI_SESSION_STATES,
-  AGENTOS_AI_STATUS_CLASSES,
-  AGENTOS_AI_STREAM_MODES,
-  AGENTOS_AI_STREAM_OUTCOMES,
-  type AgentOSAIErrorClass,
-  type AgentOSAIStatusClass,
-} from "./contract.ts";
 import { Option } from "effect";
 
-export type AgentOSTelemetrySignal = "span" | "metric" | "log";
+import {
+  AGENTOS_TELEMETRY_ATTRIBUTE_DEFINITIONS,
+  AGENTOS_TELEMETRY_EVENT_DEFINITIONS,
+  AGENTOS_TELEMETRY_METRIC_DEFINITIONS,
+  AgentOSTelemetryAttributeDefinitionV1Schema,
+  type AgentOSAIErrorClass,
+  type AgentOSAIStatusClass,
+  type AgentOSTelemetryContractSignal,
+} from "./contract.ts";
+
+export type AgentOSTelemetrySignal = AgentOSTelemetryContractSignal;
 export type AgentOSTelemetryAttributeValue = string | number | boolean;
 export type AgentOSTelemetryAttributes = Record<
   string,
@@ -23,183 +18,11 @@ export type AgentOSTelemetryAttributes = Record<
 >;
 
 type ValueRule =
-  | { kind: "enum"; values: readonly string[] }
-  | { kind: "number"; minimum?: number; maximum?: number }
-  | { kind: "boolean" }
-  | { kind: "opaque"; pattern: RegExp; maximumLength: number };
-
-interface AttributeRule {
-  signals: readonly AgentOSTelemetrySignal[];
-  value: ValueRule;
-}
-
-const allSignals = ["span", "metric", "log"] satisfies ReadonlyArray<
-  AgentOSTelemetrySignal
->;
-const correlatedSignals = ["span", "log"] satisfies ReadonlyArray<
-  AgentOSTelemetrySignal
->;
-
-const rules: Readonly<Record<string, AttributeRule>> = Object.freeze({
-  "agentos.telemetry.contract.version": {
-    signals: allSignals,
-    value: { kind: "number", minimum: 1, maximum: 1 },
-  },
-  "agentos.ai.runtime": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_RUNTIMES },
-  },
-  "agentos.ai.runtime.version": {
-    signals: allSignals,
-    value: {
-      kind: "opaque",
-      pattern: /^[0-9A-Za-z][0-9A-Za-z.+_-]*$/,
-      maximumLength: 32,
-    },
-  },
-  "agentos.ai.route": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_ROUTES },
-  },
-  "agentos.ai.provider.family": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_PROVIDER_FAMILIES },
-  },
-  "agentos.ai.request.kind": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_REQUEST_KINDS },
-  },
-  "agentos.ai.compaction.path": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_COMPACTION_PATHS },
-  },
-  "agentos.ai.status_class": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_STATUS_CLASSES },
-  },
-  "agentos.ai.error.class": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_ERROR_CLASSES },
-  },
-  "agentos.ai.stream.mode": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_STREAM_MODES },
-  },
-  "agentos.ai.stream.outcome": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_STREAM_OUTCOMES },
-  },
-  "agentos.ai.session.state": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_SESSION_STATES },
-  },
-  "agentos.ai.model.family": {
-    signals: allSignals,
-    value: { kind: "enum", values: AGENTOS_AI_MODEL_FAMILIES },
-  },
-  "agentos.ai.route.slot": {
-    signals: correlatedSignals,
-    value: {
-      kind: "opaque",
-      pattern: /^slot-[0-9A-Za-z_-]+$/,
-      maximumLength: 32,
-    },
-  },
-  "agentos.ai.operation.id": {
-    signals: correlatedSignals,
-    value: {
-      kind: "opaque",
-      pattern: /^[0-9A-Za-z_-]+$/,
-      maximumLength: 128,
-    },
-  },
-  "agentos.ai.request.attempt_id": {
-    signals: correlatedSignals,
-    value: {
-      kind: "opaque",
-      pattern: /^[0-9A-Za-z_-]+$/,
-      maximumLength: 128,
-    },
-  },
-  "agentos.ai.provider.request_id": {
-    signals: correlatedSignals,
-    value: {
-      kind: "opaque",
-      pattern: /^[0-9A-Za-z_.:-]+$/,
-      maximumLength: 128,
-    },
-  },
-  "http.response.status_code": {
-    signals: correlatedSignals,
-    value: { kind: "number", minimum: 100, maximum: 599 },
-  },
-  "agentos.ai.retry.count": {
-    signals: allSignals,
-    value: { kind: "number", minimum: 0, maximum: 32 },
-  },
-  "agentos.ai.stream.chunks": {
-    signals: correlatedSignals,
-    value: { kind: "number", minimum: 0 },
-  },
-  "agentos.ai.stream.bytes": {
-    signals: correlatedSignals,
-    value: { kind: "number", minimum: 0 },
-  },
-  "agentos.ai.usage.input_tokens": {
-    signals: correlatedSignals,
-    value: { kind: "number", minimum: 0 },
-  },
-  "agentos.ai.usage.output_tokens": {
-    signals: correlatedSignals,
-    value: { kind: "number", minimum: 0 },
-  },
-  "agentos.ai.quota.stale": {
-    signals: allSignals,
-    value: { kind: "boolean" },
-  },
-  "agentos.identity.agent_id": {
-    signals: correlatedSignals,
-    value: {
-      kind: "opaque",
-      pattern:
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-      maximumLength: 36,
-    },
-  },
-  "agentos.identity.assignment_id": {
-    signals: correlatedSignals,
-    value: {
-      kind: "opaque",
-      pattern:
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-      maximumLength: 36,
-    },
-  },
-  "agentos.authz.decision_ref": {
-    signals: correlatedSignals,
-    value: {
-      kind: "opaque",
-      pattern: /^decision_[0-9a-f]{32}$/,
-      maximumLength: 41,
-    },
-  },
-  "agentos.authz.profile_id": {
-    signals: correlatedSignals,
-    value: {
-      kind: "opaque",
-      pattern: /^[a-z][a-z0-9-]{0,62}$/,
-      maximumLength: 63,
-    },
-  },
-  "agentos.authz.profile_version": {
-    signals: correlatedSignals,
-    value: { kind: "number", minimum: 1 },
-  },
-  "agentos.authz.rate_class": {
-    signals: correlatedSignals,
-    value: { kind: "enum", values: ["low", "standard", "high"] },
-  },
-});
+  (typeof AgentOSTelemetryAttributeDefinitionV1Schema.Type)["value"];
+type OpaqueFormat = Extract<
+  ValueRule,
+  { readonly kind: "opaque" }
+>["format"];
 
 export function safeTelemetryAttributes(
   input: Readonly<Record<string, unknown>>,
@@ -207,9 +30,41 @@ export function safeTelemetryAttributes(
 ): AgentOSTelemetryAttributes {
   const safe: AgentOSTelemetryAttributes = {};
   for (const key of Object.keys(input).sort()) {
-    const rule = rules[key];
-    if (!rule?.signals.includes(signal)) continue;
-    const value = safeValue(input[key], rule.value);
+    const definition = AGENTOS_TELEMETRY_ATTRIBUTE_DEFINITIONS[key];
+    if (!definition?.signals.includes(signal)) continue;
+    const value = safeValue(input[key], definition.value);
+    if (value !== undefined) safe[key] = value;
+  }
+  return safe;
+}
+
+export function safeMetricAttributes(
+  metricName: string,
+  input: Readonly<Record<string, unknown>>,
+): AgentOSTelemetryAttributes {
+  const metric = AGENTOS_TELEMETRY_METRIC_DEFINITIONS[metricName];
+  if (metric === undefined) return {};
+  const safe: AgentOSTelemetryAttributes = {};
+  for (const key of [...metric.labels].sort()) {
+    const definition = AGENTOS_TELEMETRY_ATTRIBUTE_DEFINITIONS[key];
+    if (!definition?.signals.includes("metric")) continue;
+    const value = safeValue(input[key], definition.value);
+    if (value !== undefined) safe[key] = value;
+  }
+  return safe;
+}
+
+export function safeEventAttributes(
+  eventName: string,
+  input: Readonly<Record<string, unknown>>,
+): AgentOSTelemetryAttributes {
+  const event = AGENTOS_TELEMETRY_EVENT_DEFINITIONS[eventName];
+  if (event === undefined) return {};
+  const safe: AgentOSTelemetryAttributes = {};
+  for (const key of [...event.attributes].sort()) {
+    const definition = AGENTOS_TELEMETRY_ATTRIBUTE_DEFINITIONS[key];
+    if (!definition?.signals.includes(event.signal)) continue;
+    const value = safeValue(input[key], definition.value);
     if (value !== undefined) safe[key] = value;
   }
   return safe;
@@ -290,19 +145,42 @@ function safeValue(
         : undefined;
     case "number":
       return typeof input === "number" &&
-        Number.isFinite(input) &&
-        (rule.minimum === undefined || input >= rule.minimum) &&
-        (rule.maximum === undefined || input <= rule.maximum)
+          Number.isFinite(input) &&
+          (rule.minimum === null || input >= rule.minimum) &&
+          (rule.maximum === null || input <= rule.maximum)
         ? input
         : undefined;
     case "boolean":
       return typeof input === "boolean" ? input : undefined;
     case "opaque":
       return typeof input === "string" &&
-        input.length <= rule.maximumLength &&
-        rule.pattern.test(input)
+          input.length <= rule.maximumLength &&
+          opaquePattern(rule.format).test(input)
         ? input
         : undefined;
+  }
+}
+
+function opaquePattern(format: OpaqueFormat): RegExp {
+  switch (format) {
+    case "decision_ref":
+      return /^decision_[0-9a-f]{32}$/;
+    case "digest":
+      return /^[0-9a-f]{64}$/;
+    case "identifier":
+      return /^[0-9A-Za-z_.:@/-]+$/;
+    case "profile_id":
+      return /^[a-z][a-z0-9-]{0,62}$/;
+    case "provider_request":
+      return /^[0-9A-Za-z_.:-]+$/;
+    case "resource_name":
+      return /^[0-9A-Za-z][0-9A-Za-z._:/@+-]*$/;
+    case "route_slot":
+      return /^slot-[0-9A-Za-z_-]+$/;
+    case "uuid":
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+    case "version":
+      return /^[0-9A-Za-z][0-9A-Za-z.+_-]*$/;
   }
 }
 

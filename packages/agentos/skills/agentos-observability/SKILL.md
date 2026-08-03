@@ -27,9 +27,11 @@ telemetry export health as independent signals.
    `ai-gateway.route.acquire`, `ai-gateway.upstream`, and
    `ai-gateway.stream`. Use trace/request/attempt IDs only for protected
    correlation, never as metric labels.
-6. For delegation or runtime recovery, follow
+6. For memory, access, protocol, topology, readiness, delegation or runtime
+   recovery, start at the published root in the Fleet telemetry contract. For
+   recovery, follow
    `agentos.resilience.operation` through the ordered
-   `agentos.resilience.<phase>` spans. Correlate the topology plan, workload
+   named `agentos.resilience.<phase>` spans. Correlate the topology plan, workload
    spec/overlay digests, reviewed render digest, runtime journal, Kubernetes
    placement, semantic readiness, provider, listener, ACP/A2A adapter, native
    session, policy, and reconciliation evidence. A missing boundary must be

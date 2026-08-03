@@ -6,6 +6,13 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseDocument } from "yaml";
 
+import {
+  AGENTOS_TELEMETRY_ATTRIBUTE_DEFINITIONS,
+  AGENTOS_TELEMETRY_EVENT_DEFINITIONS,
+  AGENTOS_TELEMETRY_FORBIDDEN_ATTRIBUTE_KEYS,
+  AGENTOS_TELEMETRY_METRIC_DEFINITIONS,
+  AGENTOS_TELEMETRY_PROTECTED_ATTRIBUTE_KEYS,
+} from "../../../../packages/agentos/src/telemetry/contract.ts";
 import { renderKustomize } from "../../../../tooling/testing/kubernetes.ts";
 
 const Resource = Schema.Struct({
@@ -18,10 +25,16 @@ const Action = Schema.Struct({
   key: Schema.String,
   action: Schema.String,
 });
+const StatementGroup = Schema.Struct({
+  statements: Schema.Array(Schema.String),
+});
 const CollectorConfig = Schema.Struct({
   processors: Schema.Record(Schema.String, Schema.Struct({
     actions: Schema.optional(Schema.Array(Action)),
     attributes: Schema.optional(Schema.Array(Action)),
+    trace_statements: Schema.optional(Schema.Array(StatementGroup)),
+    metric_statements: Schema.optional(Schema.Array(StatementGroup)),
+    log_statements: Schema.optional(Schema.Array(StatementGroup)),
   })),
   service: Schema.Struct({
     pipelines: Schema.Record(Schema.String, Schema.Struct({
@@ -148,6 +161,42 @@ const imageReady = Layer.effectDiscard(Effect.gen(function*() {
 })).pipe(Layer.provide(BunServices.layer));
 const testLayer = Layer.merge(BunServices.layer, imageReady);
 
+function contractAttributesFor(signal: "resource" | "span") {
+  return Object.values(AGENTOS_TELEMETRY_ATTRIBUTE_DEFINITIONS)
+    .filter((definition) => definition.signals.includes(signal))
+    .map(({ name }) => name)
+    .sort();
+}
+
+function metricAttributes() {
+  return Array.from(new Set(
+    Object.values(AGENTOS_TELEMETRY_METRIC_DEFINITIONS)
+      .flatMap(({ labels }) => labels),
+  )).sort();
+}
+
+function eventAttributes() {
+  return Array.from(new Set(
+    Object.values(AGENTOS_TELEMETRY_EVENT_DEFINITIONS)
+      .flatMap(({ attributes }) => attributes),
+  )).sort();
+}
+
+function keepKeys(target: string, keys: ReadonlyArray<string>) {
+  return `keep_keys(${target}, [${keys.map((key) => JSON.stringify(key)).join(", ")}])`;
+}
+
+function assertKeepKeys(
+  actual: string | undefined,
+  target: string,
+  keys: ReadonlyArray<string>,
+) {
+  assert.strictEqual(
+    actual?.replace(/\s+/g, " "),
+    keepKeys(target, keys),
+  );
+}
+
 layer(testLayer, { timeout: "60 seconds" })("Collector configuration", (it) => {
   for (const directory of [
     "base",
@@ -164,35 +213,136 @@ layer(testLayer, { timeout: "60 seconds" })("Collector configuration", (it) => {
       }), { timeout: 60_000 });
   }
 
-  it.effect("applies the privacy processors to every signal", () =>
+  it.effect("applies the contract privacy boundary to every signal and overlay", () =>
     Effect.gen(function*() {
-      const config = yield* renderConfig("overlays/remote");
-      const parsed = yield* Effect.try({
-        try: () => parseDocument(config).toJSON(),
-        catch: () => testError("yaml", "Collector config is invalid YAML"),
-      }).pipe(Effect.flatMap(Schema.decodeUnknownEffect(CollectorConfig)));
-      for (const signal of ["traces", "metrics", "logs"]) {
-        assert.deepStrictEqual(parsed.service.pipelines[signal]?.processors, [
+      for (const directory of [
+        "base",
+        "overlays/remote",
+        "overlays/local-diagnostics",
+      ]) {
+        const config = yield* renderConfig(directory);
+        const parsed = yield* Effect.try({
+          try: () => parseDocument(config).toJSON(),
+          catch: () => testError("yaml", "Collector config is invalid YAML"),
+        }).pipe(Effect.flatMap(Schema.decodeUnknownEffect(CollectorConfig)));
+        for (const signal of ["traces", "logs"]) {
+          assert.deepStrictEqual(parsed.service.pipelines[signal]?.processors, [
+            "memory_limiter",
+            "k8sattributes",
+            "resource/privacy",
+            "attributes/privacy",
+            "transform/contract_allowlist",
+            "batch",
+          ]);
+        }
+        assert.deepStrictEqual(parsed.service.pipelines.metrics?.processors, [
           "memory_limiter",
           "k8sattributes",
           "resource/privacy",
           "attributes/privacy",
+          "attributes/metric_cardinality",
+          "transform/contract_allowlist",
           "batch",
         ]);
-        assert.deepStrictEqual(parsed.service.pipelines[signal]?.exporters, [
-          "otlp_http/remote",
-        ]);
+        const spanPrivacy = parsed.processors["attributes/privacy"];
+        const resourcePrivacy = parsed.processors["resource/privacy"];
+        const metricCardinality =
+          parsed.processors["attributes/metric_cardinality"];
+        assert.isDefined(spanPrivacy);
+        assert.isDefined(resourcePrivacy);
+        assert.isDefined(metricCardinality);
+        const traceStatements =
+          parsed.processors["transform/contract_allowlist"]
+            ?.trace_statements;
+        assert.lengthOf(traceStatements ?? [], 4);
+        assertKeepKeys(
+          traceStatements?.[0]?.statements[0],
+          "resource.attributes",
+          contractAttributesFor("resource"),
+        );
+        assert.strictEqual(
+          traceStatements?.[1]?.statements[0],
+          'delete_matching_keys(scope.attributes, ".*")',
+        );
+        assertKeepKeys(
+          traceStatements?.[2]?.statements[0],
+          "span.attributes",
+          contractAttributesFor("span"),
+        );
+        assert.strictEqual(
+          traceStatements?.[3]?.statements[0],
+          'delete_matching_keys(spanevent.attributes, ".*")',
+        );
+
+        const metricStatements =
+          parsed.processors["transform/contract_allowlist"]
+            ?.metric_statements;
+        assert.lengthOf(metricStatements ?? [], 4);
+        assertKeepKeys(
+          metricStatements?.[0]?.statements[0],
+          "resource.attributes",
+          contractAttributesFor("resource"),
+        );
+        assert.strictEqual(
+          metricStatements?.[1]?.statements[0],
+          'delete_matching_keys(scope.attributes, ".*")',
+        );
+        assertKeepKeys(
+          metricStatements?.[2]?.statements[0],
+          "datapoint.attributes",
+          metricAttributes(),
+        );
+        assert.strictEqual(
+          metricStatements?.[3]?.statements[0],
+          'delete_matching_keys(exemplar.filtered_attributes, ".*")',
+        );
+
+        const logStatements =
+          parsed.processors["transform/contract_allowlist"]?.log_statements;
+        assert.lengthOf(logStatements ?? [], 4);
+        assertKeepKeys(
+          logStatements?.[0]?.statements[0],
+          "resource.attributes",
+          contractAttributesFor("resource"),
+        );
+        assert.strictEqual(
+          logStatements?.[1]?.statements[0],
+          'delete_matching_keys(scope.attributes, ".*")',
+        );
+        assertKeepKeys(
+          logStatements?.[2]?.statements[0],
+          "log.attributes",
+          eventAttributes(),
+        );
+        assert.strictEqual(
+          logStatements?.[3]?.statements[0],
+          'set(log.body, "")',
+        );
+        const spanForbidden = new Set(
+          spanPrivacy?.actions?.map(({ key }) => key) ?? [],
+        );
+        const resourceForbidden = new Set(
+          resourcePrivacy?.attributes?.map(({ key }) => key) ?? [],
+        );
+        for (const key of AGENTOS_TELEMETRY_FORBIDDEN_ATTRIBUTE_KEYS) {
+          assert.isTrue(
+            spanForbidden.has(key),
+            `${directory} span privacy: ${key}`,
+          );
+          assert.isTrue(
+            resourceForbidden.has(key),
+            `${directory} resource privacy: ${key}`,
+          );
+        }
+        const metricProtected = new Set(
+          metricCardinality?.actions?.map(({ key }) => key) ?? [],
+        );
+        for (const key of AGENTOS_TELEMETRY_PROTECTED_ATTRIBUTE_KEYS) {
+          assert.isTrue(
+            metricProtected.has(key),
+            `${directory} metric cardinality: ${key}`,
+          );
+        }
       }
-      const spanPrivacy = parsed.processors["attributes/privacy"];
-      const resourcePrivacy = parsed.processors["resource/privacy"];
-      assert.isDefined(spanPrivacy);
-      assert.isDefined(resourcePrivacy);
-      const spanForbidden = new Set(
-        spanPrivacy?.actions?.map(({ key }) => key) ?? [],
-      );
-      const resourceForbidden = new Set(
-        resourcePrivacy?.attributes?.map(({ key }) => key) ?? [],
-      );
-      for (const key of spanForbidden) assert.isTrue(resourceForbidden.has(key));
     }));
 });
