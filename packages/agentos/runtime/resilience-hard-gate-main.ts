@@ -8,6 +8,12 @@ import {
   ResilienceHardGateRunnerError,
   agentOSResilienceHardGate,
 } from "../src/resilience/hard-gate.ts";
+import {
+  AgentOSResilienceGateError,
+  ResilienceRegressionSourceError,
+} from "../src/resilience/conformance.ts";
+import { ResilienceExecutionError } from "../src/resilience/execution.ts";
+import { ProtocolResilienceGateError } from "../src/protocol/resilience-conformance.ts";
 
 const platform = Layer.merge(
   BunServices.layer,
@@ -30,7 +36,22 @@ const program = agentOSResilienceHardGate.pipe(
       }
       : {
         event: "agentos.resilience.hard_gate_failed",
-        code: "conformance_rejected",
+        ...(error instanceof ResilienceExecutionError
+          ? {
+            code: error.code,
+            path: error.path,
+            title: error.title,
+          }
+          : error instanceof AgentOSResilienceGateError ||
+              error instanceof ProtocolResilienceGateError
+          ? { code: error.code, scenario: error.scenario }
+          : error instanceof ResilienceRegressionSourceError
+          ? {
+            code: error.code,
+            scenario: error.scenario,
+            kind: error.kind,
+          }
+          : { code: "conformance_rejected" }),
       };
     return Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(
       diagnostic,
