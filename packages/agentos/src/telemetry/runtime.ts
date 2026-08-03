@@ -96,6 +96,9 @@ export interface AgentOSProviderAttempt {
 
 export interface AgentOSOperation {
   readonly id: string;
+  readonly inject: (
+    carrier: Headers | Record<string, string>,
+  ) => Effect.Effect<void>;
   readonly startProviderAttempt: (
     input: AgentOSProviderAttemptInput,
   ) => Effect.Effect<AgentOSProviderAttempt>;
@@ -289,6 +292,11 @@ const startOperationCore = Effect.fn("agentos.telemetry.startOperation")(
     const ended = yield* Ref.make(false);
     return {
       id: operationId,
+      inject: (carrier) => injectContext(
+        options.propagator,
+        operationContext,
+        carrier,
+      ),
       startProviderAttempt: (attemptInput) => startProviderAttempt({
         attemptInput,
         base,
@@ -368,22 +376,33 @@ const startProviderAttemptCore = Effect.fn("agentos.telemetry.startProviderAttem
     const ended = yield* Ref.make(false);
     return {
       id: attemptId,
-      inject: (carrier) => Effect.sync(() => {
-        const injected: Record<string, string> = {};
-        options.propagator.inject(attemptContext, injected, carrierSetter);
+      inject: (carrier) => {
+        const correlation: Record<string, string> = {};
+        const safeAttemptId = safeOpaqueRequestId(attemptId);
+        if (
+          options.base["agentos.ai.route"] === "direct" &&
+          options.base["agentos.ai.provider.family"] === "openai" &&
+          safeAttemptId !== undefined
+        ) {
+          correlation["x-client-request-id"] = safeAttemptId;
+        }
         if (options.base["agentos.ai.route"] === "ai_gateway") {
-          injected["x-agentos-request-attempt-id"] = attemptId;
-          injected["x-agentos-runtime"] = String(options.base["agentos.ai.runtime"] ?? "");
-          injected["x-agentos-request-kind"] = options.attemptInput.requestKind;
-          injected["x-agentos-model-family"] = String(options.base["agentos.ai.model.family"] ?? "other");
-          injected["x-agentos-stream-mode"] = options.attemptInput.streamMode;
-          injected["x-agentos-session-state"] = String(options.base["agentos.ai.session.state"] ?? "fresh");
+          if (safeAttemptId !== undefined) {
+            correlation["x-agentos-request-attempt-id"] = safeAttemptId;
+          }
+          correlation["x-agentos-runtime"] = String(options.base["agentos.ai.runtime"] ?? "");
+          correlation["x-agentos-request-kind"] = options.attemptInput.requestKind;
+          correlation["x-agentos-model-family"] = String(options.base["agentos.ai.model.family"] ?? "other");
+          correlation["x-agentos-stream-mode"] = options.attemptInput.streamMode;
+          correlation["x-agentos-session-state"] = String(options.base["agentos.ai.session.state"] ?? "fresh");
         }
-        for (const [key, value] of Object.entries(injected)) {
-          if (carrier instanceof Headers) carrier.set(key, value);
-          else carrier[key] = value;
-        }
-      }).pipe(Effect.catchCause(() => Effect.void)),
+        return injectContext(
+          options.propagator,
+          attemptContext,
+          carrier,
+          correlation,
+        );
+      },
       end: (outcome = {}) => Effect.gen(function*() {
         if (yield* Ref.getAndSet(ended, true)) return;
         const final = {
@@ -463,6 +482,33 @@ function finishSpan(span: Span, attributes: Readonly<Record<string, unknown>>) {
   });
 }
 
+function injectContext(
+  propagator: TextMapPropagator,
+  spanContext: Context,
+  carrier: Headers | Record<string, string>,
+  correlation: Readonly<Record<string, string>> = {},
+) {
+  return Effect.sync(() => {
+    const injected: Record<string, string> = {};
+    propagator.inject(spanContext, injected, carrierSetter);
+    for (const [key, value] of Object.entries({
+      ...injected,
+      ...correlation,
+    })) {
+      if (carrier instanceof Headers) carrier.set(key, value);
+      else carrier[key] = value;
+    }
+  }).pipe(Effect.catchCause(() => Effect.void));
+}
+
+function safeOpaqueRequestId(value: string): string | undefined {
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.length <= 128 &&
+      /^[0-9A-Za-z_.:-]+$/.test(normalized)
+    ? normalized
+    : undefined;
+}
+
 const extractParent = Effect.fn("agentos.telemetry.extractParent")(
   function*(propagator: TextMapPropagator, carrier?: AgentOSTraceCarrier) {
     if (!carrier) return context.active();
@@ -507,6 +553,7 @@ const noopAttempt: AgentOSProviderAttempt = Object.freeze({
 
 const noopOperation: AgentOSOperation = Object.freeze({
   id: "",
+  inject: () => Effect.void,
   startProviderAttempt: () => Effect.succeed(noopAttempt),
   end: () => Effect.void,
 });

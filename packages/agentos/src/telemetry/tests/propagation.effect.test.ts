@@ -7,9 +7,12 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { Effect, Option, Ref, Tracer } from "effect";
+import type { Api, Model } from "@earendil-works/pi-ai";
 
 import { makeAIGatewayTelemetry } from "../../../../../services/ai-gateway/src/observability.ts";
+import { startAgentOSAuxiliaryOperation } from "../auxiliary.ts";
 import { createAgentOSTelemetry } from "../runtime.ts";
+import { makeAgentOSTelemetryRuntime } from "../runtime-context.ts";
 
 const traceFixture = Effect.fn("test.telemetry.traceFixture")(function*() {
   const base = yield* Effect.sync(() => {
@@ -46,6 +49,21 @@ const providerAction = (evaluate: () => Promise<unknown>) =>
   Effect.tryPromise({ try: evaluate, catch: (cause) => cause }).pipe(
     Effect.asVoid,
   );
+
+function gatewayModel(): Model<Api> {
+  return {
+    id: "gpt-5.6-sol",
+    name: "GPT-5.6 Sol",
+    api: "openai-codex-responses",
+    provider: "openai-codex",
+    baseUrl: "http://ai-gateway:8787",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 200_000,
+    maxTokens: 100_000,
+  };
+}
 
 describe("AgentOS AI trace propagation", () => {
   it.effect("connects a Pi operation through native Effect Gateway spans", () =>
@@ -152,6 +170,55 @@ describe("AgentOS AI trace propagation", () => {
       yield* attempt.end({ status: 200, streamOutcome: "not_streamed" });
       yield* operation.end({ status: 200 });
       expect(fixture.gatewaySpans).toEqual([]);
+      yield* providerAction(() => fixture.provider.shutdown());
+    }));
+
+  it.effect("parents memory and compaction work to the retained Pi operation", () =>
+    Effect.gen(function*() {
+      const fixture = yield* traceFixture().pipe(Effect.provide(BunCryptoLayer));
+      const runtime = yield* makeAgentOSTelemetryRuntime(
+        Effect.succeed(fixture.agent),
+      );
+      const main = yield* fixture.agent.startOperation({
+        runtime: "pi",
+        route: "ai_gateway",
+        sessionState: "fresh",
+        modelFamily: "gpt-5",
+        providerFamily: "openai",
+      });
+      yield* runtime.publish(main);
+      yield* main.end({ status: 200 });
+
+      const auxiliary = yield* startAgentOSAuxiliaryOperation(
+        gatewayModel(),
+        undefined,
+        "resumed",
+        runtime,
+      );
+      const attempt = yield* auxiliary.startProviderAttempt({
+        requestKind: "memory_extract",
+        streamMode: "non_streaming",
+      });
+      yield* attempt.end({ status: 200, streamOutcome: "completed" });
+      yield* auxiliary.end({ status: 200 });
+      yield* providerAction(() => fixture.provider.forceFlush());
+
+      const spans = fixture.spans.getFinishedSpans();
+      const operations = spans.filter(({ name }) =>
+        name === "agentos.ai.operation"
+      );
+      const auxiliaryAttempt = spans.find(({ attributes }) =>
+        attributes["agentos.ai.request.kind"] === "memory_extract"
+      );
+      expect(operations).toHaveLength(2);
+      expect(operations[1]?.parentSpanContext?.spanId).toBe(
+        operations[0]?.spanContext().spanId,
+      );
+      expect(auxiliaryAttempt?.parentSpanContext?.spanId).toBe(
+        operations[1]?.spanContext().spanId,
+      );
+      expect(new Set(spans.map((span) => span.spanContext().traceId)).size)
+        .toBe(1);
       yield* providerAction(() => fixture.provider.shutdown());
     }));
 

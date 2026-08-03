@@ -66,6 +66,7 @@ function gatewayRequest(
   headers.set("authorization", "Bearer projected-workload-token");
   headers.set("content-type", "application/json");
   headers.set("session-id", "conversation-a");
+  headers.set("baggage", "private=must-not-reach-provider");
   headers.set("x-agentos-private", "must-be-stripped");
   return new Request("http://ai-gateway.test/v1/responses", {
     method: "POST",
@@ -600,6 +601,7 @@ describe("Effect AI Gateway forwarding", () => {
           ),
         [],
       );
+      assert.strictEqual(observed?.headers.has("baggage"), false);
       assert.notInclude(
         JSON.stringify(observed === undefined ? [] : [...observed.headers]),
         "projected-workload-token",

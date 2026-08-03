@@ -66,6 +66,8 @@ describe("AgentOS fail-open telemetry runtime", () => {
         modelFamily: "gpt-5",
         providerFamily: "openai",
       });
+      const operationHeaders = new Headers();
+      yield* operation.inject(operationHeaders);
       const first = yield* operation.startProviderAttempt({ requestKind: "main", streamMode: "streaming" });
       const firstHeaders = new Headers();
       yield* first.inject(firstHeaders);
@@ -79,6 +81,7 @@ describe("AgentOS fail-open telemetry runtime", () => {
 
       expect(first.id).toBe("attempt-2");
       expect(second.id).toBe("attempt-3");
+      expect(operationHeaders.get("traceparent")).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
       expect(firstHeaders.get("traceparent")).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
       expect(firstHeaders.get("x-agentos-request-attempt-id")).toBe("attempt-2");
       expect(firstHeaders.get("x-agentos-runtime")).toBe("pi");
@@ -88,6 +91,7 @@ describe("AgentOS fail-open telemetry runtime", () => {
       expect(firstHeaders.get("x-agentos-session-state")).toBe("resumed");
       expect(secondHeaders.get("x-agentos-request-attempt-id")).toBe("attempt-3");
       expect(firstHeaders.get("traceparent")?.split("-")[1]).toBe(secondHeaders.get("traceparent")?.split("-")[1]);
+      expect(operationHeaders.get("traceparent")?.split("-")[1]).toBe(firstHeaders.get("traceparent")?.split("-")[1]);
 
       yield* first.end({
         status: 200,
@@ -179,6 +183,7 @@ describe("AgentOS fail-open telemetry runtime", () => {
       const headers = new Headers();
       yield* attempt.inject(headers);
       expect(headers.get("traceparent")).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+      expect(headers.get("x-client-request-id")).toBe("attempt-2");
       expect([...headers.keys()].filter((name) => name.startsWith("x-agentos-"))).toEqual([]);
       yield* attempt.end({ status: 200, streamOutcome: "completed" });
       yield* operation.end({ status: 200 });

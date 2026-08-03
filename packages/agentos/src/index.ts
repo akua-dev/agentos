@@ -305,6 +305,7 @@ export {
   validatePiSkillName,
   validateQualifiedName,
   type AgentOSNameClaimsV1,
+  type AgentOSRegistrationContextV1,
   type AgentOSRegistrationV1,
 } from "./preflight.ts";
 export {
@@ -507,6 +508,11 @@ export {
   type AgentOSTelemetryOptions,
   type AgentOSTraceCarrier,
 } from "./telemetry/runtime.ts";
+export {
+  makeAgentOSTelemetryRuntime,
+  type AgentOSTelemetryRuntime,
+  type AgentOSTelemetryRuntimeSource,
+} from "./telemetry/runtime-context.ts";
 export {
   registerAgentOSObservability,
   registerAgentOSObservabilityEffect,
