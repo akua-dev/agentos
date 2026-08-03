@@ -324,7 +324,7 @@ data:
         timeout: 1s
 
     exporters:
-      otlp_http/remote:
+      otlp_grpc/remote:
         endpoint: ${env:OTEL_EXPORTER_OTLP_ENDPOINT}
         compression: gzip
         timeout: 10s
@@ -373,7 +373,7 @@ data:
             - probabilistic_sampler/fleet
             - batch
           exporters:
-            - otlp_http/remote
+            - otlp_grpc/remote
         metrics:
           receivers:
             - otlp
@@ -387,7 +387,7 @@ data:
             - transform/contract_allowlist
             - batch
           exporters:
-            - otlp_http/remote
+            - otlp_grpc/remote
         logs:
           receivers:
             - otlp
@@ -400,4 +400,4 @@ data:
             - transform/contract_allowlist
             - batch
           exporters:
-            - otlp_http/remote
+            - otlp_grpc/remote
