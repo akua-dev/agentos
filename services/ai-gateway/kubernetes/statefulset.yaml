@@ -18,6 +18,7 @@ spec:
   template:
     metadata:
       labels:
+        agentos.akua.dev/credential-domain: openai-responses
         agentos.akua.dev/otel-client: "true"
         app.kubernetes.io/name: ai-gateway
         app.kubernetes.io/component: ai-gateway
