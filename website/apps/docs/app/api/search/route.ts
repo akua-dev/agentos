@@ -1,23 +1,26 @@
 import { createSearchAPI } from 'fumadocs-core/search/server';
-import { learnSource, source } from '@/lib/source';
+import { runServerEffect } from '@/lib/effect/server-runtime';
+import {
+  loadSearchIndexes,
+  type SearchIndexPage,
+} from '@/lib/search-index';
+import { learnSource, source, type LearnPage, type Page } from '@/lib/source';
 
-const pages = [
-  ...source.getPages().map((page) => ({ page, kind: 'Docs' })),
-  ...learnSource.getPages().map((page) => ({ page, kind: 'Learn' })),
+function documentationPage(page: Page): SearchIndexPage {
+  return { page, kind: 'Docs' };
+}
+
+function learningPage(page: LearnPage): SearchIndexPage {
+  return { page, kind: 'Learn' };
+}
+
+const pages: ReadonlyArray<SearchIndexPage> = [
+  ...source.getPages().map(documentationPage),
+  ...learnSource.getPages().map(learningPage),
 ];
 
 const search = createSearchAPI('advanced', {
-  indexes: async () =>
-    Promise.all(
-      pages.map(async ({ page, kind }) => ({
-        title: page.data.title,
-        description: page.data.description,
-        id: page.url,
-        url: page.url,
-        tag: kind,
-        structuredData: await page.data.structuredData(),
-      })),
-    ),
+  indexes: () => runServerEffect(loadSearchIndexes(pages)),
 });
 
 export const revalidate = false;

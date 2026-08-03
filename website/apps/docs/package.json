@@ -5,14 +5,14 @@
   "type": "module",
   "scripts": {
     "brand:generate": "bun ./scripts/generate-brand-assets.ts",
-    "build": "fumadocs-mdx && next build",
+    "build": "fumadocs-mdx && next build --webpack",
     "build:worker": "fumadocs-mdx && opennextjs-cloudflare build && bun ./scripts/finalize-worker-build.ts",
     "types:check": "next typegen && tsc --noEmit",
     "clean": "rimraf .next",
     "deploy": "bun run build:worker && bun run deploy:worker",
     "deploy:worker": "bun ./scripts/publish-worker.ts production",
     "dev": "next dev",
-    "lint": "node ./scripts/lint.entry.ts",
+    "lint": "bun ./scripts/lint.entry.ts",
     "preview:worker": "opennextjs-cloudflare preview",
     "test": "vitest run --config vitest.config.ts",
     "upload:worker": "bun ./scripts/publish-worker.ts preview",
@@ -20,11 +20,14 @@
     "start": "next start"
   },
   "dependencies": {
+    "@effect/platform-browser": "4.0.0-beta.102",
+    "@effect/platform-bun": "4.0.0-beta.102",
     "@base-ui/react": "^1.6.0",
     "@fumadocs/satteri": "0.3.1",
     "@paper-design/shaders-react": "^0.0.77",
     "class-variance-authority": "^0.7.1",
     "cnfast": "^0.0.8",
+    "effect": "4.0.0-beta.102",
     "fumadocs-core": "16.13.0",
     "fumadocs-mdx": "15.2.0",
     "fumadocs-twoslash": "3.3.0",
@@ -44,6 +47,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@effect/vitest": "4.0.0-beta.102",
     "@fumadocs/cli": "1.4.1",
     "@next/bundle-analyzer": "16.2.11",
     "@next/env": "16.2.11",

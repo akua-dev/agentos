@@ -6,7 +6,13 @@ export interface LearningRoute {
   position: number;
 }
 
-const courses = [
+interface LearningCourse {
+  readonly slug: string;
+  readonly title: string;
+  readonly lessons: ReadonlyArray<readonly [string, string]>;
+}
+
+const courses: ReadonlyArray<LearningCourse> = [
   {
     slug: '01-first-outcome',
     title: 'Run your first outcome',
@@ -37,11 +43,15 @@ const courses = [
       ['upgrade-without-losing-control', 'Upgrade without losing control'],
     ],
   },
-] as const;
+];
+
+function learningPath(course: string, lesson: string): `/learn/${string}` {
+  return `/learn/${course}/${lesson}`;
+}
 
 export const learningRoutes: readonly LearningRoute[] = courses.flatMap((course) =>
   course.lessons.map(([lessonId, title]) => ({
-    path: `/learn/${course.slug}/${lessonId}` as `/learn/${string}`,
+    path: learningPath(course.slug, lessonId),
     title,
     lessonId,
     course: course.title,

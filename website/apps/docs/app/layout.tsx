@@ -1,11 +1,16 @@
 import './global.css';
 import type { Metadata, Viewport } from 'next';
+import { Effect } from 'effect';
 import {
   createMetadata,
   defaultDescription,
   defaultTitle,
 } from '@/lib/metadata';
+import { loadPostHogConfig } from '@/lib/analytics/posthog';
 import { Body } from '@/app/layout.client';
+import { Analytics } from '@/components/analytics';
+import { runServerEffect } from '@/lib/effect/server-runtime';
+import { LiveServerConfig } from '@/lib/effect/server-config';
 import { Provider } from './provider';
 import type { ReactNode } from 'react';
 import { Geist, JetBrains_Mono } from 'next/font/google';
@@ -44,30 +49,41 @@ export const viewport: Viewport = {
   ],
 };
 
+const renderRootLayout = Effect.fn('agentos.website.renderRootLayout')(
+  function*(children: ReactNode) {
+    const analyticsConfig = yield* loadPostHogConfig;
+
+    return (
+      <html lang="en" className={`${geist.variable} ${mono.variable}`} suppressHydrationWarning>
+        <head>
+          {/*
+            OpenNext's Worker bundle currently serializes next-themes with esbuild's
+            function-name helper call but not the helper definition. Define the
+            standard helper before next-themes runs so the first paint can select
+            the saved/system theme without a browser exception.
+          */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html:
+                'globalThis.__name=globalThis.__name||function(target,value){return Object.defineProperty(target,"name",{value:value,configurable:true})};',
+            }}
+          />
+        </head>
+        <Body>
+          <Analytics config={analyticsConfig} />
+          <NextProvider>
+            <TreeContextProvider tree={source.getPageTree()}>
+              <Provider>{children}</Provider>
+            </TreeContextProvider>
+          </NextProvider>
+        </Body>
+      </html>
+    );
+  },
+);
+
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en" className={`${geist.variable} ${mono.variable}`} suppressHydrationWarning>
-      <head>
-        {/*
-          OpenNext's Worker bundle currently serializes next-themes with esbuild's
-          function-name helper call but not the helper definition. Define the
-          standard helper before next-themes runs so the first paint can select
-          the saved/system theme without a browser exception.
-        */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              'globalThis.__name=globalThis.__name||function(target,value){return Object.defineProperty(target,"name",{value:value,configurable:true})};',
-          }}
-        />
-      </head>
-      <Body>
-        <NextProvider>
-          <TreeContextProvider tree={source.getPageTree()}>
-            <Provider>{children}</Provider>
-          </TreeContextProvider>
-        </NextProvider>
-      </Body>
-    </html>
+  return runServerEffect(
+    renderRootLayout(children).pipe(Effect.provide(LiveServerConfig)),
   );
 }

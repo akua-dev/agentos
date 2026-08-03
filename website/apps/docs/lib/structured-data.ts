@@ -32,7 +32,7 @@ export const agentOsStructuredData = {
       },
     },
   ],
-} as const;
+};
 
 export function serializeStructuredData(value: unknown): string {
   return JSON.stringify(value).replaceAll('<', '\\u003c');

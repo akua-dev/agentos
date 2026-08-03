@@ -12,19 +12,39 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Effect } from 'effect';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { cva } from 'class-variance-authority';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
+import {
+  delayBrowserEffect,
+  loadBrowserModule,
+} from '@/lib/effect/browser-effects';
+import {
+  runBrowserEffect,
+  runBrowserPromise,
+  runBrowserSync,
+} from '@/lib/effect/browser-runtime';
 
 const GrainGradient = dynamic(
-  () => import('@paper-design/shaders-react').then((mod) => mod.GrainGradient),
+  () =>
+    runBrowserPromise(
+      loadBrowserModule('@paper-design/shaders-react', () =>
+        import('@paper-design/shaders-react'),
+      ).pipe(Effect.map((module) => module.GrainGradient)),
+    ),
   { ssr: false },
 );
 
 const Dithering = dynamic(
-  () => import('@paper-design/shaders-react').then((mod) => mod.Dithering),
+  () =>
+    runBrowserPromise(
+      loadBrowserModule('@paper-design/shaders-react', () =>
+        import('@paper-design/shaders-react'),
+      ).pipe(Effect.map((module) => module.Dithering)),
+    ),
   { ssr: false },
 );
 
@@ -35,8 +55,12 @@ export function Hero() {
   const [showShaders, setShowShaders] = useState(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowShaders(true), 250);
-    return () => window.clearTimeout(timer);
+    return runBrowserEffect(
+      delayBrowserEffect(
+        '250 millis',
+        Effect.sync(() => setShowShaders(true)),
+      ),
+    );
   }, []);
 
   return (
@@ -92,8 +116,12 @@ export function CreateAppAnimation(props: ComponentProps<'div'>) {
 
   useEffect(() => {
     if (tick >= animationEnd) return;
-    const timer = window.setTimeout(() => setTick((value) => value + 1), tickTime);
-    return () => window.clearTimeout(timer);
+    return runBrowserEffect(
+      delayBrowserEffect(
+        tickTime,
+        Effect.sync(() => setTick((value) => value + 1)),
+      ),
+    );
   }, [animationEnd, tick]);
 
   const lines: ReactElement[] = [
@@ -119,7 +147,11 @@ export function CreateAppAnimation(props: ComponentProps<'div'>) {
     <div
       {...props}
       onMouseEnter={() => {
-        if (tick >= animationEnd) setTick(0);
+        runBrowserSync(
+          Effect.sync(() => {
+            if (tick >= animationEnd) setTick(0);
+          }),
+        );
       }}
     >
       {tick >= animationEnd && (
@@ -146,49 +178,61 @@ function LaunchAppWindow(props: HTMLAttributes<HTMLDivElement>) {
   );
 }
 
-const writingTabs = [
+type WritingTabValue = 'chatbot' | 'agent' | 'company';
+
+const writingTabs: ReadonlyArray<{
+  readonly name: string;
+  readonly value: WritingTabValue;
+}> = [
   { name: 'Chatbot', value: 'chatbot' },
   { name: 'Agent', value: 'agent' },
   { name: 'Company', value: 'company' },
-] as const;
+];
 
 export function Writing({
   tabs: tabContents,
 }: {
-  tabs: Record<(typeof writingTabs)[number]['value'], ReactNode>;
+  tabs: Record<WritingTabValue, ReactNode>;
 }) {
-  const [tab, setTab] = useState<(typeof writingTabs)[number]['value']>('chatbot');
+  const [tab, setTab] = useState<WritingTabValue>('chatbot');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const selectTab = (index: number) => {
-    setTab(writingTabs[index].value);
-    tabRefs.current[index]?.focus();
-  };
+  const selectTab = Effect.fn('agentos.website.selectWritingTab')(
+    (index: number) =>
+      Effect.sync(() => {
+        const selected = writingTabs[index];
+        if (selected === undefined) return;
+        setTab(selected.value);
+        tabRefs.current[index]?.focus();
+      }),
+  );
 
-  const handleTabKeyDown = (index: number, event: KeyboardEvent<HTMLButtonElement>) => {
-    let nextIndex: number | undefined;
+  const handleTabKeyDown = Effect.fn('agentos.website.handleWritingTabKey')(
+    function*(index: number, event: KeyboardEvent<HTMLButtonElement>) {
+      let nextIndex: number | undefined;
 
-    switch (event.key) {
-      case 'ArrowRight':
-      case 'ArrowDown':
-        nextIndex = (index + 1) % writingTabs.length;
-        break;
-      case 'ArrowLeft':
-      case 'ArrowUp':
-        nextIndex = (index - 1 + writingTabs.length) % writingTabs.length;
-        break;
-      case 'Home':
-        nextIndex = 0;
-        break;
-      case 'End':
-        nextIndex = writingTabs.length - 1;
-        break;
-    }
+      switch (event.key) {
+        case 'ArrowRight':
+        case 'ArrowDown':
+          nextIndex = (index + 1) % writingTabs.length;
+          break;
+        case 'ArrowLeft':
+        case 'ArrowUp':
+          nextIndex = (index - 1 + writingTabs.length) % writingTabs.length;
+          break;
+        case 'Home':
+          nextIndex = 0;
+          break;
+        case 'End':
+          nextIndex = writingTabs.length - 1;
+          break;
+      }
 
-    if (nextIndex === undefined) return;
-    event.preventDefault();
-    selectTab(nextIndex);
-  };
+      if (nextIndex === undefined) return;
+      yield* Effect.sync(() => event.preventDefault());
+      yield* selectTab(nextIndex);
+    },
+  );
 
   return (
     <div className="col-span-full my-16">
@@ -215,14 +259,20 @@ export function Writing({
               aria-controls={`progression-${item.value}`}
               id={`progression-tab-${item.value}`}
               ref={(element) => {
-                tabRefs.current[index] = element;
+                runBrowserSync(
+                  Effect.sync(() => {
+                    tabRefs.current[index] = element;
+                  }),
+                );
               }}
               className={cn(
                 'rounded-md px-2 py-1 text-base font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand sm:text-lg',
                 item.value === tab && 'text-brand',
               )}
-              onClick={() => selectTab(index)}
-              onKeyDown={(event) => handleTabKeyDown(index, event)}
+              onClick={() => runBrowserSync(selectTab(index))}
+              onKeyDown={(event) =>
+                runBrowserSync(handleTabKeyDown(index, event))
+              }
             >
               {item.name}
             </button>
@@ -268,26 +318,38 @@ export function AgnosticBackground() {
   );
 }
 
-const observerTargets = new WeakMap<Element, (entry: IntersectionObserverEntry) => void>();
-let observer: IntersectionObserver | undefined;
+const observeVisibility = Effect.fn('agentos.website.observeVisibility')(
+  (element: HTMLElement, setVisible: (visible: boolean) => void) =>
+    Effect.acquireRelease(
+      Effect.sync(() => {
+        const observer = new IntersectionObserver((entries) => {
+          runBrowserSync(
+            Effect.sync(() => {
+              for (const entry of entries) {
+                if (entry.target === element) setVisible(entry.isIntersecting);
+              }
+            }),
+          );
+        });
+        observer.observe(element);
+        return observer;
+      }),
+      (observer) => Effect.sync(() => observer.disconnect()),
+    ).pipe(Effect.andThen(Effect.never), Effect.scoped),
+);
 
 function useIsVisible(ref: RefObject<HTMLElement | null>) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    observer ??= new IntersectionObserver((entries) => {
-      for (const entry of entries) observerTargets.get(entry.target)?.(entry);
-    });
-
-    const element = ref.current;
-    if (!element) return;
-    observerTargets.set(element, (entry) => setVisible(entry.isIntersecting));
-    observer.observe(element);
-
-    return () => {
-      observer?.unobserve(element);
-      observerTargets.delete(element);
-    };
+    return runBrowserEffect(
+      Effect.suspend(() => {
+        const element = ref.current;
+        return element === null
+          ? Effect.void
+          : observeVisibility(element, setVisible);
+      }),
+    );
   }, [ref]);
 
   return visible;

@@ -1,35 +1,55 @@
-import { z } from 'zod';
+import { Effect, Schema } from 'effect';
 import type { LearnPageRecord } from './curriculum';
 
-const learnVideoSchema = z.object({
-  url: z.url().refine((value) => value.startsWith('https://'), 'Video URL must use HTTPS'),
-  title: z.string().trim().min(1),
-  transcript: z.string().trim().min(1).optional(),
+const LearnVideoSchema = Schema.Struct({
+  url: Schema.String,
+  title: Schema.String,
+  transcript: Schema.optional(Schema.String),
+});
+export type LearnVideo = typeof LearnVideoSchema.Type;
+
+export class LearnSourceError extends Schema.TaggedErrorClass<LearnSourceError>()(
+  'LearnSourceError',
+  { message: Schema.String, cause: Schema.optional(Schema.Defect()) },
+) {}
+
+export const validateLearnVideo = Effect.fn(
+  'agentos.website.validateLearnVideo',
+)(function*(value: unknown) {
+  const video = yield* Schema.decodeUnknownEffect(LearnVideoSchema)(value).pipe(
+    Effect.mapError((cause) =>
+      new LearnSourceError({
+        message: 'Learn video metadata is incomplete',
+        cause,
+      })
+    ),
+  );
+  if (
+    !video.url.startsWith('https://') ||
+    video.title.trim().length === 0 ||
+    (video.transcript !== undefined && video.transcript.trim().length === 0)
+  ) {
+    return yield* new LearnSourceError({
+      message: 'Learn video metadata must use HTTPS and non-empty text',
+    });
+  }
+  return video;
 });
 
-export type LearnVideo = z.infer<typeof learnVideoSchema>;
-
-export function validateLearnVideo(value: unknown): LearnVideo {
-  return learnVideoSchema.parse(value);
-}
-
-export function normalizeLearnPage(page: {
-  url: string;
-  data: Omit<LearnPageRecord, 'url'>;
-}): LearnPageRecord {
-  if (!page.url.startsWith('/learn/') || page.url === '/learn/') {
-    throw new Error(`Invalid Learn page URL: ${page.url}`);
+export const normalizeLearnPage = Effect.fn(
+  'agentos.website.normalizeLearnPage',
+)(function*(page: {
+  readonly url: string;
+  readonly data: Omit<LearnPageRecord, 'url'>;
+}) {
+  if (!isLearnUrl(page.url)) {
+    return yield* new LearnSourceError({
+      message: `Invalid Learn page URL: ${page.url}`,
+    });
   }
+  return { ...page.data, url: page.url };
+});
 
-  return {
-    title: page.data.title,
-    description: page.data.description,
-    url: page.url as `/learn/${string}`,
-    courseId: page.data.courseId,
-    courseTitle: page.data.courseTitle,
-    courseOrder: page.data.courseOrder,
-    lessonId: page.data.lessonId,
-    lessonOrder: page.data.lessonOrder,
-    estimatedMinutes: page.data.estimatedMinutes,
-  };
+function isLearnUrl(value: string): value is `/learn/${string}` {
+  return value.startsWith('/learn/') && value !== '/learn/';
 }

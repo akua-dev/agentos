@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { it } from '@effect/vitest';
+import { Effect } from 'effect';
+import { afterEach, describe, expect } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { buildCurriculum, type LearnPageRecord } from '@/lib/learn/curriculum';
 import { CurriculumNavigation } from './learn-sidebar';
@@ -45,38 +47,44 @@ const records: LearnPageRecord[] = [
   },
 ];
 
-const curriculum = buildCurriculum(records);
-
 describe('CurriculumNavigation', () => {
-  it('selects the introduction before the complete numbered curriculum', () => {
-    render(
+  it.effect('selects the introduction before the complete numbered curriculum', () =>
+    Effect.gen(function*() {
+      const curriculum = yield* buildCurriculum(records);
+      yield* Effect.sync(() => {
+        render(
       <CurriculumNavigation
         curriculum={curriculum}
         selection={{ kind: 'introduction' }}
       />,
-    );
+        );
 
     expect(screen.getByRole('link', { name: 'Introduction' }).getAttribute('aria-current')).toBe(
       'page',
     );
     expect(screen.getAllByRole('link')).toHaveLength(records.length + 1);
     expect(screen.getByRole('heading', { name: '1. Course one' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: '2. Course two' })).toBeTruthy();
-  });
+        expect(screen.getByRole('heading', { name: '2. Course two' })).toBeTruthy();
+      });
+    }));
 
-  it('selects exactly one numbered lesson', () => {
-    render(
+  it.effect('selects exactly one numbered lesson', () =>
+    Effect.gen(function*() {
+      const curriculum = yield* buildCurriculum(records);
+      yield* Effect.sync(() => {
+        render(
       <CurriculumNavigation
         curriculum={curriculum}
         selection={{ kind: 'lesson', lessonId: 'second' }}
       />,
-    );
+        );
 
     expect(screen.getByRole('link', { name: 'Introduction' }).hasAttribute('aria-current')).toBe(
       false,
     );
     expect(
       screen.getByRole('link', { name: /2\s*Second lesson/ }).getAttribute('aria-current'),
-    ).toBe('page');
-  });
+        ).toBe('page');
+      });
+    }));
 });

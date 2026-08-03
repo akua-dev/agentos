@@ -1,3 +1,5 @@
+import { Option, Schema } from 'effect';
+
 export interface LearnProgress {
   version: 1;
   completedLessonIds: string[];
@@ -5,31 +7,42 @@ export interface LearnProgress {
 
 export const learnProgressStorageKey = 'agentos.learn.progress.v1';
 
+export const LearnProgressSchema = Schema.Struct({
+  version: Schema.Literal(1),
+  completedLessonIds: Schema.Array(Schema.String),
+});
+export const LearnProgressFromString = Schema.fromJsonString(
+  LearnProgressSchema,
+);
+
+const LearnProgressInputSchema = Schema.Struct({
+  version: Schema.Literal(1),
+  completedLessonIds: Schema.Array(Schema.Unknown),
+});
+const LearnProgressInputFromString = Schema.fromJsonString(
+  LearnProgressInputSchema,
+);
+
 export function resetProgress(): LearnProgress {
   return { version: 1, completedLessonIds: [] };
 }
 
 export function parseProgress(value: string | null): LearnProgress {
   if (!value) return resetProgress();
-
-  try {
-    const parsed = JSON.parse(value) as {
-      version?: unknown;
-      completedLessonIds?: unknown;
-    };
-    if (parsed.version !== 1 || !Array.isArray(parsed.completedLessonIds)) {
-      return resetProgress();
-    }
-
-    return {
-      version: 1,
-      completedLessonIds: [
-        ...new Set(parsed.completedLessonIds.filter((id): id is string => typeof id === 'string')),
-      ],
-    };
-  } catch {
-    return resetProgress();
-  }
+  const decoded = Schema.decodeUnknownOption(LearnProgressInputFromString)(
+    value,
+  );
+  if (Option.isNone(decoded)) return resetProgress();
+  return {
+    version: 1,
+    completedLessonIds: [
+      ...new Set(
+        decoded.value.completedLessonIds.filter(
+          (id): id is string => typeof id === 'string',
+        ),
+      ),
+    ],
+  };
 }
 
 export function toggleLesson(progress: LearnProgress, lessonId: string): LearnProgress {

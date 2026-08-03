@@ -18,7 +18,7 @@ function section(title: string, pages: readonly LlmsIndexPage[]): string {
     `## ${title}`,
     ...pages.map(
       (page) =>
-        `- [${page.data.title}](${absoluteSiteUrl(page.url as `/${string}`)}): ${
+        `- [${page.data.title}](${absoluteSiteUrl(page.url)}): ${
           page.data.description ?? ''
         }`,
     ),
