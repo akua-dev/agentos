@@ -234,6 +234,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
           Effect.succeed({
             output: [{ type: "compaction", encrypted_content: "opaque" }],
             usage: { input_tokens: 10, output_tokens: 1, total_tokens: 11 },
+            providerRequestId: "req_safe_compaction_1",
           }),
       }));
 
@@ -273,6 +274,7 @@ describe("AgentOS OpenAI server-compaction Effect extension", () => {
           outcome: {
             inputTokens: 10,
             outputTokens: 1,
+            providerRequestId: "req_safe_compaction_1",
             status: 200,
             streamOutcome: "completed",
           },

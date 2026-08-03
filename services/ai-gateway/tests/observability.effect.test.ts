@@ -43,7 +43,8 @@ describe("native Effect AI Gateway telemetry", () => {
             headers: {
               traceparent:
                 "00-11111111111111111111111111111111-2222222222222222-01",
-              tracestate: "vendor=safe",
+              tracestate:
+                "vendor=safe, 1tenant@system=value with internal space",
               "x-agentos-runtime": "pi",
               "x-agentos-stream-mode": "streaming",
             },
@@ -74,7 +75,10 @@ describe("native Effect AI Gateway telemetry", () => {
           upstreamHeaders.get("traceparent") ?? "",
           /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
         );
-        assert.strictEqual(upstreamHeaders.get("tracestate"), "vendor=safe");
+        assert.strictEqual(
+          upstreamHeaders.get("tracestate"),
+          "vendor=safe, 1tenant@system=value with internal space",
+        );
         assert.deepStrictEqual(spans.map(({ name }) => name), [
           "ai-gateway.request",
           "ai-gateway.authenticate",
@@ -160,4 +164,36 @@ describe("native Effect AI Gateway telemetry", () => {
       );
       yield* noop.end({ streamOutcome: "not_streamed" });
     }).pipe(Effect.provide(BunCryptoLayer)));
+
+  it.effect("continues Codex context with a fresh attempt and rejects malformed tracestate", () =>
+    runWithNativeTelemetry((telemetry, spans) =>
+      Effect.gen(function*() {
+        const request = yield* telemetry.start(
+          new Request("http://ai-gateway.test/v1/responses", {
+            method: "POST",
+            headers: {
+              "user-agent": "codex-cli/0.144.5",
+              traceparent:
+                "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01",
+              tracestate: "vendor=valid,malformed==value",
+              "x-client-request-id": "long-lived-codex-thread",
+            },
+          }),
+        );
+        const upstream = new Headers();
+        yield* request.upstreamStarted(upstream);
+        yield* request.end({ status: 200, streamOutcome: "completed" });
+
+        assert.strictEqual(
+          spans[0]?.attributes.get("agentos.ai.runtime"),
+          "codex",
+        );
+        assert.strictEqual(
+          spans[0]?.traceId,
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        );
+        assert.strictEqual(upstream.get("x-client-request-id"), "gateway-2");
+        assert.strictEqual(upstream.has("tracestate"), false);
+      })
+    ));
 });

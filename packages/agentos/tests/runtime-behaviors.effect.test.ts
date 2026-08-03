@@ -3,6 +3,7 @@ import { Effect } from "effect";
 
 import { defaultAgentOSRuntime } from "../src/behaviors.ts";
 import {
+  type AgentOSRegistrationV1,
   preflightAgentOSRegistrationsEffect,
   registerAgentOSRuntimeEffect,
 } from "../src/preflight.ts";
@@ -50,5 +51,24 @@ describe("released AgentOS Pi registrations", () => {
       );
       assert.lengthOf(withoutCompaction, 5);
       yield* preflightAgentOSRegistrationsEffect(withoutCompaction);
+    }));
+
+  it.effect("creates one Effect telemetry runtime per Pi registration run", () =>
+    Effect.gen(function*() {
+      const fake = yield* makePiTestHarness();
+      const contexts: Array<unknown> = [];
+      const registration = (id: string): AgentOSRegistrationV1 => ({
+        version: 1,
+        id,
+        names: { version: 1 },
+        register: (_pi, context) => Effect.sync(() => contexts.push(context)),
+      });
+      yield* registerAgentOSRuntimeEffect(fake.pi, [
+        registration("@akua-dev/test:first"),
+        registration("@akua-dev/test:second"),
+      ]);
+      assert.lengthOf(contexts, 2);
+      assert.strictEqual(contexts[0], contexts[1]);
+      assert.deepInclude(contexts[0], { version: 1 });
     }));
 });

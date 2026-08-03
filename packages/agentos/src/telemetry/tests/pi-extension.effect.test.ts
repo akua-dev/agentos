@@ -36,6 +36,7 @@ function recorder() {
       operations.push(record);
       const operation: AgentOSOperation = {
         id: `operation-${++nextId}`,
+        inject: () => Effect.void,
         startProviderAttempt(attemptInput) {
           return Effect.sync(() => {
           const attemptRecord: (typeof record.attempts)[number] = {

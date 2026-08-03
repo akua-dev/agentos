@@ -46,8 +46,11 @@ export function createAgentOSObservabilityRegistration(
     version: 1,
     id: "@akua-dev/agentos:observability",
     names: { version: 1 },
-    register(pi) {
-      return registerAgentOSObservabilityEffect(pi, dependencies);
+    register(pi, context) {
+      return registerAgentOSObservabilityEffect(pi, {
+        ...dependencies,
+        telemetryRuntime: dependencies.telemetryRuntime ?? context?.telemetry,
+      });
     },
   };
 }
@@ -97,8 +100,11 @@ export function createAgentOSMateMemoryRegistration(
         "agentos-mate-memory-maintenance",
       ],
     },
-    register(pi) {
-      return registerMateMemoryExtensionLiveEffect(pi, dependencies).pipe(
+    register(pi, context) {
+      return registerMateMemoryExtensionLiveEffect(pi, {
+        ...dependencies,
+        telemetryRuntime: dependencies.telemetryRuntime ?? context?.telemetry,
+      }).pipe(
         Effect.asVoid,
       );
     },
@@ -112,7 +118,12 @@ export function createAgentOSOpenAIServerCompactionRegistration(
     version: 1,
     id: "@akua-dev/agentos:openai-server-compaction",
     names: { version: 1 },
-    register: (pi) => registerOpenAIServerCompactionEffect(pi, dependencies),
+    register: (pi, context) =>
+      registerOpenAIServerCompactionEffect(
+        pi,
+        dependencies,
+        context?.telemetry,
+      ),
   };
 }
 

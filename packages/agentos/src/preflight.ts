@@ -12,14 +12,26 @@ import {
   decodeOrValidationError,
   makeValidationError as validationError,
 } from "./shared/errors.ts";
+import {
+  makeAgentOSTelemetryRuntime,
+  type AgentOSTelemetryRuntime,
+} from "./telemetry/runtime-context.ts";
 
 export type { AgentOSNameClaimsV1 } from "./shared/contracts.ts";
+
+export type AgentOSRegistrationContextV1 = {
+  readonly version: 1;
+  readonly telemetry: AgentOSTelemetryRuntime;
+};
 
 export type AgentOSRegistrationV1 = {
   version: 1;
   id: string;
   names: AgentOSNameClaimsV1;
-  register(pi: ExtensionAPI): Effect.Effect<void, unknown>;
+  register(
+    pi: ExtensionAPI,
+    context?: AgentOSRegistrationContextV1,
+  ): Effect.Effect<void, unknown>;
 };
 
 type ClaimKind = "tools" | "commands" | "skills" | "messages" | "entries";
@@ -150,8 +162,12 @@ export const registerAgentOSRuntimeEffect = Effect.fn(
   registrations: readonly AgentOSRegistrationV1[],
 ) {
   yield* preflightAgentOSRegistrationsEffect(registrations);
+  const context = {
+    version: 1,
+    telemetry: yield* makeAgentOSTelemetryRuntime(),
+  } satisfies AgentOSRegistrationContextV1;
   for (const registration of registrations) {
-    yield* registration.register(pi).pipe(
+    yield* registration.register(pi, context).pipe(
       Effect.mapError(() =>
         validationError(
           "registration_failed",

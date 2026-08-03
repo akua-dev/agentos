@@ -66,6 +66,7 @@ import type {
   AgentOSProviderAttempt,
   AgentOSProviderAttemptOutcome,
 } from "../telemetry/runtime.ts";
+import type { AgentOSTelemetryRuntime } from "../telemetry/runtime-context.ts";
 
 type ResolvedAuth = {
   apiKey?: string;
@@ -446,8 +447,14 @@ function combinedUsage(
 function startTelemetryOperation(
   model: OpenAICompactionModel,
   telemetry: AgentOSTelemetrySource | undefined,
+  telemetryRuntime?: AgentOSTelemetryRuntime,
 ) {
-  return startAgentOSAuxiliaryOperation(model, telemetry, "resumed");
+  return startAgentOSAuxiliaryOperation(
+    model,
+    telemetry,
+    "resumed",
+    telemetryRuntime,
+  );
 }
 
 function resolveModelAuth(
@@ -470,6 +477,7 @@ function handleCompaction(
   requestShapes: Map<string, ProviderRequestShape>,
   event: SessionBeforeCompactEvent,
   ctx: ExtensionContext,
+  telemetryRuntime?: AgentOSTelemetryRuntime,
 ) {
   return Effect.gen(function*() {
     const config = yield* dependencies.config ?? openAIServerCompactionConfig;
@@ -496,6 +504,7 @@ function handleCompaction(
     const telemetryOperation = yield* startTelemetryOperation(
       model,
       dependencies.telemetry,
+      telemetryRuntime,
     );
     const startPortableAttempt = () =>
       telemetryOperation.startProviderAttempt({
@@ -583,6 +592,7 @@ function handleCompaction(
           remoteAttempt,
           dependencies.runServerCompaction(remoteRequest),
           (result) => ({
+            providerRequestId: result.providerRequestId,
             inputTokens: safeTokenCount(result.usage?.input_tokens),
             outputTokens: safeTokenCount(result.usage?.output_tokens),
           }),
@@ -634,7 +644,7 @@ function observeCompactionAttempt<T, E>(
     result: T,
   ) => Pick<
     AgentOSProviderAttemptOutcome,
-    "inputTokens" | "outputTokens"
+    "inputTokens" | "outputTokens" | "providerRequestId"
   >,
 ) {
   return run.pipe(
@@ -734,6 +744,7 @@ export const registerOpenAIServerCompactionEffect = Effect.fn(
 )(function*(
   pi: ExtensionAPI,
   dependencies: OpenAIServerCompactionDependencies = defaults,
+  telemetryRuntime?: AgentOSTelemetryRuntime,
 ) {
   yield* Effect.sync(() => {
     const requestShapes = new Map<string, ProviderRequestShape>();
@@ -741,7 +752,14 @@ export const registerOpenAIServerCompactionEffect = Effect.fn(
       runExtensionEffect(Effect.sync(() => requestShapes.clear()));
     pi.on("session_before_compact", (event, ctx) =>
       runExtensionEffect(
-        handleCompaction(pi, dependencies, requestShapes, event, ctx),
+        handleCompaction(
+          pi,
+          dependencies,
+          requestShapes,
+          event,
+          ctx,
+          telemetryRuntime,
+        ),
       )
     );
     pi.on("before_provider_request", (event, ctx) =>

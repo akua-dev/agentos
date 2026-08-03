@@ -248,6 +248,9 @@ describe("pinned Codex native OpenTelemetry", () => {
           /^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$/,
         );
       }
+      const firstTraceParent = providerCalls[0]?.traceparent?.split("-");
+      const retryTraceParent = providerCalls[1]?.traceparent?.split("-");
+      assert.strictEqual(firstTraceParent?.[1], retryTraceParent?.[1]);
 
       const captured = yield* Ref.get(telemetryRequests);
       assert.deepStrictEqual(

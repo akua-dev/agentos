@@ -28,12 +28,14 @@ import {
   type AgentOSProviderAttempt,
   type AgentOSTelemetry,
 } from "./runtime.ts";
+import type { AgentOSTelemetryRuntime } from "./runtime-context.ts";
 
 const TELEMETRY_INITIALIZATION_BUDGET = Duration.millis(250);
 const TELEMETRY_HOOK_BUDGET = Duration.millis(10);
 
 export interface AgentOSObservabilityDependencies {
   readonly telemetry?: AgentOSTelemetrySource;
+  readonly telemetryRuntime?: AgentOSTelemetryRuntime;
   readonly runtimeVersion?: string;
 }
 
@@ -57,6 +59,7 @@ export const registerAgentOSObservabilityEffect = Effect.fn(
   dependencies: AgentOSObservabilityDependencies = {},
 ) {
   const telemetrySource = dependencies.telemetry ??
+    dependencies.telemetryRuntime?.telemetry ??
     initializeAgentOSTelemetryFromEnvironment();
   const telemetryEffect: Effect.Effect<AgentOSTelemetry> =
     Effect.isEffect(telemetrySource)
@@ -136,6 +139,12 @@ export const registerAgentOSObservabilityEffect = Effect.fn(
         inertOperation,
       );
       yield* Ref.set(operation, Option.some(started));
+      if (dependencies.telemetryRuntime !== undefined) {
+        yield* failOpenTelemetry(
+          dependencies.telemetryRuntime.publish(started),
+          undefined,
+        );
+      }
       yield* Ref.set(operationResult, {});
       yield* Ref.set(retryCount, 0);
       return started;
@@ -200,7 +209,12 @@ export const registerAgentOSObservabilityEffect = Effect.fn(
       runAgentOSPiProgram(stateLock.withPermit(finishOperationUnlocked()))
     );
     pi.on("session_shutdown", () =>
-      runAgentOSPiProgram(stateLock.withPermit(finishOperationUnlocked()))
+      runAgentOSPiProgram(stateLock.withPermit(Effect.gen(function*() {
+        yield* finishOperationUnlocked();
+        if (dependencies.telemetryRuntime !== undefined) {
+          yield* dependencies.telemetryRuntime.clear;
+        }
+      })))
     );
   });
 });
@@ -304,6 +318,7 @@ const inertAttempt: AgentOSProviderAttempt = Object.freeze({
 
 const inertOperation: AgentOSOperation = Object.freeze({
   id: "",
+  inject: () => Effect.void,
   startProviderAttempt: () => Effect.succeed(inertAttempt),
   end: () => Effect.void,
 });

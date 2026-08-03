@@ -581,6 +581,7 @@ describe("OpenAI server compaction Effect runtime", () => {
         model: directModel(),
         apiKey: "openai-token",
         headers: {
+          "x-client-request-id": "attempt-direct-1",
           "x-agentos-request-attempt-id": "attempt-private",
           traceparent:
             "00-11111111111111111111111111111111-2222222222222222-01",
@@ -607,6 +608,7 @@ describe("OpenAI server compaction Effect runtime", () => {
       expect(headers.has("x-codex-installation-id")).toBe(false);
       expect(headers.has("x-codex-window-id")).toBe(false);
       expect(headers.has("session-id")).toBe(false);
+      expect(headers.get("x-client-request-id")).toBe("attempt-direct-1");
       expect(headers.has("x-agentos-request-attempt-id")).toBe(false);
       expect(headers.get("traceparent")).toBe(
         "00-11111111111111111111111111111111-2222222222222222-01",
@@ -712,6 +714,39 @@ describe("OpenAI server compaction Effect runtime", () => {
       expect(requestIds[1]).toMatch(UUID_PATTERN);
       expect(requestIds[0]).not.toBe(requestIds[1]);
       expect(yield* Ref.get(correlations)).toEqual([null, "attempt-private"]);
+    }),
+  );
+
+  it.effect("captures only a bounded provider request ID from response headers", () =>
+    Effect.gen(function*() {
+      const artifact = {
+        type: "compaction",
+        encrypted_content: "opaque-provider-request-id",
+      } satisfies CompactionArtifact;
+      const source = yield* sse(terminalEvents(artifact));
+      const safe = yield* execute({
+        model: codexModel(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: () =>
+          Effect.succeed(textResponse(source, 200, {
+            "x-oai-request-id": "req_safe_compaction_1",
+          })),
+      });
+      expect(safe.providerRequestId).toBe("req_safe_compaction_1");
+
+      const malformed = yield* execute({
+        model: codexModel(),
+        apiKey: "token",
+        input: [],
+        tools: [],
+        fetchImpl: () =>
+          Effect.succeed(textResponse(source, 200, {
+            "x-request-id": "private request body with spaces",
+          })),
+      });
+      expect(malformed.providerRequestId).toBeUndefined();
     }),
   );
 

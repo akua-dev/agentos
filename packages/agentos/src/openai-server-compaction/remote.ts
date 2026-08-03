@@ -119,6 +119,7 @@ export type OpenAICompactionReasoning = {
 export type ServerCompactionResult = {
   output: ResponseItem[];
   usage?: ResponseUsage;
+  providerRequestId?: string;
 };
 
 export type ServerCompactionRequest = {
@@ -462,12 +463,29 @@ function requestHeaders(
       }
     }
 
+    const existingRequestId = safeOpaqueRequestId(
+      headers.get("x-client-request-id"),
+    );
+    if (existingRequestId === undefined) {
+      const crypto = yield* Crypto.Crypto;
+      const generatedRequestId = yield* crypto.randomUUIDv4.pipe(
+        Effect.mapError(() =>
+          compactionError(
+            "identity_unavailable",
+            "OpenAI request identity could not be generated.",
+          )
+        ),
+      );
+      headers.set("x-client-request-id", generatedRequestId);
+    } else {
+      headers.set("x-client-request-id", existingRequestId);
+    }
+
     if (!isCodexModel(params.model)) {
       headers.delete("openai-beta");
       headers.delete("originator");
       headers.delete("session-id");
       headers.delete("thread-id");
-      headers.delete("x-client-request-id");
       headers.delete("x-codex-installation-id");
       headers.delete("x-codex-window-id");
       return headers;
@@ -490,16 +508,6 @@ function requestHeaders(
     if (installationId) headers.set("x-codex-installation-id", installationId);
     else headers.delete("x-codex-installation-id");
 
-    const crypto = yield* Crypto.Crypto;
-    const requestId = yield* crypto.randomUUIDv4.pipe(
-      Effect.mapError(() =>
-        compactionError(
-          "identity_unavailable",
-          "OpenAI Codex request identity could not be generated.",
-        )
-      ),
-    );
-    headers.set("x-client-request-id", requestId);
     if (params.sessionId) {
       headers.set("session-id", params.sessionId);
       headers.set("thread-id", params.sessionId);
@@ -521,6 +529,22 @@ function requestHeaders(
     }
     return headers;
   });
+}
+
+function safeOpaqueRequestId(value: string | null): string | undefined {
+  const normalized = value?.trim();
+  return normalized !== undefined && normalized.length > 0 &&
+      normalized.length <= 128 && /^[0-9A-Za-z_.:-]+$/.test(normalized)
+    ? normalized
+    : undefined;
+}
+
+function safeProviderRequestId(headers: Headers): string | undefined {
+  for (const name of ["x-request-id", "x-oai-request-id"]) {
+    const value = safeOpaqueRequestId(headers.get(name));
+    if (value !== undefined) return value;
+  }
+  return undefined;
 }
 
 function emptyBoundedBody(): BoundedBody {
@@ -921,9 +945,14 @@ export function requestServerCompaction(
       if (response.status < 200 || response.status >= 300) {
         return yield* new OpenAICompactionHttpError(response.status);
       }
+      const providerRequestId = safeProviderRequestId(response.headers);
       const responseText = yield* boundedResponseText(response);
       if (!isCodexModel(params.model)) {
-        return yield* parseDirectCompactionResponse(responseText);
+        const result = yield* parseDirectCompactionResponse(responseText);
+        return {
+          ...result,
+          ...(providerRequestId === undefined ? {} : { providerRequestId }),
+        } satisfies ServerCompactionResult;
       }
       const events = yield* parseSse(responseText);
       const result = yield* parseCompactionEvents(events);
@@ -937,6 +966,7 @@ export function requestServerCompaction(
       return {
         output: buildRemoteCompactionHistory(params.input, artifact),
         ...(result.usage ? { usage: result.usage } : {}),
+        ...(providerRequestId === undefined ? {} : { providerRequestId }),
       } satisfies ServerCompactionResult;
     }).pipe(Effect.ensuring(response.close));
   }));

@@ -35,6 +35,7 @@ import {
 import { environmentConfigLayer } from "../shared/platform.ts";
 import { runAgentOSPiProgram } from "../pi-host-adapter.ts";
 import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
+import type { AgentOSTelemetryRuntime } from "../telemetry/runtime-context.ts";
 import {
   MateMemoryMaintenance,
   type MaintenanceAgentRunner,
@@ -64,6 +65,7 @@ export interface MateMemoryExtensionDependencies {
   readonly activity?: MemoryActivityStore;
   readonly maintenanceRunner?: MaintenanceAgentRunner;
   readonly telemetry?: AgentOSTelemetrySource;
+  readonly telemetryRuntime?: AgentOSTelemetryRuntime;
 }
 
 interface PendingNativeWrite {
@@ -266,6 +268,7 @@ export function registerMateMemoryExtensionEffect(
           resolveAuth: resolveAuth(context),
           signal: context.signal,
           telemetry: dependencies.telemetry,
+          telemetryRuntime: dependencies.telemetryRuntime,
         };
         yield* maintenance.afterAgentSettled(maintenanceContext);
         yield* maintenance.maybeDream(
@@ -384,6 +387,7 @@ export function registerMateMemoryExtensionEffect(
             resolveAuth: resolveAuth(context),
             signal: context.signal,
             telemetry: dependencies.telemetry,
+            telemetryRuntime: dependencies.telemetryRuntime,
           });
           const allowed = new Set(
             startup.inventory
