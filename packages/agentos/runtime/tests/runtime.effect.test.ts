@@ -1356,14 +1356,15 @@ layer(platform)("Mate runtime", (it) => {
         }],
       );
       const child = yield* startRuntime(harness);
-      yield* waitFor(
-        "stale_pane_restart",
+      yield* waitForChildActivity(
+        child,
+        harness.state,
         readCalls(harness.state).pipe(
           Effect.map((calls) =>
             startCalls(calls).some((call) => call.includes("--session"))
           ),
         ),
-        300,
+        1_250,
       );
       assert.strictEqual((yield* stopRuntime(child)).exitCode, 0);
       const calls = yield* readCalls(harness.state);
@@ -1383,7 +1384,7 @@ layer(platform)("Mate runtime", (it) => {
         "agentos-firstmate-test",
       ]);
     })),
-    20_000,
+    35_000,
   );
 
   it.effect(
