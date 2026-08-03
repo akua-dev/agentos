@@ -67,6 +67,9 @@ jobs:
         with:
           cache: false
 
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
       - name: Verify the Cloudflare preview revision
         env:
           AGENTOS_EXPECTED_GIT_SHA: ${{ github.event.pull_request.head.sha }}

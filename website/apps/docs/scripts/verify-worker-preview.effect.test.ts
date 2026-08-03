@@ -1,6 +1,7 @@
 import * as BunServices from '@effect/platform-bun/BunServices';
 import { assert, describe, it } from '@effect/vitest';
-import { Effect, Ref } from 'effect';
+import { Effect, FileSystem, Ref } from 'effect';
+import { fileURLToPath } from 'node:url';
 
 import {
   createPreviewUrl,
@@ -12,6 +13,7 @@ import {
 
 const expectedSha = '1234567890abcdef1234567890abcdef12345678';
 const productionSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const repositoryRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 
 function dependencies(
   fetchRevision: (
@@ -35,6 +37,22 @@ const baseOptions: PreviewVerificationOptions = {
 };
 
 describe('Cloudflare preview verification', () => {
+  it.effect('installs the locked workspace before running the Effect verifier', () =>
+    Effect.gen(function*() {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const workflow = yield* fileSystem.readFileString(
+        `${repositoryRoot}/.github/workflows/ci.yml`,
+      );
+      const previewJob = workflow.slice(workflow.indexOf('  website-preview:'));
+      const install = previewJob.indexOf('run: bun install --frozen-lockfile');
+      const verify = previewJob.indexOf(
+        'run: bun website/apps/docs/scripts/verify-worker-preview.ts',
+      );
+
+      assert.isAtLeast(install, 0, 'preview job must install workspace dependencies');
+      assert.isAbove(verify, install, 'dependency install must precede verification');
+    }).pipe(Effect.provide(BunServices.layer)));
+
   it.effect('derives the public preview URL from the same branch alias as upload', () =>
     Effect.gen(function*() {
       assert.strictEqual(
