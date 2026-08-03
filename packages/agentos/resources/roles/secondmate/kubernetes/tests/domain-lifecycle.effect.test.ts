@@ -227,6 +227,36 @@ const requireAdmissionDenial = Effect.fn(
   }
 });
 
+const waitForAdmissionDenial = Effect.fn(
+  "test.secondMateDomain.waitForAdmissionDenial",
+)(function*(
+  context: string,
+  environment: CommandEnvironment,
+  capturedOutput: Ref.Ref<ReadonlyArray<string>>,
+  namespace: string,
+  identity: string,
+  manifest: unknown,
+  message: string,
+) {
+  return yield* TestClock.withLive(
+    requireAdmissionDenial(
+      context,
+      environment,
+      capturedOutput,
+      namespace,
+      identity,
+      manifest,
+      message,
+    ).pipe(Effect.retry({
+      schedule: Schedule.spaced("500 millis"),
+      times: 59,
+      while: (failure) =>
+        failure instanceof DomainLifecycleError &&
+        failure.operation === "admission_denial",
+    })),
+  );
+});
+
 const requireRecord = Effect.fn("test.secondMateDomain.requireRecord")(
   function*(value: unknown, path: string) {
     if (!isMutableRecord(value)) {
@@ -728,7 +758,7 @@ layer(platform)("Second Mate domain lifecycle", (it) => {
       const mutableImage = structuredClone(validChild);
       (yield* workloadParts(mutableImage)).container.image =
         "registry.k8s.io/pause:3.10.1";
-      yield* requireAdmissionDenial(
+      yield* waitForAdmissionDenial(
         context,
         environment,
         capturedOutput,
