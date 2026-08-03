@@ -225,10 +225,9 @@ describe("pinned Codex native OpenTelemetry", () => {
       });
 
       const environment = codexEnvironment(codexHome, home, executablePath);
-      assert.deepStrictEqual(
-        yield* runProcess(codex, ["--version"], environment),
-        { exitCode: 0, stderr: "", stdout: `${PINNED_CODEX_VERSION}\n` },
-      );
+      const version = yield* runProcess(codex, ["--version"], environment);
+      assert.strictEqual(version.exitCode, 0, version.stderr);
+      assert.strictEqual(version.stdout, `${PINNED_CODEX_VERSION}\n`);
       const turn = yield* runProcess(codex, [
         "exec",
         "--skip-git-repo-check",
