@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { it } from '@effect/vitest';
+import { Effect } from 'effect';
+import { afterEach, describe, expect } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { buildCurriculum, type LearnPageRecord } from '@/lib/learn/curriculum';
 import { LearnLayout } from './learn-layout';
@@ -11,7 +13,8 @@ afterEach(() => {
 });
 
 describe('LearnLayout', () => {
-  it('lets the desktop navigation rails reach the viewport edges', () => {
+  it.effect('lets the desktop navigation rails reach the viewport edges', () =>
+    Effect.gen(function*() {
     const record: LearnPageRecord = {
       title: 'Begin',
       description: 'Begin here.',
@@ -24,22 +27,26 @@ describe('LearnLayout', () => {
       estimatedMinutes: 2,
     };
 
-    render(
-      <LearnLayout
-        curriculum={buildCurriculum([record])}
+    const curriculum = yield* buildCurriculum([record]);
+    yield* Effect.sync(() => {
+      render(
+        <LearnLayout
+        curriculum={curriculum}
         selection={{ kind: 'introduction' }}
         toc={[]}
       >
         Introduction
       </LearnLayout>,
-    );
+      );
 
     const shell = screen.getByRole('main').parentElement;
 
-    expect(shell?.style.maxWidth).toBe('none');
-  });
+      expect(shell?.style.maxWidth).toBe('none');
+    });
+  }));
 
-  it('describes progress using the actual curriculum size', () => {
+  it.effect('describes progress using the actual curriculum size', () =>
+    Effect.gen(function*() {
     const record: LearnPageRecord = {
       title: 'Begin',
       description: 'Begin here.',
@@ -52,16 +59,19 @@ describe('LearnLayout', () => {
       estimatedMinutes: 2,
     };
 
-    render(
-      <LearnLayout
-        curriculum={buildCurriculum([record])}
+    const curriculum = yield* buildCurriculum([record]);
+    yield* Effect.sync(() => {
+      render(
+        <LearnLayout
+        curriculum={curriculum}
         selection={{ kind: 'introduction' }}
         toc={[]}
       >
         Introduction
       </LearnLayout>,
-    );
+      );
 
-    expect(screen.getByText(/progress counts the 1 chapter\./i)).toBeTruthy();
-  });
+      expect(screen.getByText(/progress counts the 1 chapter\./i)).toBeTruthy();
+    });
+  }));
 });

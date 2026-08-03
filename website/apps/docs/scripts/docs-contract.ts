@@ -13,7 +13,10 @@ export interface DocumentationRoute {
   canonicalRequired: boolean;
 }
 
-const groupRoutes = {
+const groupRoutes: Record<
+  DocumentationGroup,
+  ReadonlyArray<readonly [string, string]>
+> = {
   start: [
     ['start', 'Start'],
     ['start/what-is-agentos', 'What is AgentOS?'],
@@ -87,7 +90,20 @@ const groupRoutes = {
     ['contribute/improvement', 'Improve from evidence'],
     ['contribute/releases', 'Release model'],
   ],
-} as const satisfies Record<DocumentationGroup, ReadonlyArray<readonly [string, string]>>;
+};
+
+const groupOrder: ReadonlyArray<DocumentationGroup> = [
+  'start',
+  'concepts',
+  'operate',
+  'architecture',
+  'reference',
+  'contribute',
+];
+
+function documentationPath(path: string): `/docs${string}` {
+  return `/docs/${path}`;
+}
 
 export const documentationRoutes: readonly DocumentationRoute[] = [
   {
@@ -96,11 +112,11 @@ export const documentationRoutes: readonly DocumentationRoute[] = [
     group: null,
     canonicalRequired: false,
   },
-  ...Object.entries(groupRoutes).flatMap(([group, routes]) =>
-    routes.map(([path, title]) => ({
-      path: `/docs/${path}` as const,
+  ...groupOrder.flatMap((group) =>
+    groupRoutes[group].map(([path, title]) => ({
+      path: documentationPath(path),
       title,
-      group: group as DocumentationGroup,
+      group,
       canonicalRequired: true,
     })),
   ),

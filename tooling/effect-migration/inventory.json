@@ -866,6 +866,36 @@
       "status": "migrated"
     },
     {
+      "id": "website-script-runtime-adapter",
+      "issue": 99,
+      "pattern": "^website/apps/docs/scripts/script-runtime\\.ts$",
+      "runtime": "bun-entrypoint",
+      "package": "@agentos/docs",
+      "io": ["filesystem", "http", "process", "runtime-adapter", "stream"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "website-browser-runtime-adapter",
+      "issue": 99,
+      "pattern": "^website/apps/docs/lib/effect/browser-runtime\\.ts$",
+      "runtime": "browser-entrypoint",
+      "package": "@agentos/docs",
+      "io": ["framework", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "website-server-runtime-adapter",
+      "issue": 99,
+      "pattern": "^website/apps/docs/lib/effect/server-runtime\\.ts$",
+      "runtime": "nextjs-cloudflare-entrypoint",
+      "package": "@agentos/docs",
+      "io": ["framework", "runtime-adapter"],
+      "migrationDependencies": [100, 101],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "website",
       "issue": 99,
       "pattern": "^website/apps/docs/",

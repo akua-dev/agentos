@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { it } from '@effect/vitest';
+import { ConfigProvider, Effect } from 'effect';
+import { describe, expect } from 'vitest';
 import {
   createMetadata,
   createNotFoundMetadata,
   defaultDescription,
   defaultTitle,
+  loadSiteMetadataConfig,
   socialImage,
 } from './metadata';
 
@@ -78,4 +81,21 @@ describe('AgentOS page metadata', () => {
       robots: null,
     });
   });
+
+  it.effect('loads an explicit canonical site URL through Effect Config', () =>
+    Effect.gen(function*() {
+      const config = yield* loadSiteMetadataConfig.pipe(
+        Effect.provide(
+          ConfigProvider.layer(ConfigProvider.fromEnv({
+            env: {
+              NEXT_PUBLIC_SITE_URL: 'https://preview.agentos.test/base/',
+              NODE_ENV: 'production',
+            },
+          })),
+        ),
+      );
+      expect(config.baseUrl.toString()).toBe(
+        'https://preview.agentos.test/base/',
+      );
+    }));
 });

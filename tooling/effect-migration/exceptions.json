@@ -3,6 +3,42 @@
   "exceptions": [
     {
       "kind": "outer-host-adapter",
+      "path": "website/apps/docs/scripts/script-runtime.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "All website maintenance executables share one Bun entry around typed Effect programs and Bun platform services.",
+      "ownerIssue": 99,
+      "test": "website/apps/docs/scripts/script-runtime.effect.test.ts",
+      "removalCondition": "Retain only while website maintenance is exposed through standalone Bun scripts.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "website/apps/docs/lib/effect/browser-runtime.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runSync",
+      "maximumOccurrences": 1,
+      "reason": "React event callbacks require immediate state updates before returning control, so one domain-free adapter runs infallible synchronous browser Effects.",
+      "ownerIssue": 99,
+      "test": "website/apps/docs/lib/effect/browser-runtime.effect.test.ts",
+      "removalCondition": "Remove when React event callbacks accept Effect values directly.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "website/apps/docs/lib/effect/browser-runtime.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runPromise",
+      "maximumOccurrences": 1,
+      "reason": "Next.js dynamic modules and React Suspense require Promises, so one domain-free browser adapter enters Effect after module failures are typed.",
+      "ownerIssue": 99,
+      "test": "website/apps/docs/lib/effect/browser-runtime.effect.test.ts",
+      "removalCondition": "Remove when browser framework module callbacks accept Effect values directly.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "benchmarks/profiles/agentos/pi-session-adapter.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",
@@ -95,6 +131,30 @@
       "ownerIssue": 97,
       "test": "release/kubernetes/tests/release.effect.test.ts",
       "removalCondition": "Retain only while Kubernetes release rendering remains a standalone CLI.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "website/apps/docs/lib/effect/server-runtime.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runPromise",
+      "maximumOccurrences": 1,
+      "reason": "Next.js route and page callback ABIs require a Promise, so one domain-free adapter enters an Effect runtime for server and Cloudflare programs.",
+      "ownerIssue": 99,
+      "test": "website/apps/docs/lib/effect/server-runtime.effect.test.ts",
+      "removalCondition": "Remove when Next.js accepts Effect values directly from route, page, and metadata callbacks.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "website/apps/docs/lib/effect/server-runtime.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runSync",
+      "maximumOccurrences": 1,
+      "reason": "Next.js and Fumadocs configuration modules require synchronous exported values, so one domain-free adapter enters Effect after all typed failures are handled.",
+      "ownerIssue": 99,
+      "test": "website/apps/docs/lib/effect/server-runtime.effect.test.ts",
+      "removalCondition": "Remove when every framework configuration callback accepts Effect values asynchronously.",
       "expiresOn": null
     },
     {

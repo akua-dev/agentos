@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
-const progression = [
+const progression: ReadonlyArray<readonly [string, string]> = [
   ['Model', 'generates'],
   ['Chat', 'carries context'],
   ['Tools', 'create effects'],
@@ -9,15 +9,15 @@ const progression = [
   ['Harness', 'preserves work'],
   ['Crew', 'coordinates'],
   ['Autonomous company', 'operates and learns'],
-] as const;
+];
 
-const outcomes = [
+const outcomes: ReadonlyArray<string> = [
   'A persistent First Mate and one real outcome with durable ownership.',
   'A bounded crew you can inspect and steer through native project artifacts.',
   'Human decisions routed to the right people only when consequences require them.',
   'External signals, shared learning and recovery that survive individual sessions.',
   'An upgradeable, sovereign foundation built from Kubernetes, PostgreSQL and Git.',
-] as const;
+];
 
 export function CourseIntroduction({ firstLessonUrl }: { firstLessonUrl: string }) {
   return (

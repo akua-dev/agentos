@@ -1,6 +1,8 @@
 import type { TOCItemType } from 'fumadocs-core/toc';
+import { Effect } from 'effect';
 import { CourseIntroduction } from '@/components/learn/course-introduction';
 import { LearnLayout } from '@/components/learn/learn-layout';
+import { runServerEffect } from '@/lib/effect/server-runtime';
 import { getCurriculum } from '@/lib/learn/curriculum.server';
 import { createMetadata } from '@/lib/metadata';
 
@@ -19,21 +21,25 @@ const introductionToc: TOCItemType[] = [
   { title: 'How to use this course', url: '#how-to-use-course', depth: 2 },
 ];
 
-export default function Page() {
-  const curriculum = getCurriculum();
-  const firstLesson = curriculum.lessons[0];
+const renderIntroduction = getCurriculum.pipe(
+  Effect.map((curriculum) => {
+    const firstLesson = curriculum.lessons[0];
+    return (
+      <LearnLayout
+        curriculum={curriculum}
+        selection={{ kind: 'introduction' }}
+        toc={introductionToc}
+      >
+        <CourseIntroduction
+          firstLessonUrl={
+            firstLesson?.url ?? '/learn/01-first-outcome/bring-agentos-online'
+          }
+        />
+      </LearnLayout>
+    );
+  }),
+);
 
-  return (
-    <LearnLayout
-      curriculum={curriculum}
-      selection={{ kind: 'introduction' }}
-      toc={introductionToc}
-    >
-      <CourseIntroduction
-        firstLessonUrl={
-          firstLesson?.url ?? '/learn/01-first-outcome/bring-agentos-online'
-        }
-      />
-    </LearnLayout>
-  );
+export default function Page() {
+  return runServerEffect(renderIntroduction);
 }
