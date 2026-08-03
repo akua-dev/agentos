@@ -86,7 +86,7 @@ export const makeAIGatewayApplication = Effect.fn(
     fallbackKey !== undefined && fallbackKey.length > 0;
 
   const candidateSet = Effect.fn("agentos.aiGateway.loadCandidates")(
-    function*() {
+    function*(telemetry?: AIGatewayRequestTelemetry) {
       const currentTime = yield* Clock.currentTimeMillis;
       const accountResult = yield* Effect.result(vault.list);
       if (Result.isFailure(accountResult)) {
@@ -105,6 +105,7 @@ export const makeAIGatewayApplication = Effect.fn(
             vault,
             quota,
             usage,
+            telemetry,
           ),
         { concurrency: 4 },
       );
@@ -122,7 +123,7 @@ export const makeAIGatewayApplication = Effect.fn(
       _authorization: ProviderAuthorizationGrantV1 | undefined,
       telemetry: AIGatewayRequestTelemetry,
     ): Effect.fn.Return<AIForwardLease | undefined, AIForwardRouteError> {
-      const set = yield* candidateSet();
+      const set = yield* candidateSet(telemetry);
       const currentTime = yield* Clock.currentTimeMillis;
       yield* Effect.forEach(
         set.candidates,
@@ -301,6 +302,7 @@ function candidateForAccount(
   vault: ManagedAccountVault["Service"],
   quota: CodexQuota["Service"],
   cache: Ref.Ref<ReadonlyMap<string, UsageSnapshot>>,
+  telemetry?: AIGatewayRequestTelemetry,
 ): Effect.Effect<Candidate> {
   if (account.needsReauth) {
     return Effect.succeed({
@@ -310,20 +312,31 @@ function candidateForAccount(
     });
   }
   if (cached !== undefined && currentTime - cached.observedAt < usageCacheMillis) {
-    return Effect.succeed({
+    const candidate = {
       accountId: account.id,
       label: account.label,
       needsReauth: false,
       usage: cached,
-    });
+    } satisfies Candidate;
+    return quotaRefreshTelemetry(telemetry, "cache_hit").pipe(
+      Effect.as(candidate),
+    );
   }
   return Effect.gen(function*() {
     const credentialResult = yield* Effect.result(
       vault.getFreshCredential(account.id),
     );
     if (Result.isFailure(credentialResult)) {
-      return staleOrUnknownCandidate(account, cached,
-        credentialResult.failure.code === "needs_reauthentication");
+      yield* quotaRefreshTelemetry(
+        telemetry,
+        "failed",
+        credentialResult.failure,
+      );
+      return staleOrUnknownCandidate(
+        account,
+        cached,
+        credentialResult.failure.code === "needs_reauthentication",
+      );
     }
     const credential = credentialResult.success;
     const quotaResult = yield* Effect.result(quota.observe({
@@ -332,6 +345,7 @@ function candidateForAccount(
       managedAccountId: account.id,
     }));
     if (Result.isFailure(quotaResult)) {
+      yield* quotaRefreshTelemetry(telemetry, "failed", quotaResult.failure);
       if (quotaResult.failure.code === "needs_reauthentication") {
         yield* vault.markNeedsReauth(
           account.id,
@@ -342,6 +356,10 @@ function candidateForAccount(
       return staleOrUnknownCandidate(account, cached, false);
     }
     const snapshot = quotaResult.success;
+    yield* quotaRefreshTelemetry(
+      telemetry,
+      snapshot.stale ? "stale" : "fresh",
+    );
     yield* Ref.update(cache, (current) => {
       const updated = new Map(current);
       updated.set(account.id, snapshot);
@@ -354,6 +372,18 @@ function candidateForAccount(
       usage: snapshot,
     } satisfies Candidate;
   });
+}
+
+function quotaRefreshTelemetry(
+  telemetry: AIGatewayRequestTelemetry | undefined,
+  outcome: "cache_hit" | "fresh" | "stale" | "failed",
+  error?: unknown,
+): Effect.Effect<void> {
+  return telemetry === undefined
+    ? Effect.void
+    : telemetry.quotaRefresh(outcome, error).pipe(
+        Effect.catchCause(() => Effect.void),
+      );
 }
 
 function staleOrUnknownCandidate(

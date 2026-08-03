@@ -100,6 +100,8 @@ export function classifyAIError(
   if (name === "AbortError" || code === "ABORT_ERR") return "abort";
   if (
     name === "TimeoutError" ||
+    name === "TimeoutException" ||
+    code === "provider_timeout" ||
     code === "ETIMEDOUT" ||
     code === "UND_ERR_CONNECT_TIMEOUT" ||
     code === "UND_ERR_HEADERS_TIMEOUT" ||
@@ -110,19 +112,30 @@ export function classifyAIError(
   if (
     code === "Z_DATA_ERROR" ||
     code === "Z_BUF_ERROR" ||
-    code === "ERR_ENCODING_INVALID_ENCODED_DATA"
+    code === "ERR_ENCODING_INVALID_ENCODED_DATA" ||
+    code === "provider_decode_failed" ||
+    code === "invalid_response" ||
+    code === "terminal_usage_invalid" ||
+    code === "terminal_usage_ambiguous"
   ) {
     return "decode";
   }
   if (
     code.startsWith("HPE_") ||
     code === "ERR_INVALID_CHAR" ||
-    code === "UND_ERR_RES_CONTENT_LENGTH_MISMATCH"
+    code === "UND_ERR_RES_CONTENT_LENGTH_MISMATCH" ||
+    code === "provider_protocol_failed" ||
+    code === "request_invalid" ||
+    code === "invalid_configuration" ||
+    code === "terminal_usage_missing"
   ) {
     return "protocol";
   }
   if (
     name === "TypeError" ||
+    code === "provider_unavailable" ||
+    code === "provider_stream_failed" ||
+    code === "provider_transport_failed" ||
     code === "ECONNRESET" ||
     code === "ECONNREFUSED" ||
     code === "EAI_AGAIN" ||
@@ -130,6 +143,13 @@ export function classifyAIError(
     code === "UND_ERR_SOCKET"
   ) {
     return "transport";
+  }
+  if (
+    code === "credential_unavailable" ||
+    code === "routing_unavailable" ||
+    code === "state_unavailable"
+  ) {
+    return "unavailable";
   }
   return "unknown";
 }

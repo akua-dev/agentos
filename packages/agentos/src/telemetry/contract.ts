@@ -53,6 +53,7 @@ export const AGENTOS_TELEMETRY_SPANS = Object.freeze({
   accessProvider: "agentos.access.provider",
   accessProviderAdapter: "agentos.access.provider_adapter",
   aiGatewayAuthenticate: "ai-gateway.authenticate",
+  aiGatewayQuotaRefresh: "ai-gateway.quota.refresh",
   aiGatewayRequest: "ai-gateway.request",
   aiGatewayRouteAcquire: "ai-gateway.route.acquire",
   aiGatewayRouteRelease: "ai-gateway.route.release",
@@ -189,6 +190,24 @@ export type AgentOSAIRuntime = (typeof AGENTOS_AI_RUNTIMES)[number];
 export const AGENTOS_AI_ROUTES = values("direct", "ai_gateway");
 export type AgentOSAIRoute = (typeof AGENTOS_AI_ROUTES)[number];
 
+export const AGENTOS_AI_ROUTE_OPERATIONS = values(
+  "acquire",
+  "reserve",
+  "block",
+  "release",
+);
+export type AgentOSAIRouteOperation =
+  (typeof AGENTOS_AI_ROUTE_OPERATIONS)[number];
+
+export const AGENTOS_AI_QUOTA_OUTCOMES = values(
+  "cache_hit",
+  "fresh",
+  "stale",
+  "failed",
+);
+export type AgentOSAIQuotaOutcome =
+  (typeof AGENTOS_AI_QUOTA_OUTCOMES)[number];
+
 export const AGENTOS_AI_REQUEST_KINDS = values(
   "main",
   "compaction",
@@ -276,8 +295,12 @@ export const AGENTOS_AI_METRICS = constant({
   activeStreams: "agentos.ai.streams.active",
   streamChunks: "agentos.ai.stream.chunks",
   streamBytes: "agentos.ai.stream.bytes",
+  streams: "agentos.ai.streams",
   routeAcquisitionDuration: "agentos.ai.route.acquire.duration",
+  routeEvents: "agentos.ai.route.events",
+  activeReservations: "agentos.ai.route.reservations.active",
   quotaObservationAge: "agentos.ai.quota.observation.age",
+  quotaRefreshes: "agentos.ai.quota.refreshes",
   tokens: "agentos.ai.tokens",
   cost: "agentos.ai.cost",
   budgetEvents: "agentos.ai.budget.events",
@@ -643,6 +666,11 @@ export const AGENTOS_TELEMETRY_ATTRIBUTE_DEFINITIONS: Readonly<
     "ai",
     AGENTOS_AI_ROUTES,
   ),
+  "agentos.ai.route.operation": boundedEnum(
+    "agentos.ai.route.operation",
+    "ai",
+    AGENTOS_AI_ROUTE_OPERATIONS,
+  ),
   "agentos.ai.provider.family": boundedEnum(
     "agentos.ai.provider.family",
     "ai",
@@ -704,6 +732,11 @@ export const AGENTOS_TELEMETRY_ATTRIBUTE_DEFINITIONS: Readonly<
     ["available", "warning", "exhausted", "killed"],
   ),
   "agentos.ai.quota.stale": boundedBoolean("agentos.ai.quota.stale", "ai"),
+  "agentos.ai.quota.outcome": boundedEnum(
+    "agentos.ai.quota.outcome",
+    "ai",
+    AGENTOS_AI_QUOTA_OUTCOMES,
+  ),
   "agentos.ai.retry.count": boundedNumber(
     "agentos.ai.retry.count",
     "ai",
@@ -1402,6 +1435,8 @@ export const AGENTOS_TELEMETRY_METRIC_DEFINITIONS: Readonly<
     [
       "agentos.ai.runtime",
       "agentos.ai.route",
+      "agentos.ai.request.kind",
+      "agentos.ai.model.family",
       "agentos.ai.status_class",
       "agentos.ai.error.class",
     ],
@@ -1498,6 +1533,14 @@ export const AGENTOS_TELEMETRY_METRIC_DEFINITIONS: Readonly<
     ["agentos.ai.route", "agentos.ai.stream.outcome"],
     "completed_stream_bytes",
   ),
+  [AGENTOS_AI_METRICS.streams]: metricDefinition(
+    AGENTOS_AI_METRICS.streams,
+    "ai",
+    "counter",
+    "{stream}",
+    ["agentos.ai.route", "agentos.ai.stream.outcome"],
+    "completed_streams",
+  ),
   [AGENTOS_AI_METRICS.routeAcquisitionDuration]: metricDefinition(
     AGENTOS_AI_METRICS.routeAcquisitionDuration,
     "ai",
@@ -1507,6 +1550,27 @@ export const AGENTOS_TELEMETRY_METRIC_DEFINITIONS: Readonly<
     "route_reservation_duration",
     durationBuckets,
   ),
+  [AGENTOS_AI_METRICS.routeEvents]: metricDefinition(
+    AGENTOS_AI_METRICS.routeEvents,
+    "ai",
+    "counter",
+    "{event}",
+    [
+      "agentos.ai.route",
+      "agentos.ai.route.operation",
+      "agentos.ai.status_class",
+      "agentos.ai.error.class",
+    ],
+    "completed_route_lifecycle_events",
+  ),
+  [AGENTOS_AI_METRICS.activeReservations]: metricDefinition(
+    AGENTOS_AI_METRICS.activeReservations,
+    "ai",
+    "up_down_counter",
+    "{reservation}",
+    ["agentos.ai.route"],
+    "currently_active_route_reservations",
+  ),
   [AGENTOS_AI_METRICS.quotaObservationAge]: metricDefinition(
     AGENTOS_AI_METRICS.quotaObservationAge,
     "ai",
@@ -1515,6 +1579,18 @@ export const AGENTOS_TELEMETRY_METRIC_DEFINITIONS: Readonly<
     ["agentos.ai.route", "agentos.ai.quota.stale"],
     "quota_observation_age",
     durationBuckets,
+  ),
+  [AGENTOS_AI_METRICS.quotaRefreshes]: metricDefinition(
+    AGENTOS_AI_METRICS.quotaRefreshes,
+    "ai",
+    "counter",
+    "{refresh}",
+    [
+      "agentos.ai.route",
+      "agentos.ai.quota.outcome",
+      "agentos.ai.error.class",
+    ],
+    "completed_quota_refresh_attempts",
   ),
   [AGENTOS_AI_METRICS.tokens]: metricDefinition(
     AGENTOS_AI_METRICS.tokens,

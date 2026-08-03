@@ -18,6 +18,7 @@ import {
 import {
   AIGatewayTelemetry,
   type AIGatewayRequestTelemetry,
+  makeAIGatewayTelemetry,
   noopAIGatewayTelemetry,
 } from "../src/observability.ts";
 import { AIProviderHttp } from "../src/provider-http.ts";
@@ -236,8 +237,8 @@ const makeQuotaTelemetryRecorder = Effect.fn(
     readonly ageSeconds: number;
     readonly stale: boolean;
   }>>([]);
+  const refreshes = yield* Ref.make<ReadonlyArray<string>>([]);
   const requestTelemetry: AIGatewayRequestTelemetry = {
-    attemptId: "attempt-safe",
     authenticate: () => Effect.void,
     routeStarted: Effect.void,
     routeEnded: () => Effect.void,
@@ -246,6 +247,8 @@ const makeQuotaTelemetryRecorder = Effect.fn(
         ...current,
         { ageSeconds, stale },
       ]),
+    quotaRefresh: (outcome) =>
+      Ref.update(refreshes, (current) => [...current, outcome]),
     upstreamStarted: () => Effect.void,
     upstreamHeaders: () => Effect.void,
     upstreamFailed: () => Effect.void,
@@ -257,6 +260,7 @@ const makeQuotaTelemetryRecorder = Effect.fn(
   };
   return {
     observations,
+    refreshes,
     telemetry: AIGatewayTelemetry.of({
       enabled: true,
       start: () => Effect.succeed(requestTelemetry),
@@ -299,6 +303,28 @@ describe("Effect AI Gateway application", () => {
         ageSeconds: AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
         stale: true,
       }]);
+      assert.deepStrictEqual(yield* Ref.get(telemetry.refreshes), ["stale"]);
+    }));
+
+  it.effect("distinguishes fresh quota refreshes from cache hits", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const telemetry = yield* makeQuotaTelemetryRecorder();
+      const application = yield* makeApplication(
+        services,
+        options,
+        telemetry.telemetry,
+      );
+      const first = yield* application.handle(providerRequest());
+      yield* Effect.tryPromise(() => first.arrayBuffer());
+      const second = yield* application.handle(providerRequest());
+      yield* Effect.tryPromise(() => second.arrayBuffer());
+      assert.deepStrictEqual(yield* Ref.get(telemetry.refreshes), [
+        "fresh",
+        "cache_hit",
+      ]);
+      assert.strictEqual(yield* Ref.get(services.quotaCalls), 1);
     }));
 
   it.effect("routes a healthy OAuth account and settles exact terminal usage", () =>
@@ -341,6 +367,28 @@ describe("Effect AI Gateway application", () => {
         spendMicros: 0,
       }]);
     }));
+
+  it.effect("preserves serving behavior with native telemetry enabled and disabled", () =>
+    Effect.forEach([true, false], (enabled) =>
+      Effect.gen(function*() {
+        yield* TestClock.setTime(now);
+        const services = yield* makeTestServices(true);
+        const telemetry = yield* makeAIGatewayTelemetry({ enabled }).pipe(
+          Effect.provide(BunCryptoLayer),
+        );
+        const application = yield* makeApplication(
+          services,
+          options,
+          telemetry,
+        );
+        const response = yield* application.handle(providerRequest());
+        assert.strictEqual(response.status, 200);
+        assert.strictEqual(
+          yield* Effect.tryPromise(() => response.text()),
+          completedEvent,
+        );
+        assert.strictEqual(yield* Ref.get(services.released), 1);
+      }), { discard: true }));
 
   it.effect("keeps health public while readiness and status stay honest and protected", () =>
     Effect.gen(function*() {

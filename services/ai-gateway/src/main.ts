@@ -7,11 +7,11 @@ import * as BunHttpServer from "@effect/platform-bun/BunHttpServer";
 import * as BunPath from "@effect/platform-bun/BunPath";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import {
-  initializeAgentOSTelemetryFromEnvironment,
   makeProviderBudgetSettlementHttpLayer,
   ProviderBudgetSettlementReporter,
 } from "@akua-dev/agentos";
 import {
+  Config,
   ConfigProvider,
   Console,
   Context,
@@ -57,10 +57,10 @@ import { makeAIGatewayApplication } from "./gateway-service.ts";
 import type { AIForwardClientAuthentication } from "./forward.ts";
 import {
   AIGatewayTelemetry,
-  makeLegacyAIGatewayTelemetry,
-  noopAIGatewayTelemetry,
+  makeAIGatewayTelemetry,
 } from "./observability.ts";
 import { AIProviderHttp, AIProviderHttpLive } from "./provider-http.ts";
+import { AIGatewayOtlpLive } from "./otlp.ts";
 import { CodexQuota, makeCodexQuotaLayer } from "./quota.ts";
 import { makeEffectManagedAccountVaultLayer } from "./managed-account-live.ts";
 import { defaultRoutingConfig } from "./selection.ts";
@@ -69,7 +69,6 @@ import {
   AIRoutingState,
   ManagedAccountVault,
 } from "./state.ts";
-import { createGatewayTelemetry } from "./telemetry.ts";
 
 class AIGatewayProcessExit extends Data.TaggedError("AIGatewayProcessExit")<{
   readonly code: number;
@@ -130,16 +129,12 @@ const AIGatewayStatusClientLive = Layer.effect(
 );
 
 function acquireAIGatewayTelemetry() {
-  return Effect.acquireRelease(
-    initializeAgentOSTelemetryFromEnvironment(),
-    (telemetry) => telemetry.shutdown,
-  ).pipe(
-    Effect.map((telemetry) =>
-      telemetry.enabled
-        ? makeLegacyAIGatewayTelemetry(createGatewayTelemetry())
-        : noopAIGatewayTelemetry
-    ),
-  );
+  return Effect.gen(function*() {
+    const disabled = yield* Config.boolean("OTEL_SDK_DISABLED").pipe(
+      Config.withDefault(false),
+    );
+    return yield* makeAIGatewayTelemetry({ enabled: !disabled });
+  });
 }
 
 function makeManagedAccountVaultLive(
@@ -201,7 +196,12 @@ function makeAIGatewayRuntimeLive(
             ),
           );
           const routing = Context.get(routingContext, AIRoutingState);
-          const telemetry = yield* acquireAIGatewayTelemetry();
+          const telemetry = yield* acquireAIGatewayTelemetry().pipe(
+            Effect.provideService(Crypto.Crypto, crypto),
+            Effect.mapError(() =>
+              aiGatewayEntrypointError("invalid_configuration")
+            ),
+          );
           const clientAuthentication: AIForwardClientAuthentication =
             serveConfig.authentication.kind ===
               "workload_identity"
@@ -303,7 +303,10 @@ if (import.meta.main) {
     BunPath.layer,
     ConfigProvider.layer(ConfigProvider.fromEnv()),
   );
-  BunRuntime.runMain(startup.pipe(Effect.provide(platform)), {
+  BunRuntime.runMain(startup.pipe(
+    Effect.provide(AIGatewayOtlpLive),
+    Effect.provide(platform),
+  ), {
     disableErrorReporting: true,
   });
 }
