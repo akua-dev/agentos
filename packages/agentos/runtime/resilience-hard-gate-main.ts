@@ -5,6 +5,10 @@ import * as BunServices from "@effect/platform-bun/BunServices";
 import { ConfigProvider, Console, Effect, Layer, Schema } from "effect";
 
 import {
+  AccessResilienceGateError,
+  AccessResilienceRegressionSourceError,
+} from "../src/access/resilience-conformance.ts";
+import {
   ResilienceHardGateRunnerError,
   agentOSResilienceHardGate,
 } from "../src/resilience/hard-gate.ts";
@@ -43,9 +47,11 @@ const program = agentOSResilienceHardGate.pipe(
             title: error.title,
           }
           : error instanceof AgentOSResilienceGateError ||
-              error instanceof ProtocolResilienceGateError
+              error instanceof ProtocolResilienceGateError ||
+              error instanceof AccessResilienceGateError
           ? { code: error.code, scenario: error.scenario }
-          : error instanceof ResilienceRegressionSourceError
+          : error instanceof ResilienceRegressionSourceError ||
+              error instanceof AccessResilienceRegressionSourceError
           ? {
             code: error.code,
             scenario: error.scenario,

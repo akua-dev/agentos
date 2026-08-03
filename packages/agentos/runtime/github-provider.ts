@@ -8,6 +8,8 @@ import {
   Schema,
 } from "effect";
 
+import { isValidGitHubHost } from "./github-host.ts";
+
 const WRAPPER_MARKER = "# agentos-managed github-workload-wrapper-v1";
 const INCLUDE_BEGIN = "# agentos-github-broker-include-begin";
 const INCLUDE_END = "# agentos-github-broker-include-end";
@@ -128,8 +130,7 @@ export const reconcileGitHubProviderConfigurationValue = Effect.fn(
   if (
     endpoint.protocol !== "https:" || endpoint.username || endpoint.password ||
     endpoint.pathname !== "/" || endpoint.search || endpoint.hash ||
-    endpoint.hostname !== host ||
-    !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host) || host.length > 253
+    endpoint.host !== host || !isValidGitHubHost(host)
   ) {
     return yield* providerError("invalid_configuration", null);
   }

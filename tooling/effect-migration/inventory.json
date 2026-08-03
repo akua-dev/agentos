@@ -381,6 +381,26 @@
       "status": "migrated"
     },
     {
+      "id": "access-resilience-conformance-effect-tests",
+      "issue": 92,
+      "pattern": "^packages/agentos/src/access/tests/(?:disposable-kubernetes|resilience-conformance)\\.effect\\.test\\.ts$",
+      "runtime": "bun-kubernetes",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "clock", "filesystem", "process", "kubernetes", "schema"],
+      "migrationDependencies": [87, 88, 89, 90, 94, 100, 101],
+      "status": "migrated"
+    },
+    {
+      "id": "access-resilience-conformance-runtime",
+      "issue": 92,
+      "pattern": "^packages/agentos/src/access/(?:disposable-kubernetes|resilience-conformance)\\.ts$",
+      "runtime": "shared-bun-kubernetes",
+      "package": "@akua-dev/agentos",
+      "io": ["clock", "filesystem", "process", "kubernetes", "schema"],
+      "migrationDependencies": [87, 88, 89, 90, 94, 100, 101],
+      "status": "migrated"
+    },
+    {
       "id": "openfga-service-core",
       "issue": 90,
       "pattern": "^services/openfga/src/kubernetes\\.ts$",
@@ -433,7 +453,7 @@
     {
       "id": "github-broker-effect-tests",
       "issue": 94,
-      "pattern": "^services/github-broker/tests/.*\\.effect\\.test\\.ts$|^packages/agentos/runtime/tests/github-(?:provider|workload-auth)\\.effect\\.test\\.ts$",
+      "pattern": "^services/github-broker/tests/.*\\.effect\\.test\\.ts$|^packages/agentos/runtime/tests/github-(?:native-clients|provider|workload-auth)\\.effect\\.test\\.ts$",
       "runtime": "bun",
       "package": "github-broker",
       "io": ["test", "clock", "filesystem", "http", "process", "stream"],
@@ -863,7 +883,7 @@
     {
       "id": "github-broker-runtime",
       "issue": 94,
-      "pattern": "^services/github-broker/src/|^packages/agentos/runtime/github-(?:provider|workload-auth)\\.ts$",
+      "pattern": "^services/github-broker/src/|^packages/agentos/runtime/github-(?:host|provider|workload-auth)\\.ts$",
       "runtime": "bun-kubernetes",
       "package": "github-broker",
       "io": ["config", "filesystem", "http", "process", "stream"],

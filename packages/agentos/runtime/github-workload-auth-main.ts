@@ -25,6 +25,7 @@ const WorkloadClientConfig = Config.all({
   ghBinary: Config.string("AGENTOS_GITHUB_GH_BIN").pipe(Config.option),
   home: Config.string("HOME"),
   host: Config.string("AGENTOS_GITHUB_HOST"),
+  path: Config.string("PATH"),
   tokenFile: Config.string("AGENTOS_EGRESS_TOKEN_FILE"),
 });
 
@@ -59,6 +60,7 @@ const program = Effect.gen(function*() {
     ghBinary: Option.getOrUndefined(config.ghBinary),
     home: config.home,
     host: config.host.toLowerCase(),
+    path: config.path,
     tokenFile: config.tokenFile,
   });
 }).pipe(

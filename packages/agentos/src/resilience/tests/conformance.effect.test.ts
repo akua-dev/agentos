@@ -2,6 +2,13 @@ import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 
 import {
+  ACCESS_RESILIENCE_SCENARIOS,
+  accessResilienceScenarioDefinition,
+  type AccessResilienceObservationV1,
+  type AccessResilienceRunV1,
+  type AccessResilienceScenarioId,
+} from "../../access/resilience-conformance.ts";
+import {
   DISPOSABLE_PROTOCOL_RESILIENCE_SCENARIOS,
   PROTOCOL_RESILIENCE_SCENARIOS,
   protocolResilienceScenarioDefinition,
@@ -108,6 +115,78 @@ function protocolRun(): ProtocolResilienceRunV1 {
   };
 }
 
+function accessObservation(
+  scenario: AccessResilienceScenarioId,
+): AccessResilienceObservationV1 {
+  const expected = accessResilienceScenarioDefinition(scenario);
+  const attempts = expected.requiresLoad ? 32 : 1;
+  const allowed = ["allowed", "completed", "bypassed"].includes(
+    expected.outcome,
+  );
+  return {
+    version: 1,
+    scenario,
+    source: expected.minimumSource,
+    status: "observed",
+    outcome: expected.outcome,
+    failureClass: expected.failureClass,
+    recovery: expected.recovery,
+    elapsedMillis: 25,
+    revocationMillis: expected.requiresRevocationSlo ? 1_250 : null,
+    hotReloadMillis: expected.requiresHotReloadSlo ? 900 : null,
+    load: {
+      attempts,
+      allowed: allowed ? attempts : 0,
+      denied: allowed ? 0 : attempts,
+      providerForwards: expected.providerForwardExpected ? attempts : 0,
+      settlements: expected.settlementExpected ? attempts : 0,
+    },
+    enforcement: {
+      providerAdapterReached: expected.providerForwardExpected,
+      credentialReleased: expected.credentialReleaseExpected,
+      unrelatedSubjectAllowed: expected.requiresUnrelatedContinuity
+        ? true
+        : null,
+      ordinaryInternetAllowed: expected.requiresInternetContinuity
+        ? true
+        : null,
+    },
+    native: {
+      client: expected.nativeClient,
+      projectedTokenReread: expected.nativeClient === "none" ? null : true,
+      persistedLogin: expected.nativeClient === "none" ? null : false,
+      statusPreserved: expected.requiresNativeSemantics ? true : null,
+      streamPreserved: expected.requiresNativeSemantics ? true : null,
+      stderrPreserved: expected.requiresNativeSemantics ? true : null,
+      exitCodePreserved: expected.requiresNativeSemantics ? true : null,
+    },
+    audit: {
+      complete: true,
+      protected: true,
+      eventCount: 1,
+      metricDimensions: [
+        "operation",
+        "outcome",
+        "failure_class",
+        "dependency",
+        "credential_outcome",
+      ],
+      observedContent: [],
+    },
+  };
+}
+
+function accessRun(): AccessResilienceRunV1 {
+  const parent = protocolRun();
+  return {
+    version: 1,
+    revision: Revision,
+    environment: parent.environment,
+    images: parent.images,
+    observations: ACCESS_RESILIENCE_SCENARIOS.map(accessObservation),
+  };
+}
+
 function observation(
   scenario: AgentOSResilienceScenarioId,
 ): AgentOSResilienceObservationV1 {
@@ -154,6 +233,7 @@ function completeRun(): AgentOSResilienceRunV1 {
     images: protocolRun().images,
     observations: AGENTOS_RESILIENCE_SCENARIOS.map(observation),
     protocol: protocolRun(),
+    access: accessRun(),
   };
 }
 
@@ -175,7 +255,8 @@ describe("AgentOS resilience parent hard gate", () => {
       assert.strictEqual(
         verdict.scenarioCount,
         AGENTOS_RESILIENCE_SCENARIOS.length +
-          PROTOCOL_RESILIENCE_SCENARIOS.length,
+          PROTOCOL_RESILIENCE_SCENARIOS.length +
+          ACCESS_RESILIENCE_SCENARIOS.length,
       );
       assert.strictEqual(verdict.revision, Revision);
       assert.strictEqual(verdict.workAuthority, "postgresql");
@@ -367,5 +448,18 @@ describe("AgentOS resilience parent hard gate", () => {
         },
       });
       assert.strictEqual(childMissing.code, "protocol_gate_failed");
+    }));
+
+  it.effect("cannot replace a failed access child gate with parent claims", () =>
+    Effect.gen(function*() {
+      const run = completeRun();
+      const childMissing = yield* gateFailure({
+        ...run,
+        access: {
+          ...run.access,
+          observations: run.access.observations.slice(1),
+        },
+      });
+      assert.strictEqual(childMissing.code, "access_gate_failed");
     }));
 });

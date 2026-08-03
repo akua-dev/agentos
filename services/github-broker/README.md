@@ -24,6 +24,14 @@ exit status. Git uses a dynamic credential helper and an owned `insteadOf`
 rewrite. Neither path places identity or provider tokens in argv, remotes,
 credential stores, shell history, managed state, logs or responses.
 
+The release gate executes the actual locked Linux `gh`, the installed
+`gh-axi`, and the host `git` against a disposable local TLS fixture. The helper
+prepends the configured `gh` directory to `PATH`, because `gh-axi` resolves the
+literal `gh` executable rather than a custom `GH_PATH`. Each invocation rereads
+the projected token file; the fixture retains only authorization-header
+lengths, and no persistent `hosts.yml` is permitted. See the
+[access-plane resilience contract](../../docs/conformance/access-plane-resilience.md).
+
 The broker validates the closed grant before minting a credential, requests one
 repository and one minimum GitHub App permission, strips workload and grant
 headers, and streams the upstream response. A provider `401` invalidates the
@@ -71,6 +79,7 @@ not buffered for authorization.
 
 ```bash
 bunx vitest run services/github-broker/tests
+bunx vitest run packages/agentos/runtime/tests/github-workload-auth.effect.test.ts
 kubectl kustomize services/github-broker/kubernetes
 helm template agentgateway-github \
   oci://cr.agentgateway.dev/charts/agentgateway-standalone \

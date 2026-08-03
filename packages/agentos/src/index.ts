@@ -1,4 +1,26 @@
 export {
+  ACCESS_HOT_RELOAD_SLO_MILLIS,
+  ACCESS_MINIMUM_LOAD_ATTEMPTS,
+  ACCESS_RESILIENCE_REGRESSION_SOURCES,
+  ACCESS_RESILIENCE_SCENARIOS,
+  ACCESS_REVOCATION_SLO_MILLIS,
+  DISPOSABLE_ACCESS_RESILIENCE_SCENARIOS,
+  AccessResilienceGateError,
+  AccessResilienceObservationV1Schema,
+  AccessResilienceRegressionSourceError,
+  AccessResilienceRegressionSourceV1Schema,
+  AccessResilienceRunV1Schema,
+  AccessResilienceScenarioIdSchema,
+  accessResilienceScenarioDefinition,
+  compileAccessResilienceVerdict,
+  verifyAccessResilienceRegressionSources,
+  type AccessResilienceObservationV1,
+  type AccessResilienceRegressionSourceV1,
+  type AccessResilienceRunV1,
+  type AccessResilienceScenarioDefinition,
+  type AccessResilienceScenarioId,
+} from "./access/resilience-conformance.ts";
+export {
   AccessAuditEventV1Schema,
   AccessBindingSubjectV1Schema,
   AccessBindingV1Schema,
@@ -712,6 +734,7 @@ export {
   type ResilienceRegressionSourceV1,
 } from "./resilience/conformance.ts";
 export {
+  AccessHardGateEvidenceV1Schema,
   AGENTOS_RESILIENCE_EXECUTION_REFERENCES,
   ProtocolHardGateEvidenceV1Schema,
   ResilienceExecutionError,
