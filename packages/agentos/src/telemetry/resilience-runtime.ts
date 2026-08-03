@@ -17,7 +17,12 @@ import {
 } from "@opentelemetry/sdk-metrics";
 import { Clock, Effect, Ref } from "effect";
 
-import { AGENTOS_AI_DURATION_BUCKETS_SECONDS } from "./contract.ts";
+import {
+  AGENTOS_AI_DURATION_BUCKETS_SECONDS,
+  AGENTOS_RESILIENCE_METRIC_NAMES,
+  AGENTOS_TELEMETRY_SPANS,
+} from "./contract.ts";
+import { safeMetricAttributes } from "./privacy.ts";
 import {
   resilienceMetricAttributes,
   resilienceProtectedAttributes,
@@ -25,11 +30,7 @@ import {
   type ResilienceProtectedCorrelationV1,
 } from "./resilience-contract.ts";
 
-export const AGENTOS_RESILIENCE_METRICS = Object.freeze({
-  observations: "agentos.resilience.observations",
-  operations: "agentos.resilience.operations",
-  operationDuration: "agentos.resilience.operation.duration",
-});
+export const AGENTOS_RESILIENCE_METRICS = AGENTOS_RESILIENCE_METRIC_NAMES;
 
 export interface AgentOSResilienceOperation {
   readonly observe: (
@@ -146,7 +147,7 @@ const startOperationCore = Effect.fn(
   if (parentContext === undefined) return noopOperation;
   const root = yield* Effect.try({
     try: () => options.tracer.startSpan(
-      "agentos.resilience.operation",
+      AGENTOS_TELEMETRY_SPANS.resilienceOperation,
       { attributes: protectedCorrelationAttributes(options.correlation) },
       parentContext,
     ),
@@ -192,12 +193,18 @@ const startOperationCore = Effect.fn(
         }));
         yield* record(() => options.instruments.operations.add(
           1,
-          metricAttributes,
+          safeMetricAttributes(
+            AGENTOS_RESILIENCE_METRICS.operations,
+            metricAttributes,
+          ),
         ));
         const endedAt = yield* options.clock;
         yield* record(() => options.instruments.operationDuration.record(
           Math.max(0, endedAt - startedAt) / 1_000,
-          metricAttributes,
+          safeMetricAttributes(
+            AGENTOS_RESILIENCE_METRICS.operationDuration,
+            metricAttributes,
+          ),
         ));
       }
       yield* endSpan(root);
@@ -230,7 +237,7 @@ const emitObservationCore = Effect.fn(
   const metricAttributes = resilienceMetricAttributes(options.observation);
   const span = yield* Effect.try({
     try: () => options.tracer.startSpan(
-      `agentos.resilience.${options.observation.phase}`,
+      resilienceSpanName(options.observation.phase),
       { attributes: protectedAttributes },
       options.operationContext,
     ),
@@ -240,7 +247,13 @@ const emitObservationCore = Effect.fn(
     yield* record(() => span.setStatus({ code: statusCode(options.observation) }));
     yield* endSpan(span);
   }
-  yield* record(() => options.instruments.observations.add(1, metricAttributes));
+  yield* record(() => options.instruments.observations.add(
+    1,
+    safeMetricAttributes(
+      AGENTOS_RESILIENCE_METRICS.observations,
+      metricAttributes,
+    ),
+  ));
   yield* options.diagnostic(options.observation).pipe(
     Effect.catchCause(() => Effect.void),
   );
@@ -317,6 +330,39 @@ function statusCode(observation: ResilienceObservationV1): SpanStatusCode {
     case "pending":
     case "unobserved":
       return SpanStatusCode.UNSET;
+  }
+}
+
+function resilienceSpanName(
+  phase: ResilienceObservationV1["phase"],
+): string {
+  switch (phase) {
+    case "topology_decision":
+      return AGENTOS_TELEMETRY_SPANS.resilienceTopologyDecision;
+    case "workload_plan":
+      return AGENTOS_TELEMETRY_SPANS.resilienceWorkloadPlan;
+    case "render":
+      return AGENTOS_TELEMETRY_SPANS.resilienceRender;
+    case "apply":
+      return AGENTOS_TELEMETRY_SPANS.resilienceApply;
+    case "capacity":
+      return AGENTOS_TELEMETRY_SPANS.resilienceCapacity;
+    case "placement":
+      return AGENTOS_TELEMETRY_SPANS.resiliencePlacement;
+    case "readiness":
+      return AGENTOS_TELEMETRY_SPANS.resilienceReadiness;
+    case "provider":
+      return AGENTOS_TELEMETRY_SPANS.resilienceProvider;
+    case "listener":
+      return AGENTOS_TELEMETRY_SPANS.resilienceListener;
+    case "protocol":
+      return AGENTOS_TELEMETRY_SPANS.resilienceProtocol;
+    case "session":
+      return AGENTOS_TELEMETRY_SPANS.resilienceSession;
+    case "reconciliation":
+      return AGENTOS_TELEMETRY_SPANS.resilienceReconciliation;
+    case "outcome":
+      return AGENTOS_TELEMETRY_SPANS.resilienceOutcome;
   }
 }
 

@@ -20,6 +20,9 @@ import {
 } from "effect/unstable/http";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 
+import {
+  AGENTOS_TELEMETRY_EVENTS,
+} from "../../../packages/agentos/src/telemetry/contract.ts";
 import { allocateBunTestPort } from "../../../tooling/testing/bun-http.ts";
 import { renderKustomize } from "../../../tooling/testing/kubernetes.ts";
 import { acquireOtlpTestSink } from "./otlp-sink.ts";
@@ -50,6 +53,44 @@ const TracePayload = Schema.Struct({
         endTimeUnixNano: Schema.String,
         attributes: Schema.Array(TraceAttribute),
         status: Schema.Struct({ code: Schema.Number }),
+      })),
+    })),
+  })),
+});
+const MetricPayload = Schema.Struct({
+  resourceMetrics: Schema.Array(Schema.Struct({
+    resource: Schema.Struct({ attributes: Schema.Array(TraceAttribute) }),
+    scopeMetrics: Schema.Array(Schema.Struct({
+      scope: Schema.Struct({ name: Schema.String }),
+      metrics: Schema.Array(Schema.Struct({
+        name: Schema.String,
+        unit: Schema.String,
+        gauge: Schema.Struct({
+          dataPoints: Schema.Array(Schema.Struct({
+            attributes: Schema.Array(TraceAttribute),
+            timeUnixNano: Schema.String,
+            asDouble: Schema.Number,
+          })),
+        }),
+      })),
+    })),
+  })),
+});
+const LogPayload = Schema.Struct({
+  resourceLogs: Schema.Array(Schema.Struct({
+    resource: Schema.Struct({ attributes: Schema.Array(TraceAttribute) }),
+    scopeLogs: Schema.Array(Schema.Struct({
+      scope: Schema.Struct({ name: Schema.String }),
+      logRecords: Schema.Array(Schema.Struct({
+        timeUnixNano: Schema.String,
+        observedTimeUnixNano: Schema.String,
+        severityNumber: Schema.Number,
+        severityText: Schema.String,
+        traceId: Schema.String,
+        spanId: Schema.String,
+        eventName: Schema.String,
+        body: Schema.Struct({ stringValue: Schema.String }),
+        attributes: Schema.Array(TraceAttribute),
       })),
     })),
   })),
@@ -149,26 +190,44 @@ function startCollector(options: {
 }
 
 function stopCollector(name: string) {
-  return runCommand("docker", ["stop", "--time", "2", name]).pipe(
+  return runCommand("docker", ["stop", "--timeout", "2", name]).pipe(
     Effect.asVoid,
   );
 }
 
-const postTrace = Effect.fn("test.otelE2e.postTrace")(function*(
+function removeCollector(name: string) {
+  return runCommand("docker", ["rm", "--force", name]).pipe(Effect.asVoid);
+}
+
+const postOtlp = Effect.fn("test.otelE2e.postOtlp")(function*(
+  signal: "logs" | "metrics" | "traces",
   port: number,
   body: string,
 ) {
   const client = yield* HttpClient.HttpClient;
   const request = HttpClientRequest.post(
-    `http://127.0.0.1:${port}/v1/traces`,
+    `http://127.0.0.1:${port}/v1/${signal}`,
   ).pipe(
     HttpClientRequest.setHeader("content-type", "application/json"),
     HttpClientRequest.bodyText(body, "application/json"),
   );
   return yield* client.execute(request).pipe(
-    Effect.mapError(() => failure("post_trace", "http_failed")),
+    Effect.flatMap((response) => response.text.pipe(Effect.as(response))),
+    Effect.mapError(() => failure(`post_${signal}`, "http_failed")),
   );
 });
+
+function postTrace(port: number, body: string) {
+  return postOtlp("traces", port, body);
+}
+
+function postMetrics(port: number, body: string) {
+  return postOtlp("metrics", port, body);
+}
+
+function postLogs(port: number, body: string) {
+  return postOtlp("logs", port, body);
+}
 
 const waitFor = Effect.fn("test.otelE2e.waitFor")(function*<R>(
   operation: string,
@@ -178,10 +237,10 @@ const waitFor = Effect.fn("test.otelE2e.waitFor")(function*<R>(
     Effect.flatMap((ready) =>
       ready ? Effect.void : Effect.fail(failure(operation, "timeout"))
     ),
-    Effect.retry({
-      times: 150,
-      schedule: Schedule.spaced("100 millis"),
-    }),
+    Effect.retry(Schedule.addDelay(
+      Schedule.recurs(150),
+      () => Effect.succeed("100 millis"),
+    )),
   );
 });
 
@@ -215,6 +274,7 @@ function seedTrace() {
                 endTimeUnixNano: "2000000000",
                 attributes: [
                   attribute("agentos.ai.runtime", "pi"),
+                  attribute("custom.safe_looking", "SEED_UNKNOWN_TRACE"),
                   attribute("gen_ai.prompt", "SEED_PROMPT"),
                   attribute("authorization", "Bearer sk-seeded-secret"),
                   attribute(
@@ -232,137 +292,322 @@ function seedTrace() {
   } satisfies typeof TracePayload.Type;
 }
 
-layer(platform)("OpenTelemetry Collector outage conformance", (it) => {
-  it.effect(
-    "persists a privacy-filtered batch across remote outage and Collector restart",
-    () => Effect.scoped(Effect.gen(function*() {
-      const enabled = yield* Config.option(
-        Config.string("AGENTOS_RUN_OTEL_E2E"),
-      );
-      if (Option.getOrUndefined(enabled) !== "true") return;
+function seedMetric() {
+  const attribute = (key: string, value: string) => ({
+    key,
+    value: { stringValue: value },
+  });
+  return {
+    resourceMetrics: [
+      {
+        resource: {
+          attributes: [
+            attribute("service.name", "agentos-e2e"),
+            attribute("agentos.repository.name", "private-repository"),
+          ],
+        },
+        scopeMetrics: [
+          {
+            scope: { name: "agentos-e2e" },
+            metrics: [
+              {
+                name: "agentos.test.cardinality",
+                unit: "{request}",
+                gauge: {
+                  dataPoints: [
+                    {
+                      attributes: [
+                        attribute("agentos.ai.route", "ai_gateway"),
+                        attribute(
+                          "agentos.identity.agent_id",
+                          "10000000-0000-4000-8000-000000000001",
+                        ),
+                        attribute(
+                          "agentos.memory.query",
+                          "SEED_PRIVATE_MEMORY_QUERY",
+                        ),
+                        attribute(
+                          "custom.safe_looking",
+                          "SEED_UNKNOWN_METRIC",
+                        ),
+                      ],
+                      timeUnixNano: "2000000000",
+                      asDouble: 1,
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  } satisfies typeof MetricPayload.Type;
+}
 
-      const fileSystem = yield* FileSystem.FileSystem;
-      const paths = yield* Path.Path;
-      const repository = yield* paths.fromFileUrl(repositoryUrl);
-      const directory = yield* fileSystem.makeTempDirectoryScoped({
-        prefix: "agentos-otel-e2e-",
-      });
-      const storage = paths.join(directory, "storage");
-      const configPath = paths.join(directory, "collector.yaml");
-      const headersPath = paths.join(directory, "headers.yaml");
-      const sink = yield* acquireOtlpTestSink();
-      const port = yield* allocateBunTestPort();
-      const name = `agentos-otel-e2e-${Math.abs(yield* Random.nextInt).toString(36)}`;
-      yield* fileSystem.makeDirectory(storage, { mode: 0o777 });
-      yield* fileSystem.chmod(storage, 0o777);
-      const rendered = yield* renderKustomize(paths.join(
-        repository,
-        "services",
-        "otel-collector",
-        "kubernetes",
-        "overlays",
-        "remote",
-      ));
-      const resources = yield* Schema.decodeUnknownEffect(
-        Schema.Array(Resource),
-      )(rendered);
-      const source = yield* required(
-        resources.find((resource) =>
-          resource.kind === "ConfigMap" &&
-          resource.metadata.name === "agentos-otel-collector"
-        )?.data?.["collector.yaml"],
-        "collector_config",
-      );
-      const config = source.replace(/^\s+- k8sattributes\s*$/gm, "");
-      yield* fileSystem.writeFileString(configPath, config, { mode: 0o600 });
-      yield* fileSystem.writeFileString(
-        headersPath,
-        [
-          "exporters:",
-          "  otlp_http/remote:",
-          "    headers:",
-          '      x-agentos-test: "bounded"',
-          "",
-        ].join("\n"),
-        { mode: 0o600 },
-      );
+function seedLog() {
+  const attribute = (key: string, value: string) => ({
+    key,
+    value: { stringValue: value },
+  });
+  return {
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            attribute("service.name", "agentos-e2e"),
+            attribute("custom.resource", "SEED_UNKNOWN_RESOURCE"),
+          ],
+        },
+        scopeLogs: [
+          {
+            scope: { name: "agentos-e2e" },
+            logRecords: [
+              {
+                timeUnixNano: "2000000000",
+                observedTimeUnixNano: "2000000000",
+                severityNumber: 17,
+                severityText: "ERROR",
+                traceId: "00000000000000000000000000000001",
+                spanId: "0000000000000001",
+                eventName: AGENTOS_TELEMETRY_EVENTS.aiGatewayFailure,
+                body: { stringValue: "SEED_PRIVATE_LOG_BODY" },
+                attributes: [
+                  attribute("agentos.ai.runtime", "pi"),
+                  attribute("agentos.ai.route", "ai_gateway"),
+                  attribute("agentos.ai.status_class", "server_error"),
+                  attribute("agentos.ai.error.class", "overload"),
+                  attribute("custom.safe_looking", "SEED_UNKNOWN_LOG"),
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  } satisfies typeof LogPayload.Type;
+}
 
-      const options = {
-        configPath,
-        headersPath,
-        name,
-        port,
-        remoteEndpoint: sink.remoteEndpoint,
-        storage,
-      };
-      const trace = yield* Schema.encodeEffect(
-        Schema.fromJsonString(TracePayload),
-      )(seedTrace());
+layer(platform, { excludeTestServices: true })(
+  "OpenTelemetry Collector outage conformance",
+  (it) => {
+    it.effect(
+      "persists a privacy-filtered batch across remote outage and Collector restart",
+      () => Effect.scoped(Effect.gen(function*() {
+        const enabled = yield* Config.option(
+          Config.string("AGENTOS_RUN_OTEL_E2E"),
+        );
+        if (Option.getOrUndefined(enabled) !== "true") return;
 
-      yield* Effect.gen(function*() {
-        const first = yield* startCollector(options);
-        yield* waitFor(
-          "receiver_start",
-          Effect.option(postTrace(port, '{"resourceSpans":[]}')).pipe(
-            Effect.map((response) =>
-              Option.isSome(response) && response.value.status === 200
+        const fileSystem = yield* FileSystem.FileSystem;
+        const paths = yield* Path.Path;
+        const repository = yield* paths.fromFileUrl(repositoryUrl);
+        const directory = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "agentos-otel-e2e-",
+        });
+        const storage = paths.join(directory, "storage");
+        const configPath = paths.join(directory, "collector.yaml");
+        const headersPath = paths.join(directory, "headers.yaml");
+        const sink = yield* acquireOtlpTestSink();
+        const port = yield* allocateBunTestPort();
+        const name =
+          `agentos-otel-e2e-${Math.abs(yield* Random.nextInt).toString(36)}`;
+        yield* fileSystem.makeDirectory(storage, { mode: 0o777 });
+        yield* fileSystem.chmod(storage, 0o777);
+        const rendered = yield* renderKustomize(paths.join(
+          repository,
+          "services",
+          "otel-collector",
+          "kubernetes",
+          "overlays",
+          "remote",
+        ));
+        const resources = yield* Schema.decodeUnknownEffect(
+          Schema.Array(Resource),
+        )(rendered);
+        const source = yield* required(
+          resources.find((resource) =>
+            resource.kind === "ConfigMap" &&
+            resource.metadata.name === "agentos-otel-collector"
+          )?.data?.["collector.yaml"],
+          "collector_config",
+        );
+        const config = source.replace(/^\s+- k8sattributes\s*$/gm, "");
+        yield* fileSystem.writeFileString(configPath, config, { mode: 0o600 });
+        yield* fileSystem.writeFileString(
+          headersPath,
+          [
+            "exporters:",
+            "  otlp_http/remote:",
+            "    headers:",
+            '      x-agentos-test: "bounded"',
+            "",
+          ].join("\n"),
+          { mode: 0o600 },
+        );
+
+        const options = {
+          configPath,
+          headersPath,
+          name,
+          port,
+          remoteEndpoint: sink.remoteEndpoint,
+          storage,
+        };
+        const trace = yield* Schema.encodeEffect(
+          Schema.fromJsonString(TracePayload),
+        )(seedTrace());
+        const metric = yield* Schema.encodeEffect(
+          Schema.fromJsonString(MetricPayload),
+        )(seedMetric());
+        const log = yield* Schema.encodeEffect(
+          Schema.fromJsonString(LogPayload),
+        )(seedLog());
+
+        yield* Effect.gen(function*() {
+          const first = yield* startCollector(options);
+          yield* waitFor(
+            "receiver_start",
+            Effect.option(postTrace(port, '{"resourceSpans":[]}')).pipe(
+              Effect.map((response) =>
+                Option.isSome(response) && response.value.status === 200
+              ),
             ),
-          ),
-        );
-        assert.strictEqual((yield* postTrace(port, trace)).status, 200);
-        yield* waitFor(
-          "outage_observed",
-          sink.requests.pipe(Effect.map((requests) =>
-            requests.some((request) =>
-              request.path === "/v1/traces" && !request.accepted
-            )
-          )),
-        );
+          );
+          assert.strictEqual((yield* postTrace(port, trace)).status, 200);
+          assert.strictEqual((yield* postMetrics(port, metric)).status, 200);
+          assert.strictEqual((yield* postLogs(port, log)).status, 200);
+          yield* waitFor(
+            "outage_observed",
+            sink.requests.pipe(Effect.map((requests) =>
+              requests.some((request) =>
+                request.path === "/v1/traces" && !request.accepted
+              )
+            )),
+          );
 
-        yield* stopCollector(name);
-        yield* first.exitCode;
-        yield* sink.setAvailable(true);
-        yield* startCollector(options);
-        yield* waitFor(
-          "receiver_restart",
-          Effect.option(postTrace(port, '{"resourceSpans":[]}')).pipe(
-            Effect.map((response) =>
-              Option.isSome(response) && response.value.status === 200
+          yield* stopCollector(name);
+          yield* first.exitCode;
+          yield* sink.setAvailable(true);
+          yield* startCollector(options);
+          yield* waitFor(
+            "receiver_restart",
+            Effect.option(postTrace(port, '{"resourceSpans":[]}')).pipe(
+              Effect.map((response) =>
+                Option.isSome(response) && response.value.status === 200
+              ),
             ),
-          ),
-        );
-        yield* waitFor(
-          "queued_batch_delivery",
-          sink.requests.pipe(Effect.map((requests) =>
-            requests.some((request) =>
-              request.path === "/v1/traces" &&
+          );
+          yield* waitFor(
+            "queued_batch_delivery",
+            sink.requests.pipe(Effect.map((requests) =>
+              requests.some((request) =>
+                request.path === "/v1/traces" &&
+                request.accepted &&
+                new TextDecoder().decode(request.body).includes(
+                  "safe.operation",
+                )
+              )
+            )),
+          );
+          yield* waitFor(
+            "queued_metric_delivery",
+            sink.requests.pipe(Effect.map((requests) =>
+              requests.some((request) =>
+                request.path === "/v1/metrics" &&
+                request.accepted &&
+                new TextDecoder().decode(request.body).includes(
+                  "agentos.test.cardinality",
+                )
+              )
+            )),
+          );
+          yield* waitFor(
+            "queued_log_delivery",
+            sink.requests.pipe(Effect.map((requests) =>
+              requests.some((request) =>
+                request.path === "/v1/logs" &&
+                request.accepted &&
+                new TextDecoder().decode(request.body).includes(
+                  AGENTOS_TELEMETRY_EVENTS.aiGatewayFailure,
+                )
+              )
+            )),
+          );
+          const accepted = yield* required(
+            (yield* sink.requests).find((request) =>
               request.accepted &&
               new TextDecoder().decode(request.body).includes("safe.operation")
-            )
-          )),
+            ),
+            "accepted_trace",
+          );
+          const serialized = new TextDecoder().decode(accepted.body);
+          assert.include(serialized, "agentos.ai.runtime");
+          assert.include(serialized, "pi");
+          for (const forbidden of [
+            "custom.safe_looking",
+            "SEED_UNKNOWN_TRACE",
+            "SEED_PROMPT",
+            "sk-seeded-secret",
+            "provider-account@example.test",
+            "raw upstream private error",
+          ]) {
+            assert.notInclude(serialized, forbidden);
+          }
+          const acceptedMetric = yield* required(
+            (yield* sink.requests).find((request) =>
+              request.path === "/v1/metrics" &&
+              request.accepted &&
+              new TextDecoder().decode(request.body).includes(
+                "agentos.test.cardinality",
+              )
+            ),
+            "accepted_metric",
+          );
+          const serializedMetric = new TextDecoder().decode(
+            acceptedMetric.body,
+          );
+          assert.include(serializedMetric, "agentos.ai.route");
+          assert.include(serializedMetric, "ai_gateway");
+          for (const forbidden of [
+            "custom.safe_looking",
+            "agentos.identity.agent_id",
+            "agentos.memory.query",
+            "agentos.repository.name",
+            "10000000-0000-4000-8000-000000000001",
+            "SEED_PRIVATE_MEMORY_QUERY",
+            "SEED_UNKNOWN_METRIC",
+            "private-repository",
+          ]) {
+            assert.notInclude(serializedMetric, forbidden);
+          }
+          const acceptedLog = yield* required(
+            (yield* sink.requests).find((request) =>
+              request.path === "/v1/logs" &&
+              request.accepted &&
+              new TextDecoder().decode(request.body).includes(
+                AGENTOS_TELEMETRY_EVENTS.aiGatewayFailure,
+              )
+            ),
+            "accepted_log",
+          );
+          const serializedLog = new TextDecoder().decode(acceptedLog.body);
+          assert.include(serializedLog, "agentos.ai.status_class");
+          assert.include(serializedLog, "server_error");
+          for (const forbidden of [
+            "custom.resource",
+            "custom.safe_looking",
+            "SEED_PRIVATE_LOG_BODY",
+            "SEED_UNKNOWN_LOG",
+            "SEED_UNKNOWN_RESOURCE",
+          ]) {
+            assert.notInclude(serializedLog, forbidden);
+          }
+        }).pipe(
+          Effect.ensuring(removeCollector(name).pipe(Effect.ignore)),
         );
-        const accepted = yield* required(
-          (yield* sink.requests).find((request) =>
-            request.accepted &&
-            new TextDecoder().decode(request.body).includes("safe.operation")
-          ),
-          "accepted_trace",
-        );
-        const serialized = new TextDecoder().decode(accepted.body);
-        assert.include(serialized, "agentos.ai.runtime");
-        assert.include(serialized, "pi");
-        for (const forbidden of [
-          "SEED_PROMPT",
-          "sk-seeded-secret",
-          "provider-account@example.test",
-          "raw upstream private error",
-        ]) {
-          assert.notInclude(serialized, forbidden);
-        }
-      }).pipe(
-        Effect.ensuring(stopCollector(name).pipe(Effect.ignore)),
-      );
-    })),
-    45_000,
-  );
-});
+      })),
+      60_000,
+    );
+  },
+);

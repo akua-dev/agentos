@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { Effect, Schema } from "effect";
 
+const values = <const Values extends ReadonlyArray<string>>(
+  ...entries: Values
+) => entries;
+
 import { contractError } from "../shared/errors.ts";
 
 const KubernetesQuantity = Schema.String.pipe(
@@ -13,11 +17,14 @@ const Sha256 = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
 );
 
-export const AgentWorkloadProfileIdSchema = Schema.Literals([
+export const AGENT_WORKLOAD_PROFILE_IDS = values(
   "persistent-mate@v1",
   "interactive-crewmate@v1",
   "stateless-job@v1",
-]);
+);
+export const AgentWorkloadProfileIdSchema = Schema.Literals(
+  AGENT_WORKLOAD_PROFILE_IDS,
+);
 export const AgentWorkloadRequirementNameSchema = Schema.Literals([
   "persistence",
   "nativeAttach",
