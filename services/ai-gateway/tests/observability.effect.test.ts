@@ -1,118 +1,163 @@
+import { layer as BunCryptoLayer } from "@effect/platform-bun/BunCrypto";
 import { assert, describe, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Metric, Ref, Tracer } from "effect";
 
 import {
   AIGatewayTelemetry,
-  makeLegacyAIGatewayTelemetry,
+  makeAIGatewayTelemetry,
   noopAIGatewayTelemetry,
 } from "../src/observability.ts";
-import type {
-  GatewayRequestOutcome,
-  GatewayTelemetry,
-} from "../src/telemetry.ts";
-import { createNoopGatewayTelemetry } from "../src/telemetry.ts";
 
-describe("Effect AI Gateway telemetry boundary", () => {
-  it.effect("lifts the complete bounded request lifecycle into Effect", () =>
+function runWithNativeTelemetry<A, E, R>(
+  effect: (
+    telemetry: AIGatewayTelemetry["Service"],
+    spans: Array<Tracer.NativeSpan>,
+  ) => Effect.Effect<A, E, R>,
+) {
+  return Effect.gen(function*() {
+    const ids = yield* Ref.make(0);
+    const spans: Array<Tracer.NativeSpan> = [];
+    const tracer = Tracer.make({
+      span(options) {
+        const span = new Tracer.NativeSpan(options);
+        spans.push(span);
+        return span;
+      },
+    });
+    const telemetry = yield* makeAIGatewayTelemetry({
+      nextId: Ref.getAndUpdate(ids, (value) => value + 1).pipe(
+        Effect.map((value) => `gateway-${value + 1}`),
+      ),
+    });
+    return yield* effect(telemetry, spans).pipe(Effect.withTracer(tracer));
+  }).pipe(Effect.provide(BunCryptoLayer));
+}
+
+describe("native Effect AI Gateway telemetry", () => {
+  it.effect("uses Effect spans and metrics for the complete bounded lifecycle", () =>
+    runWithNativeTelemetry((telemetry, spans) =>
+      Effect.gen(function*() {
+        const request = yield* telemetry.start(
+          new Request("http://ai-gateway.test/v1/responses", {
+            method: "POST",
+            headers: {
+              traceparent:
+                "00-11111111111111111111111111111111-2222222222222222-01",
+              tracestate: "vendor=safe",
+              "x-agentos-runtime": "pi",
+              "x-agentos-stream-mode": "streaming",
+            },
+          }),
+        );
+        const upstreamHeaders = new Headers();
+        yield* request.authenticate(true);
+        yield* request.routeStarted;
+        yield* request.routeEnded("acquired");
+        yield* request.quotaRefresh("fresh");
+        yield* request.quotaObservation(1.25, false);
+        yield* request.upstreamStarted(upstreamHeaders);
+        yield* request.upstreamHeaders(
+          200,
+          new Headers({ "x-request-id": "req_safe_provider_1" }),
+        );
+        yield* request.streamChunk(11);
+        yield* request.streamChunk(13);
+        yield* request.routeReleaseStarted;
+        yield* request.routeReleased;
+        yield* request.end({ status: 200, streamOutcome: "completed" });
+
+        assert.strictEqual(
+          upstreamHeaders.get("x-client-request-id"),
+          "gateway-2",
+        );
+        assert.match(
+          upstreamHeaders.get("traceparent") ?? "",
+          /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
+        );
+        assert.strictEqual(upstreamHeaders.get("tracestate"), "vendor=safe");
+        assert.deepStrictEqual(spans.map(({ name }) => name), [
+          "ai-gateway.request",
+          "ai-gateway.authenticate",
+          "ai-gateway.route.acquire",
+          "ai-gateway.quota.refresh",
+          "ai-gateway.upstream",
+          "ai-gateway.stream",
+          "ai-gateway.route.release",
+        ]);
+        const requestSpan = spans[0];
+        const upstreamSpan = spans.find(({ name }) =>
+          name === "ai-gateway.upstream"
+        );
+        assert.strictEqual(requestSpan?.traceId, "11111111111111111111111111111111");
+        assert.strictEqual(upstreamSpan?.traceId, requestSpan?.traceId);
+        assert.strictEqual(
+          upstreamSpan?.attributes.get("agentos.ai.provider.request_id"),
+          "req_safe_provider_1",
+        );
+        const streamSpan = spans.find(({ name }) =>
+          name === "ai-gateway.stream"
+        );
+        assert.strictEqual(
+          streamSpan?.attributes.get("agentos.ai.stream.chunks"),
+          2,
+          JSON.stringify(Object.fromEntries(streamSpan?.attributes ?? [])),
+        );
+
+        const metrics = yield* Metric.snapshot;
+        for (const name of [
+          "agentos.ai.operations",
+          "agentos.ai.provider.attempts",
+          "agentos.ai.route.events",
+          "agentos.ai.route.reservations.active",
+          "agentos.ai.quota.refreshes",
+          "agentos.ai.streams",
+          "agentos.ai.streams.active",
+          "agentos.ai.stream.chunks",
+          "agentos.ai.stream.bytes",
+        ]) {
+          assert.isDefined(metrics.find(({ id }) => id === name), name);
+        }
+        const active = metrics.filter(({ id }) =>
+          id === "agentos.ai.streams.active" ||
+          id === "agentos.ai.route.reservations.active"
+        );
+        assert.lengthOf(active, 2);
+        for (const metric of active) {
+          assert.strictEqual(
+            "count" in metric.state ? metric.state.count : undefined,
+            0,
+          );
+        }
+      })
+    ));
+
+  it.effect("contains tracer defects and leaves upstream headers untouched", () =>
     Effect.gen(function*() {
-      const events: Array<unknown> = [];
-      const legacy: GatewayTelemetry = {
-        enabled: true,
-        startRequest() {
-          return {
-            attemptId: "attempt-safe",
-            authenticate: (authenticated) => {
-              events.push(["authenticate", authenticated]);
-            },
-            routeStarted: () => {
-              events.push("route_started");
-            },
-            routeEnded: (outcome) => {
-              events.push(["route_ended", outcome]);
-            },
-            quotaObservation: (age, stale) => {
-              events.push(["quota", age, stale]);
-            },
-            upstreamStarted: (headers) => {
-              headers.set("x-client-request-id", "attempt-safe");
-              events.push("upstream_started");
-            },
-            upstreamHeaders: (status) => {
-              events.push(["upstream_headers", status]);
-            },
-            upstreamFailed: () => {
-              events.push("upstream_failed");
-            },
-            streamChunk: (bytes) => {
-              events.push(["chunk", bytes]);
-            },
-            routeReleaseStarted: () => {
-              events.push("release_started");
-            },
-            routeReleased: (error) => {
-              events.push(["released", error !== undefined]);
-            },
-            end: (outcome: GatewayRequestOutcome) => {
-              events.push(["end", outcome]);
-            },
-          };
+      const telemetry = yield* makeAIGatewayTelemetry();
+      const defective = Tracer.make({
+        span(options) {
+          const revoked = Proxy.revocable<Tracer.Span>(
+            new Tracer.NativeSpan(options),
+            {},
+          );
+          revoked.revoke();
+          return revoked.proxy;
         },
-      };
-      const telemetry = makeLegacyAIGatewayTelemetry(legacy);
+      });
       const request = yield* telemetry.start(
         new Request("http://ai-gateway.test/v1/responses"),
-      );
+      ).pipe(Effect.withTracer(defective));
       const headers = new Headers();
-      yield* request.authenticate(true);
-      yield* request.routeStarted;
-      yield* request.routeEnded("acquired");
-      yield* request.quotaObservation(2, false);
-      yield* request.upstreamStarted(headers);
-      yield* request.upstreamHeaders(200, new Headers());
-      yield* request.streamChunk(11);
-      yield* request.routeReleaseStarted;
-      yield* request.routeReleased;
-      yield* request.end({ status: 200, streamOutcome: "completed" });
-      assert.strictEqual(request.attemptId, "attempt-safe");
-      assert.strictEqual(headers.get("x-client-request-id"), "attempt-safe");
-      assert.deepStrictEqual(events, [
-        ["authenticate", true],
-        "route_started",
-        ["route_ended", "acquired"],
-        ["quota", 2, false],
-        "upstream_started",
-        ["upstream_headers", 200],
-        ["chunk", 11],
-        "release_started",
-        ["released", false],
-        ["end", { status: 200, streamOutcome: "completed" }],
-      ]);
-    }));
-
-  it.effect("contains telemetry defects and provides an inert no-op service", () =>
-    Effect.gen(function*() {
-      const noopLegacy = createNoopGatewayTelemetry();
-      const revoked = Proxy.revocable(noopLegacy.startRequest, {});
-      revoked.revoke();
-      const defective = makeLegacyAIGatewayTelemetry({
-        enabled: true,
-        startRequest: revoked.proxy,
-      });
-      const request = yield* defective.start(
-        new Request("http://ai-gateway.test/v1/responses"),
-      );
-      yield* request.authenticate(false, undefined, 401);
+      yield* request.upstreamStarted(headers).pipe(Effect.withTracer(defective));
       yield* request.end({
         error: new Error("private provider payload"),
         streamOutcome: "upstream_error",
-      });
-      const noop = yield* AIGatewayTelemetry.pipe(
-        Effect.provideService(AIGatewayTelemetry, noopAIGatewayTelemetry),
-      );
-      const noopRequest = yield* noop.start(
+      }).pipe(Effect.withTracer(defective));
+      assert.deepStrictEqual([...headers], []);
+
+      const noop = yield* noopAIGatewayTelemetry.start(
         new Request("http://ai-gateway.test/v1/responses"),
       );
-      yield* noopRequest.end({ streamOutcome: "not_streamed" });
-      assert.strictEqual(noopRequest.attemptId, "");
-    }));
+      yield* noop.end({ streamOutcome: "not_streamed" });
+    }).pipe(Effect.provide(BunCryptoLayer)));
 });

@@ -598,6 +598,7 @@ agentos.ai.operation
     └── ai-gateway.request                         # Gateway route only
         ├── ai-gateway.authenticate
         ├── ai-gateway.route.acquire
+        ├── ai-gateway.quota.refresh
         ├── ai-gateway.upstream
         │   └── ai-gateway.stream
         └── ai-gateway.route.release
@@ -661,7 +662,7 @@ Contract metrics are monotonic counters unless noted:
 
 | Metric                                  | Unit/type                  | Allowed labels                                                        |
 | --------------------------------------- | -------------------------- | --------------------------------------------------------------------- |
-| `agentos.ai.operations`                 | `{operation}` counter      | runtime, route, status class, error class                             |
+| `agentos.ai.operations`                 | `{operation}` counter      | runtime, route, request kind, model family, status class, error class |
 | `agentos.ai.provider.attempts`          | `{attempt}` counter        | runtime, route, request kind, compaction path, model family, status class, error class |
 | `agentos.ai.operation.duration`         | `s` histogram              | runtime, route, status class                                          |
 | `agentos.ai.provider.duration`          | `s` histogram              | runtime, route, request kind, compaction path, status class           |
@@ -671,8 +672,12 @@ Contract metrics are monotonic counters unless noted:
 | `agentos.ai.streams.active`             | `{stream}` up/down counter | route                                                                 |
 | `agentos.ai.stream.chunks`              | `{chunk}` counter          | route, stream outcome                                                 |
 | `agentos.ai.stream.bytes`               | `By` counter               | route, stream outcome                                                 |
+| `agentos.ai.streams`                    | `{stream}` counter         | route, stream outcome                                                 |
 | `agentos.ai.route.acquire.duration`     | `s` histogram              | route, status class                                                   |
+| `agentos.ai.route.events`               | `{event}` counter          | route, route operation, status class, error class                     |
+| `agentos.ai.route.reservations.active`  | `{reservation}` up/down counter | route                                                             |
 | `agentos.ai.quota.observation.age`      | `s` histogram              | route, stale boolean                                                  |
+| `agentos.ai.quota.refreshes`            | `{refresh}` counter        | route, quota outcome, error class                                     |
 
 Duration histograms use seconds with boundaries `0.005`, `0.01`, `0.025`,
 `0.05`, `0.1`, `0.25`, `0.5`, `1`, `2.5`, `5`, `10`, `30`, `60`, `120` and

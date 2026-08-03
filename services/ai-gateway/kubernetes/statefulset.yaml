@@ -108,9 +108,9 @@ spec:
               value: otlp
             - name: OTEL_SDK_DISABLED
               value: "false"
-            - name: OTEL_BSP_MAX_QUEUE_SIZE
-              value: "2048"
             - name: OTEL_BSP_MAX_EXPORT_BATCH_SIZE
+              value: "512"
+            - name: OTEL_BLRP_MAX_EXPORT_BATCH_SIZE
               value: "512"
             - name: MISE_DATA_DIR
               value: /opt/mise

@@ -65,10 +65,16 @@ provider-request ID.
 - Stream lifetime from `agentos.ai.stream.duration`, split by route and stream
   outcome.
 - Current streams from `agentos.ai.streams.active`.
-- Completed workload volume from `agentos.ai.stream.chunks` and
-  `agentos.ai.stream.bytes`, split by route and stream outcome.
+- Completed stream rate from `agentos.ai.streams`; completed workload volume
+  from `agentos.ai.stream.chunks` and `agentos.ai.stream.bytes`, split by route
+  and stream outcome.
+- Route lifecycle rate from `agentos.ai.route.events`, grouped by the bounded
+  route operation and outcome labels. Compare it with current reservations from
+  `agentos.ai.route.reservations.active` to detect leaked leases.
 - Quota freshness from `agentos.ai.quota.observation.age`, split only by the
   bounded `agentos.ai.quota.stale` boolean.
+- Quota refresh outcomes from `agentos.ai.quota.refreshes`, grouped only by the
+  bounded quota outcome and error class.
 
 ## Correlated traces and logs
 

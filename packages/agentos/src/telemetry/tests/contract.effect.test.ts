@@ -5,6 +5,8 @@ import {
   AGENTOS_AI_ERROR_CLASSES,
   AGENTOS_AI_METRICS,
   AGENTOS_AI_REQUEST_KINDS,
+  AGENTOS_AI_QUOTA_OUTCOMES,
+  AGENTOS_AI_ROUTE_OPERATIONS,
   AGENTOS_AI_ROUTES,
   AGENTOS_AI_RUNTIMES,
   AGENTOS_AI_STATUS_CLASSES,
@@ -36,6 +38,18 @@ describe("AgentOS Fleet telemetry contract v1", () => {
     expect(AGENTOS_AI_TELEMETRY_CONTRACT_VERSION).toBe(1);
     expect(AGENTOS_AI_RUNTIMES).toEqual(["pi", "codex"]);
     expect(AGENTOS_AI_ROUTES).toEqual(["direct", "ai_gateway"]);
+    expect(AGENTOS_AI_ROUTE_OPERATIONS).toEqual([
+      "acquire",
+      "reserve",
+      "block",
+      "release",
+    ]);
+    expect(AGENTOS_AI_QUOTA_OUTCOMES).toEqual([
+      "cache_hit",
+      "fresh",
+      "stale",
+      "failed",
+    ]);
     expect(AGENTOS_AI_REQUEST_KINDS).toEqual([
       "main",
       "compaction",
@@ -87,6 +101,26 @@ describe("AgentOS Fleet telemetry contract v1", () => {
     expect(classifyAIError({ code: "ECONNRESET" })).toBe("transport");
     expect(classifyAIError({ code: "HPE_INVALID_HEADER_TOKEN" })).toBe("protocol");
     expect(classifyAIError({ code: "Z_DATA_ERROR" })).toBe("decode");
+    expect(classifyAIError({ code: "provider_unavailable" })).toBe(
+      "transport",
+    );
+    expect(classifyAIError({ code: "provider_stream_failed" })).toBe(
+      "transport",
+    );
+    expect(classifyAIError({ code: "provider_timeout" })).toBe("timeout");
+    expect(classifyAIError({ code: "provider_transport_failed" })).toBe(
+      "transport",
+    );
+    expect(classifyAIError({ code: "provider_protocol_failed" })).toBe(
+      "protocol",
+    );
+    expect(classifyAIError({ code: "provider_decode_failed" })).toBe(
+      "decode",
+    );
+    expect(classifyAIError({ code: "request_invalid" })).toBe("protocol");
+    expect(classifyAIError({ code: "invalid_configuration" })).toBe(
+      "protocol",
+    );
     expect(
       classifyAIError(
         Object.defineProperty({}, "name", {
@@ -242,6 +276,7 @@ describe("AgentOS Fleet telemetry contract v1", () => {
         accessProviderAdapter: "agentos.access.provider_adapter",
         aiGatewayAuthenticate: "ai-gateway.authenticate",
         aiGatewayRequest: "ai-gateway.request",
+        aiGatewayQuotaRefresh: "ai-gateway.quota.refresh",
         aiGatewayRouteAcquire: "ai-gateway.route.acquire",
         aiGatewayRouteRelease: "ai-gateway.route.release",
         aiGatewayStream: "ai-gateway.stream",
@@ -378,6 +413,8 @@ describe("AgentOS Fleet telemetry contract v1", () => {
           labels: [
             "agentos.ai.runtime",
             "agentos.ai.route",
+            "agentos.ai.request.kind",
+            "agentos.ai.model.family",
             "agentos.ai.status_class",
             "agentos.ai.error.class",
           ],
@@ -407,6 +444,69 @@ describe("AgentOS Fleet telemetry contract v1", () => {
           AGENTOS_AI_METRICS.providerAttempts
         ]?.labels ?? [],
         "agentos.ai.compaction.path",
+      );
+      assert.deepStrictEqual(
+        AGENTOS_TELEMETRY_METRIC_DEFINITIONS[
+          AGENTOS_AI_METRICS.routeEvents
+        ],
+        {
+          name: "agentos.ai.route.events",
+          owner: "ai",
+          instrument: "counter",
+          unit: "{event}",
+          labels: [
+            "agentos.ai.route",
+            "agentos.ai.route.operation",
+            "agentos.ai.status_class",
+            "agentos.ai.error.class",
+          ],
+          histogramBoundaries: [],
+          valueSemantics: "completed_route_lifecycle_events",
+        },
+      );
+      assert.deepStrictEqual(
+        AGENTOS_TELEMETRY_METRIC_DEFINITIONS[
+          AGENTOS_AI_METRICS.activeReservations
+        ],
+        {
+          name: "agentos.ai.route.reservations.active",
+          owner: "ai",
+          instrument: "up_down_counter",
+          unit: "{reservation}",
+          labels: ["agentos.ai.route"],
+          histogramBoundaries: [],
+          valueSemantics: "currently_active_route_reservations",
+        },
+      );
+      assert.deepStrictEqual(
+        AGENTOS_TELEMETRY_METRIC_DEFINITIONS[
+          AGENTOS_AI_METRICS.quotaRefreshes
+        ],
+        {
+          name: "agentos.ai.quota.refreshes",
+          owner: "ai",
+          instrument: "counter",
+          unit: "{refresh}",
+          labels: [
+            "agentos.ai.route",
+            "agentos.ai.quota.outcome",
+            "agentos.ai.error.class",
+          ],
+          histogramBoundaries: [],
+          valueSemantics: "completed_quota_refresh_attempts",
+        },
+      );
+      assert.deepStrictEqual(
+        AGENTOS_TELEMETRY_METRIC_DEFINITIONS[AGENTOS_AI_METRICS.streams],
+        {
+          name: "agentos.ai.streams",
+          owner: "ai",
+          instrument: "counter",
+          unit: "{stream}",
+          labels: ["agentos.ai.route", "agentos.ai.stream.outcome"],
+          histogramBoundaries: [],
+          valueSemantics: "completed_streams",
+        },
       );
     }));
 
@@ -479,6 +579,7 @@ describe("AgentOS Fleet telemetry contract v1", () => {
         safeMetricAttributes(AGENTOS_AI_METRICS.operations, input),
         {
           "agentos.ai.error.class": "none",
+          "agentos.ai.request.kind": "main",
           "agentos.ai.route": "ai_gateway",
           "agentos.ai.runtime": "pi",
           "agentos.ai.status_class": "success",
