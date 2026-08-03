@@ -36,6 +36,15 @@ never mounted into Agent or Agentgateway Pods. Agentgateway Pods carry
 the AI Gateway NetworkPolicy. Agents instead authenticate to Agentgateway with
 the kubelet-rotated projected identity already mounted by the workload base.
 
+The Gateway projects its own 10-minute
+`agentos-provider-budget-settlement` token and carries the exact
+`agentos.akua.dev/credential-domain: openai-responses` Pod label admitted by
+the authorizer's ingress-only NetworkPolicy. The label grants network reach,
+not settlement authority: the authorizer still derives the provider domain
+from TokenReview, the live Pod and ServiceAccount UIDs, and its closed
+ServiceAccount registry. No egress NetworkPolicy is added, so direct ordinary
+Internet remains available.
+
 The topology does not enable an OpenAI API-key fallback. Add `OPENAI_API_KEY` from a
 separate Secret and `AI_GATEWAY_ALLOW_API_KEY_FALLBACK=true` only after the
 Captain explicitly selects that fallback. Do not add an Ingress. Login and

@@ -41,6 +41,9 @@ const StatefulSetSpec = Schema.Struct({
   persistentVolumeClaimRetentionPolicy: Schema.Unknown,
   volumeClaimTemplates: Schema.Unknown,
   template: Schema.Struct({
+    metadata: Schema.Struct({
+      labels: Schema.Record(Schema.String, Schema.String),
+    }),
     spec: Schema.Struct({
       automountServiceAccountToken: Schema.Boolean,
       securityContext: Schema.Unknown,
@@ -160,6 +163,12 @@ describe("optional Fleet AI Gateway", () => {
       }]);
 
       const pod = spec.template.spec;
+      assert.strictEqual(
+        spec.template.metadata.labels[
+          "agentos.akua.dev/credential-domain"
+        ],
+        "openai-responses",
+      );
       assert.strictEqual(pod.automountServiceAccountToken, false);
       assert.deepStrictEqual(pod.securityContext, {
         fsGroup: 1000,

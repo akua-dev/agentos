@@ -100,6 +100,10 @@ describe("egress authorizer Kubernetes boundary", () => {
       assert.include(rendered, '"resources":["pods","serviceaccounts"]');
       assert.include(rendered, '"verbs":["get"]');
       assert.include(rendered, '"policyTypes":["Ingress"]');
+      assert.include(
+        rendered,
+        '"key":"agentos.akua.dev/credential-domain","operator":"Exists"',
+      );
       assert.notInclude(rendered, '"policyTypes":["Ingress","Egress"]');
       assert.notInclude(rendered, '"egress":');
       assert.include(rendered, '"port":9001');

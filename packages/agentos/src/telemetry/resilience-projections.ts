@@ -75,6 +75,7 @@ const ReadinessReasonCodeSchema = Schema.Literals([
   "brief_digest_invalid",
   "brief_digest_mismatch",
   "brief_missing",
+  "budget_settlement_unavailable",
   "coordination_catchup_incomplete",
   "coordination_listener_missing",
   "crewmate_confirmation_invalid",
