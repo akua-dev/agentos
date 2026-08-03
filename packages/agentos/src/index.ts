@@ -1,4 +1,11 @@
 export {
+  compileProviderAccessRolloutVerdict,
+  ProviderAccessRolloutDecodeError,
+  ProviderAccessRolloutInputV1Schema,
+  type ProviderAccessRolloutInputV1,
+  type ProviderAccessRolloutVerdictV1,
+} from "./access/operations.ts";
+export {
   ACCESS_HOT_RELOAD_SLO_MILLIS,
   ACCESS_MINIMUM_LOAD_ATTEMPTS,
   ACCESS_RESILIENCE_REGRESSION_SOURCES,

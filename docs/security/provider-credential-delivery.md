@@ -99,6 +99,11 @@ Use the managed Secret procedure released in #80: create on absence, replace onl
 
 Cloud workload identity uses its provider-session expiry rather than a Kubernetes Secret resource version. The delivery plan emits no Secret mount and requires session refresh before its bounded expiry. Recovery rebinds the previous reviewed workload identity; it never introduces a root credential Secret into a Mate namespace.
 
+Install, upgrade, cross-authority acknowledgement, rollback, backup/restore,
+adapter-compromise containment, surgical kill switch, and direct-provider
+break glass are defined in the
+[provider-access operations runbook](../runbooks/provider-access-plane.md).
+
 ## Data minimization
 
 The public plan, decision, route-state, failure, and receipt Schemas contain references and finite outcomes only. They deliberately exclude provider tokens, authorization values, client secrets, refresh tokens, private keys, credential payloads, upstream bodies, arbitrary error messages, and arbitrary metadata. Unknown fields fail decoding. These same closed shapes are the only permitted journal, event, log, trace, and persisted-configuration representation for the credential-delivery control plane.

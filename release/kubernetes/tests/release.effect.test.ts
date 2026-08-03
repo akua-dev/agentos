@@ -197,6 +197,17 @@ describe("First Mate release artifacts", () => {
             namespace: "agentos",
           },
           spec: {
+            backup: {
+              target: "prefer-standby",
+              volumeSnapshot: {
+                online: true,
+                onlineConfiguration: {
+                  immediateCheckpoint: false,
+                  waitForArchive: false,
+                },
+                snapshotOwnerReference: "backup",
+              },
+            },
             bootstrap: {
               initdb: {
                 dataChecksums: true,
@@ -205,8 +216,17 @@ describe("First Mate release artifacts", () => {
               },
             },
             enableSuperuserAccess: false,
-            instances: 1,
+            instances: 3,
+            monitoring: { enablePodMonitor: false },
+            postgresql: {
+              parameters: {
+                max_connections: "200",
+                shared_buffers: "256MB",
+              },
+            },
+            primaryUpdateStrategy: "unsupervised",
             storage: { size: "20Gi" },
+            walStorage: { size: "5Gi" },
           },
         },
       ] satisfies ReadonlyArray<Resource>);

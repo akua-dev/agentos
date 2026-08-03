@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/part-of: agentos
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -28,6 +29,13 @@ spec:
       automountServiceAccountToken: false
       serviceAccountName: github-broker
       terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: github-broker
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

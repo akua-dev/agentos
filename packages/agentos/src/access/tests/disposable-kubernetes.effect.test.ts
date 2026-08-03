@@ -85,6 +85,13 @@ layer(platform)("disposable access-plane Kubernetes boundary", (it) => {
       assert.strictEqual(evidence.projectedTokensRotated, true);
       assert.strictEqual(evidence.unrelatedSubjectAllowed, true);
       assert.strictEqual(evidence.ordinaryInternetAllowed, true);
+      assert.strictEqual(evidence.rollingUpgradeObserved, true);
+      assert.strictEqual(evidence.failedRevisionWithheld, true);
+      assert.strictEqual(evidence.rollingRollbackObserved, true);
+      assert.strictEqual(
+        evidence.unrelatedWorkloadAvailableDuringRollback,
+        true,
+      );
       assert.isAtMost(evidence.revocationMillis, 60_000);
       assert.isAtMost(evidence.hotReloadMillis, 15_000);
       assert.isAtLeast(evidence.loadAttempts, 16);

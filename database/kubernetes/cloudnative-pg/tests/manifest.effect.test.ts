@@ -22,14 +22,31 @@ const Cluster = Schema.Struct({
     }),
     enableSuperuserAccess: Schema.Boolean,
     instances: Schema.Number,
+    primaryUpdateStrategy: Schema.String,
     storage: Schema.Struct({ size: Schema.String }),
+    walStorage: Schema.Struct({ size: Schema.String }),
+    postgresql: Schema.Struct({
+      parameters: Schema.Record(Schema.String, Schema.String),
+    }),
+    monitoring: Schema.Struct({ enablePodMonitor: Schema.Boolean }),
+    backup: Schema.Struct({
+      target: Schema.String,
+      volumeSnapshot: Schema.Struct({
+        online: Schema.Boolean,
+        snapshotOwnerReference: Schema.String,
+        onlineConfiguration: Schema.Struct({
+          immediateCheckpoint: Schema.Boolean,
+          waitForArchive: Schema.Boolean,
+        }),
+      }),
+    }),
   }),
 });
 const Clusters = Schema.Array(Cluster);
 const databaseDirectory = fileURLToPath(new URL("..", import.meta.url));
 
 describe("AgentOS self-hosted PostgreSQL", () => {
-  it.effect("renders one minimal CloudNativePG fleet database", () =>
+  it.effect("renders one highly available, snapshot-backed CloudNativePG fleet database", () =>
     Effect.gen(function*() {
       const resources = yield* renderKustomize(databaseDirectory).pipe(
         Effect.flatMap(Schema.decodeUnknownEffect(Clusters)),
@@ -59,8 +76,28 @@ describe("AgentOS self-hosted PostgreSQL", () => {
           },
         },
         enableSuperuserAccess: false,
-        instances: 1,
+        instances: 3,
+        primaryUpdateStrategy: "unsupervised",
         storage: { size: "20Gi" },
+        walStorage: { size: "5Gi" },
+        postgresql: {
+          parameters: {
+            max_connections: "200",
+            shared_buffers: "256MB",
+          },
+        },
+        monitoring: { enablePodMonitor: false },
+        backup: {
+          target: "prefer-standby",
+          volumeSnapshot: {
+            online: true,
+            snapshotOwnerReference: "backup",
+            onlineConfiguration: {
+              immediateCheckpoint: false,
+              waitForArchive: false,
+            },
+          },
+        },
       });
     }).pipe(Effect.provide(BunServices.layer)));
 });
