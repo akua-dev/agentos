@@ -37,7 +37,7 @@ const workspaceBinTargets = [
   'services/ai-gateway/src/main.ts',
   'services/egress-authz/src/main.ts',
   'services/github-broker/src/main.ts',
-] as const;
+];
 
 const readGitIndexModes = Effect.fn('test.website.readGitIndexModes')(
   function*(repositoryRoot: string, targets: ReadonlyArray<string>) {
@@ -66,9 +66,9 @@ const readGitIndexModes = Effect.fn('test.website.readGitIndexModes')(
             .trim()
             .split('\n')
             .filter((line) => line.length > 0)
-            .map((line) => {
+            .map<[string | undefined, string | undefined]>((line) => {
               const [metadata, path] = line.split('\t');
-              return [path, metadata?.split(' ')[0]] as const;
+              return [path, metadata?.split(' ')[0]];
             }),
         );
       }),
