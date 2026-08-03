@@ -113,6 +113,22 @@ layer(BunServices.layer)("published database migrations", (it) => {
           Schema.fromJsonString(JournalSchema),
         )),
       );
+      const migrationTags = (yield* fileSystem.readDirectory(
+        paths.join(databaseRoot, "migrations"),
+      )).filter((name) => name.endsWith(".sql"))
+        .map((name) => name.slice(0, -".sql".length))
+        .sort();
+
+      assert.deepStrictEqual(
+        journal.entries.map((entry) => entry.tag),
+        migrationTags,
+        "every SQL migration must appear in the ordered journal exactly once",
+      );
+      assert.deepStrictEqual(
+        journal.entries.map((entry) => entry.idx),
+        journal.entries.map((_, index) => index),
+        "migration journal indices must remain contiguous",
+      );
 
       assert.deepStrictEqual(
         journal.entries.slice(0, publishedMigrations.length).map((entry) => ({

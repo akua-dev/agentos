@@ -325,3 +325,24 @@ parameters, PostgreSQL errors and credentials never enter the domain failure.
 `tests/egress-authorizer-reads.effect.test.ts` proves the real role boundary,
 including removal of deliberately broad grants, exact reads and denial to an
 unrelated login.
+
+`0024_runtime_operation_workload_provenance.sql` binds compiler-originated
+runtime custody to all three reviewed identities: typed spec version/digest,
+generated-overlay digest, and rendered-resource digest. Workload callers use
+`begin_workload_runtime_operation` and
+`supersede_workload_runtime_operation`; an exact retry must match every digest,
+so a changed typed spec cannot masquerade as the same operation merely because
+it happens to render the same Kubernetes resources. Generic non-workload
+operations retain the `0017` Functions and null workload provenance.
+
+The workload provenance is all-or-none, immutable after its initial prepared
+bind, and contains no spec, overlay, YAML, Secret, status, log, or session
+content. Existing generic operations remain valid across the forward
+migration. First and Second Mates receive the hierarchy-checked workload
+Functions; Crewmates retain read-only Fleet visibility and cannot bind or
+directly update provenance. The workload recovery suites exercise exact and
+conflicting retries, exact supersession, forward upgrade, phase repair, stable
+Agent/Task/Assignment identities, and retained-resource custody. The published
+history suite also requires every ordered SQL file to occur exactly once at a
+contiguous journal index, preventing an executable migration from silently
+falling outside the journal.

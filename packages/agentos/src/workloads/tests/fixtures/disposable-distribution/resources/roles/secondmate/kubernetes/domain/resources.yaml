@@ -1,0 +1,242 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agentos-secondmate-domain
+  labels:
+    agentos.akua.dev/fleet: default
+    agentos.akua.dev/owner-agent-id: 00000000-0000-4000-8000-000000000002
+    agentos.akua.dev/crewmate-admission: v1
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: agentos-domain-workload-limits
+spec:
+  limits:
+    - type: Container
+      min:
+        cpu: 25m
+        memory: 64Mi
+      max:
+        cpu: "2"
+        memory: 2Gi
+      defaultRequest:
+        cpu: 25m
+        memory: 64Mi
+      default:
+        cpu: 250m
+        memory: 128Mi
+    - type: PersistentVolumeClaim
+      min:
+        storage: 1Gi
+      max:
+        storage: 4Gi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: agentos-domain-capacity
+spec:
+  hard:
+    requests.cpu: "2"
+    limits.cpu: "4"
+    requests.memory: 2Gi
+    limits.memory: 4Gi
+    requests.storage: 8Gi
+    persistentvolumeclaims: "4"
+    count/statefulsets.apps: "4"
+    services: "8"
+    count/serviceaccounts: "8"
+    secrets: "8"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agentos-domain-ingress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - {}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agentos-firstmate-domain-supervisor
+rules:
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "patch", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "persistentvolumeclaims", "services", "serviceaccounts", "secrets"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agentos-firstmate-domain-supervisor-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: agentos-firstmate-domain-supervisor
+subjects:
+  - kind: ServiceAccount
+    name: agentos-firstmate
+    namespace: agentos
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agentos-secondmate-workload-manager
+rules:
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agentos-secondmate-workload-manager-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: agentos-secondmate-workload-manager
+subjects:
+  - kind: ServiceAccount
+    name: agentos-secondmate
+    namespace: agentos-secondmate-domain
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agentos-secondmate
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentos-secondmate
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: agentos-secondmate
+  ports:
+    - name: herdr
+      port: 3000
+      targetPort: herdr
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: agentos-secondmate
+spec:
+  replicas: 1
+  serviceName: agentos-secondmate
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agentos-secondmate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agentos-secondmate
+    spec:
+      automountServiceAccountToken: true
+      serviceAccountName: agentos-secondmate
+      terminationGracePeriodSeconds: 1
+      securityContext:
+        fsGroup: 65535
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 65535
+        runAsNonRoot: true
+        runAsUser: 65535
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: install-tools
+          image: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+          command: ["sh", "-c", "exit 0"]
+          securityContext: &container-security
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          resources: &small-resources
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+        - name: prepare-home
+          image: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+          command: ["sh", "-c", "exit 0"]
+          securityContext: *container-security
+          resources: *small-resources
+        - name: prepare-github-provider
+          image: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+          command: ["sh", "-c", "exit 0"]
+          securityContext: *container-security
+          resources: *small-resources
+      containers:
+        - name: agentos
+          image: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              printf '%s' "$3" > /home/agent/native-session
+              mkdir -p /home/agent/www
+              printf ready > /home/agent/www/ready
+              exec httpd -f -p 3000 -h /home/agent/www
+            - --
+          ports:
+            - name: herdr
+              containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: herdr
+            periodSeconds: 1
+            failureThreshold: 10
+          securityContext: *container-security
+          resources: *small-resources
+          volumeMounts:
+            - name: home
+              mountPath: /home/agent
+            - name: agentos-egress-identity
+              mountPath: /var/run/secrets/agentos-egress
+              readOnly: true
+      volumes:
+        - name: agentos-egress-identity
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  audience: agentos-egress-authz
+                  expirationSeconds: 600
+                  path: token
+  volumeClaimTemplates:
+    - metadata:
+        name: home
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi
