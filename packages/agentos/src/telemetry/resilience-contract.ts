@@ -1,103 +1,35 @@
 import { Effect, Schema } from "effect";
 
 import {
-  SecondMateTopologyActionV1Schema,
-  SecondMateTopologyReasonV1Schema,
+  SECOND_MATE_TOPOLOGY_ACTIONS,
+  SECOND_MATE_TOPOLOGY_REASONS,
 } from "../topology/second-mate.ts";
-import { ASSIGNMENT_EXECUTION_FAILURE_CLASSES } from "../supervision/retry-recovery.ts";
-import { AgentWorkloadProfileIdSchema } from "../workloads/profiles.ts";
+import { AGENT_WORKLOAD_PROFILE_IDS } from "../workloads/profiles.ts";
+import {
+  AGENTOS_RESILIENCE_CAUSES,
+  AGENTOS_RESILIENCE_EVIDENCE,
+  AGENTOS_RESILIENCE_FAILURE_CLASSES,
+  AGENTOS_RESILIENCE_JOURNAL_PHASES,
+  AGENTOS_RESILIENCE_OUTCOMES,
+  AGENTOS_RESILIENCE_PHASES,
+  AGENTOS_RESILIENCE_PROTOCOLS,
+  AGENTOS_RESILIENCE_RECOVERY_CLASSES,
+  AGENTOS_RESILIENCE_RUNTIME_ACTIONS,
+  AGENTOS_RESILIENCE_SOURCES,
+} from "./contract.ts";
 import type { AgentOSTelemetryAttributes } from "./privacy.ts";
 
 export const AGENTOS_RESILIENCE_TELEMETRY_CONTRACT_VERSION = 1;
 
-const values = <const Values extends ReadonlyArray<string>>(
-  ...entries: Values
-) => entries;
-
-export const RESILIENCE_SOURCES = values(
-  "topology_plan",
-  "workload_plan",
-  "runtime_journal",
-  "kubernetes",
-  "semantic_readiness",
-  "provider",
-  "postgresql_listener",
-  "native_session",
-  "acp",
-  "a2a",
-  "assignment",
-);
-
-export const RESILIENCE_PHASES = values(
-  "topology_decision",
-  "workload_plan",
-  "render",
-  "apply",
-  "capacity",
-  "placement",
-  "readiness",
-  "provider",
-  "listener",
-  "protocol",
-  "session",
-  "reconciliation",
-  "outcome",
-);
-
-export const RESILIENCE_CAUSES = values(
-  "none",
-  "invalid_workload_plan",
-  "conflicting_workload_plan",
-  "render_boundary",
-  "apply_boundary",
-  "capacity",
-  "placement",
-  "readiness",
-  "provider",
-  "listener",
-  "protocol_adapter",
-  "native_session",
-  "policy",
-  "reconciliation",
-  "retry_exhausted",
-);
-
-export const RESILIENCE_FAILURE_CLASSES =
-  ASSIGNMENT_EXECUTION_FAILURE_CLASSES;
-
-export const RESILIENCE_OUTCOMES = values(
-  "pending",
-  "succeeded",
-  "degraded",
-  "recovered",
-  "failed",
-  "blocked",
-  "unobserved",
-);
-
-export const RESILIENCE_RECOVERY_CLASSES = values(
-  "not_required",
-  "retry",
-  "awaiting_supervisor",
-  "repair_forward",
-  "native_session_resume",
-  "postgresql_listener_then_herdr_wake",
-  "reassigned",
-  "stopped",
-  "superseded",
-  "unobserved",
-);
-
-export const RUNTIME_OPERATION_JOURNAL_PHASES = values(
-  "prepared",
-  "applied",
-  "workload_ready",
-  "harness_ready",
-  "recovery_required",
-  "completed",
-  "failed",
-  "superseded",
-);
+export const RESILIENCE_SOURCES = AGENTOS_RESILIENCE_SOURCES;
+export const RESILIENCE_PHASES = AGENTOS_RESILIENCE_PHASES;
+export const RESILIENCE_CAUSES = AGENTOS_RESILIENCE_CAUSES;
+export const RESILIENCE_FAILURE_CLASSES = AGENTOS_RESILIENCE_FAILURE_CLASSES;
+export const RESILIENCE_OUTCOMES = AGENTOS_RESILIENCE_OUTCOMES;
+export const RESILIENCE_RECOVERY_CLASSES =
+  AGENTOS_RESILIENCE_RECOVERY_CLASSES;
+export const RUNTIME_OPERATION_JOURNAL_PHASES =
+  AGENTOS_RESILIENCE_JOURNAL_PHASES;
 
 const UuidSchema = Schema.String.pipe(
   Schema.check(
@@ -142,27 +74,24 @@ export const ResilienceObservationV1Schema = Schema.Struct({
   version: Schema.Literal(AGENTOS_RESILIENCE_TELEMETRY_CONTRACT_VERSION),
   source: Schema.Literals(RESILIENCE_SOURCES),
   phase: Schema.Literals(RESILIENCE_PHASES),
-  evidence: Schema.Literals(["observed", "unobserved"]),
+  evidence: Schema.Literals(AGENTOS_RESILIENCE_EVIDENCE),
   outcome: Schema.Literals(RESILIENCE_OUTCOMES),
   cause: Schema.Literals(RESILIENCE_CAUSES),
   failureClass: Schema.NullOr(Schema.Literals(RESILIENCE_FAILURE_CLASSES)),
   recovery: Schema.Literals(RESILIENCE_RECOVERY_CLASSES),
   attempt: BoundedAttemptSchema,
-  topologyAction: Schema.NullOr(SecondMateTopologyActionV1Schema),
-  topologyReason: Schema.NullOr(SecondMateTopologyReasonV1Schema),
-  runtimeAction: Schema.NullOr(Schema.Literals([
-    "provision",
-    "rollout",
-    "recover",
-    "teardown",
-  ])),
-  workloadProfile: Schema.NullOr(AgentWorkloadProfileIdSchema),
+  topologyAction: Schema.NullOr(Schema.Literals(SECOND_MATE_TOPOLOGY_ACTIONS)),
+  topologyReason: Schema.NullOr(Schema.Literals(SECOND_MATE_TOPOLOGY_REASONS)),
+  runtimeAction: Schema.NullOr(
+    Schema.Literals(AGENTOS_RESILIENCE_RUNTIME_ACTIONS),
+  ),
+  workloadProfile: Schema.NullOr(Schema.Literals(AGENT_WORKLOAD_PROFILE_IDS)),
   workloadSpecVersion: Schema.NullOr(VersionSchema),
   workloadSpecDigest: Schema.NullOr(DigestSchema),
   workloadOverlayDigest: Schema.NullOr(DigestSchema),
   renderedManifestDigest: Schema.NullOr(DigestSchema),
   journalPhase: Schema.NullOr(Schema.Literals(RUNTIME_OPERATION_JOURNAL_PHASES)),
-  protocol: Schema.NullOr(Schema.Literals(["acp", "a2a"])),
+  protocol: Schema.NullOr(Schema.Literals(AGENTOS_RESILIENCE_PROTOCOLS)),
   protected: ResilienceProtectedCorrelationV1Schema,
 });
 

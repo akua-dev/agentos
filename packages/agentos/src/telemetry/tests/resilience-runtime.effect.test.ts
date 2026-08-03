@@ -128,6 +128,9 @@ describe("delegation and recovery telemetry runtime", () => {
       expect(metricPayload).not.toContain(AgentId);
       expect(metricPayload).not.toContain(AssignmentId);
       expect(metricPayload).not.toContain(OperationId);
+      expect(metricPayload).not.toContain("agentos.resilience.runtime.action");
+      expect(metricPayload).not.toContain("agentos.resilience.attempt");
+      expect(metricPayload).not.toContain("agentos.resilience.journal.phase");
       expect((metricPayload.match(/agentos.resilience.operations/g) ?? [])).toHaveLength(1);
 
       yield* Effect.all([

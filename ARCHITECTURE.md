@@ -515,23 +515,38 @@ implicit property of using the Worker.
 Claude, Gemini, WebSockets, multi-replica authority, public ingress and
 general-purpose egress proxy behavior remain outside the first contract.
 
-## AI telemetry contract v1
+## Fleet telemetry, privacy and cardinality contract v1
 
-AgentOS AI telemetry is a diagnostic control plane, never a second inference
-data plane. Pi, Codex and the optional Fleet AI Gateway export asynchronously
-to one Fleet-local OpenTelemetry Collector Service. Collector or remote-export
-failure never blocks a provider request and never participates in Agent or
-Gateway readiness. The Collector remains a separate single-replica StatefulSet
-with its own retained PVC so inference credentials, routing state and telemetry
+AgentOS telemetry is a diagnostic control plane, never a second workload,
+coordination, memory, access or inference data plane. The runtime, Pi, Codex,
+memory, access services, protocol adapters, topology controller, readiness and
+recovery paths, optional Fleet AI Gateway and Collector pipeline all consume
+one contract. They export asynchronously to one Fleet-local OpenTelemetry
+Collector Service. Collector or remote-export failure never blocks a provider
+request or Fleet control operation and never participates in Agent or Gateway
+readiness. The Collector remains a separate single-replica StatefulSet with its
+own retained PVC so credentials, routing state, Agent state and telemetry
 storage do not share a process or volume.
 
-Contract version `1` owns the only AgentOS-specific AI telemetry vocabulary.
-Instrumentation imports its executable definitions from
+Contract version `1` owns the only AgentOS-specific telemetry vocabulary across
+the `runtime`, `ai`, `compaction`, `memory`, `access`, `protocol`, `topology`,
+`readiness`, `recovery` and `telemetry_pipeline` domains. Instrumentation
+imports its executable definitions from
 `packages/agentos/src/telemetry/contract.ts`; components do not invent local
-attribute or metric names. Additive bounded values may extend version 1 only
-after privacy, cardinality, Collector and dashboard review. Renaming a field,
-changing its meaning or broadening a bounded value into arbitrary input
-requires a new contract version and an explicit dashboard migration.
+resource attributes, span names, attribute names or metric names. Each
+attribute definition declares its owner, source, signals, sensitivity,
+cardinality and executable value rule. Each metric declares its owner,
+instrument, UCUM unit, exact allowed labels, histogram boundaries and value
+semantics. `agentos.ai.cost` is explicitly modeled catalog cost in `{USD}`, not
+invoice truth.
+
+Additive bounded values may extend version 1 only after the owning domain,
+privacy, cardinality, Collector and dashboard reviewers approve the same
+change. Renaming a field, changing its meaning, changing a metric unit or value
+semantics, or broadening a bounded value into arbitrary input requires a new
+contract version, dual-read migration where applicable and an explicit
+dashboard migration. A dashboard or alert may use only published contract
+fields; it cannot make a local telemetry vocabulary authoritative.
 
 Every resource carries the applicable standard OpenTelemetry identity:
 
@@ -577,49 +592,81 @@ before export.
 The canonical span trees are:
 
 ```text
-Pi direct
+Direct or Gateway AI
 agentos.ai.operation
-└── agentos.ai.provider.attempt {runtime=pi, route=direct, kind=main}
-
-Pi through Gateway
-agentos.ai.operation
-└── agentos.ai.provider.attempt {runtime=pi, route=ai_gateway, kind=main}
-    └── ai-gateway.request
+└── agentos.ai.provider.attempt {runtime, route, request kind}
+    └── ai-gateway.request                         # Gateway route only
+        ├── ai-gateway.authenticate
         ├── ai-gateway.route.acquire
         ├── ai-gateway.upstream
-        └── ai-gateway.stream
+        │   └── ai-gateway.stream
+        └── ai-gateway.route.release
 
 Codex through Gateway
 codex conversation/turn span
 └── Codex native API attempt
-    └── ai-gateway.request
-        ├── ai-gateway.route.acquire
-        ├── ai-gateway.upstream
-        └── ai-gateway.stream
+    └── ai-gateway.request ...
 
-Auxiliary work
-agentos.ai.operation
-├── agentos.ai.provider.attempt {kind=main}
-├── agentos.ai.provider.attempt {kind=compaction}
-└── agentos.ai.provider.attempt {kind=memory_extract|memory_consolidate}
+Native server compaction
+agentos.compaction.operation {path=native_server}
+└── agentos.ai.operation {request kind=compaction}
+    └── agentos.ai.provider.attempt
+
+Memory extraction, consolidation or retrieval
+agentos.memory.operation {operation, method, outcome}
+└── agentos.ai.operation {request kind=memory_extract|memory_consolidate}
+    └── agentos.ai.provider.attempt
+
+Authorized external access
+agentos.access.http | agentos.access.mcp            # Mate client boundary
+└── agentos.access.agentgateway                    # workload-identity boundary
+    ├── agentos.access.authorization
+    ├── agentos.access.provider_adapter
+    │   └── agentos.access.credential.release
+    ├── agentos.protocol.operation                 # MCP when applicable
+    └── agentos.access.provider                    # upstream client boundary
+
+First Mate topology and semantic readiness
+agentos.topology.decision {action, reason}
+└── agentos.resilience.operation
+    ├── agentos.resilience.topology_decision
+    ├── agentos.resilience.workload_plan
+    ├── agentos.resilience.render
+    ├── agentos.resilience.apply
+    └── agentos.readiness.check
+
+Repair-forward recovery
+agentos.resilience.operation
+├── agentos.resilience.reconciliation
+├── agentos.resilience.provider|listener|protocol|session
+└── agentos.resilience.outcome
 ```
 
 A retry or failover creates a new provider-attempt span and unique AgentOS
 attempt ID under the same operation trace. Stream chunks are aggregated, not
 spanned individually. Direct routes never manufacture a Gateway span.
-Auxiliary work is a child of the active operation when possible and otherwise
-uses a safe standalone operation or span link.
+Compaction and memory work is a child of the active operation when possible and
+otherwise uses a safe standalone operation or span link. Access spans record a
+bounded decision and protocol outcome but never the credential, request body,
+MCP arguments or response. They correlate authorization through an opaque
+decision reference and profile version; provider identity and provider
+resource identifiers remain forbidden even on protected signals. Topology and
+recovery spans correlate proposal, Agent, Assignment, Kubernetes object,
+protocol and native-session identifiers only in protected traces and logs;
+metrics receive only their explicitly declared bounded projection.
+Repair-forward creates new phase evidence under the same resilience operation
+instead of rewriting or erasing the failed attempt.
 
 Contract metrics are monotonic counters unless noted:
 
-| Metric                                  | Unit/type                  | Required labels                                                       |
+| Metric                                  | Unit/type                  | Allowed labels                                                        |
 | --------------------------------------- | -------------------------- | --------------------------------------------------------------------- |
 | `agentos.ai.operations`                 | `{operation}` counter      | runtime, route, status class, error class                             |
-| `agentos.ai.provider.attempts`          | `{attempt}` counter        | runtime, route, request kind, model family, status class, error class |
+| `agentos.ai.provider.attempts`          | `{attempt}` counter        | runtime, route, request kind, compaction path, model family, status class, error class |
 | `agentos.ai.operation.duration`         | `s` histogram              | runtime, route, status class                                          |
-| `agentos.ai.provider.duration`          | `s` histogram              | runtime, route, request kind, status class                            |
+| `agentos.ai.provider.duration`          | `s` histogram              | runtime, route, request kind, compaction path, status class           |
 | `agentos.ai.upstream.headers.duration`  | `s` histogram              | route, status class                                                   |
-| `agentos.ai.stream.first_byte.duration` | `s` histogram              | route, stream outcome                                                 |
+| `agentos.ai.stream.first_byte.duration` | `s` histogram              | route                                                                 |
 | `agentos.ai.stream.duration`            | `s` histogram              | route, stream outcome                                                 |
 | `agentos.ai.streams.active`             | `{stream}` up/down counter | route                                                                 |
 | `agentos.ai.stream.chunks`              | `{chunk}` counter          | route, stream outcome                                                 |
@@ -632,16 +679,81 @@ Duration histograms use seconds with boundaries `0.005`, `0.01`, `0.025`,
 `300`. Backend-derived dashboards may calculate provider calls per operation
 from trace structure; operation IDs are never copied into metric labels.
 
-The privacy boundary is an allowlist at both instrumentation and Collector
-layers. Telemetry never includes prompts, system prompts, transcripts, message
-content, request or response bodies, tool arguments or results, memory content,
-authorization values, cookies, API/OAuth keys, OTLP exporter headers,
-provider-account identity, arbitrary upstream error bodies or content-bearing
-stack traces. HTTP headers are never captured wholesale. Provider
+The remaining metric families are equally contractual:
+
+| Owner | Metric names | Units and purpose |
+| --- | --- | --- |
+| AI and budget | `agentos.ai.tokens`, `agentos.ai.cost`, `agentos.ai.budget.events` | `{token}`, `{USD}` and `{event}` counters for normalized usage, modeled catalog cost and bounded budget-state transitions |
+| memory | `agentos.memory.operations`, `agentos.memory.operation.duration`, `agentos.memory.candidates`, `agentos.memory.attachments`, `agentos.memory.attached.bytes`, `agentos.memory.index.age` | operation counters plus `s`, `{candidate}`, `{attachment}`, `By` and `s` histograms; query, topic and embedding values are never labels |
+| access | `agentos.access.decisions`, `agentos.access.decision.duration`, `agentos.access.revocation.duration`, `agentos.access.profile_reload.duration`, `agentos.access.credential.releases`, `agentos.access.protocol.operations` | decision/release/operation counters and `s` histograms scoped only by bounded operation, decision, reason, dependency, credential outcome and protocol dimensions |
+| protocol | `agentos.protocol.operations`, `agentos.protocol.operation.duration`, `agentos.protocol.fallbacks` | `{operation}` and `{fallback}` counters plus an `s` histogram for bounded HTTP, MCP, ACP and A2A outcomes |
+| topology, readiness and recovery | `agentos.topology.decisions`, `agentos.readiness.checks`, `agentos.resilience.observations`, `agentos.resilience.operations`, `agentos.resilience.operation.duration` | `{decision}`, `{check}`, `{observation}` and `{operation}` counters plus an `s` histogram; proposal, Agent, Assignment, Pod, PVC, session, protocol and digest identifiers are excluded |
+| Collector pipeline | `agentos.telemetry.pipeline.events`, `agentos.telemetry.queue.size`, `agentos.telemetry.export.duration`, `agentos.telemetry.dropped.batches` | `{event}` and `{batch}` counters, `{batch}` up/down counter and `s` histogram for bounded signal, stage, outcome and reason dimensions |
+
+The executable metric registry is the exact name-to-owner, instrument, UCUM
+unit, label and bucket table. Runtime helpers project attributes through that
+specific metric definition; passing a generally metric-safe attribute is not
+sufficient. Unknown metric names receive no AgentOS labels. Count histograms
+use the published count buckets, byte histograms use the published byte
+buckets, and all wall-time and age histograms use seconds.
+
+The executable event registry applies the same rule to structured logs and
+audit projections. It owns each event name, domain, signal, exact attribute set
+and value semantics. Version 1 includes bounded AI Gateway and compaction
+failures, memory degradation and forgetting, access decisions and credential
+release, protocol fallback, topology decisions, readiness transitions,
+resilience observations and telemetry-export failures. An unknown event
+receives no AgentOS attributes; an attribute that is safe for some log or audit
+is still rejected unless that exact event declares it.
+
+Signal ownership is explicit:
+
+- resources describe deployment-controlled service, Fleet, Kubernetes and
+  runtime identity; resource enrichment cannot add content-bearing fields;
+- spans describe causal work using only the published span tree and bounded
+  operational outcomes, with protected opaque correlation when needed;
+- metrics are aggregate operational evidence and accept only the exact labels
+  declared for that metric;
+- logs are registry-defined bounded state transitions or failures correlated
+  by trace and span ID; arbitrary messages, serialized errors and
+  console-shaped payloads are not telemetry contracts; and
+- audit records remain durable domain evidence in the authoritative
+  PostgreSQL/repository contract. An OTLP audit projection is diagnostic and
+  privacy-bounded; it never replaces the source record or grants authority.
+
+The privacy boundary is an allowlist at both instrumentation and Collector.
+After the defense-in-depth known-content denylist, the Collector keeps only the
+contract's resource keys, span keys, metric-label union or event-log keys in
+the corresponding OTTL context. Scope and span-event attributes are cleared,
+as are metric exemplar attributes. Arbitrary log bodies are cleared because
+structured event fields—not message text—are the log contract. A metrics-only
+Collector processor additionally deletes every contract field classified as
+restricted or unbounded, so a foreign or lagging instrument cannot turn a
+protected correlation value into a remote metric label. Instrumentation still
+enforces the stricter exact per-metric and per-event projection before export.
+Telemetry never includes prompts, system prompts,
+transcripts, message content, database query text, request or response bodies,
+tool arguments or results, memory queries, snippets, bodies or embeddings,
+Assignment briefs, inbox bodies, repository names, authorization values,
+cookies, API/OAuth keys, OTLP exporter headers, provider credentials or account
+identity, arbitrary upstream error bodies or content-bearing stack traces.
+HTTP headers are never captured wholesale. Provider
 `x-request-id` or `x-oai-request-id` may be copied only into a capped protected
 span/log field. A unique AgentOS attempt value may be sent as
 `x-client-request-id` where the provider contract supports it; long-lived
 Codex thread identity is kept separate.
+
+`public_operational` and `operational` attributes may be exported only on their
+declared signals. `restricted` or `unbounded` fields are permitted only for the
+declared protected correlation signals and are categorically excluded from
+metrics. Cardinality is assessed on possible distinct values, not string
+length: a capped UUID is still unbounded. Instrumentation tests seed every
+forbidden key, metric tests assert exact per-instrument labels, Collector config
+tests compare every overlay with the executable signal, event, metric,
+forbidden and protected catalogs. The live OTLP outage test proves that known
+forbidden fields, unknown safe-looking attributes, arbitrary log bodies and
+dynamic Mate identity do not reach the remote sink while bounded route,
+runtime and status attributes do.
 
 AgentOS extracts and injects W3C `traceparent` and `tracestate`. Baggage is
 disabled unless a reviewed key allowlist exists; arbitrary inbound baggage and
@@ -672,9 +784,13 @@ the otherwise default analytics metrics path.
 Collector persistent sending queues retain accepted batches only until remote
 delivery or bounded queue eviction. The optional local diagnostic archive is
 off by default, size/time rotated on the Collector PVC and never a supported
-query backend. The remote OTLP backend owns searchable retention and access
-control. Collector queue exhaustion or storage failure may drop telemetry but
-cannot consume the AI Gateway volume or change inference health.
+query backend. Authoritative audit events follow the retention and deletion
+policy of their owning PostgreSQL/repository domain; Collector queues,
+diagnostic rotation and remote-backend expiry cannot delete or replace that
+evidence. OTLP audit projections are diagnostic copies. The remote OTLP backend
+owns its own searchable retention and access control. Collector queue
+exhaustion or storage failure may drop telemetry but cannot consume the AI
+Gateway volume or change inference health.
 
 ## Health and recovery
 

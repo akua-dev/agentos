@@ -21,8 +21,12 @@ import {
   AGENTOS_AI_METRICS,
   AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
   AGENTOS_AI_TELEMETRY_CONTRACT_VERSION,
+  AGENTOS_TELEMETRY_EVENTS,
+  AGENTOS_TELEMETRY_SPANS,
   classifyAIError,
   classifyAIStatus,
+  safeEventAttributes,
+  safeMetricAttributes,
   safeTelemetryAttributes,
   type AgentOSAIModelFamily,
   type AgentOSAIRequestKind,
@@ -157,7 +161,7 @@ function startGatewayRequest(options: {
   let base = requestAttributes(options.request.headers, requestId);
   const requestStartedAt = options.clock();
   const requestSpan = options.tracer.startSpan(
-    "ai-gateway.request",
+    AGENTOS_TELEMETRY_SPANS.aiGatewayRequest,
     {
       kind: SpanKind.SERVER,
       attributes: safeTelemetryAttributes(base, "span"),
@@ -182,7 +186,10 @@ function startGatewayRequest(options: {
   let bytes = 0;
   let ended = false;
 
-  const metricBase = () => safeTelemetryAttributes(base, "metric");
+  const metricAttributes = (
+    metricName: string,
+    input: Readonly<Record<string, unknown>> = {},
+  ) => safeMetricAttributes(metricName, { ...base, ...input });
   const spanBase = () => safeTelemetryAttributes(base, "span");
 
   return {
@@ -201,7 +208,7 @@ function startGatewayRequest(options: {
           );
         }
         const span = options.tracer.startSpan(
-          "ai-gateway.authenticate",
+          AGENTOS_TELEMETRY_SPANS.aiGatewayAuthenticate,
           undefined,
           requestContext,
         );
@@ -221,7 +228,7 @@ function startGatewayRequest(options: {
         if (routeSpan) return;
         routeStartedAt = options.clock();
         routeSpan = options.tracer.startSpan(
-          "ai-gateway.route.acquire",
+          AGENTOS_TELEMETRY_SPANS.aiGatewayRouteAcquire,
           undefined,
           requestContext,
         );
@@ -236,7 +243,10 @@ function startGatewayRequest(options: {
         if (routeStartedAt !== undefined) {
           options.instruments.routeAcquisitionDuration.record(
             elapsed(routeStartedAt, options.clock()),
-            safeTelemetryAttributes({ ...base, ...attributes }, "metric"),
+            metricAttributes(
+              AGENTOS_AI_METRICS.routeAcquisitionDuration,
+              attributes,
+            ),
           );
         }
         routeSpan = undefined;
@@ -246,9 +256,9 @@ function startGatewayRequest(options: {
       safely(() => {
         options.instruments.quotaObservationAge.record(
           boundedQuotaObservationAge(ageSeconds),
-          safeTelemetryAttributes(
-            { ...base, "agentos.ai.quota.stale": stale },
-            "metric",
+          metricAttributes(
+            AGENTOS_AI_METRICS.quotaObservationAge,
+            { "agentos.ai.quota.stale": stale },
           ),
         );
       });
@@ -259,7 +269,7 @@ function startGatewayRequest(options: {
         attemptId = options.id();
         upstreamStartedAt = options.clock();
         upstreamSpan = options.tracer.startSpan(
-          "ai-gateway.upstream",
+          AGENTOS_TELEMETRY_SPANS.aiGatewayUpstream,
           {
             kind: SpanKind.CLIENT,
             attributes: safeTelemetryAttributes(
@@ -288,9 +298,9 @@ function startGatewayRequest(options: {
         if (upstreamStartedAt !== undefined) {
           options.instruments.upstreamHeadersDuration.record(
             elapsed(upstreamStartedAt, options.clock()),
-            safeTelemetryAttributes(
-              { ...base, ...outcomeAttributes(status) },
-              "metric",
+            metricAttributes(
+              AGENTOS_AI_METRICS.upstreamHeadersDuration,
+              outcomeAttributes(status),
             ),
           );
         }
@@ -332,7 +342,7 @@ function startGatewayRequest(options: {
           firstByteRecorded = true;
           options.instruments.firstByteDuration.record(
             elapsed(upstreamStartedAt, options.clock()),
-            metricBase(),
+            metricAttributes(AGENTOS_AI_METRICS.firstByteDuration),
           );
         }
         chunks = boundedAdd(chunks, 1);
@@ -343,7 +353,7 @@ function startGatewayRequest(options: {
       safely(() => {
         if (releaseSpan) return;
         releaseSpan = options.tracer.startSpan(
-          "ai-gateway.route.release",
+          AGENTOS_TELEMETRY_SPANS.aiGatewayRouteRelease,
           undefined,
           requestContext,
         );
@@ -385,19 +395,22 @@ function startGatewayRequest(options: {
           if (streamStartedAt !== undefined) {
             options.instruments.streamDuration.record(
               elapsed(streamStartedAt, options.clock()),
-              safeTelemetryAttributes({ ...base, ...final }, "metric"),
+              metricAttributes(AGENTOS_AI_METRICS.streamDuration, final),
             );
           }
           options.instruments.streamChunks.add(
             chunks,
-            safeTelemetryAttributes({ ...base, ...final }, "metric"),
+            metricAttributes(AGENTOS_AI_METRICS.streamChunks, final),
           );
           options.instruments.streamBytes.add(
             bytes,
-            safeTelemetryAttributes({ ...base, ...final }, "metric"),
+            metricAttributes(AGENTOS_AI_METRICS.streamBytes, final),
           );
           if (streamActive) {
-            options.instruments.activeStreams.add(-1, metricBase());
+            options.instruments.activeStreams.add(
+              -1,
+              metricAttributes(AGENTOS_AI_METRICS.activeStreams),
+            );
             streamActive = false;
           }
         }
@@ -415,26 +428,24 @@ function startGatewayRequest(options: {
             "span",
           );
           finishSpan(upstreamSpan, upstreamFinal);
-          const providerMetricAttributes = safeTelemetryAttributes(
-            { ...base, ...final },
-            "metric",
+          options.instruments.providerAttempts.add(
+            1,
+            metricAttributes(AGENTOS_AI_METRICS.providerAttempts, final),
           );
-          options.instruments.providerAttempts.add(1, providerMetricAttributes);
           if (upstreamStartedAt !== undefined) {
             options.instruments.providerDuration.record(
               elapsed(upstreamStartedAt, options.clock()),
-              providerMetricAttributes,
+              metricAttributes(AGENTOS_AI_METRICS.providerDuration, final),
             );
           }
         }
-        const operationMetricAttributes = safeTelemetryAttributes(
-          { ...base, ...final },
-          "metric",
+        options.instruments.operations.add(
+          1,
+          metricAttributes(AGENTOS_AI_METRICS.operations, final),
         );
-        options.instruments.operations.add(1, operationMetricAttributes);
         options.instruments.operationDuration.record(
           elapsed(requestStartedAt, options.clock()),
-          operationMetricAttributes,
+          metricAttributes(AGENTOS_AI_METRICS.operationDuration, final),
         );
         finishSpan(requestSpan, final);
         if (
@@ -462,11 +473,14 @@ function startGatewayRequest(options: {
     if (streamSpan) return;
     streamStartedAt = options.clock();
     streamSpan = options.tracer.startSpan(
-      "ai-gateway.stream",
+      AGENTOS_TELEMETRY_SPANS.aiGatewayStream,
       { attributes: spanBase() },
       upstreamContext ?? requestContext,
     );
-    options.instruments.activeStreams.add(1, metricBase());
+    options.instruments.activeStreams.add(
+      1,
+      metricAttributes(AGENTOS_AI_METRICS.activeStreams),
+    );
     streamActive = true;
   }
 }
@@ -662,18 +676,18 @@ function correlatedFailureRecord(input: {
   error?: unknown;
   streamOutcome: AgentOSAIStreamOutcome;
 }): Readonly<Record<string, string | number>> {
-  const safe = safeTelemetryAttributes(
+  const safe = safeEventAttributes(
+    AGENTOS_TELEMETRY_EVENTS.aiGatewayFailure,
     {
       ...input.base,
       ...outcomeAttributes(input.status, input.error),
       "agentos.ai.request.attempt_id": input.attemptId,
       "agentos.ai.stream.outcome": input.streamOutcome,
     },
-    "log",
   );
   const spanContext = input.span.spanContext();
   return {
-    event: "ai_gateway_failure",
+    event: AGENTOS_TELEMETRY_EVENTS.aiGatewayFailure,
     ...safe,
     trace_id: spanContext.traceId,
     span_id: spanContext.spanId,
