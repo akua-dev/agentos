@@ -651,7 +651,11 @@ otherwise uses a safe standalone operation or span link. Access spans record a
 bounded decision and protocol outcome but never the credential, request body,
 MCP arguments or response. They correlate authorization through an opaque
 decision reference and profile version; provider identity and provider
-resource identifiers remain forbidden even on protected signals. Topology and
+resource identifiers remain forbidden even on protected signals. Provider
+access route, adapter, provider and terminal outcome use finite contract enums;
+Mate, Assignment, decision and profile identifiers remain span-only and never
+become metric labels. A valid W3C `traceparent` joins the native AgentGateway,
+authorizer and provider-adapter spans without granting authority. Topology and
 recovery spans correlate proposal, Agent, Assignment, Kubernetes object,
 protocol and native-session identifiers only in protected traces and logs;
 metrics receive only their explicitly declared bounded projection.
@@ -690,7 +694,7 @@ The remaining metric families are equally contractual:
 | --- | --- | --- |
 | AI and budget | `agentos.ai.tokens`, `agentos.ai.cost`, `agentos.ai.budget.events` | `{token}`, `{USD}` and `{event}` counters for normalized usage, modeled catalog cost and bounded budget-state transitions |
 | memory | `agentos.memory.operations`, `agentos.memory.operation.duration`, `agentos.memory.candidates`, `agentos.memory.attachments`, `agentos.memory.attached.bytes`, `agentos.memory.index.age` | operation counters plus `s`, `{candidate}`, `{attachment}`, `By` and `s` histograms; query, topic and embedding values are never labels |
-| access | `agentos.access.decisions`, `agentos.access.decision.duration`, `agentos.access.revocation.duration`, `agentos.access.profile_reload.duration`, `agentos.access.credential.releases`, `agentos.access.protocol.operations` | decision/release/operation counters and `s` histograms scoped only by bounded operation, decision, reason, dependency, credential outcome and protocol dimensions |
+| access | `agentos.access.decisions`, `agentos.access.decision.duration`, `agentos.access.revocation.duration`, `agentos.access.profile_reload.duration`, `agentos.access.credential.releases`, `agentos.access.provider.operations`, `agentos.access.protocol.operations` | decision/release/provider/operation counters and `s` histograms scoped only by bounded operation, route, adapter, provider, decision, reason, dependency, credential outcome, terminal outcome and protocol dimensions |
 | protocol | `agentos.protocol.operations`, `agentos.protocol.operation.duration`, `agentos.protocol.fallbacks` | `{operation}` and `{fallback}` counters plus an `s` histogram for bounded HTTP, MCP, ACP and A2A outcomes |
 | topology, readiness and recovery | `agentos.topology.decisions`, `agentos.readiness.checks`, `agentos.resilience.observations`, `agentos.resilience.operations`, `agentos.resilience.operation.duration` | `{decision}`, `{check}`, `{observation}` and `{operation}` counters plus an `s` histogram; proposal, Agent, Assignment, Pod, PVC, session, protocol and digest identifiers are excluded |
 | Collector pipeline | `agentos.telemetry.pipeline.events`, `agentos.telemetry.queue.size`, `agentos.telemetry.export.duration`, `agentos.telemetry.dropped.batches` | `{event}` and `{batch}` counters, `{batch}` up/down counter and `s` histogram for bounded signal, stage, outcome and reason dimensions |

@@ -19,6 +19,12 @@ import {
   WorkloadIdentityV1Schema,
   type WorkloadIdentityV1,
 } from "./identity.ts";
+import type {
+  ProviderAccessTelemetry,
+  ProviderAccessTelemetryEnd,
+  ProviderAccessTelemetryOperation,
+  ProviderAccessTelemetryStart,
+} from "../telemetry/provider-access.ts";
 
 const Uuid = WorkloadIdentityV1Schema.fields.agentId;
 const KubernetesName = WorkloadIdentityV1Schema.fields.fleet;
@@ -325,6 +331,7 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
 )(function*(options: {
   readonly clock?: Effect.Effect<number>;
   readonly id: Effect.Effect<string, ProviderPolicyDecisionError>;
+  readonly telemetry?: ProviderAccessTelemetry["Service"];
 }) {
   const authenticator = yield* WorkloadIdentityAuthenticator;
   const decisionPoint = yield* ProviderPolicyDecisionPoint;
@@ -332,7 +339,10 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
   const id = options.id;
 
   const authorize = Effect.fn("agentos.providerAuthorization.authorizeHttp")(
-    function*(request: Request) {
+    function*(
+      request: Request,
+      telemetry?: ProviderAccessTelemetryOperation,
+    ) {
       if (request.method !== "POST" || new URL(request.url).pathname !== "/authorize") {
         return forbiddenResponse();
       }
@@ -429,6 +439,7 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
         Effect.mapError(() => authorizerError("invalid_grant")),
       );
       if (grant.expiresAtMillis <= issuedAtMillis) return forbiddenResponse();
+      if (telemetry !== undefined) yield* telemetry.correlate(grant);
       return new Response(null, {
         status: 200,
         headers: providerAuthorizationGrantHeaders(grant),
@@ -437,12 +448,202 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
   );
 
   return (request: Request): Effect.Effect<Response> =>
-    authorize(request).pipe(
-      Effect.catch((error) =>
-        Effect.succeed(responseForAuthorizationFailure(error))
-      ),
-    );
+    Effect.gen(function*() {
+      const telemetry = options.telemetry === undefined
+        ? undefined
+        : yield* options.telemetry.start(
+            providerAccessTelemetryStart(request),
+          );
+      const result = yield* Effect.result(authorize(request, telemetry));
+      if (result._tag === "Failure") {
+        const response = responseForAuthorizationFailure(result.failure);
+        if (telemetry !== undefined) {
+          yield* telemetry.end(
+            providerAccessFailure(result.failure, response.status),
+          );
+        }
+        return response;
+      }
+      if (telemetry !== undefined) {
+        yield* telemetry.end(providerAccessResponse(result.success));
+      }
+      return result.success;
+    });
 });
+
+function providerAccessTelemetryStart(
+  request: Request,
+): ProviderAccessTelemetryStart {
+  const route = providerAccessRoute(
+    request.headers.get("x-agentos-original-path"),
+  );
+  return {
+    request,
+    operation: "authorization",
+    route,
+    adapter: "egress_authz",
+    provider: route === "openai_responses" || route === "openai_compaction"
+      ? "openai"
+      : route === "github_rest" || route === "github_graphql" ||
+          route === "github_git"
+      ? "github"
+      : "unknown",
+  };
+}
+
+function providerAccessRoute(
+  path: string | null,
+): ProviderAccessTelemetryStart["route"] {
+  if (path === "/v1/responses") return "openai_responses";
+  if (path === "/v1/responses/compact") return "openai_compaction";
+  if (path === "/api/graphql") return "github_graphql";
+  if (path?.startsWith("/api/v3/") === true) return "github_rest";
+  if (
+    path !== null &&
+    /^\/[^/]+\/[^/]+\.git\/(?:info\/refs|git-upload-pack|git-receive-pack)(?:\?.*)?$/.test(
+      path,
+    )
+  ) {
+    return "github_git";
+  }
+  return "unknown";
+}
+
+function providerAccessResponse(response: Response): ProviderAccessTelemetryEnd {
+  if (response.status === 200) {
+    return {
+      decision: "allow",
+      reason: "allowed",
+      dependency: "none",
+      providerOutcome: "unobserved",
+      status: response.status,
+    };
+  }
+  if (response.status === 401) {
+    return {
+      decision: "deny",
+      reason: "identity_invalid",
+      dependency: "none",
+      providerOutcome: "not_forwarded",
+      status: response.status,
+    };
+  }
+  if (response.status === 429) {
+    const budget = response.headers.get("x-agentos-denial-reason") ===
+      "budget_exhausted";
+    return {
+      decision: "deny",
+      reason: budget ? "budget_denied" : "rate_limited",
+      dependency: budget ? "postgresql" : "none",
+      providerOutcome: "not_forwarded",
+      status: response.status,
+    };
+  }
+  return {
+    decision: response.status >= 500 ? "error" : "deny",
+    reason: response.status >= 500 ? "dependency_unavailable" : "unknown",
+    dependency: response.status >= 500 ? "authorizer" : "none",
+    providerOutcome: "not_forwarded",
+    status: response.status,
+  };
+}
+
+function providerAccessFailure(
+  error: unknown,
+  status: number,
+): ProviderAccessTelemetryEnd {
+  if (error instanceof ProviderPolicyDecisionError) {
+    switch (error.outcome) {
+      case "database_unavailable":
+        return accessFailure("dependency_unavailable", "postgresql", status);
+      case "policy_stale":
+        return accessFailure("policy_stale", "postgresql", status);
+      case "openfga_unavailable":
+        return accessFailure("dependency_unavailable", "openfga", status);
+      case "decision_reference_unavailable":
+        return accessFailure("dependency_unavailable", "authorizer", status);
+      case "identity_rejected":
+        return accessDenial("identity_invalid", "postgresql", status);
+      case "profile_denied":
+      case "effective_policy_denied":
+        return accessDenial("profile_denied", "none", status);
+      case "ceiling_denied":
+        return accessDenial("ceiling_denied", "none", status);
+      case "rate_class_disabled":
+      case "rate_class_exceeded":
+      case "rate_limited":
+        return accessDenial("rate_limited", "postgresql", status);
+      case "budget_exhausted":
+        return accessDenial("budget_denied", "postgresql", status);
+      case "invalid_route":
+        return accessDenial("unknown", "none", status);
+    }
+  }
+  if (
+    typeof error === "object" && error !== null && "_tag" in error &&
+    error._tag === "WorkloadIdentityDependencyUnavailable"
+  ) {
+    const dependency = "dependency" in error &&
+        error.dependency === "identity_store"
+      ? "postgresql"
+      : "kubernetes";
+    return accessFailure("dependency_unavailable", dependency, status);
+  }
+  if (
+    typeof error === "object" && error !== null && "_tag" in error &&
+    error._tag === "WorkloadIdentityResolutionError"
+  ) {
+    const assignment = "code" in error && typeof error.code === "string" &&
+      error.code.startsWith("assignment_");
+    return accessDenial(
+      assignment ? "assignment_inactive" : "identity_invalid",
+      "postgresql",
+      status,
+    );
+  }
+  if (
+    typeof error === "object" && error !== null && "_tag" in error &&
+    error._tag === "WorkloadAuthenticationError"
+  ) {
+    return accessDenial("identity_invalid", "kubernetes", status);
+  }
+  if (
+    typeof error === "object" && error !== null && "_tag" in error &&
+    (error._tag === "WorkloadAuthorizationError" ||
+      error._tag === "WorkloadPolicyDenied")
+  ) {
+    return accessDenial("identity_invalid", "postgresql", status);
+  }
+  return providerAccessResponse(new Response(null, { status }));
+}
+
+function accessFailure(
+  reason: ProviderAccessTelemetryEnd["reason"],
+  dependency: ProviderAccessTelemetryEnd["dependency"],
+  status: number,
+): ProviderAccessTelemetryEnd {
+  return {
+    decision: "error",
+    reason,
+    dependency,
+    providerOutcome: "not_forwarded",
+    status,
+  };
+}
+
+function accessDenial(
+  reason: ProviderAccessTelemetryEnd["reason"],
+  dependency: ProviderAccessTelemetryEnd["dependency"],
+  status: number,
+): ProviderAccessTelemetryEnd {
+  return {
+    decision: "deny",
+    reason,
+    dependency,
+    providerOutcome: "not_forwarded",
+    status,
+  };
+}
 
 const GITHUB_AUTHORIZATION_BODY_MAX_BYTES = 256 * 1_024;
 const GitHubOwnerPattern = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;

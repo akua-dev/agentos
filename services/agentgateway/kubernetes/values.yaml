@@ -84,6 +84,7 @@ config:
                 - x-agentos-authz-rate-class
           includeRequestHeaders:
             - authorization
+            - traceparent
             - x-agentos-assignment-id
       backends:
         - host: ai-gateway.agentos.svc.cluster.local:8787

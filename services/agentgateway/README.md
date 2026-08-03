@@ -203,6 +203,11 @@ omits agentgateway's request-log database.
 - The admin UI remains loopback-only and is not an Agent or operator mutation surface. Production policy changes flow through reviewed configuration/OpenFGA state.
 - AgentOS omits `config.database`. This avoids a request database and its full span-attribute blob; cost dashboards that require it are deliberately unavailable. The official docs confirm that request logging is disabled when the database field is omitted: [request-log storage](https://agentgateway.dev/docs/standalone/latest/integrations/observability/database/).
 - Native OTLP and Prometheus support are accepted, but the Fleet collector must continue removing content-bearing attributes. See the official [tracing](https://agentgateway.dev/docs/standalone/latest/reference/observability/traces/) and [metrics](https://agentgateway.dev/docs/reference/observability/metrics/) documentation.
+- Governed routes explicitly forward only the W3C `traceparent` propagation
+  header to external authorization. The authorizer and provider adapters use
+  that trace ID to join AgentGateway-native route spans to validated
+  Mate/Assignment/profile correlation and provider terminal outcomes; arbitrary
+  trace metadata is not promoted to metric labels.
 - Dynamic route reload remains a proven binary capability, but production route files are immutable and roll by ConfigMap hash. The pinned source keeps the previous state after a failed reload and publishes the synchronization metric: [state manager at v1.4.1](https://github.com/agentgateway/agentgateway/blob/163ea2146acb7b82082acea30ed691b29079095f/crates/agentgateway/src/state_manager.rs).
 
 ## Shipped features versus architectural material

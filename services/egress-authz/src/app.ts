@@ -6,6 +6,7 @@ import {
   ProviderBudgetSettlementReportV1Schema,
   ProviderDecisionReferenceGenerator,
   ProviderPolicyDecisionPoint,
+  type ProviderAccessTelemetry,
   WorkloadIdentityAuthenticator,
   createProviderAuthorizationHttpHandler,
 } from "@akua-dev/agentos";
@@ -47,6 +48,7 @@ export interface EgressAuthorizerLimits {
   readonly maximumHeaderValueBytes: number;
   readonly maximumSettlementBodyBytes: number;
   readonly clock?: Effect.Effect<number>;
+  readonly telemetry?: ProviderAccessTelemetry["Service"];
 }
 
 export class EgressAuthorizerConfigurationError extends Schema.TaggedErrorClass<EgressAuthorizerConfigurationError>()(
@@ -89,6 +91,9 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
   const authorize = yield* createProviderAuthorizationHttpHandler({
     clock,
     id: decisionReferences.next,
+    ...(options.telemetry === undefined
+      ? {}
+      : { telemetry: options.telemetry }),
   });
   const permits = yield* Semaphore.make(limits.maximumConcurrentRequests);
 

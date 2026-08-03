@@ -1,12 +1,17 @@
 import { assert, describe, it } from "@effect/vitest";
 import {
+  AGENTOS_TELEMETRY_SPANS,
+  makeProviderAccessTelemetry,
+  ProviderAccessTelemetry,
   ProviderBudgetSettlementHttpError,
   ProviderBudgetSettlementReporter,
   providerAuthorizationGrantHeaders,
   type ProviderBudgetSettlementReportV1,
+  type AgentOSAccessCredentialOutcome,
+  type ProviderAccessTelemetryEnd,
   type ProviderAuthorizationGrantV1,
 } from "@akua-dev/agentos";
-import { Effect, Fiber, Ref } from "effect";
+import { Effect, Fiber, Ref, Tracer } from "effect";
 import { TestClock } from "effect/testing";
 
 import {
@@ -30,6 +35,27 @@ const successfulSettlements = ProviderBudgetSettlementReporter.of({
     decisionRef: report.decisionRef,
     outcome: "settled",
   }),
+});
+
+const makeAccessTelemetryRecorder = Effect.fn(
+  "test.githubBroker.makeAccessTelemetryRecorder",
+)(function*() {
+  const credentials = yield* Ref.make<ReadonlyArray<
+    AgentOSAccessCredentialOutcome
+  >>([]);
+  const outcomes = yield* Ref.make<ReadonlyArray<
+    ProviderAccessTelemetryEnd
+  >>([]);
+  const telemetry = ProviderAccessTelemetry.of({
+    start: () => Effect.succeed({
+      correlate: () => Effect.void,
+      credential: (outcome) =>
+        Ref.update(credentials, (current) => [...current, outcome]),
+      end: (outcome) =>
+        Ref.update(outcomes, (current) => [...current, outcome]),
+    }),
+  });
+  return { credentials, outcomes, telemetry };
 });
 
 function grant(
@@ -219,9 +245,70 @@ describe("GitHub workload broker", () => {
       }]);
     }));
 
+  it.effect("correlates grant, credential release, adapter, and provider outcome", () => {
+    const spans: Array<Tracer.NativeSpan> = [];
+    const tracer = Tracer.make({
+      span(options) {
+        const span = new Tracer.NativeSpan(options);
+        spans.push(span);
+        return span;
+      },
+    });
+    return Effect.gen(function*() {
+      const tokens = yield* makeTokenProvider();
+      const telemetry = yield* makeProviderAccessTelemetry();
+      const handler = yield* makeGitHubBrokerHandler({
+        tokens: tokens.provider,
+        apiUrl: "https://api.github.test",
+        gitUrl: "https://github.test",
+        settlements: successfulSettlements,
+        telemetry,
+        now: Effect.succeed(now),
+      }).pipe(Effect.provideService(GitHubProviderHttp, GitHubProviderHttp.of({
+        execute: () => Effect.succeed(new Response(null, { status: 204 })),
+      })));
+      const outbound = brokerRequest(
+        "/api/v3/repos/akua-dev/agentos/issues/94",
+      );
+      outbound.headers.set(
+        "traceparent",
+        "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01",
+      );
+      const response = yield* handleGitHubBrokerRequest(handler, outbound);
+      assert.strictEqual(response.status, 204);
+
+      const span = spans.find(({ name }) =>
+        name === AGENTOS_TELEMETRY_SPANS.accessProviderAdapter
+      );
+      assert.isDefined(span);
+      assert.strictEqual(span.traceId, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+      assert.strictEqual(
+        span.attributes.get("agentos.identity.agent_id"),
+        grant().identity.agentId,
+      );
+      assert.strictEqual(
+        span.attributes.get("agentos.access.route"),
+        "github_rest",
+      );
+      assert.strictEqual(
+        span.attributes.get("agentos.access.adapter"),
+        "github_broker",
+      );
+      assert.strictEqual(
+        span.attributes.get("agentos.access.credential.outcome"),
+        "released",
+      );
+      assert.strictEqual(
+        span.attributes.get("agentos.access.provider.outcome"),
+        "completed",
+      );
+    }).pipe(Effect.withTracer(tracer));
+  });
+
   it.effect("never acquires a credential for a missing or route-mismatched grant", () =>
     Effect.gen(function*() {
       const tokens = yield* makeTokenProvider();
+      const access = yield* makeAccessTelemetryRecorder();
       const upstreamCalls = yield* Ref.make(0);
       const http = GitHubProviderHttp.of({
         execute: () =>
@@ -234,6 +321,7 @@ describe("GitHub workload broker", () => {
         apiUrl: "https://api.github.test",
         gitUrl: "https://github.test",
         settlements: successfulSettlements,
+        telemetry: access.telemetry,
         now: Effect.succeed(now),
       }).pipe(Effect.provideService(GitHubProviderHttp, http));
       const missing = brokerRequest(
@@ -257,6 +345,16 @@ describe("GitHub workload broker", () => {
       );
       assert.deepStrictEqual(yield* Ref.get(tokens.acquired), []);
       assert.strictEqual(yield* Ref.get(upstreamCalls), 0);
+      assert.deepStrictEqual(yield* Ref.get(access.credentials), [
+        "withheld",
+        "withheld",
+      ]);
+      assert.deepStrictEqual(
+        (yield* Ref.get(access.outcomes)).map(({ providerOutcome }) =>
+          providerOutcome
+        ),
+        ["not_forwarded", "not_forwarded"],
+      );
     }));
 
   it.effect("uses Basic installation auth for smart HTTP and preserves native failures", () =>
@@ -412,6 +510,7 @@ describe("GitHub workload broker", () => {
   it.effect("settles completed and provider-rejected forwards after their bodies terminate", () =>
     Effect.gen(function*() {
       const tokens = yield* makeTokenProvider();
+      const access = yield* makeAccessTelemetryRecorder();
       const reports = yield* Ref.make<ReadonlyArray<
         ProviderBudgetSettlementReportV1
       >>([]);
@@ -438,6 +537,7 @@ describe("GitHub workload broker", () => {
         apiUrl: "https://api.github.test",
         gitUrl: "https://github.test",
         settlements,
+        telemetry: access.telemetry,
         now: Effect.succeed(now),
       }).pipe(Effect.provideService(GitHubProviderHttp, http));
 
@@ -473,11 +573,18 @@ describe("GitHub workload broker", () => {
           spendMicros: 0,
         },
       ]);
+      assert.deepStrictEqual(
+        (yield* Ref.get(access.outcomes)).map(({ providerOutcome }) =>
+          providerOutcome
+        ),
+        ["completed", "provider_rejected"],
+      );
     }));
 
   it.effect("settles transport failures while a settlement outage never replaces provider semantics", () =>
     Effect.gen(function*() {
       const tokens = yield* makeTokenProvider();
+      const access = yield* makeAccessTelemetryRecorder();
       const reports = yield* Ref.make<ReadonlyArray<
         ProviderBudgetSettlementReportV1
       >>([]);
@@ -499,6 +606,7 @@ describe("GitHub workload broker", () => {
         apiUrl: "https://api.github.test",
         gitUrl: "https://github.test",
         settlements: recordingSettlements,
+        telemetry: access.telemetry,
         now: Effect.succeed(now),
       }).pipe(Effect.provideService(GitHubProviderHttp, transportFailure));
       assert.strictEqual((yield* handleGitHubBrokerRequest(
@@ -525,6 +633,7 @@ describe("GitHub workload broker", () => {
         apiUrl: "https://api.github.test",
         gitUrl: "https://github.test",
         settlements: unavailableSettlements,
+        telemetry: access.telemetry,
         now: Effect.succeed(now),
       }).pipe(Effect.provideService(GitHubProviderHttp, upstream));
       const preserved = yield* handleGitHubBrokerRequest(
@@ -536,11 +645,18 @@ describe("GitHub workload broker", () => {
         yield* Effect.tryPromise(() => preserved.text()),
         "native response",
       );
+      assert.deepStrictEqual(
+        (yield* Ref.get(access.outcomes)).map(({ providerOutcome }) =>
+          providerOutcome
+        ),
+        ["transport_failed", "completed"],
+      );
     }));
 
   it.effect("settles a downstream-cancelled response as cancelled exactly once", () =>
     Effect.gen(function*() {
       const tokens = yield* makeTokenProvider();
+      const access = yield* makeAccessTelemetryRecorder();
       const reports = yield* Ref.make<ReadonlyArray<
         ProviderBudgetSettlementReportV1
       >>([]);
@@ -564,6 +680,7 @@ describe("GitHub workload broker", () => {
         apiUrl: "https://api.github.test",
         gitUrl: "https://github.test",
         settlements,
+        telemetry: access.telemetry,
         now: Effect.succeed(now),
       }).pipe(Effect.provideService(GitHubProviderHttp, http));
       const response = yield* handleGitHubBrokerRequest(
@@ -577,6 +694,12 @@ describe("GitHub workload broker", () => {
       }
       assert.deepStrictEqual(
         (yield* Ref.get(reports)).map(({ forwardOutcome }) => forwardOutcome),
+        ["cancelled"],
+      );
+      assert.deepStrictEqual(
+        (yield* Ref.get(access.outcomes)).map(({ providerOutcome }) =>
+          providerOutcome
+        ),
         ["cancelled"],
       );
     }));

@@ -55,6 +55,21 @@ readiness check. The installation check never mints a broad token and is
 cached for at most 60 seconds per public-key identity; a key rotation forces an
 immediate remote recheck. All readiness failures are content-free.
 
+## OpenTelemetry
+
+The broker continues the bounded AgentGateway trace through grant validation,
+repository-scoped installation-token acquisition and the complete GitHub
+response stream. Its Effect lifecycle ends exactly once with `completed`,
+`provider_rejected`, `transport_failed`, or `cancelled`, alongside the matching
+durable budget settlement. A denied grant records a withheld credential; a
+token-source failure records a failed credential; neither value nor any GitHub
+body is observed.
+
+Mate, Assignment, decision and profile identifiers are span-only correlation.
+Metrics contain only finite route, adapter, provider, decision, credential and
+terminal-outcome dimensions. Telemetry export failure cannot alter native
+GitHub status, streaming, token invalidation or settlement behavior.
+
 ## Kubernetes inputs
 
 [`kubernetes/`](./kubernetes/) expects these core-namespace resources:

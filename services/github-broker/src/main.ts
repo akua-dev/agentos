@@ -7,6 +7,7 @@ import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import {
   AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL,
   AGENTOS_PROVIDER_BUDGET_SETTLEMENT_TOKEN_PATH,
+  makeProviderAccessTelemetry,
   ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
   makeProviderBudgetSettlementHttpLayer,
@@ -32,6 +33,7 @@ import {
 import { GitHubProviderHttpLive } from "./http.ts";
 import { makeGitHubInstallationTokenProvider } from "./token.ts";
 import { githubBrokerError } from "./types.ts";
+import { GitHubBrokerOtlpLive } from "./otlp.ts";
 
 const BrokerConfig = Config.all({
   apiUrl: Config.url("GITHUB_API_URL").pipe(
@@ -127,11 +129,13 @@ const startup = Effect.gen(function*() {
     readiness: ProviderBudgetSettlementReadiness,
     reporter: ProviderBudgetSettlementReporter,
   }).pipe(Effect.provide(settlementLayer));
+  const telemetry = yield* makeProviderAccessTelemetry();
   const handler = yield* makeGitHubBrokerHandler({
     tokens,
     apiUrl: config.apiUrl.toString(),
     gitUrl: config.gitUrl.toString(),
     settlements: settlementServices.reporter,
+    telemetry,
   });
   const readiness = {
     check: Effect.all([
@@ -171,6 +175,7 @@ if (import.meta.main) {
         event: "agentos.github_broker.failed",
       }))
     ),
+    Effect.provide(GitHubBrokerOtlpLive),
     Effect.provide(platform),
   ));
 }

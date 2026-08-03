@@ -277,6 +277,105 @@ export const AGENTOS_AI_SESSION_STATES = values("fresh", "resumed");
 export type AgentOSAISessionState =
   (typeof AGENTOS_AI_SESSION_STATES)[number];
 
+export const AGENTOS_ACCESS_OPERATIONS = values(
+  "identity",
+  "token_review",
+  "authorization",
+  "credential",
+  "http",
+  "mcp",
+  "revocation",
+  "profile_reload",
+);
+export type AgentOSAccessOperation =
+  (typeof AGENTOS_ACCESS_OPERATIONS)[number];
+
+export const AGENTOS_ACCESS_DECISIONS = values(
+  "allow",
+  "deny",
+  "error",
+  "unobserved",
+);
+export type AgentOSAccessDecision =
+  (typeof AGENTOS_ACCESS_DECISIONS)[number];
+
+export const AGENTOS_ACCESS_REASONS = values(
+  "allowed",
+  "identity_invalid",
+  "assignment_inactive",
+  "profile_denied",
+  "ceiling_denied",
+  "budget_denied",
+  "policy_stale",
+  "dependency_unavailable",
+  "rate_limited",
+  "revoked",
+  "unknown",
+);
+export type AgentOSAccessReason =
+  (typeof AGENTOS_ACCESS_REASONS)[number];
+
+export const AGENTOS_ACCESS_DEPENDENCIES = values(
+  "none",
+  "kubernetes",
+  "postgresql",
+  "openfga",
+  "authorizer",
+  "agentgateway",
+  "credential_adapter",
+  "provider",
+);
+export type AgentOSAccessDependency =
+  (typeof AGENTOS_ACCESS_DEPENDENCIES)[number];
+
+export const AGENTOS_ACCESS_CREDENTIAL_OUTCOMES = values(
+  "not_requested",
+  "released",
+  "withheld",
+  "failed",
+);
+export type AgentOSAccessCredentialOutcome =
+  (typeof AGENTOS_ACCESS_CREDENTIAL_OUTCOMES)[number];
+
+export const AGENTOS_ACCESS_ROUTES = values(
+  "openai_responses",
+  "openai_compaction",
+  "github_rest",
+  "github_graphql",
+  "github_git",
+  "unknown",
+);
+export type AgentOSAccessRoute = (typeof AGENTOS_ACCESS_ROUTES)[number];
+
+export const AGENTOS_ACCESS_ADAPTERS = values(
+  "egress_authz",
+  "agentgateway_openai",
+  "agentgateway_github",
+  "ai_gateway",
+  "github_broker",
+  "unknown",
+);
+export type AgentOSAccessAdapter = (typeof AGENTOS_ACCESS_ADAPTERS)[number];
+
+export const AGENTOS_ACCESS_PROVIDERS = values(
+  "openai",
+  "github",
+  "unknown",
+);
+export type AgentOSAccessProvider =
+  (typeof AGENTOS_ACCESS_PROVIDERS)[number];
+
+export const AGENTOS_ACCESS_PROVIDER_OUTCOMES = values(
+  "unobserved",
+  "not_forwarded",
+  "completed",
+  "provider_rejected",
+  "transport_failed",
+  "cancelled",
+);
+export type AgentOSAccessProviderOutcome =
+  (typeof AGENTOS_ACCESS_PROVIDER_OUTCOMES)[number];
+
 export const AGENTOS_AI_STREAM_MODES = values(
   "streaming",
   "non_streaming",
@@ -321,6 +420,7 @@ export const AGENTOS_ACCESS_METRICS = constant({
   revocationDuration: "agentos.access.revocation.duration",
   profileReloadDuration: "agentos.access.profile_reload.duration",
   credentialReleases: "agentos.access.credential.releases",
+  providerOperations: "agentos.access.provider.operations",
   protocolOperations: "agentos.access.protocol.operations",
 });
 
@@ -811,50 +911,22 @@ export const AGENTOS_TELEMETRY_ATTRIBUTE_DEFINITIONS: Readonly<
   "agentos.access.operation": boundedEnum(
     "agentos.access.operation",
     "access",
-    [
-      "identity",
-      "token_review",
-      "authorization",
-      "credential",
-      "http",
-      "mcp",
-      "revocation",
-      "profile_reload",
-    ],
+    AGENTOS_ACCESS_OPERATIONS,
   ),
   "agentos.access.decision": boundedEnum(
     "agentos.access.decision",
     "access",
-    ["allow", "deny", "error", "unobserved"],
+    AGENTOS_ACCESS_DECISIONS,
   ),
   "agentos.access.reason": boundedEnum(
     "agentos.access.reason",
     "access",
-    [
-      "allowed",
-      "identity_invalid",
-      "assignment_inactive",
-      "profile_denied",
-      "ceiling_denied",
-      "budget_denied",
-      "dependency_unavailable",
-      "rate_limited",
-      "revoked",
-      "unknown",
-    ],
+    AGENTOS_ACCESS_REASONS,
   ),
   "agentos.access.dependency": boundedEnum(
     "agentos.access.dependency",
     "access",
-    [
-      "none",
-      "kubernetes",
-      "postgresql",
-      "openfga",
-      "agentgateway",
-      "credential_adapter",
-      "provider",
-    ],
+    AGENTOS_ACCESS_DEPENDENCIES,
   ),
   "agentos.access.cache.result": boundedEnum(
     "agentos.access.cache.result",
@@ -864,7 +936,27 @@ export const AGENTOS_TELEMETRY_ATTRIBUTE_DEFINITIONS: Readonly<
   "agentos.access.credential.outcome": boundedEnum(
     "agentos.access.credential.outcome",
     "access",
-    ["not_requested", "released", "withheld", "failed"],
+    AGENTOS_ACCESS_CREDENTIAL_OUTCOMES,
+  ),
+  "agentos.access.route": boundedEnum(
+    "agentos.access.route",
+    "access",
+    AGENTOS_ACCESS_ROUTES,
+  ),
+  "agentos.access.adapter": boundedEnum(
+    "agentos.access.adapter",
+    "access",
+    AGENTOS_ACCESS_ADAPTERS,
+  ),
+  "agentos.access.provider": boundedEnum(
+    "agentos.access.provider",
+    "access",
+    AGENTOS_ACCESS_PROVIDERS,
+  ),
+  "agentos.access.provider.outcome": boundedEnum(
+    "agentos.access.provider.outcome",
+    "access",
+    AGENTOS_ACCESS_PROVIDER_OUTCOMES,
   ),
   "agentos.authz.rate_class": attributeDefinition(
     "agentos.authz.rate_class",
@@ -1699,6 +1791,8 @@ export const AGENTOS_TELEMETRY_METRIC_DEFINITIONS: Readonly<
       "agentos.access.decision",
       "agentos.access.reason",
       "agentos.access.dependency",
+      "agentos.access.route",
+      "agentos.access.adapter",
     ],
     "completed_access_decisions",
   ),
@@ -1707,7 +1801,12 @@ export const AGENTOS_TELEMETRY_METRIC_DEFINITIONS: Readonly<
     "access",
     "histogram",
     "s",
-    ["agentos.access.operation", "agentos.access.decision"],
+    [
+      "agentos.access.operation",
+      "agentos.access.decision",
+      "agentos.access.route",
+      "agentos.access.adapter",
+    ],
     "access_decision_wall_duration",
     durationBuckets,
   ),
@@ -1734,8 +1833,26 @@ export const AGENTOS_TELEMETRY_METRIC_DEFINITIONS: Readonly<
     "access",
     "counter",
     "{release}",
-    ["agentos.access.decision", "agentos.access.credential.outcome"],
+    [
+      "agentos.access.decision",
+      "agentos.access.credential.outcome",
+      "agentos.access.adapter",
+      "agentos.access.provider",
+    ],
     "credential_adapter_release_outcomes",
+  ),
+  [AGENTOS_ACCESS_METRICS.providerOperations]: metricDefinition(
+    AGENTOS_ACCESS_METRICS.providerOperations,
+    "access",
+    "counter",
+    "{operation}",
+    [
+      "agentos.access.route",
+      "agentos.access.adapter",
+      "agentos.access.provider",
+      "agentos.access.provider.outcome",
+    ],
+    "provider_adapter_terminal_outcomes",
   ),
   [AGENTOS_ACCESS_METRICS.protocolOperations]: metricDefinition(
     AGENTOS_ACCESS_METRICS.protocolOperations,

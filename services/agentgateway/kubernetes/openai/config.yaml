@@ -19,6 +19,7 @@ routes:
         failureMode: deny
         includeRequestHeaders:
           - authorization
+          - traceparent
           - x-agentos-assignment-id
         protocol:
           http:

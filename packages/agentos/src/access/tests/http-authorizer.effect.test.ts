@@ -1,5 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Tracer } from "effect";
+
+import {
+  AGENTOS_TELEMETRY_SPANS,
+  makeProviderAccessTelemetry,
+} from "../../index.ts";
 
 import {
   ProviderPolicyDecisionError,
@@ -287,6 +292,59 @@ describe("AgentGateway HTTP authorization contract", () => {
         })),
       })),
     ));
+
+  it.effect("attributes the typed OpenFGA failure before reducing the public response", () => {
+    const spans: Array<Tracer.NativeSpan> = [];
+    const tracer = Tracer.make({
+      span(options) {
+        const span = new Tracer.NativeSpan(options);
+        spans.push(span);
+        return span;
+      },
+    });
+    return Effect.gen(function*() {
+      const telemetry = yield* makeProviderAccessTelemetry();
+      const handler = yield* createProviderAuthorizationHttpHandler({
+        clock: Effect.succeed(now),
+        id: Effect.succeed("44444444444444444444444444444444"),
+        telemetry,
+      });
+      const response = yield* handler(request());
+      assert.strictEqual(response.status, 503);
+      const span = spans.find(({ name }) =>
+        name === AGENTOS_TELEMETRY_SPANS.accessAuthorization
+      );
+      assert.isDefined(span);
+      assert.strictEqual(
+        span.attributes.get("agentos.access.decision"),
+        "error",
+      );
+      assert.strictEqual(
+        span.attributes.get("agentos.access.reason"),
+        "dependency_unavailable",
+      );
+      assert.strictEqual(
+        span.attributes.get("agentos.access.dependency"),
+        "openfga",
+      );
+      assert.strictEqual(
+        span.attributes.get("agentos.access.route"),
+        "openai_responses",
+      );
+      assert.strictEqual(
+        span.attributes.get("agentos.access.provider.outcome"),
+        "not_forwarded",
+      );
+    }).pipe(
+      Effect.provide(services({
+        decide: () => Effect.fail(ProviderPolicyDecisionError.make({
+          outcome: "openfga_unavailable",
+          retryable: true,
+        })),
+      })),
+      Effect.withTracer(tracer),
+    );
+  });
 
   it.effect("keeps policy denials distinct from dependency unavailability", () =>
     Effect.gen(function*() {

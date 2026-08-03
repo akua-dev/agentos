@@ -86,6 +86,10 @@ Every provider attempt receives a fresh `x-client-request-id`; inbound
 before OpenAI. Provider request IDs appear only on protected spans and
 correlated failure logs. Metrics never contain request, trace, span, operation,
 attempt, session, route-slot, provider-account, or provider-request IDs.
+The same request span also carries the finite provider-access route, adapter,
+credential-release and terminal-outcome fields used by the GitHub adapter, so
+one trace can compare the two credential domains without copying Mate,
+Assignment, decision or profile identifiers into metrics.
 
 The checked-in load regression runs 300 complete request lifecycles after
 warm-up and compares telemetry enabled with the inert service on the same live

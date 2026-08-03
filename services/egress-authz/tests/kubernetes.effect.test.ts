@@ -77,6 +77,15 @@ describe("egress authorizer Kubernetes boundary", () => {
       assert.include(rendered, '"command":["agentos-egress-authz"]');
       assert.include(rendered, '"automountServiceAccountToken":true');
       assert.include(rendered, '"agentos.akua.dev/openfga-client":"true"');
+      assert.include(rendered, '"agentos.akua.dev/otel-client":"true"');
+      assert.include(rendered, '"name":"OTEL_SERVICE_NAME","value":"agentos-egress-authz"');
+      assert.include(
+        rendered,
+        '"name":"OTEL_EXPORTER_OTLP_ENDPOINT","value":"http://agentos-otel-collector.agentos.svc.cluster.local:4318"',
+      );
+      assert.include(rendered, '"name":"OTEL_RESOURCE_ATTRIBUTES"');
+      assert.include(rendered, "agentos.fleet.name=default");
+      assert.include(rendered, "k8s.workload.name=egress-authz");
       assert.include(
         rendered,
         '"secretName":"agentos-egress-authz-database"',

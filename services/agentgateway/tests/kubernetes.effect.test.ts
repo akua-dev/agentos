@@ -187,6 +187,7 @@ describe("owned agentgateway Kustomize workloads", () => {
           /^agentgateway-(?:github|openai)-config-[a-z0-9]+$/,
         );
         assert.include(config.data?.["config.yaml"] ?? "", "failureMode: deny");
+        assert.include(config.data?.["config.yaml"] ?? "", "- traceparent");
         assert.notInclude(config.data?.["config.yaml"] ?? "", "database:");
       }
     }).pipe(Effect.provide(BunServices.layer))));
