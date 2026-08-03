@@ -16,6 +16,7 @@ import {
   startAgentOSAuxiliaryOperation,
 } from "../telemetry/auxiliary.ts";
 import type { AgentOSProviderAttempt } from "../telemetry/runtime.ts";
+import type { AgentOSTelemetryRuntime } from "../telemetry/runtime-context.ts";
 import type { RelevantSelectionAuth } from "./model.ts";
 import { formatTopic, redactAuxiliaryInput } from "./prompts.ts";
 
@@ -30,6 +31,7 @@ export interface MaintenanceRunContext {
   readonly resolveAuth?: Effect.Effect<RelevantSelectionAuth, unknown>;
   readonly signal?: AbortSignal;
   readonly telemetry?: AgentOSTelemetrySource;
+  readonly telemetryRuntime?: AgentOSTelemetryRuntime;
 }
 
 export interface MaintenanceRunRequest extends MaintenanceRunContext {
@@ -779,7 +781,12 @@ function defaultComplete(
 }
 
 function startTelemetry(request: MaintenanceRunRequest, model: Model<Api>) {
-  return startAgentOSAuxiliaryOperation(model, request.telemetry, "resumed");
+  return startAgentOSAuxiliaryOperation(
+    model,
+    request.telemetry,
+    "resumed",
+    request.telemetryRuntime,
+  );
 }
 
 export const runIsolatedMaintenanceAgent: MaintenanceAgentRunner = (request) =>

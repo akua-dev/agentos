@@ -28,8 +28,21 @@ export function createTelemetryRecorder() {
         attempts: [],
       };
       operations.push(record);
+      const operationId = `operation-${++nextId}`;
+      const operationSuffix = nextId.toString(16);
       return {
-        id: `operation-${++nextId}`,
+        id: operationId,
+        inject(carrier) {
+          return Effect.sync(() => {
+            const traceparent =
+              `00-${operationSuffix.padStart(32, "0")}-${operationSuffix.padStart(16, "0")}-01`;
+            if (carrier instanceof Headers) {
+              carrier.set("traceparent", traceparent);
+            } else {
+              carrier.traceparent = traceparent;
+            }
+          });
+        },
         startProviderAttempt(attemptInput) {
           return Effect.sync(() => {
           const attempt: RecordedTelemetryOperation["attempts"][number] = {

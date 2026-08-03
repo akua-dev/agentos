@@ -12,6 +12,7 @@ import {
   type AgentOSOperation,
   type AgentOSTelemetry,
 } from "./runtime.ts";
+import type { AgentOSTelemetryRuntime } from "./runtime-context.ts";
 
 export type AgentOSTelemetrySource =
   | AgentOSTelemetry
@@ -23,12 +24,17 @@ export const startAgentOSAuxiliaryOperation = Effect.fn(
   model: Model<Api>,
   telemetry: AgentOSTelemetrySource | undefined,
   sessionState: AgentOSAISessionState,
+  runtime?: AgentOSTelemetryRuntime,
 ): Effect.fn.Return<AgentOSOperation, never> {
-  const resolved = telemetry === undefined
+  const source = telemetry ?? runtime?.telemetry;
+  const resolved = source === undefined
     ? yield* initializeAgentOSTelemetryFromEnvironment()
-    : Effect.isEffect(telemetry)
-    ? yield* telemetry
-    : telemetry;
+    : Effect.isEffect(source)
+    ? yield* source
+    : source;
+  const parentCarrier = runtime === undefined
+    ? undefined
+    : yield* runtime.parentCarrier;
   return yield* resolved.startOperation({
     runtime: "pi",
     runtimeVersion: "0.81.1",
@@ -36,7 +42,7 @@ export const startAgentOSAuxiliaryOperation = Effect.fn(
     sessionState,
     modelFamily: agentOSModelFamily(model.id),
     providerFamily: agentOSProviderFamily(model.provider),
-  });
+  }, parentCarrier);
 });
 
 export function agentOSRouteForModel(

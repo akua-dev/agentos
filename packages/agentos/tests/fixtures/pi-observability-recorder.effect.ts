@@ -46,6 +46,7 @@ const registerRecorder = Effect.fn("test.piObservability.registerRecorder")(
         ]);
         return {
           id,
+          inject: () => Effect.void,
           startProviderAttempt: (attemptInput) => Effect.gen(function*() {
             const attemptId = yield* allocateId("attempt");
             yield* Ref.update(evidence, (current) => current.map((operation) =>

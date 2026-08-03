@@ -4,6 +4,7 @@ import { Clock, Effect, Schema } from "effect";
 
 import type { StartupMemoryContext } from "../memory/store.ts";
 import type { AgentOSTelemetrySource } from "../telemetry/auxiliary.ts";
+import type { AgentOSTelemetryRuntime } from "../telemetry/runtime-context.ts";
 import {
   safeAssistantFailure,
   safeTokenCount,
@@ -32,6 +33,7 @@ export interface RelevantSelectionInput {
   readonly resolveAuth: Effect.Effect<RelevantSelectionAuth, unknown>;
   readonly signal?: AbortSignal;
   readonly telemetry?: AgentOSTelemetrySource;
+  readonly telemetryRuntime?: AgentOSTelemetryRuntime;
   readonly completeImpl?: (
     ...args: Parameters<typeof complete>
   ) => Effect.Effect<CompleteResult, unknown>;
@@ -129,7 +131,12 @@ function defaultComplete(
 }
 
 function startTelemetry(input: RelevantSelectionInput, model: Model<Api>) {
-  return startAgentOSAuxiliaryOperation(model, input.telemetry, "resumed");
+  return startAgentOSAuxiliaryOperation(
+    model,
+    input.telemetry,
+    "resumed",
+    input.telemetryRuntime,
+  );
 }
 
 export const selectRelevantTopics: RelevantTopicSelector = (input) =>

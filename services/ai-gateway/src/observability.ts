@@ -1007,10 +1007,40 @@ function traceParent(headers: Headers): Tracer.ExternalSpan | undefined {
 
 function safeTraceState(headers: Headers): string | undefined {
   const value = headers.get("tracestate")?.trim();
-  return value !== undefined && value.length > 0 && value.length <= 512 &&
-      /^[\x20-\x7e]+$/.test(value)
-    ? value
-    : undefined;
+  if (value === undefined || value.length === 0 || value.length > 512) {
+    return undefined;
+  }
+  const members = value.split(",");
+  if (members.length > 32) return undefined;
+  const keys = new Set<string>();
+  for (const rawMember of members) {
+    const member = rawMember.trim();
+    if (member.length === 0) continue;
+    const separator = member.indexOf("=");
+    if (separator <= 0 || separator !== member.lastIndexOf("=")) {
+      return undefined;
+    }
+    const key = member.slice(0, separator);
+    const memberValue = member.slice(separator + 1);
+    if (
+      !isTraceStateKey(key) || keys.has(key) || memberValue.length === 0 ||
+      memberValue.length > 256 ||
+      !/^[\x20-\x2b\x2d-\x3c\x3e-\x7e]{0,255}[\x21-\x2b\x2d-\x3c\x3e-\x7e]$/.test(
+        memberValue,
+      )
+    ) {
+      return undefined;
+    }
+    keys.add(key);
+  }
+  return keys.size === 0 ? undefined : value;
+}
+
+function isTraceStateKey(value: string): boolean {
+  return /^[a-z][a-z0-9_*/-]{0,255}$/.test(value) ||
+    /^[a-z0-9][a-z0-9_*/-]{0,240}@[a-z][a-z0-9_*/-]{0,13}$/.test(
+      value,
+    );
 }
 
 function safeProviderRequestId(headers: Headers): string | undefined {
