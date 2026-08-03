@@ -86,19 +86,6 @@ RUN MISE_DATA_DIR=/opt/mise \
     /usr/local/bin/bun \
   && test "$(bun --revision)" = "1.4.0-canary.1+3979cbe80"
 
-FROM agentos-base AS agentos-seed
-
-ARG AGENTOS_GIT_REMOTE=https://github.com/akua-dev/agentos.git
-ARG AGENTOS_GIT_UPSTREAM=https://github.com/akua-dev/agentos.git
-
-COPY . /tmp/agentos-source
-
-RUN bun /tmp/agentos-source/packages/agentos/runtime/create-image-seed.ts \
-      --source /tmp/agentos-source \
-      --output /opt/agentos-seed \
-      --origin "$AGENTOS_GIT_REMOTE" \
-      --upstream "$AGENTOS_GIT_UPSTREAM"
-
 FROM agentos-base AS agentos-runtime-dependencies
 
 WORKDIR /tmp/agentos-dependencies
@@ -135,6 +122,27 @@ RUN bun install \
       --filter @agentos/openfga \
   && bun clis/github-app-token/github-app-token.ts --help >/dev/null \
   && bun clis/pg-listen/pg-listen.ts --help >/dev/null
+
+FROM agentos-runtime-dependencies AS agentos-seed
+
+ARG AGENTOS_GIT_REMOTE=https://github.com/akua-dev/agentos.git
+ARG AGENTOS_GIT_UPSTREAM=https://github.com/akua-dev/agentos.git
+
+COPY . /tmp/agentos-source
+
+RUN ln -s /tmp/agentos-dependencies/node_modules /tmp/agentos-source/node_modules \
+  && ln -s \
+    /tmp/agentos-dependencies/packages/agentos/node_modules \
+    /tmp/agentos-source/packages/agentos/node_modules \
+  && printf '%s\n' \
+    /node_modules \
+    /packages/agentos/node_modules \
+    >> /tmp/agentos-source/.git/info/exclude \
+  && bun /tmp/agentos-source/packages/agentos/runtime/create-image-seed.ts \
+      --source /tmp/agentos-source \
+      --output /opt/agentos-seed \
+      --origin "$AGENTOS_GIT_REMOTE" \
+      --upstream "$AGENTOS_GIT_UPSTREAM"
 
 FROM agentos-base AS agentos-package-build
 

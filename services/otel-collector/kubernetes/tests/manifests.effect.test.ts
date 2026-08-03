@@ -237,7 +237,7 @@ describe("Fleet OpenTelemetry Collector", () => {
       assert.deepInclude(collector.env, {
         name: "OTEL_RESOURCE_ATTRIBUTES",
         value:
-          "agentos.fleet.name=default,deployment.environment.name=development,agentos.telemetry.contract.version=1",
+          "agentos.fleet.name=default,deployment.environment.name=development,agentos.telemetry.contract.version=1,k8s.cluster.name=agentos",
       });
       assert.deepStrictEqual(collector.securityContext, {
         allowPrivilegeEscalation: false,

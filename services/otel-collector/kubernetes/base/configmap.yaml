@@ -72,11 +72,94 @@ data:
             - service.namespace
             - service.name
             - service.version
+          labels:
+            - tag_name: agentos.ai.runtime
+              key: agentos.akua.dev/ai-runtime
+              from: pod
+            - tag_name: agentos.ai.runtime.version
+              key: agentos.akua.dev/ai-runtime-version
+              from: pod
       resource_detection/fleet:
         detectors:
           - env
         timeout: 2s
         override: false
+      transform/codex_native:
+        error_mode: ignore
+        trace_statements:
+          - statements:
+              - >-
+                set(resource.attributes["k8s.workload.name"], resource.attributes["k8s.statefulset.name"]) where resource.attributes["k8s.workload.name"] == nil and resource.attributes["k8s.statefulset.name"] != nil
+              - >-
+                set(resource.attributes["k8s.workload.name"], resource.attributes["k8s.deployment.name"]) where resource.attributes["k8s.workload.name"] == nil and resource.attributes["k8s.deployment.name"] != nil
+              - >-
+                set(resource.attributes["k8s.workload.name"], resource.attributes["k8s.daemonset.name"]) where resource.attributes["k8s.workload.name"] == nil and resource.attributes["k8s.daemonset.name"] != nil
+        metric_statements:
+          - statements:
+              - >-
+                set(resource.attributes["k8s.workload.name"], resource.attributes["k8s.statefulset.name"]) where resource.attributes["k8s.workload.name"] == nil and resource.attributes["k8s.statefulset.name"] != nil
+              - >-
+                set(resource.attributes["k8s.workload.name"], resource.attributes["k8s.deployment.name"]) where resource.attributes["k8s.workload.name"] == nil and resource.attributes["k8s.deployment.name"] != nil
+              - >-
+                set(resource.attributes["k8s.workload.name"], resource.attributes["k8s.daemonset.name"]) where resource.attributes["k8s.workload.name"] == nil and resource.attributes["k8s.daemonset.name"] != nil
+          - statements:
+              - >-
+                set(datapoint.attributes["agentos.ai.request.kind"], "main") where metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms"
+              - >-
+                set(datapoint.attributes["agentos.ai.status_class"], "success") where (metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms") and datapoint.attributes["success"] == "true"
+              - >-
+                set(datapoint.attributes["agentos.ai.status_class"], "client_error") where (metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms") and IsMatch(datapoint.attributes["status"], "^4[0-9][0-9]$")
+              - >-
+                set(datapoint.attributes["agentos.ai.status_class"], "server_error") where (metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms") and IsMatch(datapoint.attributes["status"], "^5[0-9][0-9]$")
+              - >-
+                set(datapoint.attributes["agentos.ai.status_class"], "error") where (metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms") and datapoint.attributes["success"] != "true" and not IsMatch(datapoint.attributes["status"], "^[45][0-9][0-9]$")
+              - >-
+                set(datapoint.attributes["agentos.ai.error.class"], "none") where (metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms") and datapoint.attributes["success"] == "true"
+              - >-
+                set(datapoint.attributes["agentos.ai.error.class"], "authentication") where (metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms") and (datapoint.attributes["status"] == "401" or datapoint.attributes["status"] == "403")
+              - >-
+                set(datapoint.attributes["agentos.ai.error.class"], "rate_limit") where (metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms") and datapoint.attributes["status"] == "429"
+              - >-
+                set(datapoint.attributes["agentos.ai.error.class"], "overload") where (metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms") and (datapoint.attributes["status"] == "502" or datapoint.attributes["status"] == "503" or datapoint.attributes["status"] == "529")
+              - >-
+                set(datapoint.attributes["agentos.ai.error.class"], "unavailable") where (metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms") and IsMatch(datapoint.attributes["status"], "^5[0-9][0-9]$") and datapoint.attributes["status"] != "502" and datapoint.attributes["status"] != "503" and datapoint.attributes["status"] != "529"
+              - >-
+                set(datapoint.attributes["agentos.ai.error.class"], "unknown") where (metric.name == "codex.api_request" or metric.name == "codex.api_request.duration_ms") and datapoint.attributes["success"] != "true" and datapoint.attributes["agentos.ai.error.class"] == nil
+        log_statements:
+          - statements:
+              - >-
+                set(resource.attributes["k8s.workload.name"], resource.attributes["k8s.statefulset.name"]) where resource.attributes["k8s.workload.name"] == nil and resource.attributes["k8s.statefulset.name"] != nil
+              - >-
+                set(resource.attributes["k8s.workload.name"], resource.attributes["k8s.deployment.name"]) where resource.attributes["k8s.workload.name"] == nil and resource.attributes["k8s.deployment.name"] != nil
+              - >-
+                set(resource.attributes["k8s.workload.name"], resource.attributes["k8s.daemonset.name"]) where resource.attributes["k8s.workload.name"] == nil and resource.attributes["k8s.daemonset.name"] != nil
+          - statements:
+              - >-
+                set(log.attributes["agentos.ai.request.kind"], "main") where log.attributes["event.name"] == "codex.api_request"
+              - >-
+                set(log.attributes["agentos.ai.status_class"], "error") where log.attributes["event.name"] == "codex.api_request"
+              - >-
+                set(log.attributes["agentos.ai.status_class"], "success") where log.attributes["event.name"] == "codex.api_request" and log.attributes["http.response.status_code"] >= 200 and log.attributes["http.response.status_code"] < 400 and log.attributes["error.message"] == nil
+              - >-
+                set(log.attributes["agentos.ai.status_class"], "client_error") where log.attributes["event.name"] == "codex.api_request" and log.attributes["http.response.status_code"] >= 400 and log.attributes["http.response.status_code"] < 500
+              - >-
+                set(log.attributes["agentos.ai.status_class"], "server_error") where log.attributes["event.name"] == "codex.api_request" and log.attributes["http.response.status_code"] >= 500 and log.attributes["http.response.status_code"] < 600
+              - >-
+                set(log.attributes["agentos.ai.error.class"], "unknown") where log.attributes["event.name"] == "codex.api_request"
+              - >-
+                set(log.attributes["agentos.ai.error.class"], "none") where log.attributes["event.name"] == "codex.api_request" and log.attributes["error.message"] == nil and log.attributes["http.response.status_code"] < 400
+              - >-
+                set(log.attributes["agentos.ai.error.class"], "authentication") where log.attributes["event.name"] == "codex.api_request" and (log.attributes["http.response.status_code"] == 401 or log.attributes["http.response.status_code"] == 403)
+              - >-
+                set(log.attributes["agentos.ai.error.class"], "rate_limit") where log.attributes["event.name"] == "codex.api_request" and log.attributes["http.response.status_code"] == 429
+              - >-
+                set(log.attributes["agentos.ai.error.class"], "overload") where log.attributes["event.name"] == "codex.api_request" and (log.attributes["http.response.status_code"] == 502 or log.attributes["http.response.status_code"] == 503 or log.attributes["http.response.status_code"] == 529)
+              - >-
+                set(log.attributes["agentos.ai.error.class"], "unavailable") where log.attributes["event.name"] == "codex.api_request" and log.attributes["http.response.status_code"] >= 500 and log.attributes["http.response.status_code"] < 600 and log.attributes["http.response.status_code"] != 502 and log.attributes["http.response.status_code"] != 503 and log.attributes["http.response.status_code"] != 529
+              - >-
+                set(log.attributes["agentos.ai.provider.request_id"], log.attributes["auth.request_id"]) where log.attributes["event.name"] == "codex.api_request" and log.attributes["auth.request_id"] != nil
+              - >-
+                truncate_all(log.attributes, 128) where log.attributes["event.name"] == "codex.api_request"
       probabilistic_sampler/fleet:
         mode: proportional
         sampling_percentage: ${env:AGENTOS_OTEL_TRACE_SAMPLING_PERCENTAGE}
@@ -318,7 +401,7 @@ data:
               - delete_matching_keys(scope.attributes, ".*")
           - statements:
               - >-
-                keep_keys(log.attributes, ["agentos.access.credential.outcome", "agentos.access.decision", "agentos.access.dependency", "agentos.access.operation", "agentos.access.reason", "agentos.ai.compaction.path", "agentos.ai.error.class", "agentos.ai.operation.id", "agentos.ai.provider.request_id", "agentos.ai.request.attempt_id", "agentos.ai.request.kind", "agentos.ai.route", "agentos.ai.runtime", "agentos.ai.status_class", "agentos.ai.stream.outcome", "agentos.authz.decision_ref", "agentos.authz.profile_id", "agentos.authz.profile_version", "agentos.identity.agent_id", "agentos.identity.assignment_id", "agentos.memory.degradation.class", "agentos.memory.index.state", "agentos.memory.index.version", "agentos.memory.method", "agentos.memory.operation", "agentos.memory.outcome", "agentos.memory.topic_id", "agentos.protocol.fallback", "agentos.protocol.name", "agentos.protocol.operation", "agentos.protocol.outcome", "agentos.readiness.component", "agentos.readiness.outcome", "agentos.resilience.cause", "agentos.resilience.evidence", "agentos.resilience.operation.id", "agentos.resilience.outcome", "agentos.resilience.phase", "agentos.resilience.protocol.id", "agentos.resilience.recovery", "agentos.resilience.source", "agentos.resilience.topology.proposal_id", "agentos.telemetry.contract.version", "agentos.telemetry.outcome", "agentos.telemetry.reason", "agentos.telemetry.signal", "agentos.telemetry.stage", "agentos.topology.action", "agentos.topology.reason"])
+                keep_keys(log.attributes, ["agentos.access.credential.outcome", "agentos.access.decision", "agentos.access.dependency", "agentos.access.operation", "agentos.access.reason", "agentos.ai.compaction.path", "agentos.ai.error.class", "agentos.ai.operation.id", "agentos.ai.provider.request_id", "agentos.ai.request.attempt_id", "agentos.ai.request.kind", "agentos.ai.route", "agentos.ai.runtime", "agentos.ai.status_class", "agentos.ai.stream.outcome", "agentos.authz.decision_ref", "agentos.authz.profile_id", "agentos.authz.profile_version", "agentos.identity.agent_id", "agentos.identity.assignment_id", "agentos.memory.degradation.class", "agentos.memory.index.state", "agentos.memory.index.version", "agentos.memory.method", "agentos.memory.operation", "agentos.memory.outcome", "agentos.memory.topic_id", "agentos.protocol.fallback", "agentos.protocol.name", "agentos.protocol.operation", "agentos.protocol.outcome", "agentos.readiness.component", "agentos.readiness.outcome", "agentos.resilience.cause", "agentos.resilience.evidence", "agentos.resilience.operation.id", "agentos.resilience.outcome", "agentos.resilience.phase", "agentos.resilience.protocol.id", "agentos.resilience.recovery", "agentos.resilience.source", "agentos.resilience.topology.proposal_id", "agentos.telemetry.contract.version", "agentos.telemetry.outcome", "agentos.telemetry.reason", "agentos.telemetry.signal", "agentos.telemetry.stage", "agentos.topology.action", "agentos.topology.reason", "http.response.status_code"])
           - statements:
               - set(log.body, "")
       batch:
@@ -354,6 +437,7 @@ data:
             - memory_limiter
             - k8sattributes
             - resource_detection/fleet
+            - transform/codex_native
             - resource/privacy
             - attributes/privacy
             - transform/contract_allowlist
@@ -368,6 +452,7 @@ data:
             - memory_limiter
             - k8sattributes
             - resource_detection/fleet
+            - transform/codex_native
             - resource/privacy
             - attributes/privacy
             - attributes/metric_cardinality
@@ -382,6 +467,7 @@ data:
             - memory_limiter
             - k8sattributes
             - resource_detection/fleet
+            - transform/codex_native
             - resource/privacy
             - attributes/privacy
             - transform/contract_allowlist
