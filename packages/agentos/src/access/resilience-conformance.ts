@@ -999,6 +999,11 @@ const GitHubSemanticReadiness = regressionTest(
   "keeps liveness independent while semantic readiness fails closed",
   "#96",
 );
+const OpenAISemanticReadiness = regressionTest(
+  "services/ai-gateway/tests/gateway-service.effect.test.ts",
+  "fails readiness closed when authenticated budget settlement is unusable",
+  "#96",
+);
 const SettlementIdentityReadiness = regressionTest(
   "packages/agentos/src/access/tests/provider-budget-settlement-http.effect.test.ts",
   "proves its rotated Pod identity against authenticated settlement readiness",
@@ -1055,7 +1060,7 @@ export const ACCESS_RESILIENCE_REGRESSION_SOURCES: ReadonlyArray<
   ...regressionPair("dependency.openfga_outage", PolicyOpenFgaFailure, AuthorizerReadiness),
   ...regressionPair("dependency.authorizer_outage", HttpDependency, AuthorizerReadiness),
   ...regressionPair("dependency.agentgateway_outage", Agentgateway, AgentgatewayTopology),
-  ...regressionPair("dependency.provider_adapter_outage", GitHubTransport, GitHubSemanticReadiness),
+  ...regressionPair("dependency.provider_adapter_outage", GitHubSemanticReadiness, OpenAISemanticReadiness),
   ...regressionPair("credential.provider_expiry_refresh", GitHubTokenCache, GitHubRefresh),
   ...regressionPair("credential.projected_token_rotation", KubernetesRotation, SettlementIdentityReadiness),
   ...regressionPair("transport.bounded_retry", GitHubTokenCache, DatabaseBudgetRetry),

@@ -59,6 +59,15 @@ composes only the approved clients. Repeated Gateway-owned device logins create
 the multi-subscription pool; `$agentos-ai-gateway` owns the exact lifecycle and
 native Pi/Codex configuration.
 
+`GET /healthz` proves only that the process is serving. `GET /readyz` requires
+both usable pooled/provider fallback capacity and the current
+`agentos-provider-budget-settlement` Pod token to pass the authorizer's
+authenticated semantic readiness boundary. This rechecks TokenReview, live
+Pod/ServiceAccount identity, PostgreSQL policy and budget privileges, and the
+pinned OpenFGA model without mutating a budget. A settlement outage therefore
+removes the adapter from ready endpoints even when an OpenAI credential is
+otherwise usable; failures disclose no credential or dependency content.
+
 ## OpenTelemetry
 
 The Gateway uses Effect's native tracer, logger, metrics, and scoped OTLP/HTTP

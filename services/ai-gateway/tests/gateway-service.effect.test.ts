@@ -2,6 +2,8 @@ import { layer as BunCryptoLayer } from "@effect/platform-bun/BunCrypto";
 import { assert, describe, it } from "@effect/vitest";
 import {
   AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
+  ProviderBudgetSettlementHttpError,
+  ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
   providerAuthorizationGrantHeaders,
   type ProviderAuthorizationGrantV1,
@@ -98,6 +100,7 @@ interface TestServices {
   readonly quota: CodexQuota["Service"];
   readonly provider: AIProviderHttp["Service"];
   readonly settlements: ProviderBudgetSettlementReporter["Service"];
+  readonly settlementReadiness: ProviderBudgetSettlementReadiness["Service"];
   readonly providerRequests: Ref.Ref<ReadonlyArray<Request>>;
   readonly settlementReports: Ref.Ref<ReadonlyArray<
     ProviderBudgetSettlementReportV1
@@ -197,12 +200,16 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
         ).pipe(Effect.as(receipt));
       },
     });
+    const settlementReadiness = ProviderBudgetSettlementReadiness.of({
+      check: Effect.void,
+    });
     return {
       vault,
       routing,
       quota,
       provider,
       settlements,
+      settlementReadiness,
       providerRequests,
       settlementReports,
       released,
@@ -224,6 +231,10 @@ function makeApplication(
     Effect.provideService(
       ProviderBudgetSettlementReporter,
       services.settlements,
+    ),
+    Effect.provideService(
+      ProviderBudgetSettlementReadiness,
+      services.settlementReadiness,
     ),
     Effect.provideService(AIGatewayTelemetry, telemetry),
     Effect.provide(BunCryptoLayer),
@@ -420,6 +431,66 @@ describe("Effect AI Gateway application", () => {
       const statusText = yield* Effect.tryPromise(() => authorized.text());
       assert.notInclude(statusText, "operator-secret");
       assert.notInclude(statusText, "provider-secret");
+    }));
+
+  it.effect("fails readiness closed when authenticated budget settlement is unusable", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const checks = yield* Ref.make(0);
+      const application = yield* makeApplication({
+        ...services,
+        settlementReadiness: ProviderBudgetSettlementReadiness.of({
+          check: Ref.update(checks, (count) => count + 1).pipe(
+            Effect.flatMap(() =>
+              ProviderBudgetSettlementHttpError.make({
+                code: "dependency_unavailable",
+                status: 503,
+              })
+            ),
+          ),
+        }),
+      });
+      assert.strictEqual(
+        (yield* application.handle(
+          new Request("http://ai-gateway.test/healthz"),
+        )).status,
+        200,
+      );
+      const response = yield* application.handle(
+        new Request("http://ai-gateway.test/readyz"),
+      );
+      assert.strictEqual(response.status, 503);
+      assert.deepStrictEqual(yield* Effect.tryPromise(() => response.json()), {
+        reasons: ["budget_settlement_unavailable"],
+        status: "not_ready",
+        version: 1,
+      });
+      const fallbackServices = yield* makeTestServices(false);
+      const fallback = yield* makeApplication({
+        ...fallbackServices,
+        settlementReadiness: ProviderBudgetSettlementReadiness.of({
+          check: Ref.update(checks, (count) => count + 1).pipe(
+            Effect.flatMap(() =>
+              ProviderBudgetSettlementHttpError.make({
+                code: "dependency_unavailable",
+                status: 503,
+              })
+            ),
+          ),
+        }),
+      }, {
+        ...options,
+        allowApiKeyFallback: true,
+        openAIApiKey: "fallback-provider-secret",
+      });
+      assert.strictEqual(
+        (yield* fallback.handle(
+          new Request("http://ai-gateway.test/readyz"),
+        )).status,
+        503,
+      );
+      assert.strictEqual(yield* Ref.get(checks), 2);
     }));
 
   it.effect("uses the API-key credential only when fallback is explicitly enabled", () =>

@@ -1,5 +1,6 @@
 import {
   AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
+  ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
   type ProviderAuthorizationGrantV1,
 } from "@akua-dev/agentos";
@@ -78,6 +79,7 @@ export const makeAIGatewayApplication = Effect.fn(
   const routing = yield* AIRoutingState;
   const quota = yield* CodexQuota;
   const provider = yield* AIProviderHttp;
+  const settlementReadiness = yield* ProviderBudgetSettlementReadiness;
   const settlements = yield* ProviderBudgetSettlementReporter;
   const usage = yield* Ref.make<ReadonlyMap<string, UsageSnapshot>>(new Map());
 
@@ -208,6 +210,10 @@ export const makeAIGatewayApplication = Effect.fn(
   });
 
   const readiness = Effect.fn("agentos.aiGateway.readiness")(function*() {
+    const settlementResult = yield* Effect.result(settlementReadiness.check);
+    if (Result.isFailure(settlementResult)) {
+      return notReadyDiagnostic("budget_settlement_unavailable");
+    }
     if (fallbackAvailable) return readyDiagnostic;
     const setResult = yield* Effect.result(candidateSet());
     if (Result.isFailure(setResult)) {
@@ -485,8 +491,14 @@ function statusResponse(
   });
 }
 
+type GatewayDiagnosticReason =
+  | "budget_settlement_unavailable"
+  | "provider_capacity_degraded"
+  | "provider_capacity_unknown"
+  | "provider_credential_unavailable";
+
 interface GatewayDiagnostic {
-  readonly reasons: ReadonlyArray<string>;
+  readonly reasons: ReadonlyArray<GatewayDiagnosticReason>;
   readonly status: "ready" | "degraded" | "not_ready";
   readonly version: 1;
 }
@@ -497,10 +509,10 @@ const readyDiagnostic: GatewayDiagnostic = {
   version: 1,
 };
 
-function degradedDiagnostic(reason: string): GatewayDiagnostic {
+function degradedDiagnostic(reason: GatewayDiagnosticReason): GatewayDiagnostic {
   return { reasons: [reason], status: "degraded", version: 1 };
 }
 
-function notReadyDiagnostic(reason: string): GatewayDiagnostic {
+function notReadyDiagnostic(reason: GatewayDiagnosticReason): GatewayDiagnostic {
   return { reasons: [reason], status: "not_ready", version: 1 };
 }

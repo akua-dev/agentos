@@ -8,6 +8,7 @@ import * as BunPath from "@effect/platform-bun/BunPath";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import {
   makeProviderBudgetSettlementHttpLayer,
+  ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
 } from "@akua-dev/agentos";
 import {
@@ -167,14 +168,16 @@ function makeAIGatewayRuntimeLive(
       const quota = yield* CodexQuota.pipe(
         Effect.provide(makeCodexQuotaLayer(config.quotaTimeoutMillis)),
       );
-      const settlements = yield* ProviderBudgetSettlementReporter.pipe(
-        Effect.provide(makeProviderBudgetSettlementHttpLayer({
-          baseUrl: config.settlementBaseUrl,
-          tokenPath: config.settlementTokenPath,
-          timeoutMillis: config.settlementTimeoutMillis,
-          maximumResponseBytes: config.settlementMaximumResponseBytes,
-        })),
-      );
+      const settlementLayer = makeProviderBudgetSettlementHttpLayer({
+        baseUrl: config.settlementBaseUrl,
+        tokenPath: config.settlementTokenPath,
+        timeoutMillis: config.settlementTimeoutMillis,
+        maximumResponseBytes: config.settlementMaximumResponseBytes,
+      });
+      const settlementServices = yield* Effect.all({
+        readiness: ProviderBudgetSettlementReadiness,
+        reporter: ProviderBudgetSettlementReporter,
+      }).pipe(Effect.provide(settlementLayer));
 
       const serve = Effect.fn("agentos.aiGateway.serve")(
         (serveConfig: AIGatewayServeConfig) => Effect.scoped(Effect.gen(function*() {
@@ -227,7 +230,11 @@ function makeAIGatewayRuntimeLive(
             Effect.provideService(CodexQuota, quota),
             Effect.provideService(
               ProviderBudgetSettlementReporter,
-              settlements,
+              settlementServices.reporter,
+            ),
+            Effect.provideService(
+              ProviderBudgetSettlementReadiness,
+              settlementServices.readiness,
             ),
             Effect.provideService(AIGatewayTelemetry, telemetry),
             Effect.mapError(() =>
