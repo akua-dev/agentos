@@ -46,7 +46,7 @@ const platform = Layer.mergeAll(
 class KubernetesSmokeError extends Schema.TaggedErrorClass<KubernetesSmokeError>()(
   "KubernetesSmokeError",
   {
-    operation: Schema.Literals(["docker", "kind", "kubectl"]),
+    operation: Schema.Literals(["docker", "git", "kind", "kubectl"]),
     command: Schema.String,
     detail: Schema.optional(Schema.String),
     exitCode: Schema.optional(Schema.Number),
@@ -593,6 +593,7 @@ layer(platform, { excludeTestServices: true })(
           prefix: "agentos-otel-kind-",
         });
         const imageArchive = paths.join(archiveDirectory, "images.tar");
+        const imageSource = paths.join(archiveDirectory, "source");
         const kube = (arguments_: ReadonlyArray<string>, input?: string) =>
           requireCommand(
             "kubectl",
@@ -618,13 +619,35 @@ layer(platform, { excludeTestServices: true })(
         const evidence = yield* Effect.gen(function*() {
           yield* requireCommand("docker", "docker", ["pull", "--quiet", collectorImage]);
           yield* requireCommand("docker", "docker", ["pull", "--quiet", busyboxImage]);
+          const sourceRevision = (yield* requireCommand("git", "git", [
+            "-C",
+            repositoryRoot,
+            "rev-parse",
+            "HEAD",
+          ])).trim();
+          yield* requireCommand("git", "git", [
+            "clone",
+            "--no-checkout",
+            "--no-hardlinks",
+            "--quiet",
+            repositoryRoot,
+            imageSource,
+          ]);
+          yield* requireCommand("git", "git", [
+            "-C",
+            imageSource,
+            "checkout",
+            "--detach",
+            "--quiet",
+            sourceRevision,
+          ]);
           yield* requireCommand("docker", "docker", [
             "build",
             "--tag",
             agentosLoadImage,
             "--build-arg",
             "AGENTOS_VERSION=codex-otel-smoke",
-            repositoryRoot,
+            imageSource,
           ]);
           yield* requireCommand("docker", "docker", [
             "tag",

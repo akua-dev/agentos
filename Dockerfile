@@ -134,6 +134,10 @@ RUN ln -s /tmp/agentos-dependencies/node_modules /tmp/agentos-source/node_module
   && ln -s \
     /tmp/agentos-dependencies/packages/agentos/node_modules \
     /tmp/agentos-source/packages/agentos/node_modules \
+  && printf '%s\n' \
+    /node_modules \
+    /packages/agentos/node_modules \
+    >> /tmp/agentos-source/.git/info/exclude \
   && bun /tmp/agentos-source/packages/agentos/runtime/create-image-seed.ts \
       --source /tmp/agentos-source \
       --output /opt/agentos-seed \
