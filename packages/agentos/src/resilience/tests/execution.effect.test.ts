@@ -43,11 +43,13 @@ function report(
 
 function completeExecutionReport(root: string) {
   return {
+    numTotalTestSuites: AGENTOS_RESILIENCE_EXECUTION_REFERENCES.length,
     success: true,
     numFailedTests: 0,
     testResults: AGENTOS_RESILIENCE_EXECUTION_REFERENCES.map((item) => ({
       name: `${root}/${item.path}`,
       status: "passed",
+      startTime: 1_785_716_626_226,
       assertionResults: [{
         title: item.title,
         fullName: item.title,

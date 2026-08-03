@@ -157,7 +157,7 @@ const ExecutedVerdictInputSchema = Schema.Struct({
   workloadSpecDigest: DigestSchema,
   renderDigest: DigestSchema,
   protocolRevocationMillis: NonNegativeIntegerSchema,
-  report: VitestReportSchema,
+  report: Schema.Unknown,
 });
 
 const HardGateArtifactInputSchema = Schema.Struct({
