@@ -67,6 +67,12 @@ native session marker survive two Pod replacements. It then deletes the child
 plan, verifies the PVC remains, removes every disposable namespace and policy,
 and records only bounded digests and booleans.
 
+The parent [AgentOS resilience hard gate](./agentos-resilience.md) attests this
+suite together with the exact gateway, access, journal, supervision, runtime,
+and ACP/A2A regressions from one clean revision. Its live artifacts add separate
+Mate/Crewmate replacement, retained-PVC/node-affinity, worktree, projected
+`0440` Secret mode, and CPU/memory quota evidence without reading a credential.
+
 The in-memory PostgreSQL companion drives the same typed operation through
 render, apply, rollout, Herdr-launch and locator-update interruption codes. It
 proves exact retry, rejects a changed spec with an identical render, preserves
