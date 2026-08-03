@@ -72,7 +72,7 @@ describe("default AgentOS lifecycle", () => {
         id: "@example/collision",
         names: { version: 1, commands: ["example-first_mate"] },
         register(pi) {
-          pi.on("session_start", () => undefined);
+          return Effect.sync(() => pi.on("session_start", () => undefined));
         },
       };
       const failure = yield* registerDefaultAgentOSEntrypointEffect(fake.pi, {

@@ -4,7 +4,7 @@ import { assert, describe, layer } from "@effect/vitest";
 import { Data, Effect, FileSystem, Layer, Path } from "effect";
 
 import {
-  registerPiWorkloadIdentity,
+  registerPiWorkloadIdentityEffect,
   resolvePiWorkloadIdentity,
 } from "../pi-workload-identity.ts";
 import { makePiTestHarness } from "../../../tests/pi-test-harness.ts";
@@ -51,7 +51,10 @@ describe("Effect Pi projected workload identity", () => {
         const fake = yield* makePiTestHarness({
           context: { model: gatewayModel },
         });
-        registerPiWorkloadIdentity(fake.pi, { environment, tokenFile });
+        yield* registerPiWorkloadIdentityEffect(fake.pi, {
+          environment,
+          tokenFile,
+        });
 
         yield* fileSystem.writeFileString(
           tokenFile,

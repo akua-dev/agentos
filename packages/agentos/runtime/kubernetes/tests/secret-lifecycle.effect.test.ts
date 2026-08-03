@@ -36,7 +36,6 @@ const RenderedSecret = Schema.Struct({
   data: StringRecord,
   kind: Schema.Literal("Secret"),
   metadata: Schema.Struct({ name: Schema.String }),
-  type: Schema.String,
 });
 const ManagedSecretManifest = Schema.Struct({
   apiVersion: Schema.String,
@@ -268,17 +267,11 @@ const writeManagedSecret = Effect.fn(
       `status=${renderedResult.exitCode}; stderr=${renderedResult.stderr.trim()}`,
     );
   }
-  const rendered = yield* decodeJson(RenderedSecret, renderedResult.stdout);
-  const metadata = resourceVersion === ""
-    ? { labels: expectedLabels, name: secretName }
-    : { labels: expectedLabels, name: secretName, resourceVersion };
-  const source = yield* encodeJson(ManagedSecretManifest, {
-    apiVersion: rendered.apiVersion,
-    data: rendered.data,
-    kind: "Secret",
-    metadata,
-    type: rendered.type,
-  });
+  const manifest = yield* managedSecretManifest(
+    renderedResult.stdout,
+    resourceVersion,
+  );
+  const source = yield* encodeJson(ManagedSecretManifest, manifest);
   return yield* submitJson(
     context,
     environment,
@@ -287,6 +280,22 @@ const writeManagedSecret = Effect.fn(
     operation,
     source,
   );
+});
+
+const managedSecretManifest = Effect.fn(
+  "test.secretLifecycle.managedSecretManifest",
+)(function*(source: string, resourceVersion = "") {
+  const rendered = yield* decodeJson(RenderedSecret, source);
+  const metadata = resourceVersion === ""
+    ? { labels: expectedLabels, name: secretName }
+    : { labels: expectedLabels, name: secretName, resourceVersion };
+  return {
+    apiVersion: rendered.apiVersion,
+    data: rendered.data,
+    kind: "Secret",
+    metadata,
+    type: "Opaque",
+  } satisfies typeof ManagedSecretManifest.Type;
 });
 
 const inspectSecret = Effect.fn("test.secretLifecycle.inspectSecret")(
@@ -394,6 +403,15 @@ const waitForProjectedVersion = Effect.fn(
 });
 
 layer(platform)("managed Kubernetes Secret lifecycle", (it) => {
+  it.effect("normalizes kubectl's omitted default Secret type", () =>
+    Effect.gen(function*() {
+      const manifest = yield* managedSecretManifest(
+        '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"managed-credential"},"data":{"token":"eA==","version":"djE="}}',
+      );
+      assert.strictEqual(manifest.type, "Opaque");
+      assert.deepStrictEqual(manifest.metadata.labels, expectedLabels);
+    }));
+
   it.effect(
     "proves retry, rotation, conflict, takeover, projection, rollback, and revocation",
     () => Effect.scoped(Effect.gen(function*() {
@@ -852,8 +870,6 @@ layer(platform)("managed Kubernetes Secret lifecycle", (it) => {
         "",
       );
 
-      yield* fileSystem.remove(staging, { force: true, recursive: true });
-      assert.isFalse(yield* fileSystem.exists(staging));
     })),
     420_000,
   );

@@ -201,7 +201,7 @@ describe("Crewmate Kubernetes base", () => {
           },
           {
             limits: { cpu: "250m", memory: "128Mi" },
-            requests: { cpu: "25m", memory: "32Mi" },
+            requests: { cpu: "25m", memory: "64Mi" },
           },
           {
             limits: { cpu: "2", memory: "4Gi" },

@@ -14,7 +14,7 @@ import {
   decodeOrValidationError,
   makeValidationError,
 } from "./shared/errors.ts";
-import { runPromiseLegacy, runSyncLegacy } from "./shared/legacy.ts";
+import { runAgentOSPiProgram } from "./pi-host-adapter.ts";
 
 export type { AgentOSStartupContributionV1 } from "./shared/contracts.ts";
 
@@ -272,31 +272,12 @@ const handleSessionStartEffect = Effect.fn(
   });
 });
 
-export function buildAgentOSStartupPrompt(
-  contributions: readonly AgentOSStartupContributionV1[],
-): string {
-  return runSyncLegacy(buildAgentOSStartupPromptEffect(contributions));
-}
-
-export function preflightAgentOSStartup(
-  options: AgentOSStartupOptions,
-): void {
-  runSyncLegacy(preflightAgentOSStartupEffect(options));
-}
-
-export function registerAgentOSStartup(
-  pi: ExtensionAPI,
-  options: AgentOSStartupOptions,
-): void {
-  runSyncLegacy(registerAgentOSStartupEffect(pi, options));
-}
-
 function runStartupHandler(
   handler: Effect.Effect<void, unknown>,
   onError: ((error: unknown) => void) | undefined,
 ): Promise<void> {
-  if (onError === undefined) return runPromiseLegacy(handler);
-  return runPromiseLegacy(
+  if (onError === undefined) return runAgentOSPiProgram(handler);
+  return runAgentOSPiProgram(
     handler.pipe(
       Effect.catchCause((cause) =>
         Effect.sync(() => onError(Cause.squash(cause))),

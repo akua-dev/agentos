@@ -10,7 +10,6 @@ import {
   decodeOrValidationError,
   makeValidationError,
 } from "./shared/errors.ts";
-import { runSyncLegacy } from "./shared/legacy.ts";
 
 export type { AgentOSInstructionSourceV1 } from "./shared/contracts.ts";
 
@@ -92,16 +91,3 @@ export const registerAgentOSInstructionsEffect = Effect.fn(
     });
   });
 });
-
-export function buildAgentOSInstructions(
-  sources: readonly AgentOSInstructionSourceV1[],
-): string {
-  return runSyncLegacy(buildAgentOSInstructionsEffect(sources));
-}
-
-export function registerAgentOSInstructions(
-  pi: ExtensionAPI,
-  sources: readonly AgentOSInstructionSourceV1[],
-): void {
-  runSyncLegacy(registerAgentOSInstructionsEffect(pi, sources));
-}
