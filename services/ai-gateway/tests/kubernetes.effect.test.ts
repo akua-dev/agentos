@@ -37,7 +37,9 @@ const Container = Schema.Struct({
 });
 const StatefulSetSpec = Schema.Struct({
   replicas: Schema.Number,
+  revisionHistoryLimit: Schema.Number,
   serviceName: Schema.String,
+  updateStrategy: Schema.Struct({ type: Schema.Literal("OnDelete") }),
   persistentVolumeClaimRetentionPolicy: Schema.Unknown,
   volumeClaimTemplates: Schema.Unknown,
   template: Schema.Struct({
@@ -149,7 +151,9 @@ describe("optional Fleet AI Gateway", () => {
         statefulSet.spec,
       );
       assert.strictEqual(spec.replicas, 1);
+      assert.strictEqual(spec.revisionHistoryLimit, 3);
       assert.strictEqual(spec.serviceName, "ai-gateway");
+      assert.deepStrictEqual(spec.updateStrategy, { type: "OnDelete" });
       assert.deepStrictEqual(spec.persistentVolumeClaimRetentionPolicy, {
         whenDeleted: "Retain",
         whenScaled: "Retain",

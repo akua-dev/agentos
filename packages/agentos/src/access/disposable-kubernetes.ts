@@ -145,6 +145,99 @@ const RoleBindingSchema = Schema.fromJsonString(Schema.Struct({
     namespace: KubernetesNameSchema,
   })).pipe(Schema.check(Schema.isMinLength(1), Schema.isMaxLength(2))),
 }));
+const RolloutDeploymentSchema = Schema.fromJsonString(Schema.Struct({
+  apiVersion: Schema.Literal("apps/v1"),
+  kind: Schema.Literal("Deployment"),
+  metadata: Schema.Struct({ name: Schema.Literal("access-rollout") }),
+  spec: Schema.Struct({
+    replicas: Schema.Literal(2),
+    revisionHistoryLimit: Schema.Literal(3),
+    progressDeadlineSeconds: Schema.Literal(15),
+    strategy: Schema.Struct({
+      type: Schema.Literal("RollingUpdate"),
+      rollingUpdate: Schema.Struct({
+        maxSurge: Schema.Literal(1),
+        maxUnavailable: Schema.Literal(0),
+      }),
+    }),
+    selector: Schema.Struct({
+      matchLabels: Schema.Struct({ app: Schema.Literal("access-rollout") }),
+    }),
+    template: Schema.Struct({
+      metadata: Schema.Struct({
+        labels: Schema.Struct({
+          app: Schema.Literal("access-rollout"),
+          revision: KubernetesNameSchema,
+        }),
+      }),
+      spec: Schema.Struct({
+        automountServiceAccountToken: Schema.Literal(false),
+        terminationGracePeriodSeconds: Schema.Literal(1),
+        securityContext: Schema.Struct({
+          runAsNonRoot: Schema.Literal(true),
+          runAsUser: Schema.Literal(65_535),
+          runAsGroup: Schema.Literal(65_535),
+          seccompProfile: Schema.Struct({
+            type: Schema.Literal("RuntimeDefault"),
+          }),
+        }),
+        containers: Schema.Tuple([Schema.Struct({
+          name: Schema.Literal("probe"),
+          image: Schema.Literal(disposableAccessProbeImage),
+          imagePullPolicy: Schema.Literal("IfNotPresent"),
+          command: Schema.Tuple([
+            Schema.Literal("/bin/sh"),
+            Schema.Literal("-c"),
+            Schema.Literal("httpd -f -p 8080 -h /www"),
+          ]),
+          ports: Schema.Tuple([Schema.Struct({
+            name: Schema.Literal("http"),
+            containerPort: Schema.Literal(8080),
+          })]),
+          readinessProbe: Schema.Struct({
+            httpGet: Schema.Struct({
+              path: Schema.Literal("/readyz"),
+              port: Schema.Literal("http"),
+            }),
+            periodSeconds: Schema.Literal(1),
+            timeoutSeconds: Schema.Literal(1),
+            failureThreshold: Schema.Literal(2),
+          }),
+          securityContext: Schema.Struct({
+            allowPrivilegeEscalation: Schema.Literal(false),
+            readOnlyRootFilesystem: Schema.Literal(true),
+            capabilities: Schema.Struct({
+              drop: Schema.Tuple([Schema.Literal("ALL")]),
+            }),
+          }),
+          volumeMounts: Schema.Tuple([Schema.Struct({
+            name: Schema.Literal("content"),
+            mountPath: Schema.Literal("/www"),
+            readOnly: Schema.Literal(true),
+          })]),
+        })]),
+        volumes: Schema.Tuple([Schema.Struct({
+          name: Schema.Literal("content"),
+          configMap: Schema.Struct({ name: KubernetesNameSchema }),
+        })]),
+      }),
+    }),
+  }),
+}));
+const RolloutStatusSchema = Schema.fromJsonString(Schema.Struct({
+  spec: Schema.Struct({
+    replicas: Schema.Number,
+    template: Schema.Struct({
+      metadata: Schema.Struct({
+        labels: Schema.Record(Schema.String, Schema.String),
+      }),
+    }),
+  }),
+  status: Schema.Struct({
+    availableReplicas: Schema.optionalKey(Schema.Number),
+    updatedReplicas: Schema.optionalKey(Schema.Number),
+  }),
+}));
 
 const TokenPattern = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const TokenPath = "/var/run/secrets/agentos-egress/token";
@@ -162,6 +255,8 @@ export class DisposableAccessProofError extends Schema.TaggedErrorClass<Disposab
       "hot_reload_timeout",
       "access_plane_not_absent",
       "internet_unavailable",
+      "rollout_failed",
+      "rollback_failed",
     ]),
   },
 ) {}
@@ -187,6 +282,10 @@ export interface DisposableAccessPlaneEvidence {
   readonly projectedTokensRotated: true;
   readonly unrelatedSubjectAllowed: true;
   readonly ordinaryInternetAllowed: true;
+  readonly rollingUpgradeObserved: true;
+  readonly failedRevisionWithheld: true;
+  readonly rollingRollbackObserved: true;
+  readonly unrelatedWorkloadAvailableDuringRollback: true;
   readonly namespacesDeleted: true;
   readonly productionEndpointContacted: false;
 }
@@ -419,6 +518,11 @@ export const runDisposableAccessPlaneProof = Effect.fn(
       `system:serviceaccount:${namespace}:unrelated`,
     );
 
+    const rollout = yield* exerciseAccessRollout(
+      options.context,
+      namespace,
+    );
+
     yield* requireAccessPlaneAbsent(options.context);
     const internet = yield* runKubectl(options.context, [
       "--namespace",
@@ -463,6 +567,11 @@ export const runDisposableAccessPlaneProof = Effect.fn(
       projectedTokensRotated: true,
       unrelatedSubjectAllowed: true,
       ordinaryInternetAllowed: true,
+      rollingUpgradeObserved: rollout.rollingUpgradeObserved,
+      failedRevisionWithheld: rollout.failedRevisionWithheld,
+      rollingRollbackObserved: rollout.rollingRollbackObserved,
+      unrelatedWorkloadAvailableDuringRollback:
+        rollout.unrelatedWorkloadAvailableDuringRollback,
       namespacesDeleted: true,
       productionEndpointContacted: false,
     };
@@ -579,6 +688,258 @@ function pod(name: string, serviceAccount: string): typeof PodSchema.Type {
     },
   };
 }
+
+const exerciseAccessRollout = Effect.fn(
+  "agentos.access.exerciseDisposableRollout",
+)(function*(context: string, namespace: string) {
+  yield* Effect.forEach(
+    [
+      { name: "rollout-v1", ready: true },
+      { name: "rollout-bad", ready: false },
+      { name: "rollout-v2", ready: true },
+    ],
+    ({ name, ready }) =>
+      requireKubectl(context, [
+        "--namespace",
+        namespace,
+        "create",
+        "configmap",
+        name,
+        `--from-literal=${ready ? "readyz=ready" : "not-ready=blocked"}`,
+      ]),
+    { concurrency: 3, discard: true },
+  );
+  yield* applyRolloutDeployment(
+    context,
+    namespace,
+    "rollout-v1",
+    "revision-v1",
+  );
+  yield* requireKubectl(context, [
+    "--namespace",
+    namespace,
+    "expose",
+    "deployment",
+    "access-rollout",
+    "--name=access-rollout",
+    "--port=8080",
+    "--target-port=http",
+  ]);
+  yield* requireKubectl(context, [
+    "--namespace",
+    namespace,
+    "rollout",
+    "status",
+    "deployment/access-rollout",
+    "--timeout=60s",
+  ]);
+  yield* requireRolloutRevision(
+    context,
+    namespace,
+    "revision-v1",
+  );
+
+  yield* applyRolloutDeployment(
+    context,
+    namespace,
+    "rollout-bad",
+    "revision-bad",
+  );
+  const failed = yield* runKubectl(context, [
+    "--namespace",
+    namespace,
+    "rollout",
+    "status",
+    "deployment/access-rollout",
+    "--timeout=18s",
+  ]);
+  if (failed.exitCode === 0) return yield* proofError("rollout_failed");
+  const badState = yield* deploymentStatus(context, namespace);
+  if ((badState.status.availableReplicas ?? 0) < 2) {
+    return yield* proofError("rollout_failed");
+  }
+  const unrelatedWorkloadAvailableDuringRollback = yield* rolloutServiceReady(
+    context,
+    namespace,
+  );
+  if (!unrelatedWorkloadAvailableDuringRollback) {
+    return yield* proofError("rollout_failed");
+  }
+
+  yield* requireKubectl(context, [
+    "--namespace",
+    namespace,
+    "rollout",
+    "undo",
+    "deployment/access-rollout",
+  ]);
+  yield* requireKubectl(context, [
+    "--namespace",
+    namespace,
+    "rollout",
+    "status",
+    "deployment/access-rollout",
+    "--timeout=60s",
+  ]);
+  yield* requireRolloutRevision(
+    context,
+    namespace,
+    "revision-v1",
+  ).pipe(Effect.mapError(() => proofError("rollback_failed")));
+
+  yield* applyRolloutDeployment(
+    context,
+    namespace,
+    "rollout-v2",
+    "revision-v2",
+  );
+  yield* requireKubectl(context, [
+    "--namespace",
+    namespace,
+    "rollout",
+    "status",
+    "deployment/access-rollout",
+    "--timeout=60s",
+  ]);
+  yield* requireRolloutRevision(
+    context,
+    namespace,
+    "revision-v2",
+  );
+  if (!(yield* rolloutServiceReady(context, namespace))) {
+    return yield* proofError("rollout_failed");
+  }
+  return successfulRolloutEvidence();
+});
+
+function successfulRolloutEvidence(): {
+  readonly rollingUpgradeObserved: true;
+  readonly failedRevisionWithheld: true;
+  readonly rollingRollbackObserved: true;
+  readonly unrelatedWorkloadAvailableDuringRollback: true;
+} {
+  return {
+    rollingUpgradeObserved: true,
+    failedRevisionWithheld: true,
+    rollingRollbackObserved: true,
+    unrelatedWorkloadAvailableDuringRollback: true,
+  };
+}
+
+const applyRolloutDeployment = Effect.fn(
+  "agentos.access.applyDisposableRollout",
+)(function*(
+  context: string,
+  namespace: string,
+  configMap: string,
+  revision: string,
+) {
+  const manifest = yield* Schema.encodeEffect(RolloutDeploymentSchema)({
+    apiVersion: "apps/v1",
+    kind: "Deployment",
+    metadata: { name: "access-rollout" },
+    spec: {
+      replicas: 2,
+      revisionHistoryLimit: 3,
+      progressDeadlineSeconds: 15,
+      strategy: {
+        type: "RollingUpdate",
+        rollingUpdate: { maxSurge: 1, maxUnavailable: 0 },
+      },
+      selector: { matchLabels: { app: "access-rollout" } },
+      template: {
+        metadata: { labels: { app: "access-rollout", revision } },
+        spec: {
+          automountServiceAccountToken: false,
+          terminationGracePeriodSeconds: 1,
+          securityContext: {
+            runAsNonRoot: true,
+            runAsUser: 65_535,
+            runAsGroup: 65_535,
+            seccompProfile: { type: "RuntimeDefault" },
+          },
+          containers: [{
+            name: "probe",
+            image: disposableAccessProbeImage,
+            imagePullPolicy: "IfNotPresent",
+            command: ["/bin/sh", "-c", "httpd -f -p 8080 -h /www"],
+            ports: [{ name: "http", containerPort: 8080 }],
+            readinessProbe: {
+              httpGet: { path: "/readyz", port: "http" },
+              periodSeconds: 1,
+              timeoutSeconds: 1,
+              failureThreshold: 2,
+            },
+            securityContext: {
+              allowPrivilegeEscalation: false,
+              readOnlyRootFilesystem: true,
+              capabilities: { drop: ["ALL"] },
+            },
+            volumeMounts: [{
+              name: "content",
+              mountPath: "/www",
+              readOnly: true,
+            }],
+          }],
+          volumes: [{ name: "content", configMap: { name: configMap } }],
+        },
+      },
+    },
+  }).pipe(Effect.mapError(() => proofError("rollout_failed")));
+  yield* requireKubectl(
+    context,
+    ["--namespace", namespace, "apply", "--filename=-"],
+    manifest,
+  );
+});
+
+const deploymentStatus = Effect.fn(
+  "agentos.access.disposableRolloutStatus",
+)(function*(context: string, namespace: string) {
+  const source = yield* requireKubectl(context, [
+    "--namespace",
+    namespace,
+    "get",
+    "deployment",
+    "access-rollout",
+    "--output=json",
+  ]);
+  return yield* Schema.decodeUnknownEffect(RolloutStatusSchema)(source).pipe(
+    Effect.mapError(() => proofError("rollout_failed")),
+  );
+});
+
+const requireRolloutRevision = Effect.fn(
+  "agentos.access.requireDisposableRolloutRevision",
+)(function*(context: string, namespace: string, revision: string) {
+  const state = yield* deploymentStatus(context, namespace);
+  if (
+    state.spec.template.metadata.labels.revision !== revision ||
+    state.spec.replicas !== 2 ||
+    state.status.availableReplicas !== 2 ||
+    state.status.updatedReplicas !== 2
+  ) return yield* proofError("rollout_failed");
+});
+
+const rolloutServiceReady = Effect.fn(
+  "agentos.access.disposableRolloutServiceReady",
+)(function*(context: string, namespace: string) {
+  const result = yield* runKubectl(context, [
+    "--namespace",
+    namespace,
+    "exec",
+    "unrelated",
+    "--",
+    "wget",
+    "-q",
+    "-T",
+    "5",
+    "-O",
+    "/dev/null",
+    "http://access-rollout:8080/readyz",
+  ]);
+  return result.exitCode === 0;
+});
 
 const applyRoleBinding = Effect.fn("agentos.access.applyHotReloadBinding")(
   function*(context: string, namespace: string, subjects: ReadonlyArray<string>) {

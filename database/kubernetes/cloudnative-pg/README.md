@@ -1,15 +1,17 @@
 # Self-hosted PostgreSQL
 
 This directory owns the optional in-cluster database shape. The version-neutral
-manifest set
-renders one `postgresql.cnpg.io/v1` `Cluster` backed by CloudNativePG: one
-instance, a 20 GiB PVC, data checksums, and the unprivileged `agentos`
-application identity. An external PostgreSQL endpoint is an equally supported
-topology and uses the same SQL contract.
+manifest set renders one `postgresql.cnpg.io/v1` `Cluster` backed by
+CloudNativePG: three instances, separate 20 GiB data and 5 GiB WAL PVCs, data
+checksums, standby-preferred online VolumeSnapshot backup, and the unprivileged
+`agentos` application identity. An external PostgreSQL endpoint is an equally
+supported topology and uses the same SQL contract.
 
-The single-instance topology is the fastest bootstrap path, not an HA or backed-up
-production topology. First Mate must explain that boundary and ask before
-installing the cluster-scoped CNPG controller or creating the database.
+The target cluster must provide CSI `VolumeSnapshot` support and a default or
+explicitly patched snapshot class before a backup is requested. Replication is
+not backup: First Mate must verify a completed restore into a new Cluster before
+calling the topology production-ready. Installing the cluster-scoped CNPG
+controller or creating the database still requires explicit approval.
 
 First Mate discovers the newest stable official CloudNativePG release compatible
 with the selected Kubernetes server and the newest stable supported PostgreSQL

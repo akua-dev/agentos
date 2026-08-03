@@ -7,8 +7,9 @@ metadata:
     app.kubernetes.io/name: agentos-postgres
     app.kubernetes.io/part-of: agentos
 spec:
-  instances: 1
+  instances: 3
   enableSuperuserAccess: false
+  primaryUpdateStrategy: unsupervised
   bootstrap:
     initdb:
       database: agentos
@@ -16,3 +17,19 @@ spec:
       dataChecksums: true
   storage:
     size: 20Gi
+  walStorage:
+    size: 5Gi
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: 256MB
+  monitoring:
+    enablePodMonitor: false
+  backup:
+    target: prefer-standby
+    volumeSnapshot:
+      online: true
+      snapshotOwnerReference: backup
+      onlineConfiguration:
+        immediateCheckpoint: false
+        waitForArchive: false

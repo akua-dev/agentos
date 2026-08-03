@@ -93,6 +93,13 @@ describe("GitHub broker Kubernetes boundary", () => {
         '"mountPath":"/var/run/secrets/agentos-budget-settlement"',
       );
       assert.include(rendered, '"path":"token"');
+      assert.include(rendered, '"revisionHistoryLimit":3');
+      assert.include(
+        rendered,
+        '"rollingUpdate":{"maxSurge":1,"maxUnavailable":0}',
+      );
+      assert.include(rendered, '"topologyKey":"kubernetes.io/hostname"');
+      assert.include(rendered, '"whenUnsatisfiable":"ScheduleAnyway"');
       assert.notInclude(rendered, "ClusterRole");
       assert.notInclude(rendered, "ClusterRoleBinding");
     }).pipe(Effect.provide(platform)));
