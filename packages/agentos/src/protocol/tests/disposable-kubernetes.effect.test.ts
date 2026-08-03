@@ -13,7 +13,10 @@ import {
 } from "effect";
 import { TestClock } from "effect/testing";
 
-import { runDisposableProtocolIdentityProof } from "../disposable-kubernetes.ts";
+import {
+  disposableProtocolWriterImage,
+  runDisposableProtocolIdentityProof,
+} from "../disposable-kubernetes.ts";
 import {
   ProtocolHardGateEvidenceV1Schema,
   resolveDisposableProofOptions,
@@ -42,6 +45,14 @@ const LiveConfig = Config.all({
 });
 
 describe("disposable ACP/A2A Kubernetes identity boundary", () => {
+  it.effect("pins every disposable protocol writer image by digest", () =>
+    Effect.sync(() => {
+      assert.match(
+        disposableProtocolWriterImage,
+        /^registry\.k8s\.io\/pause@sha256:[0-9a-f]{64}$/,
+      );
+    }));
+
   it.effect("proves projected identity, direct-edge RBAC, denial, revocation, and cleanup", () =>
     Effect.gen(function*() {
       const config = yield* LiveConfig;

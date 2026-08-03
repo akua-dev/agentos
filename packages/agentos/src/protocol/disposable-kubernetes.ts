@@ -7,6 +7,9 @@ import {
 } from "effect";
 import { ChildProcess } from "effect/unstable/process";
 
+export const disposableProtocolWriterImage =
+  "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a";
+
 const KubernetesNameSchema = Schema.String.pipe(
   Schema.check(
     Schema.isMaxLength(63),
@@ -84,7 +87,7 @@ const StatefulSetSchema = Schema.fromJsonString(Schema.Struct({
         }),
         containers: Schema.Tuple([Schema.Struct({
           name: Schema.Literal("writer"),
-          image: Schema.Literal("registry.k8s.io/pause:3.10"),
+          image: Schema.Literal(disposableProtocolWriterImage),
           imagePullPolicy: Schema.Literal("IfNotPresent"),
           securityContext: Schema.Struct({
             allowPrivilegeEscalation: Schema.Literal(false),
@@ -444,7 +447,7 @@ function statefulSet(
           },
           containers: [{
             name: "writer",
-            image: "registry.k8s.io/pause:3.10",
+            image: disposableProtocolWriterImage,
             imagePullPolicy: "IfNotPresent",
             securityContext: {
               allowPrivilegeEscalation: false,
