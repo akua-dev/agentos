@@ -17,8 +17,26 @@ const Resource = Schema.Struct({
   kind: Schema.String,
   metadata: Schema.Struct({ name: Schema.String }),
   data: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  spec: Schema.optional(Schema.Unknown),
 });
 const Resources = Schema.Array(Resource);
+const CollectorStatefulSet = Schema.Struct({
+  kind: Schema.Literal("StatefulSet"),
+  metadata: Schema.Struct({ name: Schema.String }),
+  spec: Schema.Struct({
+    template: Schema.Struct({
+      spec: Schema.Struct({
+        containers: Schema.Array(Schema.Struct({
+          name: Schema.String,
+          env: Schema.Array(Schema.Struct({
+            name: Schema.String,
+            value: Schema.optional(Schema.String),
+          })),
+        })),
+      }),
+    }),
+  }),
+});
 const Action = Schema.Struct({
   key: Schema.String,
   action: Schema.String,
@@ -31,6 +49,7 @@ const CollectorConfig = Schema.Struct({
     actions: Schema.optional(Schema.Array(Action)),
     attributes: Schema.optional(Schema.Array(Action)),
     detectors: Schema.optional(Schema.Array(Schema.String)),
+    extract: Schema.optional(Schema.Unknown),
     timeout: Schema.optional(Schema.String),
     override: Schema.optional(Schema.Boolean),
     mode: Schema.optional(Schema.String),
@@ -93,6 +112,15 @@ const ProbabilisticSampler = Schema.Struct({
   sampling_percentage: Schema.String,
   fail_closed: Schema.Boolean,
   sampling_precision: Schema.Number,
+});
+const KubernetesAttributes = Schema.Struct({
+  extract: Schema.Struct({
+    labels: Schema.Array(Schema.Struct({
+      tag_name: Schema.String,
+      key: Schema.String,
+      from: Schema.String,
+    })),
+  }),
 });
 const RemoteExporter = Schema.Struct({
   retry_on_failure: Schema.Struct({
@@ -285,6 +313,33 @@ const validationCases: ReadonlyArray<readonly [string, ExportMode]> = [
 ];
 
 layer(testLayer, { timeout: "60 seconds" })("Collector configuration", (it) => {
+  it.effect("declares the bounded Fleet and cluster identity used to enrich native runtimes", () =>
+    Effect.gen(function*() {
+      const paths = yield* Path.Path;
+      const kubernetesDirectory = yield* paths.fromFileUrl(kubernetesUrl);
+      const documents = yield* renderKustomize(
+        paths.join(kubernetesDirectory, "base"),
+      );
+      const resources = yield* Schema.decodeUnknownEffect(Resources)(documents);
+      const statefulSet = resources.find((resource) =>
+        resource.kind === "StatefulSet" &&
+        resource.metadata.name === "agentos-otel-collector"
+      );
+      const decoded = yield* Schema.decodeUnknownEffect(CollectorStatefulSet)(
+        statefulSet,
+      );
+      const collector = decoded.spec.template.spec.containers.find(
+        ({ name }) => name === "collector",
+      );
+      const environment = Object.fromEntries(
+        collector?.env.map(({ name, value }) => [name, value]) ?? [],
+      );
+      assert.strictEqual(
+        environment.OTEL_RESOURCE_ATTRIBUTES,
+        "agentos.fleet.name=default,deployment.environment.name=development,agentos.telemetry.contract.version=1,k8s.cluster.name=agentos",
+      );
+    }));
+
   for (const [directory, mode] of validationCases) {
     it.effect(`validates the ${directory} pipeline with Collector 0.157.0`, () =>
       Effect.gen(function*() {
@@ -314,6 +369,7 @@ layer(testLayer, { timeout: "60 seconds" })("Collector configuration", (it) => {
             "memory_limiter",
             "k8sattributes",
             "resource_detection/fleet",
+            "transform/codex_native",
             "resource/privacy",
             "attributes/privacy",
             "transform/contract_allowlist",
@@ -331,6 +387,7 @@ layer(testLayer, { timeout: "60 seconds" })("Collector configuration", (it) => {
           "memory_limiter",
           "k8sattributes",
           "resource_detection/fleet",
+          "transform/codex_native",
           "resource/privacy",
           "attributes/privacy",
           "attributes/metric_cardinality",
@@ -434,6 +491,55 @@ layer(testLayer, { timeout: "60 seconds" })("Collector configuration", (it) => {
           assert.isTrue(
             metricProtected.has(key),
             `${directory} metric cardinality: ${key}`,
+          );
+        }
+
+        assert.deepStrictEqual(
+          yield* Schema.decodeUnknownEffect(KubernetesAttributes)(
+            parsed.processors.k8sattributes,
+          ),
+          {
+            extract: {
+              labels: [
+                {
+                  tag_name: "agentos.ai.runtime",
+                  key: "agentos.akua.dev/ai-runtime",
+                  from: "pod",
+                },
+                {
+                  tag_name: "agentos.ai.runtime.version",
+                  key: "agentos.akua.dev/ai-runtime-version",
+                  from: "pod",
+                },
+              ],
+            },
+          },
+        );
+        const codexNative = parsed.processors["transform/codex_native"];
+        assert.isDefined(codexNative, `${directory} Codex normalization`);
+        for (const statements of [
+          codexNative?.trace_statements,
+          codexNative?.metric_statements,
+          codexNative?.log_statements,
+        ]) {
+          assert.isTrue(
+            (statements?.flatMap(({ statements }) => statements) ?? []).some(
+              (statement) => statement.includes('resource.attributes["k8s.workload.name"]'),
+            ),
+            `${directory} workload enrichment`,
+          );
+        }
+        const nativeLogStatements = codexNative?.log_statements
+          ?.flatMap(({ statements }) => statements) ?? [];
+        for (const attribute of [
+          "agentos.ai.status_class",
+          "agentos.ai.error.class",
+          "agentos.ai.provider.request_id",
+          "agentos.ai.request.kind",
+        ]) {
+          assert.isTrue(
+            nativeLogStatements.some((statement) => statement.includes(attribute)),
+            `${directory} Codex log projection: ${attribute}`,
           );
         }
       }

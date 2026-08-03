@@ -45,7 +45,7 @@ spec:
             - name: AGENTOS_OTEL_TRACE_SAMPLING_PERCENTAGE
               value: "100"
             - name: OTEL_RESOURCE_ATTRIBUTES
-              value: agentos.fleet.name=default,deployment.environment.name=development,agentos.telemetry.contract.version=1
+              value: agentos.fleet.name=default,deployment.environment.name=development,agentos.telemetry.contract.version=1,k8s.cluster.name=agentos
           ports:
             - name: otlp-grpc
               containerPort: 4317
