@@ -55,11 +55,12 @@ const runProcess = Effect.fn("test.codexNativeOtel.runProcess")(function*(
   command: string,
   arguments_: ReadonlyArray<string>,
   environment: Readonly<Record<string, string>>,
+  extendEnv = false,
 ) {
   return yield* Effect.scoped(Effect.gen(function*() {
     const child = yield* ChildProcess.make(command, Array.from(arguments_), {
       env: environment,
-      extendEnv: false,
+      extendEnv,
       forceKillAfter: "2 seconds",
       killSignal: "SIGTERM",
       stdin: "ignore",
@@ -97,15 +98,23 @@ const resolvePinnedCodex = Effect.fn("test.codexNativeOtel.resolvePinnedCodex")(
   function*() {
     const fileSystem = yield* FileSystem.FileSystem;
     const paths = yield* Path.Path;
-    const hostHome = yield* Config.string("HOME");
-    const executable = paths.join(
-      hostHome,
-      ".local",
-      "share",
+    const repositoryRoot = yield* paths.fromFileUrl(
+      new URL("../../../..", import.meta.url),
+    );
+    const location = yield* runProcess(
       "mise",
-      "installs",
-      "npm-openai-codex",
-      "0.144.5",
+      ["where", "npm:@openai/codex@0.144.5"],
+      { MISE_TRUSTED_CONFIG_PATHS: repositoryRoot },
+      true,
+    );
+    if (location.exitCode !== 0 || !location.stdout.trim()) {
+      return yield* testError(
+        "process",
+        "AgentOS-pinned Codex 0.144.5 is unavailable through Mise",
+      );
+    }
+    const executable = paths.join(
+      location.stdout.trim(),
       "bin",
       "codex",
     );
