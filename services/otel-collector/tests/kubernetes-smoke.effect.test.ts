@@ -196,6 +196,7 @@ function codexSmokeResources(
   const shell = [
     "set -eu",
     invocation.map((value) => `'${value.replaceAll("'", "'\\''")}'`).join(" "),
+    "touch /tmp/codex-turn-complete",
     "exec sleep 3600",
   ].join("\n");
   return {
@@ -273,6 +274,13 @@ function codexSmokeResources(
               args: [shell],
               env: environment,
               volumeMounts: [home],
+              readinessProbe: {
+                exec: {
+                  command: ["test", "-f", "/tmp/codex-turn-complete"],
+                },
+                failureThreshold: 300,
+                periodSeconds: 1,
+              },
               securityContext: {
                 allowPrivilegeEscalation: false,
                 capabilities: { drop: ["ALL"] },
@@ -614,6 +622,65 @@ layer(platform, { excludeTestServices: true })(
             busyboxLoadImage,
             agentosLoadImage,
           ]).pipe(Effect.ignore);
+        });
+        const diagnostics = Effect.gen(function*() {
+          const inspect = (arguments_: ReadonlyArray<string>) =>
+            run(
+              "kubectl",
+              kubectl,
+              ["--context", context, ...arguments_],
+            ).pipe(
+              Effect.map(({ exitCode, stderr, stdout }) => ({
+                command: arguments_.join(" "),
+                exitCode,
+                stderr,
+                stdout,
+              })),
+              Effect.catch(() => Effect.succeed({
+                command: arguments_.join(" "),
+                exitCode: -1,
+                stderr: "diagnostic command failed",
+                stdout: "",
+              })),
+            );
+          const [pods, codexLogs, prepareLogs, collectorLogs] = yield* Effect.all([
+            inspect(["--namespace", "agentos", "get", "pods", "--output=wide"]),
+            inspect([
+              "--namespace",
+              "agentos",
+              "logs",
+              "deployment/agentos-codex-native-smoke",
+              "--container=codex",
+            ]),
+            inspect([
+              "--namespace",
+              "agentos",
+              "logs",
+              "deployment/agentos-codex-native-smoke",
+              "--container=prepare-home",
+            ]),
+            inspect([
+              "--namespace",
+              "agentos",
+              "logs",
+              "statefulset/agentos-otel-collector",
+              "--container=collector",
+            ]),
+          ], { concurrency: "unbounded" });
+          const requests = yield* sink.requests;
+          const calls = yield* Ref.get(providerRequests);
+          yield* Effect.logError("AgentOS Codex Kubernetes smoke diagnostics", {
+            calls,
+            codexLogs,
+            collectorLogs,
+            paths: requests.map(({ accepted, path, responseStatus }) => ({
+              accepted,
+              path,
+              responseStatus,
+            })),
+            pods,
+            prepareLogs,
+          });
         });
 
         const evidence = yield* Effect.gen(function*() {
@@ -984,7 +1051,10 @@ layer(platform, { excludeTestServices: true })(
             pvcAfter,
             pvcBefore,
           };
-        }).pipe(Effect.ensuring(cleanup));
+        }).pipe(
+          Effect.tapError(() => diagnostics.pipe(Effect.ignore)),
+          Effect.ensuring(cleanup),
+        );
 
         assert.strictEqual(evidence.pvcAfter, evidence.pvcBefore);
         assert.isBelow(evidence.outageDuration, 8_000);
