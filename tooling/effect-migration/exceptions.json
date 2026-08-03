@@ -15,6 +15,54 @@
     },
     {
       "kind": "outer-host-adapter",
+      "path": "packages/agentos/src/pi-host-adapter.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runPromise",
+      "maximumOccurrences": 1,
+      "reason": "Pi's command registration ABI requires Promise-returning handlers, so this domain-free adapter is the sole one-way boundary from Effect command programs into Pi.",
+      "ownerIssue": 103,
+      "test": "packages/agentos/tests/pi-host-adapter.effect.test.ts",
+      "removalCondition": "Remove when Pi accepts Effect command programs directly.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "services/openfga/tests/live-model-conformance-main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The disposable OpenFGA live-model conformance executable enters one Effect runtime around typed configuration, authorization I/O, assertions, redacted failures, and schema-encoded output.",
+      "ownerIssue": 102,
+      "test": "services/openfga/tests/postgres-upgrade-conformance.ts",
+      "removalCondition": "Retain only while live-model conformance is invoked as a standalone subprocess by the upgrade harness.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "services/openfga/tests/postgres-upgrade-conformance-main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The disposable PostgreSQL upgrade/restore conformance executable enters one scoped Effect runtime around Docker children, typed files, health checks, cleanup, redacted failures, and schema-encoded output.",
+      "ownerIssue": 102,
+      "test": "services/openfga/tests/postgres-upgrade-conformance.ts",
+      "removalCondition": "Retain only while PostgreSQL upgrade and restore conformance is a standalone executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "tooling/testing/bun-http.ts",
+      "rule": "no-runtime-execution",
+      "match": "Effect.runPromise",
+      "maximumOccurrences": 1,
+      "reason": "Bun's HTTP test-server ABI requires Promise-returning fetch handlers, so one domain-free adapter runs Effect request programs and scopes server shutdown.",
+      "ownerIssue": 102,
+      "test": "tooling/testing/tests/bun-http.effect.test.ts",
+      "removalCondition": "Remove when Bun test servers accept Effect request programs directly.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "website/apps/docs/lib/effect/browser-runtime.ts",
       "rule": "no-runtime-execution",
       "match": "Effect.runSync",
@@ -345,7 +393,7 @@
       "maximumOccurrences": 1,
       "reason": "The retained-home preparation executable needs one reviewed Bun process boundary around its typed Effect configuration, filesystem, provider, and subprocess program.",
       "ownerIssue": 104,
-      "test": "packages/agentos/runtime/tests/prepare-home.test.ts",
+      "test": "packages/agentos/runtime/tests/prepare-home.effect.test.ts",
       "removalCondition": "Retain only while Kubernetes invokes Mate home preparation as a standalone init-container executable.",
       "expiresOn": null
     },
@@ -357,8 +405,20 @@
       "maximumOccurrences": 1,
       "reason": "The persistent Mate executable needs one reviewed Bun process boundary around its scoped Effect Herdr and Pi lifecycle program.",
       "ownerIssue": 104,
-      "test": "packages/agentos/runtime/tests/runtime.test.ts",
+      "test": "packages/agentos/runtime/tests/runtime.effect.test.ts",
       "removalCondition": "Retain only while Kubernetes invokes the persistent Mate lifecycle as a standalone executable.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
+      "path": "packages/agentos/runtime/tests/fixtures/fake-herdr.effect.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The fake Herdr executable needs one reviewed Bun process entry boundary around its typed Effect configuration, filesystem, subprocess, and lifecycle program.",
+      "ownerIssue": 102,
+      "test": "packages/agentos/runtime/tests/runtime.effect.test.ts",
+      "removalCondition": "Retain only while Mate runtime conformance requires a real Herdr subprocess ABI.",
       "expiresOn": null
     },
     {

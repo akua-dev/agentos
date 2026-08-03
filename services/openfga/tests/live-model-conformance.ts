@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 
-import * as BunHttpClient from "@effect/platform-bun/BunHttpClient";
-import { Effect, Layer, Redacted } from "effect";
+import { Config, Effect, Layer, Option } from "effect";
 
 import {
   OpenFgaAuthorizationApiHttpLayer,
@@ -26,17 +25,16 @@ import type {
   AuthorizationResourceV1,
 } from "../../../packages/agentos/src/access/contracts.ts";
 
-const baseUrl = process.env.OPENFGA_TEST_URL;
-if (baseUrl === undefined) {
-  throw new Error("OPENFGA_TEST_URL is required");
-}
-
 const Fleet = "agentos";
 const OtherFleet = "other-fleet";
 const MateId = "11111111-1111-4111-8111-111111111111";
 const CaptainId = "22222222-2222-4222-8222-222222222222";
 const EffectiveAt = Date.parse("2026-08-01T00:00:00.000Z");
 const ExpiresAt = Date.parse("2026-08-02T00:00:00.000Z");
+const LiveModelConfig = Config.all({
+  baseUrl: Config.url("OPENFGA_TEST_URL"),
+  presharedKey: Config.option(Config.redacted("OPENFGA_TEST_PRESHARED_KEY")),
+});
 
 const repository: AuthorizationResourceV1 = {
   kind: "github_repository",
@@ -109,118 +107,115 @@ function binding(state: "active" | "revoked" = "active"): AccessBindingV1 {
   };
 }
 
-const transport = makeOpenFgaHttpTransportLayer({
-  baseUrl,
-  presharedKey: process.env.OPENFGA_TEST_PRESHARED_KEY === undefined
-    ? null
-    : Redacted.make(process.env.OPENFGA_TEST_PRESHARED_KEY),
-  timeoutMillis: 5_000,
-  maximumResponseBytes: 512 * 1_024,
-}).pipe(Layer.provide(BunHttpClient.layer));
-const services = Layer.merge(
-  OpenFgaManagementApiHttpLayer.pipe(Layer.provide(transport)),
-  OpenFgaAuthorizationApiHttpLayer.pipe(Layer.provide(transport)),
-);
+export const liveModelConformance = Effect.gen(function*() {
+  const config = yield* LiveModelConfig;
+  const transport = makeOpenFgaHttpTransportLayer({
+    baseUrl: config.baseUrl.toString(),
+    presharedKey: Option.getOrNull(config.presharedKey),
+    timeoutMillis: 5_000,
+    maximumResponseBytes: 512 * 1_024,
+  });
+  const services = Layer.merge(
+    OpenFgaManagementApiHttpLayer.pipe(Layer.provide(transport)),
+    OpenFgaAuthorizationApiHttpLayer.pipe(Layer.provide(transport)),
+  );
+  return yield* Effect.gen(function*() {
+    const deployment = yield* bootstrapOpenFgaAuthorization;
+    const api = yield* OpenFgaAuthorizationApi;
+    let assertions = 0;
+    const check = Effect.fn("agentos.openfga.conformance.check")(
+      function*(
+        permission: AccessPermissionV1,
+        fleet: string,
+        currentTime: string,
+      ) {
+        return yield* api.check({
+          ...deployment,
+          user: openFgaSubject(binding().subject),
+          relation: openFgaCapabilityRelation(permission.capability).allow,
+          object: openFgaTarget(fleet, permission),
+          context: { current_time: currentTime },
+          consistency: "HIGHER_CONSISTENCY",
+        } satisfies OpenFgaApiCheckRequest);
+      },
+    );
 
-const program = Effect.gen(function*() {
-  const deployment = yield* bootstrapOpenFgaAuthorization;
-  const api = yield* OpenFgaAuthorizationApi;
-  let assertions = 0;
-  const check = Effect.fn("agentos.openfga.conformance.check")(
-    function*(
-      permission: AccessPermissionV1,
-      fleet: string,
-      currentTime: string,
-    ) {
-      return yield* api.check({
-        ...deployment,
-        user: openFgaSubject(binding().subject),
-        relation: openFgaCapabilityRelation(permission.capability).allow,
-        object: openFgaTarget(fleet, permission),
-        context: { current_time: currentTime },
-        consistency: "HIGHER_CONSISTENCY",
-      } satisfies OpenFgaApiCheckRequest);
-    },
-  );
+    const initial = yield* compileOpenFgaAuthorizationState({
+      ceiling: ceiling(1, [writeIssue, readIssue]),
+      profile: profile(),
+      binding: binding(),
+    });
+    yield* api.mutateTuples({
+      ...deployment,
+      mutation: { writes: initial.tuples, deletes: [] },
+    });
+    assert.equal(
+      yield* check(writeIssue, Fleet, "2026-08-01T12:00:00.000Z"),
+      true,
+      "domain membership, profile, and ceiling should allow",
+    );
+    assertions += 1;
+    assert.equal(
+      yield* check(writeIssue, OtherFleet, "2026-08-01T12:00:00.000Z"),
+      false,
+      "a cross-Fleet target should deny",
+    );
+    assertions += 1;
+    assert.equal(
+      yield* check(writeIssue, Fleet, "2026-08-02T00:00:00.000Z"),
+      false,
+      "an expired binding should deny at the exclusive boundary",
+    );
+    assertions += 1;
 
-  const initial = yield* compileOpenFgaAuthorizationState({
-    ceiling: ceiling(1, [writeIssue, readIssue]),
-    profile: profile(),
-    binding: binding(),
-  });
-  yield* api.mutateTuples({
-    ...deployment,
-    mutation: { writes: initial.tuples, deletes: [] },
-  });
-  assert.equal(
-    yield* check(writeIssue, Fleet, "2026-08-01T12:00:00.000Z"),
-    true,
-    "domain membership, profile, and ceiling should allow",
-  );
-  assertions += 1;
-  assert.equal(
-    yield* check(writeIssue, OtherFleet, "2026-08-01T12:00:00.000Z"),
-    false,
-    "a cross-Fleet target should deny",
-  );
-  assertions += 1;
-  assert.equal(
-    yield* check(writeIssue, Fleet, "2026-08-02T00:00:00.000Z"),
-    false,
-    "an expired binding should deny at the exclusive boundary",
-  );
-  assertions += 1;
+    const shrunken = yield* compileOpenFgaAuthorizationState({
+      ceiling: ceiling(2, [readIssue]),
+      profile: profile(),
+      binding: binding(),
+    });
+    const shrinkMutation = yield* diffOpenFgaTuplePlans(initial, shrunken);
+    yield* api.mutateTuples({ ...deployment, mutation: shrinkMutation });
+    assert.equal(
+      yield* check(writeIssue, Fleet, "2026-08-01T12:00:00.000Z"),
+      false,
+      "a ceiling shrink should revoke removed capability access",
+    );
+    assertions += 1;
+    assert.equal(
+      yield* check(readIssue, Fleet, "2026-08-01T12:00:00.000Z"),
+      true,
+      "a ceiling shrink should preserve retained capability access",
+    );
+    assertions += 1;
 
-  const shrunken = yield* compileOpenFgaAuthorizationState({
-    ceiling: ceiling(2, [readIssue]),
-    profile: profile(),
-    binding: binding(),
-  });
-  const shrinkMutation = yield* diffOpenFgaTuplePlans(initial, shrunken);
-  yield* api.mutateTuples({ ...deployment, mutation: shrinkMutation });
-  assert.equal(
-    yield* check(writeIssue, Fleet, "2026-08-01T12:00:00.000Z"),
-    false,
-    "a ceiling shrink should revoke removed capability access",
-  );
-  assertions += 1;
-  assert.equal(
-    yield* check(readIssue, Fleet, "2026-08-01T12:00:00.000Z"),
-    true,
-    "a ceiling shrink should preserve retained capability access",
-  );
-  assertions += 1;
+    const revoked = yield* compileOpenFgaAuthorizationState({
+      ceiling: ceiling(2, [readIssue]),
+      profile: profile(),
+      binding: binding("revoked"),
+    });
+    yield* api.mutateTuples({
+      ...deployment,
+      mutation: yield* diffOpenFgaTuplePlans(shrunken, revoked),
+    });
+    assert.equal(
+      yield* check(readIssue, Fleet, "2026-08-01T12:00:00.000Z"),
+      false,
+      "a revoked profile binding should deny",
+    );
+    assertions += 1;
 
-  const revoked = yield* compileOpenFgaAuthorizationState({
-    ceiling: ceiling(2, [readIssue]),
-    profile: profile(),
-    binding: binding("revoked"),
-  });
-  yield* api.mutateTuples({
-    ...deployment,
-    mutation: yield* diffOpenFgaTuplePlans(shrunken, revoked),
-  });
-  assert.equal(
-    yield* check(readIssue, Fleet, "2026-08-01T12:00:00.000Z"),
-    false,
-    "a revoked profile binding should deny",
-  );
-  assertions += 1;
-
-  const overCeiling = yield* compileOpenFgaAuthorizationState({
-    ceiling: ceiling(1, [{ ...writeIssue, rateClass: "standard" }]),
-    profile: profile([{ ...writeIssue, rateClass: "high" }]),
-    binding: binding(),
-  });
-  assert.equal(
-    overCeiling.tuples.some(({ relation }) =>
-      relation === openFgaCapabilityRelation(writeIssue.capability).allow),
-    false,
-    "a profile rate above the Captain ceiling must not materialize a grant",
-  );
-  assertions += 1;
-  return { ...deployment, assertions };
+    const overCeiling = yield* compileOpenFgaAuthorizationState({
+      ceiling: ceiling(1, [{ ...writeIssue, rateClass: "standard" }]),
+      profile: profile([{ ...writeIssue, rateClass: "high" }]),
+      binding: binding(),
+    });
+    assert.equal(
+      overCeiling.tuples.some(({ relation }) =>
+        relation === openFgaCapabilityRelation(writeIssue.capability).allow),
+      false,
+      "a profile rate above the Captain ceiling must not materialize a grant",
+    );
+    assertions += 1;
+    return { assertions };
+  }).pipe(Effect.provide(services));
 });
-
-const result = await Effect.runPromise(program.pipe(Effect.provide(services)));
-console.log(JSON.stringify(result));

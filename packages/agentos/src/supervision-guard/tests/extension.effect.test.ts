@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 import { Data, Effect } from "effect";
 
-import { createFakePi } from "../../../tests/fake-pi.ts";
+import { makePiTestHarness } from "../../../tests/pi-test-harness.ts";
 import { registerAgentosSupervisionGuard } from "../extension.ts";
 
 class SupervisionTestBoundaryError extends Data.TaggedError(
@@ -9,18 +9,17 @@ class SupervisionTestBoundaryError extends Data.TaggedError(
 )<{}> {}
 
 function emit(
-  fake: ReturnType<typeof createFakePi>,
+  fake: Effect.Success<ReturnType<typeof makePiTestHarness>>,
   event: string,
   payload: Record<string, unknown> = {},
 ) {
-  return Effect.tryPromise({
-    try: () => fake.emit(event, payload),
-    catch: () => new SupervisionTestBoundaryError(),
-  });
+  return fake.emit(event, payload).pipe(
+    Effect.mapError(() => new SupervisionTestBoundaryError()),
+  );
 }
 
 function register(
-  fake: ReturnType<typeof createFakePi>,
+  fake: Effect.Success<ReturnType<typeof makePiTestHarness>>,
   disabled = false,
 ) {
   registerAgentosSupervisionGuard(fake.pi, {
@@ -39,7 +38,7 @@ const taggedTask = {
 describe("Effect AgentOS Mate supervision guard", () => {
   it.effect("starts one recovery turn per runtime startup", () =>
     Effect.gen(function*() {
-      const fake = createFakePi();
+      const fake = yield* makePiTestHarness();
       register(fake);
       yield* emit(fake, "session_start");
       yield* emit(fake, "session_start");
@@ -61,17 +60,17 @@ describe("Effect AgentOS Mate supervision guard", () => {
 
   it.effect("can be disabled without ambient environment mutation", () =>
     Effect.gen(function*() {
-      const fake = createFakePi();
+      const fake = yield* makePiTestHarness();
       register(fake, true);
       yield* emit(fake, "session_start");
       yield* emit(fake, "agent_settled");
       assert.deepStrictEqual(fake.messages, []);
-      assert.strictEqual(fake.handlers.size, 0);
+      assert.strictEqual(fake.extension.handlers.size, 0);
     }));
 
   it.effect("reminds once, tracks a tagged wait, and forgets it on completion", () =>
     Effect.gen(function*() {
-      const reminder = createFakePi();
+      const reminder = yield* makePiTestHarness();
       register(reminder);
       yield* emit(reminder, "agent_settled");
       yield* emit(reminder, "agent_settled");
@@ -81,7 +80,7 @@ describe("Effect AgentOS Mate supervision guard", () => {
         "agentos-supervision-guard",
       );
 
-      const tracked = createFakePi();
+      const tracked = yield* makePiTestHarness();
       register(tracked);
       yield* emit(tracked, "tool_result", {
         toolName: "run_background_command",
@@ -107,7 +106,7 @@ describe("Effect AgentOS Mate supervision guard", () => {
         { id: "bg-done", state: "succeeded" },
         { id: "bg-unrelated", state: "running", description: "other" },
       ]) {
-        const fake = createFakePi();
+        const fake = yield* makePiTestHarness();
         register(fake);
         yield* emit(fake, "tool_result", {
           toolName: "list_background_commands",
@@ -118,7 +117,7 @@ describe("Effect AgentOS Mate supervision guard", () => {
         assert.lengthOf(fake.messages, 1);
       }
 
-      const listed = createFakePi();
+      const listed = yield* makePiTestHarness();
       register(listed);
       yield* emit(listed, "tool_result", {
         toolName: "list_background_commands",
@@ -128,7 +127,7 @@ describe("Effect AgentOS Mate supervision guard", () => {
       yield* emit(listed, "agent_settled");
       assert.deepStrictEqual(listed.messages, []);
 
-      const fake = createFakePi();
+      const fake = yield* makePiTestHarness();
       register(fake);
       yield* emit(fake, "tool_result", {
         toolName: "run_background_command",

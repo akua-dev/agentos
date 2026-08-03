@@ -308,6 +308,10 @@ export {
   type AgentOSRegistrationV1,
 } from "./preflight.ts";
 export {
+  defineAgentOSPiCommandHandler,
+  type AgentOSPiCommandProgram,
+} from "./pi-host-adapter.ts";
+export {
   createDefaultAgentOSEntrypoint,
   DefaultAgentOSRoleSchema,
   loadPackagedRoleSetup,

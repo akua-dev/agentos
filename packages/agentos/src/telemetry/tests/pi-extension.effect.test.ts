@@ -9,8 +9,8 @@ import type {
   AgentOSTelemetry,
 } from "../runtime.ts";
 import { registerAgentOSObservabilityEffect } from "../pi-extension.ts";
-import { createFakePi } from "../../../tests/fake-pi.ts";
-import { Effect } from "effect";
+import { makePiTestHarness } from "../../../tests/pi-test-harness.ts";
+import { Effect, Schema } from "effect";
 
 function recorder() {
   const operations: Array<{
@@ -118,11 +118,8 @@ function assistantMessage(
   };
 }
 
-const emit = <A>(evaluate: () => Promise<A>) =>
-  Effect.tryPromise({ try: evaluate, catch: (cause) => cause });
-
 function configureContext(
-  fake: ReturnType<typeof createFakePi>,
+  fake: Effect.Success<ReturnType<typeof makePiTestHarness>>,
   entries: unknown[] = [],
 ) {
   Object.assign(fake.context, {
@@ -140,7 +137,7 @@ function configureContext(
 
 describe("Pi provider observability extension", () => {
   it.effect("records one safe main attempt and propagates correlation headers", () => Effect.gen(function*() {
-    const fake = createFakePi();
+    const fake = yield* makePiTestHarness();
     configureContext(fake, [{ type: "session" }]);
     const recorded = recorder();
     yield* registerAgentOSObservabilityEffect(fake.pi, {
@@ -148,30 +145,30 @@ describe("Pi provider observability extension", () => {
       runtimeVersion: "0.81.1",
     });
 
-    yield* emit(() => fake.emit("before_agent_start", {
+    yield* fake.emit("before_agent_start", {
       type: "before_agent_start",
       prompt: "SEED_PROMPT sk-seeded-secret",
       systemPrompt: "private system prompt",
       systemPromptOptions: {},
-    }));
+    });
     const headers: Record<string, string> = {};
-    yield* emit(() => fake.emit("before_provider_headers", {
+    yield* fake.emit("before_provider_headers", {
       type: "before_provider_headers",
       headers,
-    }));
-    yield* emit(() => fake.emit("after_provider_response", {
+    });
+    yield* fake.emit("after_provider_response", {
       type: "after_provider_response",
       status: 200,
       headers: {
         "x-request-id": "req_safe_1",
         authorization: "Bearer provider-secret",
       },
-    }));
-    yield* emit(() => fake.emit("message_end", {
+    });
+    yield* fake.emit("message_end", {
       type: "message_end",
       message: assistantMessage("stop"),
-    }));
-    yield* emit(() => fake.emit("agent_settled", { type: "agent_settled" }));
+    });
+    yield* fake.emit("agent_settled", { type: "agent_settled" });
 
     expect(headers.traceparent).toBe(
       "00-11111111111111111111111111111111-2222222222222222-01",
@@ -214,34 +211,37 @@ describe("Pi provider observability extension", () => {
       error: undefined,
       status: 200,
     });
-    expect(JSON.stringify(recorded.operations)).not.toContain("SEED_PROMPT");
-    expect(JSON.stringify(recorded.operations)).not.toContain(
+    const encoded = yield* Schema.encodeEffect(
+      Schema.fromJsonString(Schema.Unknown),
+    )(recorded.operations);
+    expect(encoded).not.toContain("SEED_PROMPT");
+    expect(encoded).not.toContain(
       "provider-secret",
     );
   }));
 
   it.effect("classifies a failed stream without copying Pi error text", () => Effect.gen(function*() {
-    const fake = createFakePi();
+    const fake = yield* makePiTestHarness();
     configureContext(fake);
     const recorded = recorder();
     yield* registerAgentOSObservabilityEffect(fake.pi, {
       telemetry: recorded.telemetry,
     });
 
-    yield* emit(() => fake.emit("before_provider_headers", {
+    yield* fake.emit("before_provider_headers", {
       type: "before_provider_headers",
       headers: {},
-    }));
-    yield* emit(() => fake.emit("after_provider_response", {
+    });
+    yield* fake.emit("after_provider_response", {
       type: "after_provider_response",
       status: 503,
       headers: {},
-    }));
-    yield* emit(() => fake.emit("message_end", {
+    });
+    yield* fake.emit("message_end", {
       type: "message_end",
       message: assistantMessage("error"),
-    }));
-    yield* emit(() => fake.emit("agent_settled", { type: "agent_settled" }));
+    });
+    yield* fake.emit("agent_settled", { type: "agent_settled" });
 
     const attempt = recorded.operations[0]?.attempts[0];
     expect(attempt?.outcome).toMatchObject({
@@ -253,29 +253,32 @@ describe("Pi provider observability extension", () => {
       error: { name: "ProviderError" },
       status: 503,
     });
-    expect(JSON.stringify(recorded.operations)).not.toContain(
+    const encoded = yield* Schema.encodeEffect(
+      Schema.fromJsonString(Schema.Unknown),
+    )(recorded.operations);
+    expect(encoded).not.toContain(
       "provider-private body",
     );
   }));
 
   it.effect("classifies a stream without a terminal message as a provider failure", () => Effect.gen(function*() {
-    const fake = createFakePi();
+    const fake = yield* makePiTestHarness();
     configureContext(fake);
     const recorded = recorder();
     yield* registerAgentOSObservabilityEffect(fake.pi, {
       telemetry: recorded.telemetry,
     });
 
-    yield* emit(() => fake.emit("before_provider_headers", {
+    yield* fake.emit("before_provider_headers", {
       type: "before_provider_headers",
       headers: {},
-    }));
-    yield* emit(() => fake.emit("after_provider_response", {
+    });
+    yield* fake.emit("after_provider_response", {
       type: "after_provider_response",
       status: 200,
       headers: {},
-    }));
-    yield* emit(() => fake.emit("agent_settled", { type: "agent_settled" }));
+    });
+    yield* fake.emit("agent_settled", { type: "agent_settled" });
 
     const attempt = recorded.operations[0]?.attempts[0];
     expect(attempt?.outcome).toMatchObject({
@@ -290,16 +293,14 @@ describe("Pi provider observability extension", () => {
   }));
 
   it.effect("can run alone as the explicit extension-disabled control", () => Effect.gen(function*() {
-    const fake = createFakePi();
+    const fake = yield* makePiTestHarness();
     const recorded = recorder();
     yield* registerAgentOSObservabilityEffect(fake.pi, {
       telemetry: recorded.telemetry,
     });
 
     expect(
-      fake.registrations
-        .filter(({ kind }) => kind === "handler")
-        .map(({ name }) => name),
+      [...fake.extension.handlers.keys()],
     ).toEqual([
       "before_agent_start",
       "before_provider_headers",
@@ -309,10 +310,8 @@ describe("Pi provider observability extension", () => {
       "session_shutdown",
     ]);
     expect(
-      fake.registrations.filter(({ kind }) =>
-        ["command", "tool"].includes(kind),
-      ),
+      [...fake.extension.commands.keys(), ...fake.extension.tools.keys()],
     ).toEqual([]);
-    expect(fake.handlers.has("before_provider_request")).toBe(false);
+    expect(fake.extension.handlers.has("before_provider_request")).toBe(false);
   }));
 });

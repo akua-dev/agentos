@@ -69,6 +69,75 @@
       "status": "runtime-boundary"
     },
     {
+      "id": "pi-command-host-adapter",
+      "issue": 103,
+      "pattern": "^packages/agentos/src/pi-host-adapter\\.ts$",
+      "runtime": "pi-entrypoint",
+      "package": "@akua-dev/agentos",
+      "io": [
+        "framework",
+        "runtime-adapter"
+      ],
+      "migrationDependencies": [
+        100,
+        101
+      ],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "openfga-live-model-conformance-entrypoint",
+      "issue": 102,
+      "pattern": "^services/openfga/tests/live-model-conformance-main\\.ts$",
+      "runtime": "bun-openfga-entrypoint",
+      "package": "@agentos/openfga",
+      "io": [
+        "config",
+        "http",
+        "runtime-adapter"
+      ],
+      "migrationDependencies": [
+        100,
+        101
+      ],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "openfga-postgres-upgrade-conformance-entrypoint",
+      "issue": 102,
+      "pattern": "^services/openfga/tests/postgres-upgrade-conformance-main\\.ts$",
+      "runtime": "bun-openfga-docker-entrypoint",
+      "package": "@agentos/openfga",
+      "io": [
+        "filesystem",
+        "http",
+        "process",
+        "runtime-adapter",
+        "stream"
+      ],
+      "migrationDependencies": [
+        100,
+        101
+      ],
+      "status": "runtime-boundary"
+    },
+    {
+      "id": "bun-http-test-host-adapter",
+      "issue": 102,
+      "pattern": "^tooling/testing/bun-http\\.ts$",
+      "runtime": "bun-http-entrypoint",
+      "package": "@agentos/root",
+      "io": [
+        "http",
+        "runtime-adapter",
+        "test"
+      ],
+      "migrationDependencies": [
+        100,
+        101
+      ],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "shared-foundation-consumers",
       "issue": 101,
       "pattern": "^packages/agentos/src/(?:instructions|preflight|readiness-state|resources|startup)\\.ts$|^packages/agentos/src/roles/default\\.ts$",
@@ -526,6 +595,16 @@
       "status": "runtime-boundary"
     },
     {
+      "id": "mate-runtime-effect-test-entrypoint",
+      "issue": 102,
+      "pattern": "^packages/agentos/runtime/tests/fixtures/fake-herdr\\.effect\\.ts$",
+      "runtime": "bun-herdr-test-entrypoint",
+      "package": "@akua-dev/agentos",
+      "io": ["config", "filesystem", "process", "runtime-adapter", "schema", "stream", "test"],
+      "migrationDependencies": [100, 101, 104],
+      "status": "runtime-boundary"
+    },
+    {
       "id": "agentos-telemetry-effect-tests",
       "issue": 102,
       "pattern": "^packages/agentos/src/telemetry/tests/(?:.*\\.effect\\.test\\.ts|fake-telemetry\\.ts)$",
@@ -616,6 +695,16 @@
       "status": "migrated"
     },
     {
+      "id": "effect-test-support",
+      "issue": 102,
+      "pattern": "^tooling/testing/",
+      "runtime": "bun-kubernetes",
+      "package": "@agentos/root",
+      "io": ["test", "filesystem", "process", "kubernetes", "schema"],
+      "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
       "id": "effect-test-conformance",
       "issue": 102,
       "pattern": "(?:^|/)(?:tests?|__tests__)/|\\.(?:test|spec)\\.tsx?$",
@@ -623,7 +712,7 @@
       "package": "mixed",
       "io": ["test", "filesystem", "process", "http", "database", "kubernetes"],
       "migrationDependencies": [100, 101, 97, 98, 99, 104, 105],
-      "status": "planned"
+      "status": "migrated"
     },
     {
       "id": "database-drizzle-framework-adapter",
