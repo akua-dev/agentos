@@ -651,6 +651,7 @@ layer(platform, { excludeTestServices: true })(
               "logs",
               "deployment/agentos-codex-native-smoke",
               "--container=codex",
+              "--tail=120",
             ]),
             inspect([
               "--namespace",
@@ -658,6 +659,7 @@ layer(platform, { excludeTestServices: true })(
               "logs",
               "deployment/agentos-codex-native-smoke",
               "--container=prepare-home",
+              "--tail=120",
             ]),
             inspect([
               "--namespace",
@@ -665,6 +667,7 @@ layer(platform, { excludeTestServices: true })(
               "logs",
               "statefulset/agentos-otel-collector",
               "--container=collector",
+              "--tail=120",
             ]),
           ], { concurrency: "unbounded" });
           const requests = yield* sink.requests;
@@ -788,11 +791,6 @@ layer(platform, { excludeTestServices: true })(
             },
           }));
           yield* kube(["apply", "-k", collectorOverlay]);
-          yield* kube(["apply", "-f", "-"], JSON.stringify(smokeResources()));
-          yield* kube(
-            ["apply", "-f", "-"],
-            JSON.stringify(codexSmokeResources(agentosLoadImage, providerEndpoint)),
-          );
           yield* kube([
             "--namespace",
             "agentos",
@@ -801,6 +799,11 @@ layer(platform, { excludeTestServices: true })(
             "statefulset/agentos-otel-collector",
             "--timeout=180s",
           ]);
+          yield* kube(["apply", "-f", "-"], JSON.stringify(smokeResources()));
+          yield* kube(
+            ["apply", "-f", "-"],
+            JSON.stringify(codexSmokeResources(agentosLoadImage, providerEndpoint)),
+          );
           yield* kube([
             "--namespace",
             "agentos",
