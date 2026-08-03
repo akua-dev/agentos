@@ -209,6 +209,7 @@ export {
 export {
   AGENTOS_EGRESS_TOKEN_FILE_ENV,
   registerPiWorkloadIdentity,
+  registerPiWorkloadIdentityEffect,
   type PiWorkloadIdentityOptions,
 } from "./access/pi-workload-identity.ts";
 export {
@@ -298,23 +299,24 @@ export {
   type OpenFgaStoreV1,
 } from "./access/openfga-http.ts";
 export {
-  assertPiSkillName,
-  assertQualifiedName,
-  preflightAgentOSRegistrations,
   preflightAgentOSRegistrationsEffect,
   registerAgentOSRuntime,
   registerAgentOSRuntimeEffect,
+  validatePiSkillName,
+  validateQualifiedName,
   type AgentOSNameClaimsV1,
   type AgentOSRegistrationV1,
 } from "./preflight.ts";
 export {
   defineAgentOSPiCommandHandler,
+  defineAgentOSPiExtension,
+  runAgentOSPiProgram,
   type AgentOSPiCommandProgram,
+  type AgentOSPiExtensionProgram,
 } from "./pi-host-adapter.ts";
 export {
   createDefaultAgentOSEntrypoint,
   DefaultAgentOSRoleSchema,
-  loadPackagedRoleSetup,
   loadPackagedRoleSetupEffect,
   registerDefaultAgentOSEntrypointEffect,
   selectedDefaultAgentOSRoleEffect,
@@ -334,6 +336,7 @@ export {
 export {
   makeAgentosBackgroundTasks,
   registerAgentosBackgroundTasks,
+  registerAgentosBackgroundTasksEffect,
   type AgentOSBackgroundTasksHost,
   type AgentOSBackgroundTasksOptions,
   type AgentOSBackgroundTasksRuntime,
@@ -342,6 +345,7 @@ export {
 export {
   makeCoordinationReadiness,
   registerCoordinationReadiness,
+  registerCoordinationReadinessEffect,
   CoordinationReadinessError,
   type CoordinationReadinessOptions,
   type CoordinationReadinessResult,
@@ -363,14 +367,14 @@ export {
   writeCrewmateReadinessEffect,
 } from "./readiness-state.ts";
 export {
-  buildAgentOSInstructions,
   buildAgentOSInstructionsEffect,
-  registerAgentOSInstructions,
   registerAgentOSInstructionsEffect,
   type AgentOSInstructionSourceV1,
 } from "./instructions.ts";
 export {
   registerMateMemoryExtension,
+  registerMateMemoryExtensionEffect,
+  registerMateMemoryExtensionLiveEffect,
   type MateMemoryExtensionDependencies,
 } from "./mate-memory/extension.ts";
 export {
@@ -385,6 +389,7 @@ export {
   type MateMemoryPolicy,
 } from "./memory/policy.ts";
 export {
+  createMateMemoryStore,
   createMateMemoryStoreEffect,
   type MateMemoryStore,
   type StartupMemoryContext,
@@ -392,34 +397,27 @@ export {
   type TopicWrite,
 } from "./memory/store.ts";
 export {
-  createMateMemoryStoreLegacy as createMateMemoryStore,
-} from "./shared/legacy.ts";
-export {
   createOpenAIServerCompactionExtension,
+  registerOpenAIServerCompactionEffect,
   type OpenAIServerCompactionDependencies,
 } from "./openai-server-compaction/extension.ts";
 export {
-  discoverAgentOSSkillNames,
   discoverAgentOSSkillNamesEffect,
-  registerAgentOSResources,
   registerAgentOSResourcesEffect,
-  resolveAgentOSResources,
   resolveAgentOSResourcesEffect,
   type AgentOSResourceInputV1,
   type AgentOSResourcesV1,
 } from "./resources.ts";
 export {
-  buildAgentOSStartupPrompt,
   buildAgentOSStartupPromptEffect,
-  preflightAgentOSStartup,
   preflightAgentOSStartupEffect,
-  registerAgentOSStartup,
   registerAgentOSStartupEffect,
   type AgentOSStartupContributionV1,
   type AgentOSStartupOptions,
 } from "./startup.ts";
 export {
   registerAgentosSupervisionGuard,
+  registerAgentosSupervisionGuardEffect,
   type AgentOSSupervisionGuardOptions,
 } from "./supervision-guard/extension.ts";
 export {
@@ -475,6 +473,7 @@ export {
 } from "./telemetry/runtime.ts";
 export {
   registerAgentOSObservability,
+  registerAgentOSObservabilityEffect,
   type AgentOSObservabilityDependencies,
 } from "./telemetry/pi-extension.ts";
 export {

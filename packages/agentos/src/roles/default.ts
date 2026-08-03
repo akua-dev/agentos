@@ -43,10 +43,8 @@ import {
   decodeOrValidationError,
   makeValidationError,
 } from "../shared/errors.ts";
-import {
-  legacyEnvironmentConfigLayer,
-  runPromiseLegacy,
-} from "../shared/legacy.ts";
+import { runAgentOSPiProgram } from "../pi-host-adapter.ts";
+import { environmentConfigLayer } from "../shared/platform.ts";
 
 export const DefaultAgentOSRoleSchema = Schema.Literals([
   "first_mate",
@@ -76,9 +74,6 @@ export type DefaultAgentOSEntrypointOptions = {
     FileSystem.FileSystem | Path.Path
   >;
   getRole?: () => string | undefined;
-  loadRole?: (
-    role: DefaultAgentOSRole,
-  ) => Promise<DefaultRoleSetupV1>;
 };
 
 const Version1 = Schema.Literal(1);
@@ -95,7 +90,7 @@ const rolePlatformLayer = Layer.merge(
 );
 
 function roleLiveLayer() {
-  return Layer.merge(rolePlatformLayer, legacyEnvironmentConfigLayer());
+  return Layer.merge(rolePlatformLayer, environmentConfigLayer());
 }
 
 export const selectedDefaultAgentOSRoleEffect = DefaultAgentOSRoleConfig.pipe(
@@ -116,7 +111,6 @@ export const registerDefaultAgentOSEntrypointEffect = Effect.fn(
   const setup = yield* loadRoleSetupEffect(
     role,
     options.loadRoleEffect,
-    options.loadRole,
   );
   const startupPrompt = yield* preflightDefaultRoleSetupEffect(role, setup);
   const claims = roleSetupClaims(role, setup.names);
@@ -135,7 +129,7 @@ export function createDefaultAgentOSEntrypoint(
   options: DefaultAgentOSEntrypointOptions = {},
 ) {
   return function registerDefaultAgentOS(pi: ExtensionAPI): Promise<void> {
-    return runPromiseLegacy(
+    return runAgentOSPiProgram(
       registerDefaultAgentOSEntrypointEffect(pi, options).pipe(
         Effect.provide(roleLiveLayer()),
       ),
@@ -262,17 +256,6 @@ export const loadPackagedRoleSetupEffect = Effect.fn(
   } satisfies DefaultRoleSetupV1;
 });
 
-export function loadPackagedRoleSetup(
-  role: DefaultAgentOSRole,
-  directory: "firstmate" | "secondmate",
-): Promise<DefaultRoleSetupV1> {
-  return runPromiseLegacy(
-    loadPackagedRoleSetupEffect(role, directory).pipe(
-      Effect.provide(roleLiveLayer()),
-    ),
-  );
-}
-
 const selectedDistributionRootEffect = Effect.gen(function*() {
   const configured = yield* DistributionRootConfig;
   const path = yield* Path.Path;
@@ -331,21 +314,8 @@ const selectedRoleEffect = Effect.fn("agentos.roles.select")(function*(
 const loadRoleSetupEffect = Effect.fn("agentos.roles.loadSelected")(function*(
   role: DefaultAgentOSRole,
   loadRoleEffect: DefaultAgentOSEntrypointOptions["loadRoleEffect"],
-  loadRole: DefaultAgentOSEntrypointOptions["loadRole"],
 ) {
   if (loadRoleEffect !== undefined) return yield* loadRoleEffect(role);
-  if (loadRole !== undefined) {
-    return yield* Effect.tryPromise({
-      try: () => loadRole(role),
-      catch: () =>
-        makeValidationError(
-          "io_failure",
-          "role_setup",
-          "loadRole",
-          `Default AgentOS role setup could not be loaded for ${role}`,
-        ),
-    });
-  }
   return yield* loadPackagedRoleSetupEffect(
     role,
     role === "first_mate" ? "firstmate" : "secondmate",
@@ -436,6 +406,6 @@ function roleSetupClaims(
     version: 1,
     id: `@akua-dev/agentos:${role}:resources`,
     names,
-    register() {},
+    register: () => Effect.void,
   };
 }

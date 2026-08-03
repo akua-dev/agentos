@@ -57,7 +57,8 @@ const StatefulSetResource = Schema.Struct({
         containers: Schema.Array(Schema.Struct({
           env: Schema.Array(Schema.Struct({
             name: Schema.String,
-            value: Schema.String,
+            value: Schema.optional(Schema.String),
+            valueFrom: Schema.optional(Schema.Unknown),
           })),
         })),
       }),
@@ -684,7 +685,9 @@ layer(platform)("Second Mate domain lifecycle", (it) => {
         );
       }
       const secondmateEnvironment = Object.fromEntries(
-        secondmateContainer.env.map(({ name, value }) => [name, value]),
+        secondmateContainer.env.flatMap(({ name, value }) =>
+          value === undefined ? [] : [[name, value]]
+        ),
       );
       assert.deepInclude(secondmateEnvironment, {
         AGENTOS_AGENT_ID: "00000000-0000-4000-8000-00000000000a",

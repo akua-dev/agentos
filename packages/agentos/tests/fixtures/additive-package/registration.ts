@@ -12,10 +12,12 @@ export const additiveRegistration: AgentOSRegistrationV1 = {
     commands: ["example-ecosystem-status"],
   },
   register(pi) {
-    pi.registerCommand("example-ecosystem-status", {
-      description: "Inspect the additive example",
-      handler: defineAgentOSPiCommandHandler((_arguments, context) =>
-        Effect.sync(() => context.ui.notify("additive example active", "info"))),
+    return Effect.sync(() => {
+      pi.registerCommand("example-ecosystem-status", {
+        description: "Inspect the additive example",
+        handler: defineAgentOSPiCommandHandler((_arguments, context) =>
+          Effect.sync(() => context.ui.notify("additive example active", "info"))),
+      });
     });
   },
 };

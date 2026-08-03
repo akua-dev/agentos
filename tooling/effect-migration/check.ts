@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import * as BunFileSystem from "@effect/platform-bun/BunFileSystem"
 import * as BunPath from "@effect/platform-bun/BunPath"
 import * as BunRuntime from "@effect/platform-bun/BunRuntime"
-import { Clock, Console, Effect, FileSystem, Layer, Path, Schema } from "effect"
+import { Console, Effect, FileSystem, Layer, Path, Schema } from "effect"
 import { parseSync, visitorKeys } from "oxc-parser"
 
 const StrictRule = Schema.Literals([
@@ -36,7 +36,7 @@ const InventorySlice = Schema.Struct({
   package: Schema.String,
   io: Schema.Array(Schema.String),
   migrationDependencies: Schema.Array(Schema.Number),
-  status: Schema.Literals(["planned", "migrated", "pure", "runtime-boundary"])
+  status: Schema.Literals(["migrated", "pure", "runtime-boundary"])
 })
 
 const Inventory = Schema.Struct({
@@ -44,12 +44,8 @@ const Inventory = Schema.Struct({
   slices: Schema.Array(InventorySlice)
 })
 
-const IsoDate = Schema.String.pipe(
-  Schema.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/))
-)
-
 const BoundaryException = Schema.Struct({
-  kind: Schema.Literals(["outer-host-adapter", "temporary-migration-adapter"]),
+  kind: Schema.Literal("outer-host-adapter"),
   path: Schema.String,
   rule: StrictRule,
   match: Schema.String,
@@ -58,29 +54,12 @@ const BoundaryException = Schema.Struct({
   ownerIssue: Schema.Number,
   test: Schema.String,
   removalCondition: Schema.String,
-  expiresOn: Schema.NullOr(IsoDate)
+  expiresOn: Schema.Null
 })
 
 const Exceptions = Schema.Struct({
   schemaVersion: Schema.Literal(1),
   exceptions: Schema.Array(BoundaryException)
-})
-
-const LegacyBaselineEntry = Schema.Struct({
-  path: Schema.String,
-  slice: Schema.String,
-  issue: Schema.Number,
-  violationCount: Schema.Number,
-  digest: Schema.String.pipe(
-    Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/))
-  ),
-  expiresOn: IsoDate,
-  removalCondition: Schema.String
-})
-
-const LegacyBaseline = Schema.Struct({
-  schemaVersion: Schema.Literal(1),
-  entries: Schema.Array(LegacyBaselineEntry)
 })
 
 const PackageManifest = Schema.Struct({
@@ -94,7 +73,6 @@ const PackageManifest = Schema.Struct({
 type Policy = typeof Policy.Type
 type InventorySlice = typeof InventorySlice.Type
 type BoundaryException = typeof BoundaryException.Type
-type LegacyBaselineEntry = typeof LegacyBaselineEntry.Type
 type StrictRule = typeof StrictRule.Type
 
 export interface PolicyViolation {
@@ -401,8 +379,7 @@ const applyExceptions = (
   rawViolations: ReadonlyArray<AstViolation>,
   exceptions: ReadonlyArray<BoundaryException>,
   sources: ReadonlyMap<string, string>,
-  assignments: ReadonlyMap<string, InventorySlice>,
-  nowMillis: number
+  assignments: ReadonlyMap<string, InventorySlice>
 ) => {
   const violations: Array<PolicyViolation> = []
   const usable = new Set<BoundaryException>()
@@ -442,24 +419,6 @@ const applyExceptions = (
         path: exception.path,
         message: "An outer host adapter may exempt only one runtime invocation, never domain I/O or failure logic."
       })
-    } else if (
-      exception.kind === "temporary-migration-adapter" &&
-      exception.expiresOn === null
-    ) {
-      violations.push({
-        rule: "exception-expiry-missing",
-        path: exception.path,
-        message: "A temporary migration adapter requires an expiry date."
-      })
-    } else if (
-      exception.expiresOn !== null &&
-      nowMillis > Date.parse(`${exception.expiresOn}T23:59:59.999Z`)
-    ) {
-      violations.push({
-        rule: "exception-expired",
-        path: exception.path,
-        message: `The reviewed boundary expired on ${exception.expiresOn}.`
-      })
     } else if (assignment?.status !== "migrated" && assignment?.status !== "runtime-boundary") {
       violations.push({
         rule: "exception-outside-enforced-slice",
@@ -497,153 +456,13 @@ const applyExceptions = (
   return violations
 }
 
-const isStrictRule = (
-  rule: string,
-  enabledRules: ReadonlySet<StrictRule>
-): rule is StrictRule => enabledRules.has(rule)
-
-const canonicalViolation = (violation: PolicyViolation) => [
-  violation.path,
-  violation.rule,
-  violation.line ?? 0,
-  violation.fingerprint ?? "",
-  violation.message
-].join("\u0000")
-
-export const legacyViolationDigest = (
-  violations: ReadonlyArray<PolicyViolation>
-) => createHash("sha256").update(
-  [...violations].map(canonicalViolation).sort().join("\n"),
-  "utf8"
-).digest("hex")
-
-const applyLegacyBaseline = Effect.fn("effectMigration.applyLegacyBaseline")(
-  function*(
-    rawViolations: ReadonlyArray<PolicyViolation>,
-    entries: ReadonlyArray<LegacyBaselineEntry>,
-    assignments: ReadonlyMap<string, InventorySlice>,
-    enabledRules: ReadonlySet<StrictRule>
-  ) {
-    const violations: Array<PolicyViolation> = []
-    const grouped = new Map<string, Array<PolicyViolation>>()
-    const entriesByPath = new Map<string, LegacyBaselineEntry>()
-
-    for (const entry of entries) {
-      if (entriesByPath.has(entry.path)) {
-        violations.push({
-          rule: "legacy-baseline-duplicate",
-          path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline path ${entry.path} is declared more than once.`
-        })
-      } else {
-        entriesByPath.set(entry.path, entry)
-      }
-    }
-
-    for (const violation of rawViolations) {
-      const assignment = assignments.get(violation.path)
-      if (
-        assignment?.status === "planned" &&
-        isStrictRule(violation.rule, enabledRules)
-      ) {
-        const current = grouped.get(violation.path) ?? []
-        current.push(violation)
-        grouped.set(violation.path, current)
-      } else {
-        violations.push(violation)
-      }
-    }
-
-    const now = yield* Clock.currentTimeMillis
-    for (const [path, current] of grouped) {
-      const entry = entriesByPath.get(path)
-      if (entry === undefined) {
-        violations.push(...current)
-        continue
-      }
-      const assignment = assignments.get(path)
-      if (assignment === undefined) {
-        violations.push({
-          rule: "legacy-baseline-unknown-path",
-          path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline path ${path} is not assigned by inventory.json.`
-        })
-        continue
-      }
-      if (assignment.status !== "planned") {
-        violations.push({
-          rule: "legacy-baseline-outside-planned-slice",
-          path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline path ${path} belongs to ${assignment.status} slice ${assignment.id}.`
-        })
-        continue
-      }
-      if (entry.slice !== assignment.id || entry.issue !== assignment.issue) {
-        violations.push({
-          rule: "legacy-baseline-owner-mismatch",
-          path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline path ${path} must be owned by slice ${assignment.id} and issue #${assignment.issue}.`
-        })
-        continue
-      }
-      if (entry.removalCondition.trim().length < 30) {
-        violations.push({
-          rule: "legacy-baseline-removal-condition",
-          path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline path ${path} needs a substantive removal condition.`
-        })
-        continue
-      }
-      const expiresAt = Date.parse(`${entry.expiresOn}T23:59:59.999Z`)
-      if (!Number.isFinite(expiresAt) || now > expiresAt) {
-        violations.push({
-          rule: "legacy-baseline-expired",
-          path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline path ${path} expired on ${entry.expiresOn}.`
-        })
-        continue
-      }
-      const digest = legacyViolationDigest(current)
-      if (
-        entry.violationCount !== current.length ||
-        entry.digest !== digest
-      ) {
-        violations.push({
-          rule: "legacy-baseline-mismatch",
-          path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline path ${path} changed: expected ${entry.violationCount}/${entry.digest}, found ${current.length}/${digest}. Migrate every finding in the touched file; do not refresh debt in place.`
-        })
-      }
-    }
-
-    for (const entry of entries) {
-      if (!assignments.has(entry.path)) {
-        violations.push({
-          rule: "legacy-baseline-unknown-path",
-          path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline path ${entry.path} is not assigned by inventory.json.`
-        })
-      } else if (!grouped.has(entry.path)) {
-        violations.push({
-          rule: "legacy-baseline-stale",
-          path: `${manifestDirectory}/baseline.json`,
-          message: `Legacy baseline path ${entry.path} has no remaining violations and must be removed.`
-        })
-      }
-    }
-
-    return violations
-  }
-)
-
 export const auditRepository = Effect.fn("effectMigration.auditRepository")(function*(root: string) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const [policy, inventory, exceptionManifest, legacyBaseline] = yield* Effect.all([
+  const [policy, inventory, exceptionManifest] = yield* Effect.all([
     readManifest(root, `${manifestDirectory}/policy.json`, Policy),
     readManifest(root, `${manifestDirectory}/inventory.json`, Inventory),
-    readManifest(root, `${manifestDirectory}/exceptions.json`, Exceptions),
-    readManifest(root, `${manifestDirectory}/baseline.json`, LegacyBaseline)
+    readManifest(root, `${manifestDirectory}/exceptions.json`, Exceptions)
   ])
   const ignoredPathPatterns = yield* Effect.forEach(policy.ignoredPaths, (pattern) =>
     compilePattern(`${manifestDirectory}/policy.json`, pattern))
@@ -706,15 +525,9 @@ export const auditRepository = Effect.fn("effectMigration.auditRepository")(func
     rawAstViolations,
     exceptionManifest.exceptions,
     sources,
-    assignedSlices,
-    yield* Clock.currentTimeMillis
+    assignedSlices
   )
-  violations.push(...yield* applyLegacyBaseline(
-    exceptionFiltered,
-    legacyBaseline.entries,
-    assignedSlices,
-    enabledRules
-  ))
+  violations.push(...exceptionFiltered)
   violations.push(...yield* auditVersions(root, entries, policy))
 
   return {

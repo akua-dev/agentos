@@ -27,6 +27,10 @@ const Container = Schema.Struct({
   workingDir: Schema.optional(Schema.String),
   args: Schema.optional(Schema.Array(Schema.String)),
   env: Schema.optional(Schema.Array(EnvironmentEntry)),
+  resources: Schema.optional(Schema.Struct({
+    limits: Schema.Record(Schema.String, Schema.String),
+    requests: Schema.Record(Schema.String, Schema.String),
+  })),
   volumeMounts: Schema.optional(Schema.Array(VolumeMount)),
 });
 const Metadata = Schema.Struct({
@@ -224,6 +228,16 @@ describe("Second Mate Kubernetes base", () => {
         "agentos:dev",
         "agentos:dev",
       ]);
+      const githubProvider = yield* required(
+        pod.initContainers.find(({ name }) =>
+          name === "prepare-github-provider"
+        ),
+        "Missing GitHub provider preparation container",
+      );
+      assert.deepStrictEqual(githubProvider.resources, {
+        limits: { cpu: "250m", memory: "128Mi" },
+        requests: { cpu: "25m", memory: "64Mi" },
+      });
       assert.deepStrictEqual(
         allContainers.map(({ workingDir }) => workingDir),
         [

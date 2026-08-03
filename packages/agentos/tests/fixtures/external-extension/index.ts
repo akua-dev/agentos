@@ -1,11 +1,11 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   AGENTOS_EGRESS_TOKEN_AUDIENCE,
-  buildAgentOSStartupPrompt,
+  buildAgentOSStartupPromptEffect,
   defineAgentOSPiCommandHandler,
-  registerAgentOSInstructions,
-  registerAgentOSRuntime,
-  registerAgentOSStartup,
+  defineAgentOSPiExtension,
+  registerAgentOSInstructionsEffect,
+  registerAgentOSRuntimeEffect,
+  registerAgentOSStartupEffect,
   type AgentOSRegistrationV1,
   type AgentOSStartupContributionV1,
   type WorkloadIdentityV1,
@@ -39,26 +39,30 @@ const replacement: AgentOSRegistrationV1 = {
   id: "@example/extension:runtime",
   names: { version: 1, commands: ["example-agentos-status"] },
   register(pi) {
-    pi.registerCommand("example-agentos-status", {
-      description: "Show the example customization status",
-      handler: defineAgentOSPiCommandHandler((_args, context) =>
-        Effect.sync(() => context.ui.notify("example ready", "info"))),
+    return Effect.sync(() => {
+      pi.registerCommand("example-agentos-status", {
+        description: "Show the example customization status",
+        handler: defineAgentOSPiCommandHandler((_args, context) =>
+          Effect.sync(() => context.ui.notify("example ready", "info"))),
+      });
     });
   },
 };
 
-export function registerExampleAgentOS(pi: ExtensionAPI) {
-  registerAgentOSInstructions(pi, [
-    {
-      version: 1,
-      id: "@example/extension:instructions",
-      content: "Use the example organization's reviewed policy.",
-    },
-  ]);
-  registerAgentOSRuntime(pi, [replacement]);
-  registerAgentOSStartup(pi, {
-    customType: "@example/extension:startup",
-    prompt: buildAgentOSStartupPrompt([contribution]),
-    requiredSkills: [contribution.skill],
-  });
-}
+export const registerExampleAgentOS = defineAgentOSPiExtension((pi) =>
+  Effect.gen(function*() {
+    yield* registerAgentOSInstructionsEffect(pi, [
+      {
+        version: 1,
+        id: "@example/extension:instructions",
+        content: "Use the example organization's reviewed policy.",
+      },
+    ]);
+    yield* registerAgentOSRuntimeEffect(pi, [replacement]);
+    yield* registerAgentOSStartupEffect(pi, {
+      customType: "@example/extension:startup",
+      prompt: yield* buildAgentOSStartupPromptEffect([contribution]),
+      requiredSkills: [contribution.skill],
+    });
+  })
+);

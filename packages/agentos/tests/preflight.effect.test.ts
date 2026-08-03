@@ -17,7 +17,7 @@ function registration(
     id,
     names: { version: 1, ...names },
     register(pi) {
-      pi.on("session_start", () => undefined);
+      return Effect.sync(() => pi.on("session_start", () => undefined));
     },
   };
 }

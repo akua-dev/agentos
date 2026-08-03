@@ -8,6 +8,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // The rendered-site contract starts and compiles a real Next server. Keep
+    // it from competing with other test-file workers for the site workspace.
+    fileParallelism: false,
     environmentOptions: {
       jsdom: {
         url: 'https://agentos.test/',

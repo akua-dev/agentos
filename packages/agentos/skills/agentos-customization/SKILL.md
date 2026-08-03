@@ -165,10 +165,10 @@ Before attaching any Pi behavior:
    pre-session catalog.
 6. Only then attach Pi handlers, tools and commands.
 
-Use `preflightAgentOSRegistrations` for structural registration claims and
-`registerAgentOSRuntime` only after the whole selected set passes. A collision
-is a configuration error; do not rely on Pi's duplicate-name resolution or add
-a deduplication registry.
+Use `preflightAgentOSRegistrationsEffect` for structural registration claims
+and `registerAgentOSRuntimeEffect` only after the whole selected set passes. A
+collision is a configuration error; do not rely on Pi's duplicate-name
+resolution or add a deduplication registry.
 
 Extension registration cannot roll back a database write, Kubernetes mutation,
 spawned process, timer, filesystem change or other external effect. Never
@@ -182,10 +182,11 @@ reconcile the package. Keep the prompt bounded and route judgment to one
 delivered Skill:
 
 ```ts
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Effect } from "effect";
 import {
-  buildAgentOSStartupPrompt,
-  registerAgentOSStartup,
+  buildAgentOSStartupPromptEffect,
+  defineAgentOSPiExtension,
+  registerAgentOSStartupEffect,
   type AgentOSStartupContributionV1,
 } from "@akua-dev/agentos";
 
@@ -196,13 +197,16 @@ const startup: AgentOSStartupContributionV1 = {
   instruction: "Inspect and reconcile the reviewed customization.",
 };
 
-export default function registerCustomization(pi: ExtensionAPI) {
-  registerAgentOSStartup(pi, {
-    customType: "@example/agentos:startup",
-    prompt: buildAgentOSStartupPrompt([startup]),
-    requiredSkills: [startup.skill],
-  });
-}
+export default defineAgentOSPiExtension((pi) =>
+  Effect.gen(function*() {
+    const prompt = yield* buildAgentOSStartupPromptEffect([startup]);
+    yield* registerAgentOSStartupEffect(pi, {
+      customType: "@example/agentos:startup",
+      prompt,
+      requiredSkills: [startup.skill],
+    });
+  })
+);
 ```
 
 Pi 0.81.1 emits `session_start` before extension `resources_discover` hooks.

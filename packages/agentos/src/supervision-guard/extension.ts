@@ -4,11 +4,8 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Config, Effect, Result, Schema } from "effect";
 
-import {
-  legacyEnvironmentConfigLayer,
-  runPromiseLegacy,
-  runSyncLegacy,
-} from "../shared/legacy.ts";
+import { environmentConfigLayer } from "../shared/platform.ts";
+import { runAgentOSPiProgram } from "../pi-host-adapter.ts";
 
 const MESSAGE_TYPE = "agentos-supervision-guard";
 const RECOVERY_MESSAGE_TYPE = "agentos-supervision-recovery";
@@ -36,17 +33,16 @@ export class AgentOSSupervisionGuardError extends Schema.TaggedErrorClass<AgentO
   { code: Schema.Literal("message_delivery_failed") },
 ) {}
 
-export function registerAgentosSupervisionGuard(
+export const registerAgentosSupervisionGuardEffect = Effect.fn(
+  "agentos.supervisionGuard.register",
+)(function*(
   pi: ExtensionAPI,
   options: AgentOSSupervisionGuardOptions = {},
 ) {
   const disabledValue = options.environment === undefined
-    ? runSyncLegacy(
-        Config.string("AGENTOS_DISABLE_SUPERVISION_GUARD").pipe(
-          Config.withDefault(""),
-          Effect.provide(legacyEnvironmentConfigLayer()),
-        ),
-      )
+    ? yield* Config.string("AGENTOS_DISABLE_SUPERVISION_GUARD").pipe(
+      Config.withDefault(""),
+    )
     : options.environment.AGENTOS_DISABLE_SUPERVISION_GUARD;
   if (supervisionGuardDisabled(disabledValue)) return;
 
@@ -56,7 +52,7 @@ export function registerAgentosSupervisionGuard(
 
   if (options.startupRecovery !== false) {
     pi.on("session_start", (_event, context) =>
-      runPromiseLegacy(Effect.gen(function*() {
+      runAgentOSPiProgram(Effect.gen(function*() {
         if (sessionStartChecked) return;
         sessionStartChecked = true;
         if (!context.isIdle()) return;
@@ -98,7 +94,7 @@ export function registerAgentosSupervisionGuard(
   });
 
   pi.on("agent_settled", (_event, context) =>
-    runPromiseLegacy(Effect.gen(function*() {
+    runAgentOSPiProgram(Effect.gen(function*() {
       if (reminderFollowUpActive) {
         reminderFollowUpActive = false;
         return;
@@ -114,6 +110,17 @@ export function registerAgentosSupervisionGuard(
       ));
       if (Result.isFailure(delivered)) reminderFollowUpActive = false;
     })));
+});
+
+export function registerAgentosSupervisionGuard(
+  pi: ExtensionAPI,
+  options: AgentOSSupervisionGuardOptions = {},
+) {
+  return runAgentOSPiProgram(
+    registerAgentosSupervisionGuardEffect(pi, options).pipe(
+      Effect.provide(environmentConfigLayer()),
+    ),
+  );
 }
 
 export default registerAgentosSupervisionGuard;
