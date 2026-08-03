@@ -3,6 +3,18 @@
   "exceptions": [
     {
       "kind": "outer-host-adapter",
+      "path": "packages/agentos/runtime/resilience-hard-gate-main.ts",
+      "rule": "no-runtime-execution",
+      "match": "BunRuntime.runMain",
+      "maximumOccurrences": 1,
+      "reason": "The resilience hard-gate executable needs one reviewed Bun process entry around an otherwise fully typed, scoped Effect program.",
+      "ownerIssue": 84,
+      "test": "packages/agentos/src/resilience/tests/execution.effect.test.ts",
+      "removalCondition": "Retain only while the resilience proof is exposed as a standalone Bun executable and keep every proof operation inside Effect.",
+      "expiresOn": null
+    },
+    {
+      "kind": "outer-host-adapter",
       "path": "website/apps/docs/scripts/script-runtime.ts",
       "rule": "no-runtime-execution",
       "match": "BunRuntime.runMain",

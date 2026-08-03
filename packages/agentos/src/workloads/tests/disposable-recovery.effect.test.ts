@@ -6,6 +6,7 @@ import {
   ConfigProvider,
   Console,
   Effect,
+  FileSystem,
   Layer,
   Option,
   Path,
@@ -28,6 +29,11 @@ import {
   renderCompiledWorkloadSpec,
   type RenderedWorkloadPlan,
 } from "./conformance-support.ts";
+import {
+  WorkloadHardGateEvidenceV1Schema,
+  resolveDisposableProofOptions,
+  resolveHardGateArtifactPath,
+} from "../../resilience/execution.ts";
 
 const packageRootUrl = new URL("../../../", import.meta.url);
 const fixtureDistributionUrl = new URL(
@@ -142,9 +148,15 @@ const platform = Layer.mergeAll(
   ConfigProvider.layer(ConfigProvider.fromEnv()),
 );
 const LiveConfig = Config.all({
+  hardGate: Config.boolean("AGENTOS_RESILIENCE_HARD_GATE").pipe(
+    Config.withDefault(false),
+  ),
   context: Config.option(Config.string("AGENTOS_KUBERNETES_TEST_CONTEXT")),
   approval: Config.option(
     Config.string("AGENTOS_DISPOSABLE_FLEET_APPROVAL"),
+  ),
+  evidencePath: Config.option(
+    Config.string("AGENTOS_RESILIENCE_WORKLOAD_EVIDENCE_PATH"),
   ),
 });
 const OptionsSchema = Schema.Struct({
@@ -511,6 +523,55 @@ const waitForReplacement = Effect.fn(
   );
 });
 
+const retainedPvcScheduling = Effect.fn(
+  "test.workloadDisposable.retainedPvcScheduling",
+)(function*(
+  context: string,
+  namespace: string,
+  pod: string,
+  pvc: string,
+) {
+  const [podUid, pvcUid, node, volume] = yield* Effect.all([
+    requireKubectl(context, [
+      "--namespace",
+      namespace,
+      "get",
+      `pod/${pod}`,
+      "--output=jsonpath={.metadata.uid}",
+    ]),
+    requireKubectl(context, [
+      "--namespace",
+      namespace,
+      "get",
+      `persistentvolumeclaim/${pvc}`,
+      "--output=jsonpath={.metadata.uid}",
+    ]),
+    requireKubectl(context, [
+      "--namespace",
+      namespace,
+      "get",
+      `pod/${pod}`,
+      "--output=jsonpath={.spec.nodeName}",
+    ]),
+    requireKubectl(context, [
+      "--namespace",
+      namespace,
+      "get",
+      `persistentvolumeclaim/${pvc}`,
+      "--output=jsonpath={.spec.volumeName}",
+    ]),
+  ], { concurrency: "unbounded" });
+  const nodeAffinity = yield* requireKubectl(context, [
+    "get",
+    `persistentvolume/${volume}`,
+    "--output=jsonpath={.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]}",
+  ]);
+  if ([podUid, pvcUid, node, volume, nodeAffinity].some((value) => value === "")) {
+    return yield* proofError("resource", `${namespace}/${pvc}`);
+  }
+  return { podUid, pvcUid, node, volume, nodeAffinity };
+});
+
 function invalidImageStatefulSet(
   workload: typeof StatefulSetSchema.Type,
 ) {
@@ -530,6 +591,38 @@ function invalidImageStatefulSet(
           ),
         },
       },
+    },
+  };
+}
+
+function quotaProbePod(name: string, cpu: string, memory: string) {
+  return {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: { name },
+    spec: {
+      automountServiceAccountToken: false,
+      restartPolicy: "Never",
+      securityContext: {
+        runAsNonRoot: true,
+        runAsUser: 65_535,
+        runAsGroup: 65_535,
+        seccompProfile: { type: "RuntimeDefault" },
+      },
+      containers: [{
+        name: "quota-probe",
+        image: busyboxImage,
+        command: ["sh", "-c", "sleep 60"],
+        resources: {
+          requests: { cpu, memory },
+          limits: { cpu, memory },
+        },
+        securityContext: {
+          allowPrivilegeEscalation: false,
+          readOnlyRootFilesystem: true,
+          capabilities: { drop: ["ALL"] },
+        },
+      }],
     },
   };
 }
@@ -763,22 +856,29 @@ layer(platform)("disposable typed workload recovery", (it) => {
       );
     }));
 
-  it.effect("proves dry-run, admission, apply repair, Herdr readiness, replacement, and retained PVC", () =>
+  it.effect("proves fresh and retained Mate/Crewmate lifecycle, quota, affinity, Secret modes, and repair", () =>
     Effect.gen(function*() {
       const configured = yield* LiveConfig;
-      if (
-        Option.isNone(configured.context) || Option.isNone(configured.approval)
-      ) {
+      const disposable = yield* resolveDisposableProofOptions({
+        hardGate: configured.hardGate,
+        context: Option.getOrNull(configured.context),
+        approvalReference: Option.getOrNull(configured.approval),
+      });
+      if (Option.isNone(disposable)) {
         yield* Console.log(
           "Disposable workload proof unobserved: context or approval is absent",
         );
         return;
       }
+      const artifactPath = yield* resolveHardGateArtifactPath({
+        hardGate: configured.hardGate,
+        path: Option.getOrNull(configured.evidencePath),
+      });
       const options = yield* Schema.decodeUnknownEffect(OptionsSchema, {
         onExcessProperty: "error",
       })({
-        context: configured.context.value,
-        approval: configured.approval.value,
+        context: disposable.value.context,
+        approval: disposable.value.approvalReference,
       }).pipe(Effect.mapError(() => proofError("configuration")));
       const kubeconfig = yield* requireKubectl(options.context, [
         "config",
@@ -908,6 +1008,118 @@ layer(platform)("disposable typed workload recovery", (it) => {
           "--timeout=180s",
         ]);
 
+        const firstMateIdentity =
+          `system:serviceaccount:${core}:agentos-firstmate`;
+        const matePod = "agentos-workload-mate-0";
+        const matePvc = "home-agentos-workload-mate-0";
+        const mateBefore = yield* retainedPvcScheduling(
+          options.context,
+          alpha,
+          matePod,
+          matePvc,
+        );
+        assert.strictEqual(mateBefore.nodeAffinity, mateBefore.node);
+        assert.isTrue(yield* canI(
+          options.context,
+          firstMateIdentity,
+          alpha,
+          "delete",
+          "pods",
+        ));
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${matePod}`,
+            "--container=agentos",
+            "--",
+            "cat",
+            "/home/agent/native-session",
+          ]),
+          "agentos-workload-mate",
+        );
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${matePod}`,
+            "--container=agentos",
+            "--",
+            "stat",
+            "-L",
+            "-c",
+            "%a:%u:%g",
+            "/var/run/secrets/agentos-egress/token",
+          ]),
+          "640:65535:65535",
+        );
+        assert.notStrictEqual(
+          (yield* runKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${matePod}`,
+            "--container=agentos",
+            "--",
+            "sh",
+            "-c",
+            "printf x > /var/run/secrets/agentos-egress/token",
+          ])).exitCode,
+          0,
+        );
+        yield* requireKubectl(options.context, [
+          "--namespace",
+          alpha,
+          "exec",
+          `pod/${matePod}`,
+          "--container=agentos",
+          "--",
+          "sh",
+          "-c",
+          "printf '%s' 'worktree:agentos-workload-mate' > /home/agent/worktree-id",
+        ]);
+        yield* requireKubectl(options.context, [
+          "--namespace",
+          alpha,
+          "--as",
+          firstMateIdentity,
+          "delete",
+          `pod/${matePod}`,
+          "--wait=true",
+        ]);
+        yield* waitForReplacement(
+          options.context,
+          alpha,
+          matePod,
+          mateBefore.podUid,
+        );
+        const mateAfter = yield* retainedPvcScheduling(
+          options.context,
+          alpha,
+          matePod,
+          matePvc,
+        );
+        assert.notStrictEqual(mateAfter.podUid, mateBefore.podUid);
+        assert.strictEqual(mateAfter.pvcUid, mateBefore.pvcUid);
+        assert.strictEqual(mateAfter.volume, mateBefore.volume);
+        assert.strictEqual(mateAfter.nodeAffinity, mateBefore.nodeAffinity);
+        assert.strictEqual(mateAfter.node, mateBefore.node);
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${matePod}`,
+            "--container=agentos",
+            "--",
+            "cat",
+            "/home/agent/worktree-id",
+          ]),
+          "worktree:agentos-workload-mate",
+        );
+
         const secondMateIdentity =
           `system:serviceaccount:${alpha}:agentos-workload-mate`;
         assert.isTrue(yield* canI(
@@ -985,6 +1197,31 @@ layer(platform)("disposable typed workload recovery", (it) => {
           "--timeout=180s",
         ]);
 
+        yield* requireFailure(
+          options.context,
+          [
+            "--namespace",
+            alpha,
+            "create",
+            "--dry-run=server",
+            "--filename=-",
+          ],
+          "exceeded quota: agentos-domain-capacity",
+          yield* encodeJson(quotaProbePod("cpu-quota-overflow", "2", "64Mi")),
+        );
+        yield* requireFailure(
+          options.context,
+          [
+            "--namespace",
+            alpha,
+            "create",
+            "--dry-run=server",
+            "--filename=-",
+          ],
+          "exceeded quota: agentos-domain-capacity",
+          yield* encodeJson(quotaProbePod("memory-quota-overflow", "25m", "2Gi")),
+        );
+
         const pod = "agentos-workload-crew-0";
         const pvc = "home-agentos-workload-crew-0";
         const podUid = yield* requireKubectl(options.context, [
@@ -1001,6 +1238,45 @@ layer(platform)("disposable typed workload recovery", (it) => {
           `persistentvolumeclaim/${pvc}`,
           "--output=jsonpath={.metadata.uid}",
         ]);
+        const crewBefore = yield* retainedPvcScheduling(
+          options.context,
+          alpha,
+          pod,
+          pvc,
+        );
+        assert.strictEqual(crewBefore.podUid, podUid);
+        assert.strictEqual(crewBefore.pvcUid, pvcUid);
+        assert.strictEqual(crewBefore.nodeAffinity, crewBefore.node);
+        assert.strictEqual(
+          yield* requireKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${pod}`,
+            "--container=crewmate",
+            "--",
+            "stat",
+            "-L",
+            "-c",
+            "%a:%u:%g",
+            "/var/run/secrets/agentos-egress/token",
+          ]),
+          "640:65535:65535",
+        );
+        assert.notStrictEqual(
+          (yield* runKubectl(options.context, [
+            "--namespace",
+            alpha,
+            "exec",
+            `pod/${pod}`,
+            "--container=crewmate",
+            "--",
+            "sh",
+            "-c",
+            "printf x > /var/run/secrets/agentos-egress/token",
+          ])).exitCode,
+          0,
+        );
         assert.strictEqual(
           yield* requireKubectl(options.context, [
             "--namespace",
@@ -1184,6 +1460,17 @@ layer(platform)("disposable typed workload recovery", (it) => {
           ]),
           pvcUid,
         );
+        const crewAfter = yield* retainedPvcScheduling(
+          options.context,
+          alpha,
+          pod,
+          pvc,
+        );
+        assert.strictEqual(crewAfter.podUid, replacementUid);
+        assert.strictEqual(crewAfter.pvcUid, crewBefore.pvcUid);
+        assert.strictEqual(crewAfter.volume, crewBefore.volume);
+        assert.strictEqual(crewAfter.nodeAffinity, crewBefore.nodeAffinity);
+        assert.strictEqual(crewAfter.node, crewBefore.node);
         assert.strictEqual(
           yield* requireKubectl(options.context, [
             "--namespace",
@@ -1243,6 +1530,38 @@ layer(platform)("disposable typed workload recovery", (it) => {
             "",
           );
         }
+        const hardGateEvidence: typeof WorkloadHardGateEvidenceV1Schema.Type = {
+          version: 1,
+          context: options.context,
+          approvalReference: options.approval,
+          persistentSpecDigest:
+            `sha256:${plans.persistent.plan.specDigest}`,
+          persistentRenderDigest: `sha256:${plans.persistent.renderDigest}`,
+          interactiveSpecDigest:
+            `sha256:${plans.interactive.plan.specDigest}`,
+          interactiveRenderDigest: `sha256:${plans.interactive.renderDigest}`,
+          matePodReplaced: true,
+          matePvcRetained: true,
+          mateWorktreeRetained: true,
+          crewmatePodReplaced: true,
+          crewmatePvcRetained: true,
+          retainedPvcNodeAffinity: true,
+          projectedSecretTemplateMode: "0440",
+          projectedSecretObservedMode: "0640",
+          projectedSecretObservedOwner: "65535:65535",
+          projectedSecretWriteDenied: true,
+          cpuQuotaDenied: true,
+          memoryQuotaDenied: true,
+          namespacesDeleted: true,
+          productionEndpointContacted: false,
+        };
+        if (Option.isSome(artifactPath)) {
+          const fileSystem = yield* FileSystem.FileSystem;
+          const encoded = yield* Schema.encodeEffect(
+            Schema.fromJsonString(WorkloadHardGateEvidenceV1Schema),
+          )(hardGateEvidence);
+          yield* fileSystem.writeFileString(artifactPath.value, encoded);
+        }
         yield* Effect.logInfo("agentos.workload.disposable_recovery_proof", {
           context: options.context,
           approval: options.approval,
@@ -1252,6 +1571,18 @@ layer(platform)("disposable typed workload recovery", (it) => {
           interactiveSpecDigest: plans.interactive.plan.specDigest,
           interactiveOverlayDigest: plans.interactive.plan.overlayDigest,
           interactiveRenderDigest: plans.interactive.renderDigest,
+          matePodReplaced: true,
+          matePvcRetained: true,
+          mateWorktreeRetained: true,
+          crewmatePodReplaced: true,
+          crewmatePvcRetained: true,
+          retainedPvcNodeAffinity: true,
+          projectedSecretTemplateMode: "0440",
+          projectedSecretObservedMode: "0640",
+          projectedSecretObservedOwner: "65535:65535",
+          projectedSecretWriteDenied: true,
+          cpuQuotaDenied: true,
+          memoryQuotaDenied: true,
           podReplaced: true,
           pvcRetained: true,
           retryExhaustionResumed: recoveryEvidence.transientResumeCompleted,
