@@ -83,9 +83,15 @@ function testHost() {
   return Effect.gen(function*() {
     const completions = yield* Ref.make<ReadonlyArray<BackgroundTaskCompletion>>([]);
     const entries = yield* Ref.make<ReadonlyArray<TaskLifecycleEntry>>([]);
+    const terminalLifecycle = yield* Deferred.make<void>();
     const host: AgentOSBackgroundTasksHost = {
       appendLifecycle: (entry) =>
-        Ref.update(entries, (current) => [...current, entry]),
+        Effect.gen(function*() {
+          yield* Ref.update(entries, (current) => [...current, entry]);
+          if (entry.task.state !== "running") {
+            yield* Deferred.succeed(terminalLifecycle, undefined);
+          }
+        }),
       sendCompletion: (completion) =>
         Ref.update(completions, (current) => [...current, completion]),
     };
@@ -93,6 +99,7 @@ function testHost() {
       completions: Ref.get(completions),
       entries: Ref.get(entries),
       host,
+      terminalLifecycle: Deferred.await(terminalLifecycle),
     };
   });
 }
@@ -306,8 +313,7 @@ describe("Effect background-task extension runtime", () => {
           state: "succeeded",
           summary: "done",
         });
-        yield* Effect.yieldNow;
-        yield* Effect.sleep("1 millis");
+        yield* observed.terminalLifecycle;
         const output = yield* runtime.output({ task_id: started.details.id });
         yield* Effect.sleep("75 millis");
 
