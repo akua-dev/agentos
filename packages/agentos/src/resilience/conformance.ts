@@ -724,7 +724,7 @@ interface RegressionTest {
 
 const WorkloadLive = regressionTest(
   "packages/agentos/src/workloads/tests/disposable-recovery.effect.test.ts",
-  "proves dry-run, admission, apply repair, Herdr readiness, replacement, and retained PVC",
+  "proves fresh and retained Mate/Crewmate lifecycle, quota, affinity, Secret modes, and repair",
   "#127",
 );
 const WorkloadPlans = regressionTest(
@@ -852,20 +852,15 @@ const ProviderStream = regressionTest(
   "keeps provider stream defects typed and payload-free",
   "#32",
 );
-const ForwardAuthentication = regressionTest(
-  "services/ai-gateway/tests/forward.effect.test.ts",
-  "ends telemetry at authentication rejection without starting a route",
-  "#32",
-);
 const ForwardRateLimit = regressionTest(
   "services/ai-gateway/tests/forward.effect.test.ts",
   "settles provider rejections with zero usage and preserves their status/body",
   "#32",
 );
-const ForwardNoRoute = regressionTest(
+const ForwardProviderFailureMatrix = regressionTest(
   "services/ai-gateway/tests/forward.effect.test.ts",
-  "ends telemetry when no eligible route is available",
-  "#32",
+  "preserves distinct provider 401, 429, and overload responses",
+  "#84",
 );
 const ForwardTransport = regressionTest(
   "services/ai-gateway/tests/forward.effect.test.ts",
@@ -921,11 +916,6 @@ const PolicyRoute = regressionTest(
   "packages/agentos/src/access/tests/policy-decision.effect.test.ts",
   "rejects caller-controlled identity and invalid provider routes before dependencies",
   "#94",
-);
-const PolicyOverload = regressionTest(
-  "packages/agentos/src/access/tests/policy-decision.effect.test.ts",
-  "keeps budget exhaustion distinct from provider and policy failures",
-  "#96",
 );
 const ControlRevocation = regressionTest(
   "packages/agentos/src/access/tests/control-plane.effect.test.ts",
@@ -997,9 +987,9 @@ export const RESILIENCE_REGRESSION_SOURCES: ReadonlyArray<ResilienceRegressionSo
   ...regressionPair("runtime.operation.failed", JournalSupersede, JournalBoundary),
   ...regressionPair("runtime.operation.superseded", JournalSupersede, RecoveryJoin),
   ...regressionPair("gateway.config.malformed", GatewayConfig, AgentgatewayInvalid),
-  ...regressionPair("gateway.provider.unauthorized_401", QuotaFailures, ForwardAuthentication),
-  ...regressionPair("gateway.provider.rate_limited_429", ForwardRateLimit, AgentgatewayContract),
-  ...regressionPair("gateway.provider.overload", PolicyOverload, ForwardNoRoute),
+  ...regressionPair("gateway.provider.unauthorized_401", ForwardProviderFailureMatrix, QuotaFailures),
+  ...regressionPair("gateway.provider.rate_limited_429", ForwardProviderFailureMatrix, ForwardRateLimit),
+  ...regressionPair("gateway.provider.overload", ForwardProviderFailureMatrix, AgentgatewayContract),
   ...regressionPair("gateway.provider.transport_failure", ProviderTransport, ForwardTransport),
   ...regressionPair("gateway.provider.stream_failure", ProviderStream, ForwardStream),
   ...regressionPair("access.identity.expired_token", IdentityExpiry, PolicyFreshness),
