@@ -17,6 +17,7 @@ const ids = {
   assignmentBinding: "binding_2123456789abcdef0123456789abcdef",
 };
 const scope = { kind: "domain", fleet: "agentos", domain: "platform" };
+const fixtureExpiresAtMillis = 4_102_444_800_000;
 const subject = {
   kind: "mate",
   fleet: "agentos",
@@ -37,7 +38,7 @@ const permission = {
     repository: "agentos",
   },
   environment: "production",
-  expiresAtMillis: 1785715200000,
+  expiresAtMillis: fixtureExpiresAtMillis,
   rateClass: "standard",
 };
 
@@ -145,12 +146,12 @@ const databaseLayer = Layer.effect(
         created_by_agent_id
       ) VALUES (
         '${ids.binding}', 'github-maintainer', 1,
-        '${JSON.stringify(subject)}'::jsonb, 1785542400000, 1785715200000,
+        '${JSON.stringify(subject)}'::jsonb, 1785542400000, ${fixtureExpiresAtMillis},
         '${ids.ceiling}', 1, 'active', '${firstMate}'
       ), (
         '${ids.assignmentBinding}', 'github-maintainer', 1,
         '${JSON.stringify(assignmentSubject)}'::jsonb,
-        1785542400000, 1785715200000,
+        1785542400000, ${fixtureExpiresAtMillis},
         '${ids.ceiling}', 1, 'active', '${firstMate}'
       );
 
