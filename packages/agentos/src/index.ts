@@ -670,6 +670,22 @@ export {
   type ResilienceRegressionSourceV1,
 } from "./resilience/conformance.ts";
 export {
+  AGENTOS_RESILIENCE_EXECUTION_REFERENCES,
+  ProtocolHardGateEvidenceV1Schema,
+  ResilienceExecutionError,
+  WorkloadHardGateEvidenceV1Schema,
+  compileExecutedAgentOSResilienceVerdict,
+  resolveDisposableProofOptions,
+  resolveHardGateArtifactPath,
+  validateHardGateRevision,
+  verifyResilienceTestExecution,
+} from "./resilience/execution.ts";
+export {
+  ResilienceHardGateRunnerError,
+  agentOSResilienceHardGate,
+  runAgentOSResilienceHardGate,
+} from "./resilience/hard-gate.ts";
+export {
   CompiledSecondMateTopologyPlanV1Schema,
   ExistingSecondMateTopologyDestinationV1,
   NewSecondMateTopologyDestinationV1,

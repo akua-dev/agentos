@@ -6,6 +6,7 @@ import {
   ConfigProvider,
   Console,
   Effect,
+  FileSystem,
   Layer,
   Option,
   Path,
@@ -28,6 +29,11 @@ import {
   renderCompiledWorkloadSpec,
   type RenderedWorkloadPlan,
 } from "./conformance-support.ts";
+import {
+  WorkloadHardGateEvidenceV1Schema,
+  resolveDisposableProofOptions,
+  resolveHardGateArtifactPath,
+} from "../../resilience/execution.ts";
 
 const packageRootUrl = new URL("../../../", import.meta.url);
 const fixtureDistributionUrl = new URL(
@@ -142,9 +148,15 @@ const platform = Layer.mergeAll(
   ConfigProvider.layer(ConfigProvider.fromEnv()),
 );
 const LiveConfig = Config.all({
+  hardGate: Config.boolean("AGENTOS_RESILIENCE_HARD_GATE").pipe(
+    Config.withDefault(false),
+  ),
   context: Config.option(Config.string("AGENTOS_KUBERNETES_TEST_CONTEXT")),
   approval: Config.option(
     Config.string("AGENTOS_DISPOSABLE_FLEET_APPROVAL"),
+  ),
+  evidencePath: Config.option(
+    Config.string("AGENTOS_RESILIENCE_WORKLOAD_EVIDENCE_PATH"),
   ),
 });
 const OptionsSchema = Schema.Struct({
@@ -847,19 +859,26 @@ layer(platform)("disposable typed workload recovery", (it) => {
   it.effect("proves fresh and retained Mate/Crewmate lifecycle, quota, affinity, Secret modes, and repair", () =>
     Effect.gen(function*() {
       const configured = yield* LiveConfig;
-      if (
-        Option.isNone(configured.context) || Option.isNone(configured.approval)
-      ) {
+      const disposable = yield* resolveDisposableProofOptions({
+        hardGate: configured.hardGate,
+        context: Option.getOrNull(configured.context),
+        approvalReference: Option.getOrNull(configured.approval),
+      });
+      if (Option.isNone(disposable)) {
         yield* Console.log(
           "Disposable workload proof unobserved: context or approval is absent",
         );
         return;
       }
+      const artifactPath = yield* resolveHardGateArtifactPath({
+        hardGate: configured.hardGate,
+        path: Option.getOrNull(configured.evidencePath),
+      });
       const options = yield* Schema.decodeUnknownEffect(OptionsSchema, {
         onExcessProperty: "error",
       })({
-        context: configured.context.value,
-        approval: configured.approval.value,
+        context: disposable.value.context,
+        approval: disposable.value.approvalReference,
       }).pipe(Effect.mapError(() => proofError("configuration")));
       const kubeconfig = yield* requireKubectl(options.context, [
         "config",
@@ -1480,6 +1499,35 @@ layer(platform)("disposable typed workload recovery", (it) => {
             ]),
             "",
           );
+        }
+        const hardGateEvidence: typeof WorkloadHardGateEvidenceV1Schema.Type = {
+          version: 1,
+          context: options.context,
+          approvalReference: options.approval,
+          persistentSpecDigest:
+            `sha256:${plans.persistent.plan.specDigest}`,
+          persistentRenderDigest: `sha256:${plans.persistent.renderDigest}`,
+          interactiveSpecDigest:
+            `sha256:${plans.interactive.plan.specDigest}`,
+          interactiveRenderDigest: `sha256:${plans.interactive.renderDigest}`,
+          matePodReplaced: true,
+          matePvcRetained: true,
+          mateWorktreeRetained: true,
+          crewmatePodReplaced: true,
+          crewmatePvcRetained: true,
+          retainedPvcNodeAffinity: true,
+          projectedSecretMode: "0440",
+          cpuQuotaDenied: true,
+          memoryQuotaDenied: true,
+          namespacesDeleted: true,
+          productionEndpointContacted: false,
+        };
+        if (Option.isSome(artifactPath)) {
+          const fileSystem = yield* FileSystem.FileSystem;
+          const encoded = yield* Schema.encodeEffect(
+            Schema.fromJsonString(WorkloadHardGateEvidenceV1Schema),
+          )(hardGateEvidence);
+          yield* fileSystem.writeFileString(artifactPath.value, encoded);
         }
         yield* Effect.logInfo("agentos.workload.disposable_recovery_proof", {
           context: options.context,
