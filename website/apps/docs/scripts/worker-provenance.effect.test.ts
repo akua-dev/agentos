@@ -1,6 +1,7 @@
 import * as BunServices from '@effect/platform-bun/BunServices';
 import { assert, describe, it } from '@effect/vitest';
-import { Effect, FileSystem, Path, Schema } from 'effect';
+import { Effect, FileSystem, Path, Schema, Stream } from 'effect';
+import { ChildProcess } from 'effect/unstable/process';
 
 import {
   assertDeployableProvenance,
@@ -31,7 +32,67 @@ const provenance: WorkerProvenance = {
   sourceDirty: false,
 };
 
+const workspaceBinTargets = [
+  'services/a2a/src/main.ts',
+  'services/ai-gateway/src/main.ts',
+  'services/egress-authz/src/main.ts',
+  'services/github-broker/src/main.ts',
+] as const;
+
+const readGitIndexModes = Effect.fn('test.website.readGitIndexModes')(
+  function*(repositoryRoot: string, targets: ReadonlyArray<string>) {
+    return yield* Effect.scoped(
+      Effect.gen(function*() {
+        const child = yield* ChildProcess.make(
+          'git',
+          ['ls-files', '--stage', '--', ...targets],
+          {
+            cwd: repositoryRoot,
+            stderr: 'pipe',
+            stdout: 'pipe',
+          },
+        );
+        const [exitCode, stderr, stdout] = yield* Effect.all(
+          [
+            child.exitCode.pipe(Effect.map(Number)),
+            child.stderr.pipe(Stream.decodeText(), Stream.mkString),
+            child.stdout.pipe(Stream.decodeText(), Stream.mkString),
+          ],
+          { concurrency: 'unbounded' },
+        );
+        assert.strictEqual(exitCode, 0, stderr);
+        return new Map(
+          stdout
+            .trim()
+            .split('\n')
+            .filter((line) => line.length > 0)
+            .map((line) => {
+              const [metadata, path] = line.split('\t');
+              return [path, metadata?.split(' ')[0]] as const;
+            }),
+        );
+      }),
+    );
+  },
+);
+
 describe('Worker build provenance', () => {
+  it.effect('keeps Bun workspace bin targets executable in the Git index', () =>
+    Effect.gen(function*() {
+      const paths = yield* Path.Path;
+      const appDirectory = yield* paths.fromFileUrl(new URL('..', import.meta.url));
+      const repositoryRoot = paths.resolve(appDirectory, '../../..');
+      const modes = yield* readGitIndexModes(repositoryRoot, workspaceBinTargets);
+
+      for (const target of workspaceBinTargets) {
+        assert.strictEqual(
+          modes.get(target),
+          '100755',
+          `${target} is a package bin target; Bun changes non-executable targets during install and dirties Workers Builds checkouts`,
+        );
+      }
+    }).pipe(Effect.provide(BunServices.layer)));
+
   it.effect('binds a Cloudflare build to its exact checkout revision and branch', () =>
     Effect.gen(function*() {
       assert.deepStrictEqual(
