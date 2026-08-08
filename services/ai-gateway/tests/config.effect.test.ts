@@ -27,6 +27,7 @@ describe("AI Gateway Effect configuration", () => {
       );
       assert.strictEqual(config.hostname, "0.0.0.0");
       assert.strictEqual(config.port, 8787);
+      assert.strictEqual(config.idleTimeoutSeconds, 255);
       assert.strictEqual(String(config.clientToken), "<redacted>");
       assert.strictEqual(String(config.openAIApiKey), "<redacted>");
       assert.strictEqual(Redacted.value(config.clientToken), "fleet-secret");
@@ -52,6 +53,25 @@ describe("AI Gateway Effect configuration", () => {
       );
     }));
 
+  it.effect("loads an explicit Bun HTTP idle timeout", () =>
+    Effect.gen(function*() {
+      const configured = yield* loadAIGatewayConfig().pipe(
+        Effect.provide(environment({
+          HOME: "/home/agentos",
+          AI_GATEWAY_IDLE_TIMEOUT_SECONDS: "120",
+        })),
+      );
+      const disabled = yield* loadAIGatewayConfig().pipe(
+        Effect.provide(environment({
+          HOME: "/home/agentos",
+          AI_GATEWAY_IDLE_TIMEOUT_SECONDS: "0",
+        })),
+      );
+
+      assert.strictEqual(configured.idleTimeoutSeconds, 120);
+      assert.strictEqual(disabled.idleTimeoutSeconds, 0);
+    }));
+
   it.effect("rejects missing shared auth and malformed runtime bounds", () =>
     Effect.gen(function*() {
       const missingToken = yield* loadAIGatewayConfig().pipe(
@@ -64,6 +84,8 @@ describe("AI Gateway Effect configuration", () => {
       const invalidEnvironments: ReadonlyArray<Readonly<Record<string, string>>> = [
         { AI_GATEWAY_LISTEN_PORT: "0" },
         { AI_GATEWAY_LISTEN_PORT: "65536" },
+        { AI_GATEWAY_IDLE_TIMEOUT_SECONDS: "-1" },
+        { AI_GATEWAY_IDLE_TIMEOUT_SECONDS: "256" },
         { AI_GATEWAY_HEARTBEAT_MILLIS: "0" },
         { AGENTOS_PROVIDER_BUDGET_SETTLEMENT_TIMEOUT_MILLIS: "0" },
       ];
