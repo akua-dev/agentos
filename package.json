@@ -35,23 +35,23 @@
     "site:upload:worker": "bun run --cwd website/apps/docs upload:worker"
   },
   "devDependencies": {
-    "@effect/opentelemetry": "4.0.0-beta.102",
-    "@effect/platform-browser": "4.0.0-beta.102",
-    "@effect/platform-bun": "4.0.0-beta.102",
-    "@effect/sql-pg": "4.0.0-beta.102",
-    "@effect/vitest": "4.0.0-beta.102",
+    "@effect/opentelemetry": "4.0.0-beta.106",
+    "@effect/platform-browser": "4.0.0-beta.106",
+    "@effect/platform-bun": "4.0.0-beta.106",
+    "@effect/sql-pg": "4.0.0-beta.106",
+    "@effect/vitest": "4.0.0-beta.106",
     "@types/bun": "1.3.14",
     "typescript": "7.0.2",
-    "vite": "8.1.5",
-    "effect": "4.0.0-beta.102",
-    "oxc-parser": "0.128.0",
+    "vite": "8.2.1",
+    "effect": "4.0.0-beta.106",
+    "oxc-parser": "0.143.0",
     "toml": "4.3.0",
     "vitest": "4.1.10"
   },
   "dependencies": {
     "@akua-dev/agentos": "workspace:*",
-    "@earendil-works/pi-ai": "0.81.1",
-    "@earendil-works/pi-coding-agent": "0.81.1",
+    "@earendil-works/pi-ai": "0.84.1",
+    "@earendil-works/pi-coding-agent": "0.84.1",
     "ajv": "8.20.0",
     "yaml": "2.9.0",
     "zod": "4.4.3"
