@@ -49,6 +49,7 @@ export interface RunAIGatewayCliOptions {
   startServer?: (options: {
     hostname: string;
     port: number;
+    idleTimeout: number;
     fetch(request: Request): Response | Promise<Response>;
   }) => ServerHandle;
   waitForShutdown?: () => Promise<void>;
@@ -161,9 +162,13 @@ export async function runAIGatewayCli(
           const hostname =
             environment.AI_GATEWAY_LISTEN_HOST?.trim() || "0.0.0.0";
           const port = parsePort(environment.AI_GATEWAY_LISTEN_PORT);
+          const idleTimeout = parseIdleTimeout(
+            environment.AI_GATEWAY_IDLE_TIMEOUT_SECONDS,
+          );
           const server = (options.startServer ?? defaultStartServer)({
             hostname,
             port,
+            idleTimeout,
             fetch: service.fetch,
           });
           writeLine(`ai-gateway listening on ${hostname}:${port}`);
@@ -202,9 +207,30 @@ function parsePort(value: string | undefined): number {
   return port;
 }
 
+function parseIdleTimeout(value: string | undefined): number {
+  if (value === undefined) return 255;
+  if (!/^(?:0|[1-9][0-9]*)$/.test(value)) {
+    throw new Error(
+      "AI_GATEWAY_IDLE_TIMEOUT_SECONDS must be an integer from 0 to 255",
+    );
+  }
+  const idleTimeout = Number(value);
+  if (
+    !Number.isSafeInteger(idleTimeout) ||
+    idleTimeout < 0 ||
+    idleTimeout > 255
+  ) {
+    throw new Error(
+      "AI_GATEWAY_IDLE_TIMEOUT_SECONDS must be an integer from 0 to 255",
+    );
+  }
+  return idleTimeout;
+}
+
 function defaultStartServer(options: {
   hostname: string;
   port: number;
+  idleTimeout: number;
   fetch(request: Request): Response | Promise<Response>;
 }): ServerHandle {
   return Bun.serve(options);

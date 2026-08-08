@@ -110,6 +110,84 @@ describe("ai-gateway executable", () => {
     expect(telemetryShutdown).toBe(true);
   });
 
+  test.each([
+    ["the default", undefined, 255],
+    ["zero", "0", 0],
+    ["the maximum", "255", 255],
+  ] as const)(
+    "passes %s idle timeout to the native server",
+    async (_description, configuredTimeout, expectedTimeout) => {
+      const stateDirectory = await mkdtemp(
+        join(tmpdir(), "ai-gateway-idle-timeout-cli-"),
+      );
+      let idleTimeout: number | undefined;
+      const result = await runAIGatewayCli(["serve"], {
+        environment: {
+          ...(configuredTimeout === undefined
+            ? {}
+            : { AI_GATEWAY_IDLE_TIMEOUT_SECONDS: configuredTimeout }),
+          AI_GATEWAY_STATE_DIR: stateDirectory,
+          AI_GATEWAY_TOKEN: "fleet-secret",
+        },
+        writeLine: () => undefined,
+        writeError: () => undefined,
+        refresh: async () => credentials("provider-a"),
+        startServer: (options) => {
+          idleTimeout = options.idleTimeout;
+          return { stop: () => undefined };
+        },
+        waitForShutdown: async () => undefined,
+      });
+
+      expect(result).toBe(0);
+      expect(idleTimeout).toBe(expectedTimeout);
+    },
+  );
+
+  test.each([
+    "",
+    " ",
+    "\t",
+    "+1",
+    "-0",
+    "00",
+    "01",
+    "0x10",
+    "1e2",
+    "-1",
+    "0.5",
+    "256",
+    "not-a-number",
+  ])(
+    "rejects invalid AI_GATEWAY_IDLE_TIMEOUT_SECONDS=%s before binding",
+    async (configuredTimeout) => {
+      const stateDirectory = await mkdtemp(
+        join(tmpdir(), "ai-gateway-idle-timeout-cli-"),
+      );
+      const errors: string[] = [];
+      let bound = false;
+      const result = await runAIGatewayCli(["serve"], {
+        environment: {
+          AI_GATEWAY_IDLE_TIMEOUT_SECONDS: configuredTimeout,
+          AI_GATEWAY_STATE_DIR: stateDirectory,
+          AI_GATEWAY_TOKEN: "fleet-secret",
+        },
+        writeLine: () => undefined,
+        writeError: (line) => errors.push(line),
+        refresh: async () => credentials("provider-a"),
+        startServer: () => {
+          bound = true;
+          return { stop: () => undefined };
+        },
+        waitForShutdown: async () => undefined,
+      });
+
+      expect(result).toBe(1);
+      expect(bound).toBe(false);
+      expect(errors).toEqual(["ai-gateway serve failed (Error)"]);
+    },
+  );
+
   test("ignores Kubernetes Service-link metadata as a listen-port choice", async () => {
     const stateDirectory = await mkdtemp(join(tmpdir(), "ai-gateway-service-link-cli-"));
     let binding: { hostname: string; port: number } | undefined;
