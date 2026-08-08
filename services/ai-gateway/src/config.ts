@@ -20,6 +20,9 @@ const RawConfig = Config.all({
   port: Config.int("AI_GATEWAY_LISTEN_PORT").pipe(
     Config.withDefault(8787),
   ),
+  idleTimeoutSeconds: Config.int("AI_GATEWAY_IDLE_TIMEOUT_SECONDS").pipe(
+    Config.withDefault(255),
+  ),
   gracefulShutdownMillis: Config.int(
     "AI_GATEWAY_GRACEFUL_SHUTDOWN_MILLIS",
   ).pipe(Config.withDefault(20_000)),
@@ -84,6 +87,7 @@ export interface AIGatewayConfig {
   readonly stateDirectory: string;
   readonly hostname: string;
   readonly port: number;
+  readonly idleTimeoutSeconds: number;
   readonly gracefulShutdownMillis: number;
   readonly clientAuthenticationMode: "shared_token" | "workload_identity";
   readonly clientToken: Redacted.Redacted<string>;
@@ -134,6 +138,7 @@ export const loadAIGatewayConfig = Effect.fn(
     stateDirectory,
     hostname: raw.hostname,
     port: raw.port,
+    idleTimeoutSeconds: raw.idleTimeoutSeconds,
     gracefulShutdownMillis: raw.gracefulShutdownMillis,
     clientAuthenticationMode,
     clientToken: raw.clientToken,
@@ -194,6 +199,7 @@ function validConfiguration(
     validSecret(operatorToken) &&
     validSecret(openAIApiKey) &&
     validPositiveInteger(raw.port, 65_535) &&
+    validNonNegativeInteger(raw.idleTimeoutSeconds, 255) &&
     validPositiveInteger(raw.gracefulShutdownMillis) &&
     validPositiveInteger(raw.heartbeatMillis) &&
     validPositiveInteger(raw.maximumUsageEventBytes) &&
@@ -213,6 +219,10 @@ function defaultStateDirectory(home: string): string {
 function validPositiveInteger(value: number, maximum?: number): boolean {
   return Number.isSafeInteger(value) && value > 0 &&
     (maximum === undefined || value <= maximum);
+}
+
+function validNonNegativeInteger(value: number, maximum: number): boolean {
+  return Number.isSafeInteger(value) && value >= 0 && value <= maximum;
 }
 
 function validString(value: string, maximum: number): boolean {

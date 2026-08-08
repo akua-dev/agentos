@@ -248,6 +248,7 @@ function makeAIGatewayRuntimeLive(
             Layer.provide(BunHttpServer.layer({
               hostname: serveConfig.hostname,
               port: serveConfig.port,
+              idleTimeout: serveConfig.idleTimeoutSeconds,
               gracefulShutdownTimeout: serveConfig.gracefulShutdownMillis,
             })),
           );
