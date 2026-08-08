@@ -39,6 +39,7 @@ function configuration(
     stateDirectory: "/state",
     hostname: "0.0.0.0",
     port: 8787,
+    idleTimeoutSeconds: 255,
     gracefulShutdownMillis: 20_000,
     clientAuthenticationMode: "shared_token",
     clientToken: Redacted.make("fleet-secret"),
@@ -71,6 +72,7 @@ const makeHarness = Effect.fn("test.aiGateway.makeCliHarness")(function*() {
   const served = yield* Ref.make<ReadonlyArray<{
     readonly hostname: string;
     readonly port: number;
+    readonly idleTimeoutSeconds: number;
     readonly authentication: string;
   }>>([]);
   const statusTokens = yield* Ref.make<ReadonlyArray<string>>([]);
@@ -117,6 +119,7 @@ const makeHarness = Effect.fn("test.aiGateway.makeCliHarness")(function*() {
           {
             hostname: config.hostname,
             port: config.port,
+            idleTimeoutSeconds: config.idleTimeoutSeconds,
             authentication: config.authentication.kind,
           },
         ]),
@@ -172,17 +175,22 @@ describe("AI Gateway Effect CLI", () => {
       ]);
     }));
 
-  it.effect("passes the explicit native bind address to the Effect runtime", () =>
+  it.effect("passes HTTP server settings to the Effect runtime", () =>
     Effect.gen(function*() {
       const harness = yield* makeHarness();
       const exitCode = yield* runAIGatewayCli(
         ["serve"],
-        configuration({ hostname: "127.0.0.2", port: 9876 }),
+        configuration({
+          hostname: "127.0.0.2",
+          port: 9876,
+          idleTimeoutSeconds: 120,
+        }),
       ).pipe(Effect.provide(harness.layer));
       assert.strictEqual(exitCode, 0);
       assert.deepStrictEqual(yield* Ref.get(harness.served), [{
         hostname: "127.0.0.2",
         port: 9876,
+        idleTimeoutSeconds: 120,
         authentication: "shared_token",
       }]);
     }));
@@ -202,6 +210,7 @@ describe("AI Gateway Effect CLI", () => {
       assert.deepStrictEqual(yield* Ref.get(harness.served), [{
         hostname: "0.0.0.0",
         port: 8787,
+        idleTimeoutSeconds: 255,
         authentication: "workload_identity",
       }]);
     }));
