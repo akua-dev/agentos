@@ -29,42 +29,49 @@ checksum = "sha256:b2816e506390a89941c63c9187d58a3cc10e9a55f2ef0685f9ea0eccaf7c9
 url = "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-x86_64-pc-windows-msvc.zip"
 
 [[tools.gh]]
-version = "2.96.0"
+version = "2.97.0"
 backend = "aqua:cli/cli"
 
 [tools.gh."platforms.linux-arm64"]
-checksum = "sha256:06f86ec7103d41993b76cd78072f43595c34aaa56506d971d9860e67140bf909"
-url = "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_arm64.tar.gz"
+checksum = "sha256:73ea440ecad9c9e284429997ee6f93577bc6f7bc6fba357ef62c53ad8fb641a5"
+url = "https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/cli/cli/releases/assets/496108278"
 provenance = "github-attestations"
 
 [tools.gh."platforms.linux-arm64-musl"]
-checksum = "sha256:06f86ec7103d41993b76cd78072f43595c34aaa56506d971d9860e67140bf909"
-url = "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_arm64.tar.gz"
+checksum = "sha256:73ea440ecad9c9e284429997ee6f93577bc6f7bc6fba357ef62c53ad8fb641a5"
+url = "https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/cli/cli/releases/assets/496108278"
 provenance = "github-attestations"
 
 [tools.gh."platforms.linux-x64"]
-checksum = "sha256:83d5c2ccad5498f58bf6368acb1ab32588cf43ab3a4b1c301bf36328b1c8bd60"
-url = "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_amd64.tar.gz"
+checksum = "sha256:a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112"
+url = "https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/cli/cli/releases/assets/496108269"
 provenance = "github-attestations"
 
 [tools.gh."platforms.linux-x64-musl"]
-checksum = "sha256:83d5c2ccad5498f58bf6368acb1ab32588cf43ab3a4b1c301bf36328b1c8bd60"
-url = "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_amd64.tar.gz"
+checksum = "sha256:a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112"
+url = "https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/cli/cli/releases/assets/496108269"
 provenance = "github-attestations"
 
 [tools.gh."platforms.macos-arm64"]
-checksum = "sha256:f23a0c37d963aacc3bed703ccbd59b41c5ca22101fab7f00eb2b7cad23aba463"
-url = "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_macOS_arm64.zip"
+checksum = "sha256:a58b8fd77b417a38f47a0b54d1370c59b0fcdb324ccc9ca002b0998f7c4c999e"
+url = "https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_macOS_arm64.zip"
+url_api = "https://api.github.com/repos/cli/cli/releases/assets/496108298"
 provenance = "github-attestations"
 
 [tools.gh."platforms.macos-x64"]
-checksum = "sha256:4bd449df9ad639391bc62b8032546f0fe9edcd8526e06682a4f88abd8c5d163c"
-url = "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_macOS_amd64.zip"
+checksum = "sha256:63298c998cc2a924c9e254c6af6a1caad6ece281122687a91f079bc0a462700e"
+url = "https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_macOS_amd64.zip"
+url_api = "https://api.github.com/repos/cli/cli/releases/assets/496108300"
 provenance = "github-attestations"
 
 [tools.gh."platforms.windows-x64"]
-checksum = "sha256:c2d6acc935cd2f00e2144d7e036d5cd82e6b6bd5594e8c75aa75ef2a4ed6aac3"
-url = "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_windows_amd64.zip"
+checksum = "sha256:35d7fe05c4dd1411ffda1e73dfc7c6f44b75c936ca51fa6595c657fdc0350cec"
+url = "https://github.com/cli/cli/releases/download/v2.97.0/gh_2.97.0_windows_amd64.zip"
+url_api = "https://api.github.com/repos/cli/cli/releases/assets/496108319"
 provenance = "github-attestations"
 
 [[tools."github:akua-dev/cli"]]
@@ -136,116 +143,116 @@ url = "https://github.com/derailed/k9s/releases/download/v0.51.0/k9s_Windows_amd
 url_api = "https://api.github.com/repos/derailed/k9s/releases/assets/440224317"
 
 [[tools."github:kunchenguid/no-mistakes"]]
-version = "1.40.3"
+version = "1.45.4"
 backend = "github:kunchenguid/no-mistakes"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.linux-arm64"]
-checksum = "sha256:f86293c4fb37d83d34c8f51cc8aeb1116fa9a9e20ec33e2709d804354a2c8a51"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.3/no-mistakes-v1.40.3-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/485364703"
+checksum = "sha256:19ac62c4d1d7a402d7efe81424fa036b67616001d37d9b95afba9c60c0d3e453"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.45.4/no-mistakes-v1.45.4-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/501916782"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.linux-arm64-musl"]
-checksum = "sha256:f86293c4fb37d83d34c8f51cc8aeb1116fa9a9e20ec33e2709d804354a2c8a51"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.3/no-mistakes-v1.40.3-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/485364703"
+checksum = "sha256:19ac62c4d1d7a402d7efe81424fa036b67616001d37d9b95afba9c60c0d3e453"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.45.4/no-mistakes-v1.45.4-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/501916782"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.linux-x64"]
-checksum = "sha256:0f325b87a0afe61a97a22aeffe2c755827c8cd67b6b3caa4a696475ba1e84c69"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.3/no-mistakes-v1.40.3-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/485364698"
+checksum = "sha256:11ccf0bcaa575b06bd691644c669c573e2a62de6a1c1b98e9e52d34c2df2ad19"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.45.4/no-mistakes-v1.45.4-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/501916619"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.linux-x64-musl"]
-checksum = "sha256:0f325b87a0afe61a97a22aeffe2c755827c8cd67b6b3caa4a696475ba1e84c69"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.3/no-mistakes-v1.40.3-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/485364698"
+checksum = "sha256:11ccf0bcaa575b06bd691644c669c573e2a62de6a1c1b98e9e52d34c2df2ad19"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.45.4/no-mistakes-v1.45.4-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/501916619"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.macos-arm64"]
-checksum = "sha256:c057664a2868a1498a176b6bc756f073dc68a7e3ff3a26d8787410ac25a5a4d6"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.3/no-mistakes-v1.40.3-darwin-arm64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/485364568"
+checksum = "sha256:7978b68c931207088d9ff7c6255685f60ae6b240ca15228f053d674ed94af8e5"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.45.4/no-mistakes-v1.45.4-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/501916594"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.macos-x64"]
-checksum = "sha256:d2fc388ac12ca0fe79d4f738299a7985e494c9b9b964138a4dbd5b046f0743a0"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.3/no-mistakes-v1.40.3-darwin-amd64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/485365146"
+checksum = "sha256:2596aa20a2c3373b8bc28260e7fe3ad31a32e7c9c0b94dae0c79d805ac039936"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.45.4/no-mistakes-v1.45.4-darwin-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/501916881"
 
 [tools."github:kunchenguid/no-mistakes"."platforms.windows-x64"]
-checksum = "sha256:811974e30feac0e16da78592081df1a98cf3f8819c7dcfb4d27c5dba79a6c209"
-url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.40.3/no-mistakes-v1.40.3-windows-amd64.zip"
-url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/485364426"
+checksum = "sha256:f4f2d65df0ff774867fd78802fd3a192669f75b8d67f294ced21f2beb6b794c1"
+url = "https://github.com/kunchenguid/no-mistakes/releases/download/v1.45.4/no-mistakes-v1.45.4-windows-amd64.zip"
+url_api = "https://api.github.com/repos/kunchenguid/no-mistakes/releases/assets/501916489"
 
 [[tools."github:kunchenguid/treehouse"]]
-version = "2.0.0"
+version = "2.1.1"
 backend = "github:kunchenguid/treehouse"
 
 [tools."github:kunchenguid/treehouse"."platforms.linux-arm64"]
-checksum = "sha256:91bca451bab84df685ee17975c8a9d8cf671b3e95c96b7fc6ff0121ea0aae991"
-url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456806163"
+checksum = "sha256:980367c0233274eb3181a19a2ca8ec69d09b4a588ba27367937d336f9a2c938e"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.1.1/treehouse-v2.1.1-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/496281604"
 
 [tools."github:kunchenguid/treehouse"."platforms.linux-arm64-musl"]
-checksum = "sha256:91bca451bab84df685ee17975c8a9d8cf671b3e95c96b7fc6ff0121ea0aae991"
-url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456806163"
+checksum = "sha256:980367c0233274eb3181a19a2ca8ec69d09b4a588ba27367937d336f9a2c938e"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.1.1/treehouse-v2.1.1-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/496281604"
 
 [tools."github:kunchenguid/treehouse"."platforms.linux-x64"]
-checksum = "sha256:b7926c19633ee94582b7f1b58369f22b304ae7228a47253c2148e3a8176f03b0"
-url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456805913"
+checksum = "sha256:2fe3e01220ae51a967c3e5ba6ccf10ec83bdbae8e420368d194285a8d04c9ef8"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.1.1/treehouse-v2.1.1-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/496281328"
 
 [tools."github:kunchenguid/treehouse"."platforms.linux-x64-musl"]
-checksum = "sha256:b7926c19633ee94582b7f1b58369f22b304ae7228a47253c2148e3a8176f03b0"
-url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456805913"
+checksum = "sha256:2fe3e01220ae51a967c3e5ba6ccf10ec83bdbae8e420368d194285a8d04c9ef8"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.1.1/treehouse-v2.1.1-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/496281328"
 
 [tools."github:kunchenguid/treehouse"."platforms.macos-arm64"]
-checksum = "sha256:66022f36eb0c79d6f242025f266b782ac947b3a2817005f13425cbd18874f1f9"
-url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-darwin-arm64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456806162"
+checksum = "sha256:deabeb7153bad14659e98da78de5334afecaeaac7e05988b106a4888646747d3"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.1.1/treehouse-v2.1.1-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/496281623"
 
 [tools."github:kunchenguid/treehouse"."platforms.macos-x64"]
-checksum = "sha256:f4e25b52240c8b302ac2c857d1795751843d2b80aa25e011303d355a49c400b1"
-url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-darwin-amd64.tar.gz"
-url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456806093"
+checksum = "sha256:f6f6bd71fe8279826aa35f201e79f34106c1c4056179e3e8141942027dd992a6"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.1.1/treehouse-v2.1.1-darwin-amd64.tar.gz"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/496281531"
 
 [tools."github:kunchenguid/treehouse"."platforms.windows-x64"]
-checksum = "sha256:bab1d8951c458c3a2710042a6ca92bfe042db96ba0caeb07920034c060fdf69f"
-url = "https://github.com/kunchenguid/treehouse/releases/download/v2.0.0/treehouse-v2.0.0-windows-amd64.zip"
-url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/456806157"
+checksum = "sha256:d9e085d57dde7a74a86dde3d26925e2e2aeb68586485e4720a3d3ad4e4825761"
+url = "https://github.com/kunchenguid/treehouse/releases/download/v2.1.1/treehouse-v2.1.1-windows-amd64.zip"
+url_api = "https://api.github.com/repos/kunchenguid/treehouse/releases/assets/496281605"
 
 [[tools."github:ogulcancelik/herdr"]]
-version = "0.7.3"
+version = "0.8.0"
 backend = "github:ogulcancelik/herdr"
 
 [tools."github:ogulcancelik/herdr"."platforms.linux-arm64"]
-checksum = "sha256:ea490094f2c7c39099870857d00c64c628ef7b5eba1967df4258033455ee2cb1"
-url = "https://github.com/ogulcancelik/herdr/releases/download/v0.7.3/herdr-linux-aarch64"
-url_api = "https://api.github.com/repos/ogulcancelik/herdr/releases/assets/469642055"
+checksum = "sha256:f647ac66468d9efbc642fe534fb284468f0aea60641606fc008dfc0d82a3ca87"
+url = "https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-aarch64"
+url_api = "https://api.github.com/repos/herdrdev/herdr/releases/assets/500422627"
 
 [tools."github:ogulcancelik/herdr"."platforms.linux-arm64-musl"]
-checksum = "sha256:ea490094f2c7c39099870857d00c64c628ef7b5eba1967df4258033455ee2cb1"
-url = "https://github.com/ogulcancelik/herdr/releases/download/v0.7.3/herdr-linux-aarch64"
-url_api = "https://api.github.com/repos/ogulcancelik/herdr/releases/assets/469642055"
+checksum = "sha256:f647ac66468d9efbc642fe534fb284468f0aea60641606fc008dfc0d82a3ca87"
+url = "https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-aarch64"
+url_api = "https://api.github.com/repos/herdrdev/herdr/releases/assets/500422627"
 
 [tools."github:ogulcancelik/herdr"."platforms.linux-x64"]
-checksum = "sha256:043ef43ecbabda28465dcff1eec3184518150d567b8b8f20cda9c6c88770641d"
-url = "https://github.com/ogulcancelik/herdr/releases/download/v0.7.3/herdr-linux-x86_64"
-url_api = "https://api.github.com/repos/ogulcancelik/herdr/releases/assets/469642054"
+checksum = "sha256:b872ea7e40fa2cb17e857ac9b62b1bf26db7b403c622f5d2f3f5b35f6e9acd28"
+url = "https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-x86_64"
+url_api = "https://api.github.com/repos/herdrdev/herdr/releases/assets/500422625"
 
 [tools."github:ogulcancelik/herdr"."platforms.linux-x64-musl"]
-checksum = "sha256:043ef43ecbabda28465dcff1eec3184518150d567b8b8f20cda9c6c88770641d"
-url = "https://github.com/ogulcancelik/herdr/releases/download/v0.7.3/herdr-linux-x86_64"
-url_api = "https://api.github.com/repos/ogulcancelik/herdr/releases/assets/469642054"
+checksum = "sha256:b872ea7e40fa2cb17e857ac9b62b1bf26db7b403c622f5d2f3f5b35f6e9acd28"
+url = "https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-x86_64"
+url_api = "https://api.github.com/repos/herdrdev/herdr/releases/assets/500422625"
 
 [tools."github:ogulcancelik/herdr"."platforms.macos-arm64"]
-checksum = "sha256:b31345392d004ec1f1b2c821e1ad601019fa8385fe1e4c6931321eb58a920773"
-url = "https://github.com/ogulcancelik/herdr/releases/download/v0.7.3/herdr-macos-aarch64"
-url_api = "https://api.github.com/repos/ogulcancelik/herdr/releases/assets/469642056"
+checksum = "sha256:d53a9f93fccfdfcc55632927bf51002f5add0aa7990bcdf508ffbd84ac658178"
+url = "https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-macos-aarch64"
+url_api = "https://api.github.com/repos/herdrdev/herdr/releases/assets/500422629"
 
 [tools."github:ogulcancelik/herdr"."platforms.macos-x64"]
-checksum = "sha256:9b5f35d283b0877eeda0cf66ba1ef1d95ae40f32e858a04da0041f3a20df027c"
-url = "https://github.com/ogulcancelik/herdr/releases/download/v0.7.3/herdr-macos-x86_64"
-url_api = "https://api.github.com/repos/ogulcancelik/herdr/releases/assets/469642057"
+checksum = "sha256:77cb5afd6c8fcaaaf3bc28e474ec01c209331ad08094e20d7f8aa9b0bb78d649"
+url = "https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-macos-x86_64"
+url_api = "https://api.github.com/repos/herdrdev/herdr/releases/assets/500422626"
 
 [[tools."http:bun"]]
 version = "1.4.0-canary.1+3979cbe80"
@@ -319,36 +326,36 @@ url = "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-windows-amd64.
 provenance = "github-attestations"
 
 [[tools.kubectl]]
-version = "1.35.6"
+version = "1.36.3"
 backend = "aqua:kubernetes/kubernetes/kubectl"
 
 [tools.kubectl."platforms.linux-arm64"]
-checksum = "sha256:c0f97f31c9ddc22d4951d543a1a7125a9af4b31e895ad4aa99899c4ba2a6ff0b"
-url = "https://dl.k8s.io/v1.35.6/bin/linux/arm64/kubectl"
+checksum = "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62"
+url = "https://dl.k8s.io/v1.36.3/bin/linux/arm64/kubectl"
 
 [tools.kubectl."platforms.linux-arm64-musl"]
-checksum = "sha256:c0f97f31c9ddc22d4951d543a1a7125a9af4b31e895ad4aa99899c4ba2a6ff0b"
-url = "https://dl.k8s.io/v1.35.6/bin/linux/arm64/kubectl"
+checksum = "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62"
+url = "https://dl.k8s.io/v1.36.3/bin/linux/arm64/kubectl"
 
 [tools.kubectl."platforms.linux-x64"]
-checksum = "sha256:5d11e2ba01ea68ffd053f56e27738e2b4330013ee67f7e46c6da6c585d3c9926"
-url = "https://dl.k8s.io/v1.35.6/bin/linux/amd64/kubectl"
+checksum = "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336"
+url = "https://dl.k8s.io/v1.36.3/bin/linux/amd64/kubectl"
 
 [tools.kubectl."platforms.linux-x64-musl"]
-checksum = "sha256:5d11e2ba01ea68ffd053f56e27738e2b4330013ee67f7e46c6da6c585d3c9926"
-url = "https://dl.k8s.io/v1.35.6/bin/linux/amd64/kubectl"
+checksum = "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336"
+url = "https://dl.k8s.io/v1.36.3/bin/linux/amd64/kubectl"
 
 [tools.kubectl."platforms.macos-arm64"]
-checksum = "sha256:1827b555615791c1c1065dd64870eb49a4e00e9dfd389a82a2ef1d31bb46d200"
-url = "https://dl.k8s.io/v1.35.6/bin/darwin/arm64/kubectl"
+checksum = "sha256:fc8582acde13869a606730a79379d6515f30c68afcced0b5ac8789d5d002b7d6"
+url = "https://dl.k8s.io/v1.36.3/bin/darwin/arm64/kubectl"
 
 [tools.kubectl."platforms.macos-x64"]
-checksum = "sha256:fa6b472ca1e542e171d7daedd9435b8e9650bc18d42a57eb930a51f48ca58874"
-url = "https://dl.k8s.io/v1.35.6/bin/darwin/amd64/kubectl"
+checksum = "sha256:158b3b46cf74e8b6bd9b1d7cd30f665e3efb2bc1ec3c843ec925bcfdd2930de0"
+url = "https://dl.k8s.io/v1.36.3/bin/darwin/amd64/kubectl"
 
 [tools.kubectl."platforms.windows-x64"]
-checksum = "sha256:ce1c21d0e0a64fa249fad3b6372c14479e7901fedf6d5a425d92c46c2bd87442"
-url = "https://dl.k8s.io/v1.35.6/bin/windows/amd64/kubectl.exe"
+checksum = "sha256:ba76657b79d0ebcc3c029c171fc83c96351ba5ce0e71d185f1e5b8b873360a5f"
+url = "https://dl.k8s.io/v1.36.3/bin/windows/amd64/kubectl.exe"
 
 [[tools.node]]
 version = "24.16.0"
@@ -383,73 +390,103 @@ checksum = "sha256:edaca9bd58ec8e92037dac4e877d52f6b8f430b81c18b57e264b4e2fb111c
 url = "https://nodejs.org/dist/v24.16.0/node-v24.16.0-win-x64.zip"
 
 [[tools."npm:@earendil-works/pi-coding-agent"]]
-version = "0.81.1"
+version = "0.84.1"
 backend = "npm:@earendil-works/pi-coding-agent"
 
 [[tools."npm:@openai/codex"]]
-version = "0.144.5"
+version = "0.147.0"
 backend = "npm:@openai/codex"
 
 [[tools."npm:chrome-devtools-axi"]]
-version = "0.1.26"
+version = "0.1.29"
 backend = "npm:chrome-devtools-axi"
 
 [[tools."npm:gh-axi"]]
-version = "0.1.27"
+version = "0.1.30"
 backend = "npm:gh-axi"
 
 [[tools."npm:lavish-axi"]]
-version = "0.1.42"
+version = "0.1.46"
 backend = "npm:lavish-axi"
 
 [[tools."npm:quota-axi"]]
-version = "0.1.5"
+version = "0.1.19"
 backend = "npm:quota-axi"
 
 [[tools.ripgrep]]
-version = "15.1.0"
+version = "15.2.0"
 backend = "aqua:BurntSushi/ripgrep"
 
 [tools.ripgrep."platforms.linux-arm64"]
-checksum = "sha256:2b661c6ef508e902f388e9098d9c4c5aca72c87b55922d94abdba830b4dc885e"
-url = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-unknown-linux-gnu.tar.gz"
+checksum = "sha256:a740b91c82eaf9914cfedd353572f2791cbe0162c84101ee0951058f4dcbc90d"
+url = "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/478119579"
+
+[tools.ripgrep."platforms.linux-arm64-musl"]
+checksum = "sha256:800b1e7206afe799dfb5a6901f23147cfaabe0e52210538100f61e86e1740915"
+url = "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/478120060"
 
 [tools.ripgrep."platforms.linux-x64"]
-checksum = "sha256:1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599"
-url = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz"
+checksum = "sha256:33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c"
+url = "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/478120097"
 
 [tools.ripgrep."platforms.linux-x64-musl"]
-checksum = "sha256:1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599"
-url = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz"
+checksum = "sha256:33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c"
+url = "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/478120097"
 
 [tools.ripgrep."platforms.macos-arm64"]
-checksum = "sha256:378e973289176ca0c6054054ee7f631a065874a352bf43f0fa60ef079b6ba715"
-url = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-apple-darwin.tar.gz"
+checksum = "sha256:3750b2e93f37e0c692657da574d7019a101c0084da05a790c83fd335bad973e4"
+url = "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/478118851"
 
 [tools.ripgrep."platforms.macos-x64"]
-checksum = "sha256:64811cb24e77cac3057d6c40b63ac9becf9082eedd54ca411b475b755d334882"
-url = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-apple-darwin.tar.gz"
+checksum = "sha256:af7825fcc69a2afc7a7aea55fc9af90e26421d8f20fe59df32e233c0b8a231c1"
+url = "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/478119585"
 
 [tools.ripgrep."platforms.windows-x64"]
-checksum = "sha256:124510b94b6baa3380d051fdf4650eaa80a302c876d611e9dba0b2e18d87493a"
-url = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-pc-windows-msvc.zip"
+checksum = "sha256:71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5"
+url = "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/BurntSushi/ripgrep/releases/assets/478119643"
 
 [[tools.vcluster]]
-version = "0.35.2"
+version = "0.36.1"
 backend = "aqua:loft-sh/vcluster"
 
 [tools.vcluster."platforms.linux-arm64"]
-checksum = "sha256:465e7dc272fd9d411282f6649af426a3c325320f4fa8ea7f4d25ba6291822eb8"
-url = "https://github.com/loft-sh/vcluster/releases/download/v0.35.2/vcluster-linux-arm64"
+checksum = "sha256:42c977a91b33a9f930107d32bd58d05416a2f09b681d70773ca49c0848dd2152"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.36.1/vcluster-linux-arm64"
+url_api = "https://api.github.com/repos/loft-sh/vcluster/releases/assets/500042986"
+
+[tools.vcluster."platforms.linux-arm64-musl"]
+checksum = "sha256:42c977a91b33a9f930107d32bd58d05416a2f09b681d70773ca49c0848dd2152"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.36.1/vcluster-linux-arm64"
+url_api = "https://api.github.com/repos/loft-sh/vcluster/releases/assets/500042986"
 
 [tools.vcluster."platforms.linux-x64"]
-checksum = "sha256:98b1878dc67e61853d736979c43a2bcf5c77175a96d4db78169a2eeead7ba8a4"
-url = "https://github.com/loft-sh/vcluster/releases/download/v0.35.2/vcluster-linux-amd64"
+checksum = "sha256:3bb32e0aa90ecbc4ae88d8a0db7728263a6c911a488f64c53dc07ef5abd2789e"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.36.1/vcluster-linux-amd64"
+url_api = "https://api.github.com/repos/loft-sh/vcluster/releases/assets/500042982"
+
+[tools.vcluster."platforms.linux-x64-musl"]
+checksum = "sha256:3bb32e0aa90ecbc4ae88d8a0db7728263a6c911a488f64c53dc07ef5abd2789e"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.36.1/vcluster-linux-amd64"
+url_api = "https://api.github.com/repos/loft-sh/vcluster/releases/assets/500042982"
 
 [tools.vcluster."platforms.macos-arm64"]
-checksum = "sha256:96074188bba1874be5a251ef07060be4ae158f46d74cfcd0a05e002d53da3170"
-url = "https://github.com/loft-sh/vcluster/releases/download/v0.35.2/vcluster-darwin-arm64"
+checksum = "sha256:2ddc7979988b38beff3fa11f6f6d1b753e73bcdc276a8f0f9d83b5b4626f2e75"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.36.1/vcluster-darwin-arm64"
+url_api = "https://api.github.com/repos/loft-sh/vcluster/releases/assets/500042987"
 
 [tools.vcluster."platforms.macos-x64"]
-checksum = "sha256:9f01e0abbbfb04b26ca0d83a9ebe298ea199535ce101f3043a7bf30d391011b8"
-url = "https://github.com/loft-sh/vcluster/releases/download/v0.35.2/vcluster-darwin-amd64"
+checksum = "sha256:9e7aad7b9e76665aceb73e9d8e99811e8e1ac3ef823250e19919fdec8193e705"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.36.1/vcluster-darwin-amd64"
+url_api = "https://api.github.com/repos/loft-sh/vcluster/releases/assets/500042988"
+
+[tools.vcluster."platforms.windows-x64"]
+checksum = "sha256:9d79c89657d72dcf77dcbd84dcd33379056a0bb4ece8e016773097b50bf4ebe2"
+url = "https://github.com/loft-sh/vcluster/releases/download/v0.36.1/vcluster-windows-amd64.exe"
+url_api = "https://api.github.com/repos/loft-sh/vcluster/releases/assets/500042984"

@@ -8,13 +8,13 @@
     "pg-listen": "./pg-listen.ts"
   },
   "dependencies": {
-    "@effect/platform-bun": "4.0.0-beta.102",
-    "effect": "4.0.0-beta.102",
+    "@effect/platform-bun": "4.0.0-beta.106",
+    "effect": "4.0.0-beta.106",
     "pg": "8.22.0",
     "pg-connection-string": "2.14.0"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-beta.102",
-    "@types/pg": "8.20.0"
+    "@effect/vitest": "4.0.0-beta.106",
+    "@types/pg": "8.21.0"
   }
 }
