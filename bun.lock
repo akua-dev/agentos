@@ -125,7 +125,7 @@
       },
       "dependencies": {
         "@akua-dev/agentos": "workspace:*",
-        "@akua-dev/codex-router": "github:akua-dev/codex-router#489557ad72774fd0dd67f3fdec402fc246d5256e",
+        "@akua-dev/codex-router": "github:akua-dev/codex-router#01d5400e51925bae94056cda275e83071c43be83",
         "@earendil-works/pi-ai": "0.81.1",
         "@effect/platform-bun": "4.0.0-beta.102",
         "effect": "4.0.0-beta.102",
@@ -268,7 +268,7 @@
 
     "@akua-dev/agentos": ["@akua-dev/agentos@workspace:packages/agentos"],
 
-    "@akua-dev/codex-router": ["@akua-dev/codex-router@github:akua-dev/codex-router#489557a", { "dependencies": { "@effect/platform-browser": "4.0.0-beta.102", "@effect/platform-bun": "4.0.0-beta.102", "@effect/sql-sqlite-bun": "4.0.0-beta.102", "@effect/sql-sqlite-do": "4.0.0-beta.102", "effect": "4.0.0-beta.102" } }, "akua-dev-codex-router-489557a", "sha512-fNTNDJ/QuknyWW5+OjdqHYCtI7To+F9uyynpCOpwLgjanesOgDPCePoT5YeMDmKKDXOse9IR3VPcIaemzO0xMQ=="],
+    "@akua-dev/codex-router": ["@akua-dev/codex-router@github:akua-dev/codex-router#01d5400", { "dependencies": { "@effect/platform-browser": "4.0.0-beta.102", "@effect/platform-bun": "4.0.0-beta.102", "@effect/sql-sqlite-bun": "4.0.0-beta.102", "@effect/sql-sqlite-do": "4.0.0-beta.102", "effect": "4.0.0-beta.102" } }, "akua-dev-codex-router-01d5400", "sha512-XkfrTIC2cdpM40Gj550mb+r0WcKuHoZEPsWoBITL1o1eZOqfRAhF4t4IOVQNoG4qbs3HIekurM/Bhnlcl0MUmg=="],
 
     "@algolia/abtesting": ["@algolia/abtesting@1.22.0", "", { "dependencies": { "@algolia/client-common": "5.56.0", "@algolia/requester-browser-xhr": "5.56.0", "@algolia/requester-fetch": "5.56.0", "@algolia/requester-node-http": "5.56.0" } }, "sha512-BFR6zNowNKcY7Ou7TaJc9QWexES4YKPbmf/OTFofpdsdhz4x6q0lbxp3duO0EHnyrN7rE4ba/TSXuY+BDGu4+g=="],
 
