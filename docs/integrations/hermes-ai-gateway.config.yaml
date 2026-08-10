@@ -1,0 +1,20 @@
+# Hermes Agent 0.20.0 (v2026.8.3) deterministic integration fixture.
+model:
+  provider: agentos-gateway
+  default: gpt-exact-fixture
+
+providers:
+  agentos-gateway:
+    name: AgentOS Gateway
+    api: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    transport: codex_responses
+    discover_models: false
+    models:
+      - gpt-exact-fixture
+
+agent:
+  api_max_retries: 0
+
+fallback_providers: []
+fallback_model: ""

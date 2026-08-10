@@ -963,7 +963,7 @@
     {
       "id": "ai-gateway-entrypoint",
       "issue": 105,
-      "pattern": "^services/ai-gateway/src/main\\.ts$",
+      "pattern": "^services/ai-gateway/src/(?:main|workload-client-proxy-main)\\.ts$",
       "runtime": "bun-entrypoint",
       "package": "@agentos/ai-gateway",
       "io": ["config", "filesystem", "http", "oauth", "process", "stream", "telemetry", "runtime-adapter"],
