@@ -1,6 +1,6 @@
 # Hermes Agent 0.20.0 (v2026.8.3) deterministic integration fixture.
 model:
-  provider: agentos-gateway
+  provider: custom:agentos-gateway
   default: gpt-exact-fixture
 
 providers:

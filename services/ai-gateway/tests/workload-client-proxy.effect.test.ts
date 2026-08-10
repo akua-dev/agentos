@@ -59,7 +59,7 @@ suite("Hermes Responses workload client proxy", (it) => {
         parse(fixture),
       );
 
-      assert.strictEqual(config.model.provider, "agentos-gateway");
+      assert.strictEqual(config.model.provider, "custom:agentos-gateway");
       const provider = config.providers["agentos-gateway"];
       assert.strictEqual(provider.name, "AgentOS Gateway");
       assert.strictEqual(provider.transport, "codex_responses");

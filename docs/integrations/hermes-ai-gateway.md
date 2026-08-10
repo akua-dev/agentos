@@ -41,7 +41,7 @@ in `config.yaml` or `.env`.
 
 ```yaml
 model:
-  provider: agentos-gateway
+  provider: custom:agentos-gateway
   default: <exact-approved-model>
 
 providers:
@@ -62,12 +62,12 @@ fallback_model: ""
 ```
 
 These fields are load-bearing for Hermes 0.20's named-provider resolver. The
-input must select `provider: agentos-gateway`; the matching provider entry's
+input must select `provider: custom:agentos-gateway`; the matching provider entry's
 `transport: codex_responses` retains the Responses transport, and its `api`
 points that transport at the loopback `/v1` base. Hermes normalizes this named
-input at runtime to `provider: custom`, `api_mode: codex_responses`, and
-`base_url: http://127.0.0.1:8790/v1`. Putting `provider: custom` directly in the
-input falls back to Chat Completions. The checked fixture
+input at runtime to the named custom provider with `api_mode: codex_responses`
+and `base_url: http://127.0.0.1:8790/v1`. Putting bare `provider: custom`
+directly in the input falls back to Chat Completions. The checked fixture
 [`hermes-ai-gateway.config.yaml`](./hermes-ai-gateway.config.yaml) is exercised
 against the named input contract and the sidecar allowlist in the Gateway test
 suite.
@@ -77,7 +77,9 @@ contract: after Hermes sends a request, it must surface the real `401`, `403`,
 `429`, timeout, or provider failure rather than replaying the turn through a
 route that may acquire another account. Keep auxiliary model slots direct or
 configure each approved slot explicitly through the same no-retry contract;
-`auto` inherits the main route.
+`auto` inherits the main route. Set `HERMES_STREAM_RETRIES=0` on the Hermes
+container as shown below; this separately disables mid-stream reconnects after
+partial output.
 
 ## Pod wiring
 
@@ -105,6 +107,9 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: hermes
+          env:
+            - name: HERMES_STREAM_RETRIES
+              value: "0"
         - name: ai-gateway-workload-proxy
           image: <same-reviewed-agentos-image-digest-as-the-gateway-release>
           command: ["ai-gateway-workload-proxy"]
