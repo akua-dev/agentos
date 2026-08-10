@@ -264,6 +264,22 @@ suite("Hermes Responses workload client proxy", (it) => {
       );
     }));
 
+  it.effect("preserves a 205 response without constructing a body", () =>
+    Effect.gen(function*() {
+      const response = yield* responseFromUpstream({
+        status: 205,
+        headers: { "content-type": "text/plain" },
+        body: Stream.succeed(new TextEncoder().encode("invalid-body")),
+      });
+
+      assert.strictEqual(response.status, 205);
+      assert.isNull(response.body);
+      assert.strictEqual(
+        yield* Effect.promise(() => response.text()),
+        "",
+      );
+    }));
+
   it.effect("preserves upstream response streams across a long gap", () =>
     Effect.gen(function*() {
       const fileSystem = yield* FileSystem.FileSystem;

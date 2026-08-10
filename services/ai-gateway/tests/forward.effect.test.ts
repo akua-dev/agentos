@@ -8,7 +8,7 @@ import {
   type ProviderBudgetSettlementReceiptV1,
   type ProviderBudgetSettlementReportV1,
 } from "@akua-dev/agentos";
-import { Effect, Fiber, Layer, Metric, Ref, Stream, Tracer } from "effect";
+import { Effect, Exit, Fiber, Layer, Metric, Ref, Stream, Tracer } from "effect";
 import { TestClock } from "effect/testing";
 
 import {
@@ -819,6 +819,27 @@ describe("Effect AI Gateway forwarding", () => {
           },
         },
       ]);
+    }));
+
+  it.effect("releases an acquired route when the provider is interrupted before headers", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const settlement = yield* makeSettlementRecorder();
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: () => Effect.succeed(route.lease),
+        provider: AIProviderHttp.of({
+          execute: () => Effect.interrupt,
+        }),
+        settlements: settlement.settlements,
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const exit = yield* Effect.exit(handler(gatewayRequest()));
+
+      assert.isFalse(Exit.isSuccess(exit));
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
     }));
 
   it.effect("ends telemetry when a finite provider response cannot be constructed", () =>

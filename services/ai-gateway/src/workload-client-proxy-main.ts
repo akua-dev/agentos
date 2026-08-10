@@ -61,7 +61,7 @@ export function responseFromUpstream(
 ) {
   return Effect.gen(function*() {
     const headers = responseHeaders(upstream);
-    if (upstream.body === null) {
+    if (upstream.body === null || upstream.status === 205) {
       return new Response(null, { status: upstream.status, headers });
     }
     const body = yield* Stream.toReadableStreamEffect(upstream.body);

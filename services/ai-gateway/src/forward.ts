@@ -229,7 +229,9 @@ export const makeAIForwardHandler = Effect.fn(
       requestTelemetry.upstreamStarted(upstreamRequest.headers),
     );
     const upstreamResult = yield* Effect.result(
-      options.provider.execute(upstreamRequest),
+      options.provider.execute(upstreamRequest).pipe(
+        Effect.onInterrupt(() => releaseLease(lease, requestTelemetry)),
+      ),
     );
     if (Result.isFailure(upstreamResult)) {
       yield* diagnostic(

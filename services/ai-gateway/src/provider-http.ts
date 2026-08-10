@@ -54,7 +54,8 @@ export const AIProviderHttpLive = Layer.effect(
           Effect.mapError((error) => providerHttpError(httpErrorCode(error))),
         );
         const hasNoBody = request.method === "HEAD" ||
-          response.status === 204 || response.status === 304;
+          response.status === 204 || response.status === 205 ||
+          response.status === 304;
         const body: AIProviderResponse["body"] = hasNoBody
           ? null
           : response.stream.pipe(
