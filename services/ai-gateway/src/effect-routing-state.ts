@@ -8,6 +8,7 @@ import {
 } from "@akua-dev/codex-router/core";
 import {
   Effect,
+  Exit,
   Layer,
   Option,
   Ref,
@@ -112,19 +113,36 @@ export function makeEffectAIRoutingStateLayer(
             : acquired.accountId === decision.accountId
               ? decision.reason
               : "current_account_hysteresis";
-          yield* Ref.set(lastSelection, Option.some({
-            observedAt: input.now,
-            reason: decisionReason,
-            candidates: decision.candidates,
-          }));
-          return acquired === undefined
-            ? undefined
-            : {
-                accountId: acquired.accountId,
-                leaseToken: acquired.leaseToken,
-                expiresAt: acquired.expiresAt,
-                decisionReason,
-              };
+          if (acquired === undefined) {
+            yield* Ref.set(lastSelection, Option.some({
+              observedAt: input.now,
+              reason: decisionReason,
+              candidates: decision.candidates,
+            }));
+            return undefined;
+          }
+          const releaseLease = routing.release(acquired.leaseToken).pipe(
+            Effect.asVoid,
+            Effect.catchCause(() => Effect.void),
+            Effect.uninterruptible,
+          );
+          return yield* Effect.gen(function*() {
+            yield* Ref.set(lastSelection, Option.some({
+              observedAt: input.now,
+              reason: decisionReason,
+              candidates: decision.candidates,
+            }));
+            return {
+              accountId: acquired.accountId,
+              leaseToken: acquired.leaseToken,
+              expiresAt: acquired.expiresAt,
+              decisionReason,
+            };
+          }).pipe(
+            Effect.onExit((exit) =>
+              Exit.isSuccess(exit) ? Effect.void : releaseLease
+            ),
+          );
         }));
 
       const evaluate: AIRoutingState["Service"]["evaluate"] = (input) =>
