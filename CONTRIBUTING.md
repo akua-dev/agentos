@@ -313,8 +313,9 @@ git push origin v<semver>
 ```
 
 The [`Release`](./.github/workflows/release.yml) workflow builds the same clean
-tagged checkout on native GitHub-hosted amd64 and arm64 runners, publishes the
-two platform images, joins them into one OCI index, resolves its registry
+tagged checkout on the audited AgentOS ARC/Kata amd64 pool and a native
+GitHub-hosted arm64 runner, publishes the two platform images, joins them into
+one OCI index, resolves its registry
 digest, and renders the ordinary human-readable block YAML directly from
 Kustomize. It uploads the fixed-name scoped, cluster-admin and database
 manifests to a draft GitHub release and publishes the release only after every
