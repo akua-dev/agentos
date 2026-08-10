@@ -131,6 +131,13 @@ suite("Hermes Responses workload client proxy", (it) => {
         headers: {
           authorization: "Bearer hermes-placeholder",
           "content-type": "application/json",
+          "api-key": "caller-provider-secret",
+          "x-api-key": "caller-provider-secret-2",
+          "chatgpt-account-id": "caller-account",
+          baggage: "caller-baggage",
+          "x-ai-router-token": "caller-router-token",
+          "x-codex-router-session": "caller-router-session",
+          "x-ai-gateway-session": "caller-gateway-session",
           traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
           "x-agentos-assignment-id": "forged-assignment",
           "x-agentos-decision": "forged-decision",
@@ -156,6 +163,13 @@ suite("Hermes Responses workload client proxy", (it) => {
       assert.isNull(forwarded[0]?.headers.get("x-agentos-decision"));
       assert.isNull(forwarded[0]?.headers.get("x-agentos-grant"));
       assert.isNull(forwarded[0]?.headers.get("x-ai-gateway-token"));
+      assert.isNull(forwarded[0]?.headers.get("api-key"));
+      assert.isNull(forwarded[0]?.headers.get("x-api-key"));
+      assert.isNull(forwarded[0]?.headers.get("chatgpt-account-id"));
+      assert.isNull(forwarded[0]?.headers.get("baggage"));
+      assert.isNull(forwarded[0]?.headers.get("x-ai-router-token"));
+      assert.isNull(forwarded[0]?.headers.get("x-codex-router-session"));
+      assert.isNull(forwarded[0]?.headers.get("x-ai-gateway-session"));
       assert.strictEqual(
         forwarded[0]?.headers.get("traceparent"),
         "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",

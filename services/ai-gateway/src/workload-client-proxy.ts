@@ -1,3 +1,4 @@
+import { sanitizeRequestHeaders } from "@akua-dev/codex-router/codex";
 import { Config, Effect, FileSystem, Schema } from "effect";
 
 import {
@@ -11,21 +12,6 @@ const allowedPaths = new Set(["/v1/responses", "/v1/responses/compact"]);
 const assignmentIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const workloadClientProxyHostname = "127.0.0.1";
-const removedHeaders = new Set([
-  "authorization",
-  "connection",
-  "content-length",
-  "host",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
-  "x-ai-gateway-token",
-]);
-
 export class WorkloadClientProxyError extends Schema.TaggedErrorClass<WorkloadClientProxyError>()(
   "WorkloadClientProxyError",
   {
@@ -153,11 +139,11 @@ function forwardedHeaders(
   token: string,
   assignmentId: string | undefined,
 ) {
-  const headers = new Headers();
-  for (const [name, value] of input) {
-    const lower = name.toLowerCase();
-    if (removedHeaders.has(lower) || lower.startsWith("x-agentos-")) continue;
-    headers.append(name, value);
+  const headers = sanitizeRequestHeaders(input);
+  for (const name of Array.from(headers.keys())) {
+    if (name.toLowerCase().startsWith("x-agentos-")) {
+      headers.delete(name);
+    }
   }
   headers.set("authorization", `Bearer ${token}`);
   if (assignmentId !== undefined) {
