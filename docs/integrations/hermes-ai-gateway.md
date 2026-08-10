@@ -5,6 +5,13 @@ other approved clients that speak the OpenAI Responses API but cannot reread a
 Kubernetes projected token for every request. Direct per-agent OAuth remains
 the recovery path.
 
+> Deployment gate: this Hermes revision is not eligible for this route. Its
+> `codex_responses` runtime hardcodes one retry around `responses.create`, so a
+> transport failure after partial output can replay the request;
+> `HERMES_STREAM_RETRIES=0` does not change that behavior. Do not deploy the
+> fixture or Pod wiring below until a pinned Hermes revision with a verified
+> zero-retry Responses path is available.
+
 ## Client contract
 
 The client keeps authority over the exact model and reasoning configuration. It
@@ -59,6 +66,56 @@ agent:
 
 fallback_providers: []
 fallback_model: ""
+
+auxiliary:
+  vision:
+    provider: custom
+    model: <exact-approved-model>
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  web_extract:
+    provider: custom
+    model: <exact-approved-model>
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  compression:
+    provider: custom
+    model: <exact-approved-model>
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  skills_hub:
+    provider: custom
+    model: <exact-approved-model>
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  mcp:
+    provider: custom
+    model: <exact-approved-model>
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  approval:
+    provider: custom
+    model: <exact-approved-model>
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  title_generation:
+    provider: custom
+    model: <exact-approved-model>
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  triage_specifier:
+    provider: custom
+    model: <exact-approved-model>
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
 ```
 
 These fields are load-bearing for Hermes 0.20's named-provider resolver. The
@@ -77,9 +134,8 @@ contract: after Hermes sends a request, it must surface the real `401`, `403`,
 `429`, timeout, or provider failure rather than replaying the turn through a
 route that may acquire another account. Keep auxiliary model slots direct or
 configure each approved slot explicitly through the same no-retry contract;
-`auto` inherits the main route. Set `HERMES_STREAM_RETRIES=0` on the Hermes
-container as shown below; this separately disables mid-stream reconnects after
-partial output.
+`auto` is not permitted for this integration. Each supported auxiliary slot is
+bound to the same exact loopback endpoint, model, and empty fallback chain.
 
 ## Pod wiring
 
@@ -107,9 +163,6 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: hermes
-          env:
-            - name: HERMES_STREAM_RETRIES
-              value: "0"
         - name: ai-gateway-workload-proxy
           image: <same-reviewed-agentos-image-digest-as-the-gateway-release>
           command: ["ai-gateway-workload-proxy"]

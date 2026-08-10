@@ -13,6 +13,56 @@ providers:
     models:
       - gpt-exact-fixture
 
+auxiliary:
+  vision:
+    provider: custom
+    model: gpt-exact-fixture
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  web_extract:
+    provider: custom
+    model: gpt-exact-fixture
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  compression:
+    provider: custom
+    model: gpt-exact-fixture
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  skills_hub:
+    provider: custom
+    model: gpt-exact-fixture
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  mcp:
+    provider: custom
+    model: gpt-exact-fixture
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  approval:
+    provider: custom
+    model: gpt-exact-fixture
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  title_generation:
+    provider: custom
+    model: gpt-exact-fixture
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+  triage_specifier:
+    provider: custom
+    model: gpt-exact-fixture
+    base_url: http://127.0.0.1:8790/v1
+    api_key: agentos-workload-identity-placeholder
+    fallback_chain: []
+
 agent:
   api_max_retries: 0
 
