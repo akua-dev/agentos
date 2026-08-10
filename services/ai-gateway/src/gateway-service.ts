@@ -7,6 +7,7 @@ import {
 import {
   Clock,
   Effect,
+  Exit,
   Ref,
   Result,
   Schema,
@@ -151,50 +152,60 @@ export const makeAIGatewayApplication = Effect.fn(
           ? fallbackLease(fallbackKey)
           : undefined;
       }
+      const releaseReservation = routing.release(reservation.leaseToken).pipe(
+        Effect.asVoid,
+        Effect.catchCause(() => Effect.void),
+        Effect.uninterruptible,
+      );
       const credentialResult = yield* Effect.result(
-        vault.getFreshCredential(reservation.accountId),
+        Effect.gen(function*() {
+          const credential = yield* vault.getFreshCredential(
+            reservation.accountId,
+          );
+          const lease: AIForwardLease = {
+            kind: "codex_oauth",
+            accessToken: credential.accessToken,
+            providerAccountId: credential.providerAccountId,
+            renew: Clock.currentTimeMillis.pipe(
+              Effect.flatMap((renewedAt) =>
+                routing.renew(reservation.leaseToken, renewedAt)
+              ),
+              Effect.mapError(() => routeError("state_unavailable")),
+            ),
+            release: routing.release(reservation.leaseToken).pipe(
+              Effect.asVoid,
+              Effect.mapError(() => routeError("state_unavailable")),
+            ),
+            recordResponse: (status, headers) =>
+              Effect.gen(function*() {
+                const responseAt = yield* Clock.currentTimeMillis;
+                if (status === 401) {
+                  yield* vault.markNeedsReauth(
+                    reservation.accountId,
+                    credential.accessToken,
+                  ).pipe(Effect.catchCause(() => Effect.succeed(false)));
+                }
+                yield* routing.recordResponse(
+                  reservation.accountId,
+                  status,
+                  headers,
+                  responseAt,
+                ).pipe(
+                  Effect.mapError(() => routeError("state_unavailable")),
+                );
+              }),
+          };
+          return lease;
+        }).pipe(
+          Effect.onExit((exit) =>
+            Exit.isSuccess(exit) ? Effect.void : releaseReservation
+          ),
+        ),
       );
       if (Result.isFailure(credentialResult)) {
-        yield* routing.release(reservation.leaseToken).pipe(
-          Effect.catchCause(() => Effect.void),
-        );
         return yield* routeError(routeCodeForAccount(credentialResult.failure));
       }
-      const credential = credentialResult.success;
-      const lease: AIForwardLease = {
-        kind: "codex_oauth",
-        accessToken: credential.accessToken,
-        providerAccountId: credential.providerAccountId,
-        renew: Clock.currentTimeMillis.pipe(
-          Effect.flatMap((renewedAt) =>
-            routing.renew(reservation.leaseToken, renewedAt)
-          ),
-          Effect.mapError(() => routeError("state_unavailable")),
-        ),
-        release: routing.release(reservation.leaseToken).pipe(
-          Effect.asVoid,
-          Effect.mapError(() => routeError("state_unavailable")),
-        ),
-        recordResponse: (status, headers) =>
-          Effect.gen(function*() {
-            const responseAt = yield* Clock.currentTimeMillis;
-            if (status === 401) {
-              yield* vault.markNeedsReauth(
-                reservation.accountId,
-                credential.accessToken,
-              ).pipe(Effect.catchCause(() => Effect.succeed(false)));
-            }
-            yield* routing.recordResponse(
-              reservation.accountId,
-              status,
-              headers,
-              responseAt,
-            ).pipe(
-              Effect.mapError(() => routeError("state_unavailable")),
-            );
-          }),
-      };
-      return lease;
+      return credentialResult.success;
     },
   );
 

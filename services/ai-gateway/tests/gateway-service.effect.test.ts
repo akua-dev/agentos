@@ -10,7 +10,7 @@ import {
   type ProviderBudgetSettlementReceiptV1,
   type ProviderBudgetSettlementReportV1,
 } from "@akua-dev/agentos";
-import { Effect, Ref, Stream } from "effect";
+import { Deferred, Effect, Fiber, Ref, Stream } from "effect";
 import { TestClock } from "effect/testing";
 
 import {
@@ -377,6 +377,30 @@ describe("Effect AI Gateway application", () => {
         cachedInputTokens: 5,
         spendMicros: 0,
       }]);
+    }));
+
+  it.effect("releases a reservation when credential acquisition is interrupted", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const credentialStarted = yield* Deferred.make<void>();
+      const application = yield* makeApplication({
+        ...services,
+        vault: ManagedAccountVault.of({
+          ...services.vault,
+          getFreshCredential: () =>
+            Deferred.succeed(credentialStarted, undefined).pipe(
+              Effect.andThen(Effect.never),
+            ),
+        }),
+      });
+      const requestFiber = yield* Effect.forkChild(Effect.exit(
+        application.handle(providerRequest()),
+      ));
+      yield* Deferred.await(credentialStarted);
+      yield* Fiber.interrupt(requestFiber);
+
+      assert.strictEqual(yield* Ref.get(services.released), 1);
     }));
 
   it.effect("preserves serving behavior with native telemetry enabled and disabled", () =>
