@@ -223,6 +223,13 @@ normal recovery procedure.
 
 ## Hermes workload-proxy migration
 
+Before any Hermes migration, verify that the selected pinned revision's
+`codex_responses` runtime has a zero-retry Responses path. Do not deploy or
+update this integration while that gate is unmet: Hermes `0.20.0` / `v2026.8.3`
+hardcodes one retry around `responses.create`. Auxiliary requests are also out
+of scope until Hermes provides a native Responses path with no automatic retry,
+redirect, or fallback; do not enable them during migration.
+
 For the live v0.1.24 Hermes topology, the observed pre-migration state uses one
 `ai-gateway` replica with a shared `AI_GATEWAY_TOKEN`, while Hermes uses direct
 in-Pod provider authentication and has no projected egress identity. Do not

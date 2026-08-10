@@ -37,13 +37,6 @@ const HermesConfiguration = Schema.Struct({
       models: Schema.Array(Schema.String),
     }),
   }),
-  auxiliary: Schema.Record(Schema.String, Schema.Struct({
-    provider: Schema.String,
-    model: Schema.String,
-    base_url: Schema.String,
-    api_key: Schema.String,
-    fallback_chain: Schema.Array(Schema.Unknown),
-  })),
   agent: Schema.Struct({ api_max_retries: Schema.Number }),
   fallback_providers: Schema.Array(Schema.String),
   fallback_model: Schema.String,
@@ -62,8 +55,9 @@ suite("Hermes Responses workload client proxy", (it) => {
         import.meta.url,
       );
       const fixture = yield* fileSystem.readFileString(fixtureUrl.pathname);
+      const parsedFixture = parse(fixture) as Record<string, unknown>;
       const config = yield* Schema.decodeUnknownEffect(HermesConfiguration)(
-        parse(fixture),
+        parsedFixture,
       );
 
       assert.strictEqual(config.model.provider, "custom:agentos-gateway");
@@ -80,26 +74,7 @@ suite("Hermes Responses workload client proxy", (it) => {
       assert.strictEqual(config.agent.api_max_retries, 0);
       assert.deepStrictEqual(config.fallback_providers, []);
       assert.strictEqual(config.fallback_model, "");
-      const auxiliaryNames = [
-        "approval",
-        "compression",
-        "mcp",
-        "skills_hub",
-        "title_generation",
-        "triage_specifier",
-        "vision",
-        "web_extract",
-      ];
-      assert.deepStrictEqual(Object.keys(config.auxiliary).sort(), auxiliaryNames);
-      for (const name of auxiliaryNames) {
-        assert.deepInclude(config.auxiliary[name], {
-          provider: "custom",
-          model: config.model.default,
-          base_url: "http://127.0.0.1:8790/v1",
-          api_key: "agentos-workload-identity-placeholder",
-          fallback_chain: [],
-        });
-      }
+      assert.isFalse(Object.prototype.hasOwnProperty.call(parsedFixture, "auxiliary"));
 
       const directory = yield* fileSystem.makeTempDirectoryScoped();
       const tokenPath = `${directory}/token`;

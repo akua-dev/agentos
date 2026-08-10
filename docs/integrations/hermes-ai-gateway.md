@@ -66,56 +66,6 @@ agent:
 
 fallback_providers: []
 fallback_model: ""
-
-auxiliary:
-  vision:
-    provider: custom
-    model: <exact-approved-model>
-    base_url: http://127.0.0.1:8790/v1
-    api_key: agentos-workload-identity-placeholder
-    fallback_chain: []
-  web_extract:
-    provider: custom
-    model: <exact-approved-model>
-    base_url: http://127.0.0.1:8790/v1
-    api_key: agentos-workload-identity-placeholder
-    fallback_chain: []
-  compression:
-    provider: custom
-    model: <exact-approved-model>
-    base_url: http://127.0.0.1:8790/v1
-    api_key: agentos-workload-identity-placeholder
-    fallback_chain: []
-  skills_hub:
-    provider: custom
-    model: <exact-approved-model>
-    base_url: http://127.0.0.1:8790/v1
-    api_key: agentos-workload-identity-placeholder
-    fallback_chain: []
-  mcp:
-    provider: custom
-    model: <exact-approved-model>
-    base_url: http://127.0.0.1:8790/v1
-    api_key: agentos-workload-identity-placeholder
-    fallback_chain: []
-  approval:
-    provider: custom
-    model: <exact-approved-model>
-    base_url: http://127.0.0.1:8790/v1
-    api_key: agentos-workload-identity-placeholder
-    fallback_chain: []
-  title_generation:
-    provider: custom
-    model: <exact-approved-model>
-    base_url: http://127.0.0.1:8790/v1
-    api_key: agentos-workload-identity-placeholder
-    fallback_chain: []
-  triage_specifier:
-    provider: custom
-    model: <exact-approved-model>
-    base_url: http://127.0.0.1:8790/v1
-    api_key: agentos-workload-identity-placeholder
-    fallback_chain: []
 ```
 
 These fields are load-bearing for Hermes 0.20's named-provider resolver. The
@@ -132,10 +82,10 @@ suite.
 `api_max_retries: 0` and the empty fallback configuration are part of the
 contract: after Hermes sends a request, it must surface the real `401`, `403`,
 `429`, timeout, or provider failure rather than replaying the turn through a
-route that may acquire another account. Keep auxiliary model slots direct or
-configure each approved slot explicitly through the same no-retry contract;
-`auto` is not permitted for this integration. Each supported auxiliary slot is
-bound to the same exact loopback endpoint, model, and empty fallback chain.
+route that may acquire another account. Auxiliary requests are out of scope for
+this blocked Hermes revision. Do not enable them or configure `provider: auto`,
+`provider: custom`, or a fallback chain until Hermes provides a verified native
+Responses path with no automatic retry, redirect, or fallback.
 
 ## Pod wiring
 
