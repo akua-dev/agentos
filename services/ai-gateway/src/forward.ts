@@ -539,6 +539,20 @@ function finalizeStream(
   telemetry: AIGatewayRequestTelemetry,
   signal: AbortSignal,
 ): Effect.Effect<void> {
+  let released = false;
+  const releaseStreamLease = Effect.whileLoop({
+    while: () => !released,
+    body: () => releaseLeaseOnce.pipe(
+      Effect.flatMap((attempted) =>
+        attempted
+          ? Effect.succeed(true)
+          : Effect.sleep(1_000).pipe(Effect.as(false))
+      ),
+    ),
+    step: (attempted) => {
+      released = attempted;
+    },
+  });
   return Effect.gen(function*() {
     if (authorization !== undefined) {
       if (status >= 400) {
@@ -558,8 +572,7 @@ function finalizeStream(
         }
       }
     }
-    const released = yield* releaseLeaseOnce;
-    if (!released) yield* releaseLeaseOnce;
+    yield* releaseStreamLease;
     const outcome = telemetryStreamOutcome(exit, signal);
     const failure = Exit.isFailure(exit)
       ? Option.getOrUndefined(Cause.findErrorOption(exit.cause))
@@ -570,7 +583,7 @@ function finalizeStream(
       ...(failure === undefined ? {} : { error: failure }),
     }));
   }).pipe(
-    Effect.catchCause(() => releaseLeaseOnce),
+    Effect.catchCause(() => releaseStreamLease),
     Effect.catchCause(() => Effect.void),
     Effect.uninterruptible,
   );

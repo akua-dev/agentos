@@ -207,6 +207,8 @@ suite("Hermes Responses workload client proxy", (it) => {
 
       for (const invalidUrl of [
         "ftp://agentgateway-openai.agentos.svc.cluster.local:8788",
+        "http://agentgateway-github.agentos.svc.cluster.local:8788",
+        "http://example.invalid:8788",
         "http://user:password@agentgateway-openai.agentos.svc.cluster.local:8788",
         "http://agentgateway-openai.agentos.svc.cluster.local:8788?trace=1",
         "http://agentgateway-openai.agentos.svc.cluster.local:8788#fragment",

@@ -9,6 +9,8 @@ import {
 const maximumTokenBytes = 16 * 1024;
 const jwtLike = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const allowedPaths = new Set(["/v1/responses", "/v1/responses/compact"]);
+const reviewedAgentgatewayOrigin =
+  "http://agentgateway-openai.agentos.svc.cluster.local:8788";
 const assignmentIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const workloadClientProxyHostname = "127.0.0.1";
@@ -68,7 +70,7 @@ function configurationError() {
 }
 
 function isValidUpstreamBaseUrl(url: URL) {
-  return (url.protocol === "http:" || url.protocol === "https:") &&
+  return url.origin === reviewedAgentgatewayOrigin &&
     url.username === "" &&
     url.password === "" &&
     url.pathname === "/" &&
