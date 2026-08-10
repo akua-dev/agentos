@@ -35,11 +35,11 @@ type LastSelection = NonNullable<AIRoutingSummary["lastSelection"]>;
 export function makeEffectAIRoutingStateLayer(
   path: string,
   config: RoutingConfig,
-) {
-  const infrastructure = sqliteRoutingStateLayer(
+  routingLayer = sqliteRoutingStateLayer(
     path,
     toRouterConfig(config),
-  );
+  ),
+) {
   return Layer.effect(
     AIRoutingState,
     Effect.gen(function*() {
@@ -150,7 +150,9 @@ export function makeEffectAIRoutingStateLayer(
               if (acquired === undefined) return;
               const wasTransferred = yield* Ref.get(transferred);
               if (wasTransferred && exit._tag === "Success") return;
-              yield* routeEffect(releaseRoutingLease(acquired.leaseToken));
+              yield* routeEffect(releaseRoutingLease(acquired.leaseToken)).pipe(
+                Effect.catchCause(() => Effect.void),
+              );
             })),
           );
         });
@@ -187,7 +189,7 @@ export function makeEffectAIRoutingStateLayer(
           )),
       });
     }),
-  ).pipe(Layer.provide(infrastructure));
+  ).pipe(Layer.provide(routingLayer));
 }
 
 function overlayRoutingSummary(
