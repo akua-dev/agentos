@@ -539,17 +539,20 @@ function finalizeStream(
   telemetry: AIGatewayRequestTelemetry,
   signal: AbortSignal,
 ): Effect.Effect<void> {
+  const maximumReleaseAttempts = 3;
+  let attempts = 0;
   let released = false;
   const releaseStreamLease = Effect.whileLoop({
-    while: () => !released,
+    while: () => !released && attempts < maximumReleaseAttempts,
     body: () => releaseLeaseOnce.pipe(
       Effect.flatMap((attempted) =>
-        attempted
-          ? Effect.succeed(true)
+        attempted || attempts + 1 >= maximumReleaseAttempts
+          ? Effect.succeed(attempted)
           : Effect.sleep(1_000).pipe(Effect.as(false))
       ),
     ),
     step: (attempted) => {
+      attempts += 1;
       released = attempted;
     },
   });

@@ -11,6 +11,7 @@ import {
   Layer,
   Option,
   Ref,
+  Schedule,
 } from "effect";
 
 import {
@@ -46,6 +47,11 @@ export function makeEffectAIRoutingStateLayer(
       const lastSelection = yield* Ref.make<Option.Option<LastSelection>>(
         Option.none(),
       );
+      const releaseRoutingLease = (leaseToken: LeaseToken) =>
+        routing.release(leaseToken).pipe(
+          Effect.asVoid,
+          Effect.retry(Schedule.spaced("1 second")),
+        );
 
       const summary: AIRoutingState["Service"]["summary"] = (now) =>
         routeEffect(Effect.gen(function*() {
@@ -144,10 +150,7 @@ export function makeEffectAIRoutingStateLayer(
               if (acquired === undefined) return;
               const wasTransferred = yield* Ref.get(transferred);
               if (wasTransferred && exit._tag === "Success") return;
-              yield* routing.release(acquired.leaseToken).pipe(
-                Effect.asVoid,
-                Effect.catchCause(() => Effect.void),
-              );
+              yield* releaseRoutingLease(acquired.leaseToken);
             })),
           );
         });
@@ -173,7 +176,7 @@ export function makeEffectAIRoutingStateLayer(
         renew: (leaseToken, now) =>
           routeEffect(routing.renew(LeaseToken.make(leaseToken), now)),
         release: (leaseToken) =>
-          routeEffect(routing.release(LeaseToken.make(leaseToken))).pipe(
+          routeEffect(releaseRoutingLease(LeaseToken.make(leaseToken))).pipe(
             Effect.as(true),
           ),
         recordResponse: (accountId, status, headers, now) =>
