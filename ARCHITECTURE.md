@@ -475,15 +475,20 @@ never selects or changes a provider or model. `quota-axi` remains an
 observation-only tool and has no routing, login or mutation authority.
 
 An approved Responses client that cannot supply command-backed authentication
-uses the AgentOS `ai-gateway-workload-proxy` as a loopback-only sidecar. The
-sidecar rereads projected workload identity for each request, removes the
+uses the AgentOS `ai-gateway-workload-proxy` as a loopback-only sidecar; the
+exact Hermes contract and Pod wiring live in
+[`docs/integrations/hermes-ai-gateway.md`](./docs/integrations/hermes-ai-gateway.md).
+The sidecar rereads projected workload identity for each request, removes the
 client's placeholder authorization and all caller-supplied AgentOS authority
 headers, optionally injects a validated Assignment ID from its own trusted
 configuration, and forwards only the two reviewed Responses paths once to
-Agentgateway. W3C trace correlation passes through unchanged. Its process-only
-liveness and local projected-token readiness never contact an upstream. It
-owns no credential, selection, retry, fallback, prompt, response, or deployment
-authority. The
+Agentgateway. It preserves the upstream status, end-to-end headers after
+required hop-by-hop and stale `Content-Encoding`/`Content-Length` metadata
+removal, and stream without following redirects. W3C trace correlation passes
+through unchanged. Its
+process-only liveness and local projected-token readiness never contact an
+upstream. It owns no credential,
+selection, retry, fallback, prompt, response, or deployment authority. The
 client keeps exact model selection and disables request replay and provider
 fallback for this route; its workload owner composes the sidecar and projected
 token into that client's reviewed native manifest.

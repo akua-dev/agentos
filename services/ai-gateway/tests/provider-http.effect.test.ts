@@ -115,30 +115,33 @@ describe("AI provider HTTP adapter", () => {
         readonly redirect: RequestInit["redirect"] | "default";
         readonly url: string;
       }> = [];
-      const fetch: typeof globalThis.fetch = (input, init) => {
-        const request = input instanceof Request
-          ? input
-          : new Request(input, init);
-        calls.push({
-          authorization: new Headers(init?.headers).get("authorization"),
-          redirect: init?.redirect ?? "default",
-          url: request.url,
-        });
-        if (init?.redirect !== "manual") {
+      const fetchImpl = Object.assign(
+        (input: string | Request | URL, init?: RequestInit) => {
+          const request = input instanceof Request
+            ? input
+            : new Request(input.toString(), init);
           calls.push({
             authorization: new Headers(init?.headers).get("authorization"),
             redirect: init?.redirect ?? "default",
-            url: "https://redirect-target.invalid/v1/responses",
+            url: request.url,
           });
-        }
-        return Promise.resolve(new Response(null, {
-          status: 307,
-          headers: { location: "https://redirect-target.invalid/v1/responses" },
-        }));
-      };
+          if (init?.redirect !== "manual") {
+            calls.push({
+              authorization: new Headers(init?.headers).get("authorization"),
+              redirect: init?.redirect ?? "default",
+              url: "https://redirect-target.invalid/v1/responses",
+            });
+          }
+          return Promise.resolve(new Response(null, {
+            status: 307,
+            headers: { location: "https://redirect-target.invalid/v1/responses" },
+          }));
+        },
+        { preconnect: globalThis["fetch"].preconnect },
+      );
       const fetchLayer = FetchHttpClient.layer.pipe(
         Layer.provide(AIProviderHttpRequestInit),
-        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetchImpl)),
       );
       const layer = AIProviderHttpLive.pipe(
         Layer.provide(fetchLayer),
@@ -164,12 +167,15 @@ describe("AI provider HTTP adapter", () => {
   it.effect("scopes manual redirects to the provider client", () =>
     Effect.gen(function*() {
       const redirects: Array<RequestInit["redirect"] | "default"> = [];
-      const fetch: typeof globalThis.fetch = (_input, init) => {
-        redirects.push(init?.redirect ?? "default");
-        return Promise.resolve(new Response(null, { status: 204 }));
-      };
+      const fetchImpl = Object.assign(
+        (_input: string | Request | URL, init?: RequestInit) => {
+          redirects.push(init?.redirect ?? "default");
+          return Promise.resolve(new Response(null, { status: 204 }));
+        },
+        { preconnect: globalThis["fetch"].preconnect },
+      );
       const ordinaryClientLayer = FetchHttpClient.layer.pipe(
-        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetchImpl)),
       );
       const provider = yield* AIProviderHttp.pipe(
         Effect.provide(makeAIProviderHttpLive(ordinaryClientLayer)),
@@ -222,10 +228,9 @@ describe("AI provider HTTP adapter", () => {
           Effect.andThen(Effect.succeed(HttpClientResponse.fromWeb(
             request,
             new Response(new ReadableStream<Uint8Array>({
-              pull(controller) {
+              start(controller) {
                 bodyStarted = true;
                 controller.enqueue(new Uint8Array([1]));
-                return new Promise(() => {});
               },
             })),
           ))),

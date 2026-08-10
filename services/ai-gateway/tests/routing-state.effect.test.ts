@@ -208,7 +208,7 @@ describe("Effect canonical durable routing state", () => {
                 rejectionCode: "reauthentication_required",
               }]);
               return acquired;
-            }));
+            })));
           }),
       );
     }).pipe(Effect.provide(BunFileSystem.layer))));

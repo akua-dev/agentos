@@ -8,7 +8,17 @@ import {
   type ProviderBudgetSettlementReceiptV1,
   type ProviderBudgetSettlementReportV1,
 } from "@akua-dev/agentos";
-import { Effect, Exit, Fiber, Layer, Metric, Ref, Stream, Tracer } from "effect";
+import {
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Metric,
+  Option,
+  Ref,
+  Stream,
+  Tracer,
+} from "effect";
 import { TestClock } from "effect/testing";
 
 import {
@@ -96,6 +106,7 @@ const encoder = new TextEncoder();
 
 const makeLease = Effect.fn("test.aiForward.makeLease")(function*() {
   const releases = yield* Ref.make(0);
+  const released = yield* Ref.make(false);
   const renewals = yield* Ref.make(0);
   const lease: AIForwardLease = {
     kind: "openai_api_key",
@@ -103,7 +114,13 @@ const makeLease = Effect.fn("test.aiForward.makeLease")(function*() {
     renew: Ref.updateAndGet(renewals, (count) => count + 1).pipe(
       Effect.as(true),
     ),
-    release: Ref.update(releases, (count) => count + 1),
+    release: Effect.gen(function*() {
+      const shouldRelease = yield* Ref.modify(
+        released,
+        (state): readonly [boolean, boolean] => [!state, true],
+      );
+      if (shouldRelease) yield* Ref.update(releases, (count) => count + 1);
+    }),
     recordResponse: () => Effect.void,
   };
   return { lease, releases, renewals };
@@ -119,7 +136,29 @@ function acquireLease(lease: AIForwardLease | undefined) {
       lease: AIForwardLease | undefined,
       transfer: Effect.Effect<void>,
     ) => Effect.Effect<A, AIForwardRouteError>,
-  ) => use(lease, Effect.void);
+  ) => {
+    if (lease === undefined) return use(undefined, Effect.void);
+    return Effect.gen(function*() {
+      const transferred = yield* Ref.make(false);
+      return yield* Effect.acquireUseRelease(
+        Effect.succeed(lease),
+        (acquired) => use(
+          acquired,
+          Effect.uninterruptible(Ref.set(transferred, true)),
+        ),
+        (acquired, exit) =>
+          exit._tag === "Success" && acquired !== undefined
+            ? Ref.get(transferred).pipe(
+              Effect.flatMap((wasTransferred) =>
+                wasTransferred ? Effect.void : acquired.release
+              ),
+            )
+            : acquired === undefined
+            ? Effect.void
+            : acquired.release,
+      );
+    });
+  };
 }
 
 const makeSettlementRecorder = Effect.fn(
@@ -864,7 +903,7 @@ describe("Effect AI Gateway forwarding", () => {
       const brokenLease: AIForwardLease = {
         kind: route.lease.kind,
         get accessToken(): string {
-          throw new Error("invalid lease");
+          return Option.getOrThrow(Option.none());
         },
         renew: route.lease.renew,
         release: route.lease.release,

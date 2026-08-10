@@ -401,14 +401,26 @@ describe("Effect AI Gateway application", () => {
       yield* TestClock.setTime(now);
       const services = yield* makeTestServices(true);
       const credentialStarted = yield* Deferred.make<void>();
+      const credentialCalls = yield* Ref.make(0);
       const application = yield* makeApplication({
         ...services,
         vault: ManagedAccountVault.of({
           ...services.vault,
-          getFreshCredential: () =>
-            Deferred.succeed(credentialStarted, undefined).pipe(
-              Effect.andThen(Effect.never),
-            ),
+          getFreshCredential: () => Effect.gen(function*() {
+            const call = yield* Ref.modify(
+              credentialCalls,
+              (count): readonly [number, number] => [count, count + 1],
+            );
+            if (call === 0) {
+              return {
+                providerAccountId: "provider-a",
+                accessToken: "oauth-provider-secret",
+                expiresAt: now + 60_000,
+              };
+            }
+            yield* Deferred.succeed(credentialStarted, undefined);
+            return yield* Effect.never;
+          }),
         }),
       });
       const requestFiber = yield* Effect.forkChild(Effect.exit(

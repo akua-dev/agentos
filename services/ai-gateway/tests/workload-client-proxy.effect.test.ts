@@ -8,6 +8,7 @@ import {
   Schema,
   Stream,
 } from "effect";
+import { TestClock } from "effect/testing";
 import { parse } from "yaml";
 
 import {
@@ -55,7 +56,7 @@ suite("Hermes Responses workload client proxy", (it) => {
         import.meta.url,
       );
       const fixture = yield* fileSystem.readFileString(fixtureUrl.pathname);
-      const parsedFixture = parse(fixture) as Record<string, unknown>;
+      const parsedFixture = parse(fixture);
       const config = yield* Schema.decodeUnknownEffect(HermesConfiguration)(
         parsedFixture,
       );
@@ -305,27 +306,28 @@ suite("Hermes Responses workload client proxy", (it) => {
       const handler = yield* makeWorkloadClientProxyHandler({
         upstreamBaseUrl: new URL("http://agentgateway-openai.agentos.svc.cluster.local:8788"),
         tokenPath,
-        forward: () => Effect.succeed(new Response(
-          new ReadableStream<Uint8Array>({
-            start(controller) {
-              controller.enqueue(new TextEncoder().encode("first"));
-              setTimeout(() => {
-                controller.enqueue(new TextEncoder().encode("second"));
-                controller.close();
-              }, 1_100);
-            },
-          }),
-          { status: 200, headers: { "content-type": "text/plain" } },
-        )),
+        forward: () => Stream.toReadableStreamEffect(Stream.concat(
+          Stream.succeed(new TextEncoder().encode("first")),
+          Stream.fromEffect(
+            Effect.sleep("1.1 seconds").pipe(
+              Effect.andThen(Effect.succeed(new TextEncoder().encode("second"))),
+            ),
+          ),
+        )).pipe(
+          Effect.map((body) => new Response(body, {
+            status: 200,
+            headers: { "content-type": "text/plain" },
+          })),
+        ),
       });
 
-      const response = yield* handler(new Request(
+      const response = yield* TestClock.withLive(handler(new Request(
         "http://127.0.0.1:8790/v1/responses",
         { method: "POST" },
-      ));
+      )));
       assert.strictEqual(response.status, 200);
       assert.strictEqual(
-        yield* Effect.promise(() => response.text()),
+        yield* TestClock.withLive(Effect.promise(() => response.text())),
         "firstsecond",
       );
     }));

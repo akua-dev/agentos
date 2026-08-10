@@ -150,7 +150,7 @@ export function makeEffectAIRoutingStateLayer(
               if (acquired === undefined) return;
               const wasTransferred = yield* Ref.get(transferred);
               if (wasTransferred && exit._tag === "Success") return;
-              yield* releaseRoutingLease(acquired.leaseToken);
+              yield* routeEffect(releaseRoutingLease(acquired.leaseToken));
             })),
           );
         });

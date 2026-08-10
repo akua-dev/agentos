@@ -27,8 +27,11 @@ sends only `POST /v1/responses` or `POST /v1/responses/compact` to a loopback
   `agentgateway-openai`; W3C `traceparent` and `tracestate` correlation remain
   unchanged;
 - forwards the request once, without inspecting or storing its body; and
-- returns the actual upstream status, headers, and stream without retrying or
-  selecting another model or account.
+- returns the actual upstream status, end-to-end headers after required
+  hop-by-hop and stale `Content-Encoding`/`Content-Length` metadata removal,
+  and stream without retrying, following redirects, or selecting another model
+  or account. A transport failure returns the adapter's stable `502`; it never
+  becomes apparent success.
 
 Agentgateway and `agentos-egress-authz`, not the sidecar, authenticate the Pod
 and authorize its registered Agent or Assignment. Do not expose the loopback
@@ -119,6 +122,10 @@ spec:
           env:
             - name: AI_GATEWAY_URL
               value: http://agentgateway-openai.agentos.svc.cluster.local:8788
+            - name: AI_GATEWAY_IDLE_TIMEOUT_SECONDS
+              value: "255"
+            - name: AI_GATEWAY_GRACEFUL_SHUTDOWN_MILLIS
+              value: "20000"
             - name: AGENTOS_EGRESS_TOKEN_FILE
               value: /var/run/secrets/agentos-egress/token
             # Optional: set only from the workload owner's trusted Assignment.
@@ -170,6 +177,13 @@ read it. Keep the workload's dedicated ServiceAccount, register that identity
 and its approved access profile through the normal AgentOS access-plane
 procedure, and preserve the existing NetworkPolicy. The label grants only network
 reachability to Agentgateway; it is not authorization.
+
+The proxy's idle timeout defaults to the shown maximum of 255 seconds and its
+graceful-shutdown timeout defaults to 20,000 milliseconds. The idle timeout is
+an inactivity limit, not a total response limit; retain the 255-second value
+when the approved provider stream can have gaps that long. The proxy uses
+manual redirect handling, so a `3xx` response is returned to Hermes rather than
+followed.
 
 ## Operator workflow
 
