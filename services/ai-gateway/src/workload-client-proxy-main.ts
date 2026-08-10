@@ -19,8 +19,7 @@ import {
 
 import {
   AIProviderHttp,
-  AIProviderHttpLive,
-  AIProviderHttpRequestInit,
+  makeAIProviderHttpLive,
   type AIProviderResponse,
 } from "./provider-http.ts";
 import {
@@ -123,14 +122,10 @@ const startup = Effect.gen(function*() {
 });
 
 if (import.meta.main) {
-  const aiProviderHttpClientLayer = BunHttpClient.layer.pipe(
-    Layer.provide(AIProviderHttpRequestInit),
-  );
   const platform = Layer.mergeAll(
     BunFileSystem.layer,
-    aiProviderHttpClientLayer,
+    makeAIProviderHttpLive(BunHttpClient.layer),
     ConfigProvider.layer(ConfigProvider.fromEnv()),
-    AIProviderHttpLive.pipe(Layer.provide(aiProviderHttpClientLayer)),
   );
   BunRuntime.runMain(startup.pipe(
     Effect.tapError(() =>

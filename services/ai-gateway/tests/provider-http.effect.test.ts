@@ -22,6 +22,7 @@ import {
   AIProviderHttpError,
   AIProviderHttpLive,
   AIProviderHttpRequestInit,
+  makeAIProviderHttpLive,
 } from "../src/provider-http.ts";
 
 function providerLayer(
@@ -160,6 +161,35 @@ describe("AI provider HTTP adapter", () => {
       }]);
     }));
 
+  it.effect("scopes manual redirects to the provider client", () =>
+    Effect.gen(function*() {
+      const redirects: Array<RequestInit["redirect"] | "default"> = [];
+      const fetch: typeof globalThis.fetch = (_input, init) => {
+        redirects.push(init?.redirect ?? "default");
+        return Promise.resolve(new Response(null, { status: 204 }));
+      };
+      const ordinaryClientLayer = FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      );
+      const provider = yield* AIProviderHttp.pipe(
+        Effect.provide(makeAIProviderHttpLive(ordinaryClientLayer)),
+      );
+      const ordinaryClient = yield* HttpClient.HttpClient.pipe(
+        Effect.provide(ordinaryClientLayer),
+      );
+
+      yield* Effect.scoped(
+        HttpClient.withScope(ordinaryClient).execute(
+          HttpClientRequest.get("https://api.openai.test/status"),
+        ),
+      );
+      yield* provider.execute(new Request(
+        "https://api.openai.test/v1/responses",
+      ));
+
+      assert.deepStrictEqual(redirects, ["default", "manual"]);
+    }));
+
   it.effect("aborts the transport when the caller aborts before upstream headers", () =>
     Effect.gen(function*() {
       const transportSignal = yield* Deferred.make<AbortSignal>();
@@ -178,6 +208,41 @@ describe("AI provider HTTP adapter", () => {
       const signal = yield* Deferred.await(transportSignal);
       yield* Effect.sync(() => controller.abort());
       const exit = yield* Fiber.join(fiber);
+
+      assert.isFalse(Exit.isSuccess(exit));
+      assert.isTrue(signal.aborted);
+    }));
+
+  it.effect("interrupts an in-flight provider stream when the caller aborts", () =>
+    Effect.gen(function*() {
+      const transportSignal = yield* Deferred.make<AbortSignal>();
+      let bodyStarted = false;
+      const layer = providerLayer((request, _url, signal) =>
+        Deferred.succeed(transportSignal, signal).pipe(
+          Effect.andThen(Effect.succeed(HttpClientResponse.fromWeb(
+            request,
+            new Response(new ReadableStream<Uint8Array>({
+              pull(controller) {
+                bodyStarted = true;
+                controller.enqueue(new Uint8Array([1]));
+                return new Promise(() => {});
+              },
+            })),
+          ))),
+        ));
+      const controller = new AbortController();
+      const provider = yield* AIProviderHttp.pipe(Effect.provide(layer));
+      const response = yield* provider.execute(new Request(
+        "https://api.openai.test/v1/responses",
+        { signal: controller.signal },
+      ));
+      const bodyFiber = yield* Effect.forkChild(Effect.exit(
+        Stream.runDrain(response.body ?? Stream.empty),
+      ));
+      while (!bodyStarted) yield* Effect.yieldNow;
+      const signal = yield* Deferred.await(transportSignal);
+      yield* Effect.sync(() => controller.abort());
+      const exit = yield* Fiber.join(bodyFiber);
 
       assert.isFalse(Exit.isSuccess(exit));
       assert.isTrue(signal.aborted);

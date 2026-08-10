@@ -58,6 +58,7 @@ export const AIProviderHttpLive = Layer.effect(
         const body: AIProviderResponse["body"] = hasNoBody
           ? null
           : response.stream.pipe(
+            Stream.interruptWhen(abortOnSignal(request.signal)),
             Stream.mapError((error) =>
               providerHttpError(streamErrorCode(error))
             ),
@@ -77,6 +78,14 @@ export const AIProviderHttpRequestInit = Layer.succeed(
   FetchHttpClient.RequestInit,
   { redirect: "manual" },
 );
+
+export function makeAIProviderHttpLive(
+  clientLayer: Layer.Layer<HttpClient.HttpClient>,
+) {
+  return AIProviderHttpLive.pipe(
+    Layer.provide(clientLayer.pipe(Layer.provide(AIProviderHttpRequestInit))),
+  );
+}
 
 function abortOnSignal(signal: AbortSignal) {
   return Effect.callback<never, never>((resume) => {
