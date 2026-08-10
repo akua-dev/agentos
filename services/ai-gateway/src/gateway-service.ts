@@ -7,6 +7,7 @@ import {
 import {
   Clock,
   Effect,
+  Exit,
   Ref,
   Result,
   Schema,
@@ -166,18 +167,31 @@ export const makeAIGatewayApplication = Effect.fn(
               routeError(routeCodeForAccount(error))
             ),
           );
-          const releaseState = yield* Ref.make(false);
+          type ReleaseState = "available" | "releasing" | "released";
+          const releaseState = yield* Ref.make<ReleaseState>("available");
           const release = Effect.uninterruptible(Effect.gen(function*() {
-            const shouldRelease = yield* Ref.modify(
+            const action = yield* Ref.modify(
               releaseState,
-              (released): readonly [boolean, boolean] => [!released, true],
+              (state): readonly ["attempt" | "done" | "wait", ReleaseState] =>
+                state === "available"
+                  ? ["attempt", "releasing"]
+                  : state === "released"
+                  ? ["done", state]
+                  : ["wait", state],
             );
-            if (shouldRelease) {
-              yield* routing.release(reservation.leaseToken).pipe(
+            if (action !== "attempt") return;
+            const released = yield* Effect.exit(
+              routing.release(reservation.leaseToken).pipe(
                 Effect.asVoid,
                 Effect.mapError(() => routeError("state_unavailable")),
-              );
+              ),
+            );
+            if (Exit.isSuccess(released)) {
+              yield* Ref.set(releaseState, "released");
+              return;
             }
+            yield* Ref.set(releaseState, "available");
+            return yield* Effect.failCause(released.cause);
           }));
           const lease: AIForwardLease = {
             kind: "codex_oauth",

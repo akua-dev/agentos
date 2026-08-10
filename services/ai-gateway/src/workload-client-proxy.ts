@@ -1,5 +1,5 @@
 import { sanitizeRequestHeaders } from "@akua-dev/codex-router/codex";
-import { Config, Effect, FileSystem, Schema } from "effect";
+import { Config, Effect, FileSystem, Option, Schema } from "effect";
 
 import {
   defaultAIGatewayGracefulShutdownMillis,
@@ -118,7 +118,11 @@ export const readProjectedWorkloadToken = Effect.fn(
   "agentos.aiGateway.workloadClient.readToken",
 )(function*(path: string) {
   const fileSystem = yield* FileSystem.FileSystem;
-  const bytes = yield* fileSystem.readFile(path).pipe(
+  const bytes = yield* Effect.scoped(Effect.gen(function*() {
+    const file = yield* fileSystem.open(path, { flag: "r" });
+    const read = yield* file.readAlloc(maximumTokenBytes + 1);
+    return Option.getOrElse(read, () => new Uint8Array());
+  })).pipe(
     Effect.mapError(() => proxyError("token_unavailable")),
   );
   if (bytes.length === 0 || bytes.length > maximumTokenBytes) {

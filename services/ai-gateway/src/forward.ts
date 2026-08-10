@@ -210,15 +210,29 @@ export const makeAIForwardHandler = Effect.fn(
           });
         }
         return Effect.gen(function*() {
-          const leaseReleaseState = yield* Ref.make(false);
+          type LeaseReleaseState = "available" | "releasing" | "released";
+          const leaseReleaseState = yield* Ref.make<LeaseReleaseState>("available");
           const transferLease = Effect.uninterruptible(transfer);
           const releaseLeaseOnce = Effect.uninterruptible(Effect.gen(function*() {
-            yield* transferLease;
-            const shouldRelease = yield* Ref.modify(
+            const action = yield* Ref.modify(
               leaseReleaseState,
-              (released): readonly [boolean, boolean] => [!released, true],
+              (state): readonly ["attempt" | "done" | "wait", LeaseReleaseState] =>
+                state === "available"
+                  ? ["attempt", "releasing"]
+                  : state === "released"
+                  ? ["done", state]
+                  : ["wait", state],
             );
-            if (shouldRelease) yield* releaseLease(lease, requestTelemetry);
+            if (action === "done") return true;
+            if (action === "wait") return false;
+            const released = yield* releaseLease(lease, requestTelemetry);
+            if (released) {
+              yield* Ref.set(leaseReleaseState, "released");
+              yield* transferLease;
+              return true;
+            }
+            yield* Ref.set(leaseReleaseState, "available");
+            return false;
           }));
 
           yield* diagnostic(requestTelemetry.routeEnded("acquired"));
@@ -517,7 +531,7 @@ function heartbeat(lease: AIForwardLease, heartbeatMillis: number) {
 
 function finalizeStream(
   exit: Exit.Exit<unknown, AIProviderHttpError>,
-  releaseLeaseOnce: Effect.Effect<void>,
+  releaseLeaseOnce: Effect.Effect<boolean>,
   settlements: ProviderBudgetSettlementReporter["Service"],
   authorization: ProviderAuthorizationGrantV1 | undefined,
   status: number,
@@ -544,7 +558,8 @@ function finalizeStream(
         }
       }
     }
-    yield* releaseLeaseOnce;
+    const released = yield* releaseLeaseOnce;
+    if (!released) yield* releaseLeaseOnce;
     const outcome = telemetryStreamOutcome(exit, signal);
     const failure = Exit.isFailure(exit)
       ? Option.getOrUndefined(Cause.findErrorOption(exit.cause))
@@ -612,6 +627,7 @@ function releaseLease(
         ? telemetry.routeReleased
         : telemetry.routeReleaseFailed,
     );
+    return Exit.isSuccess(release);
   }).pipe(
     Effect.uninterruptible,
   );
