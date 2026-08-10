@@ -142,6 +142,7 @@ export const makeAIGatewayApplication = Effect.fn(
             ).pipe(Effect.catchCause(() => Effect.void)),
         { discard: true },
       );
+      const releaseReservationState = yield* Ref.make(false);
       const reservation = yield* routing.acquire({
         candidates: set.candidates,
         now: currentTime,
@@ -157,55 +158,71 @@ export const makeAIGatewayApplication = Effect.fn(
         Effect.catchCause(() => Effect.void),
         Effect.uninterruptible,
       );
-      const credentialResult = yield* Effect.result(
-        Effect.gen(function*() {
-          const credential = yield* vault.getFreshCredential(
-            reservation.accountId,
-          );
-          const lease: AIForwardLease = {
-            kind: "codex_oauth",
-            accessToken: credential.accessToken,
-            providerAccountId: credential.providerAccountId,
-            renew: Clock.currentTimeMillis.pipe(
-              Effect.flatMap((renewedAt) =>
-                routing.renew(reservation.leaseToken, renewedAt)
+      const releaseReservationOnce = Effect.gen(function*() {
+        const shouldRelease = yield* Ref.modify(
+          releaseReservationState,
+          (released): readonly [boolean, boolean] => [!released, true],
+        );
+        if (shouldRelease) yield* releaseReservation;
+      }).pipe(Effect.uninterruptible);
+      return yield* Effect.gen(function*() {
+        const credentialResult = yield* Effect.result(
+          Effect.gen(function*() {
+            const credential = yield* vault.getFreshCredential(
+              reservation.accountId,
+            );
+            const lease: AIForwardLease = {
+              kind: "codex_oauth",
+              accessToken: credential.accessToken,
+              providerAccountId: credential.providerAccountId,
+              renew: Clock.currentTimeMillis.pipe(
+                Effect.flatMap((renewedAt) =>
+                  routing.renew(reservation.leaseToken, renewedAt)
+                ),
+                Effect.mapError(() => routeError("state_unavailable")),
               ),
-              Effect.mapError(() => routeError("state_unavailable")),
-            ),
-            release: routing.release(reservation.leaseToken).pipe(
-              Effect.asVoid,
-              Effect.mapError(() => routeError("state_unavailable")),
-            ),
-            recordResponse: (status, headers) =>
-              Effect.gen(function*() {
-                const responseAt = yield* Clock.currentTimeMillis;
-                if (status === 401) {
-                  yield* vault.markNeedsReauth(
+              release: routing.release(reservation.leaseToken).pipe(
+                Effect.asVoid,
+                Effect.mapError(() => routeError("state_unavailable")),
+              ),
+              recordResponse: (status, headers) =>
+                Effect.gen(function*() {
+                  const responseAt = yield* Clock.currentTimeMillis;
+                  if (status === 401) {
+                    yield* vault.markNeedsReauth(
+                      reservation.accountId,
+                      credential.accessToken,
+                    ).pipe(Effect.catchCause(() => Effect.succeed(false)));
+                  }
+                  yield* routing.recordResponse(
                     reservation.accountId,
-                    credential.accessToken,
-                  ).pipe(Effect.catchCause(() => Effect.succeed(false)));
-                }
-                yield* routing.recordResponse(
-                  reservation.accountId,
-                  status,
-                  headers,
-                  responseAt,
-                ).pipe(
-                  Effect.mapError(() => routeError("state_unavailable")),
-                );
-              }),
-          };
-          return lease;
-        }).pipe(
+                    status,
+                    headers,
+                    responseAt,
+                  ).pipe(
+                    Effect.mapError(() => routeError("state_unavailable")),
+                  );
+                }),
+            };
+            return lease;
+          }),
+        ).pipe(
           Effect.onExit((exit) =>
-            Exit.isSuccess(exit) ? Effect.void : releaseReservation
+            Exit.isSuccess(exit) ? Effect.void : releaseReservationOnce
           ),
+        );
+        if (Result.isFailure(credentialResult)) {
+          yield* releaseReservationOnce;
+          return yield* routeError(
+            routeCodeForAccount(credentialResult.failure),
+          );
+        }
+        return credentialResult.success;
+      }).pipe(
+        Effect.onExit((exit) =>
+          Exit.isSuccess(exit) ? Effect.void : releaseReservationOnce
         ),
       );
-      if (Result.isFailure(credentialResult)) {
-        return yield* routeError(routeCodeForAccount(credentialResult.failure));
-      }
-      return credentialResult.success;
     },
   );
 
