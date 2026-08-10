@@ -35,7 +35,8 @@ type LastSelection = NonNullable<AIRoutingSummary["lastSelection"]>;
 export function makeEffectAIRoutingStateLayer(
   path: string,
   config: RoutingConfig,
-  routingLayer = sqliteRoutingStateLayer(
+  routingLayer: Layer.Layer<CodexRoutingState, unknown> =
+    sqliteRoutingStateLayer(
     path,
     toRouterConfig(config),
   ),
