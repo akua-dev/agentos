@@ -16,7 +16,7 @@ concurrency:
 jobs:
   check:
     name: check
-    runs-on: ubuntu-24.04
+    runs-on: akua-docker-ci-v2
     timeout-minutes: 20
     steps:
       - name: Check out the exact revision
@@ -54,7 +54,7 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     needs: check
-    runs-on: ubuntu-24.04
+    runs-on: akua-x64-ci-v2
     timeout-minutes: 40
     steps:
       - name: Check out the exact revision
