@@ -216,13 +216,13 @@ export const makeAIForwardHandler = Effect.fn(
       }));
       return jsonResponse(503, "no_eligible_account");
     }
-    const releaseLeaseOnce = Effect.gen(function*() {
+    const releaseLeaseOnce = Effect.uninterruptible(Effect.gen(function*() {
       const shouldRelease = yield* Ref.modify(
         leaseReleaseState,
         (released): readonly [boolean, boolean] => [!released, true],
       );
       if (shouldRelease) yield* releaseLease(lease, requestTelemetry);
-    });
+    }));
 
     const postAcquisition = Effect.gen(function*() {
       yield* diagnostic(requestTelemetry.routeEnded("acquired"));

@@ -100,52 +100,46 @@ export function makeEffectAIRoutingStateLayer(
             config,
             input.now,
           );
-          return yield* Effect.uninterruptibleMask((restore) =>
-            Effect.gen(function*() {
-              const lease = yield* routing.acquire({
-                candidates: input.candidates.map(toRouterCandidate),
-                now: input.now,
-                ...(input.sessionKey === undefined
-                  ? {}
-                  : { sessionKey: SessionKey.make(input.sessionKey) }),
-              });
+          return yield* Effect.acquireUseRelease(
+            routing.acquire({
+              candidates: input.candidates.map(toRouterCandidate),
+              now: input.now,
+              ...(input.sessionKey === undefined
+                ? {}
+                : { sessionKey: SessionKey.make(input.sessionKey) }),
+            }),
+            (lease) => Effect.gen(function*() {
               const acquired = Option.getOrUndefined(lease);
               const decisionReason = acquired === undefined
                 ? decision.reason
                 : acquired.accountId === decision.accountId
                   ? decision.reason
                   : "current_account_hysteresis";
-              if (acquired === undefined) {
-                yield* Ref.set(lastSelection, Option.some({
-                  observedAt: input.now,
-                  reason: decisionReason,
-                  candidates: decision.candidates,
-                }));
-                return undefined;
+              yield* Ref.set(lastSelection, Option.some({
+                observedAt: input.now,
+                reason: decisionReason,
+                candidates: decision.candidates,
+              }));
+              return acquired === undefined
+                ? undefined
+                : {
+                    accountId: acquired.accountId,
+                    leaseToken: acquired.leaseToken,
+                    expiresAt: acquired.expiresAt,
+                    decisionReason,
+                  };
+            }),
+            (lease, exit) => {
+              const acquired = Option.getOrUndefined(lease);
+              if (acquired === undefined || Exit.isSuccess(exit)) {
+                return Effect.void;
               }
-              const releaseLease = routing.release(acquired.leaseToken).pipe(
+              return routing.release(acquired.leaseToken).pipe(
                 Effect.asVoid,
                 Effect.catchCause(() => Effect.void),
                 Effect.uninterruptible,
               );
-              return yield* restore(Effect.gen(function*() {
-                yield* Ref.set(lastSelection, Option.some({
-                  observedAt: input.now,
-                  reason: decisionReason,
-                  candidates: decision.candidates,
-                }));
-                return {
-                  accountId: acquired.accountId,
-                  leaseToken: acquired.leaseToken,
-                  expiresAt: acquired.expiresAt,
-                  decisionReason,
-                };
-              }).pipe(
-                Effect.onExit((exit) =>
-                  Exit.isSuccess(exit) ? Effect.void : releaseLease
-                ),
-              ));
-            }),
+            },
           );
         }));
 
