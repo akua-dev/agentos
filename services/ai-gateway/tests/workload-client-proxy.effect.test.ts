@@ -166,6 +166,18 @@ suite("Hermes Responses workload client proxy", (it) => {
       );
       assert.strictEqual(config.hostname, "127.0.0.1");
       assert.strictEqual(config.assignmentId, assignmentId);
+      assert.strictEqual(config.idleTimeoutSeconds, 255);
+      assert.strictEqual(config.gracefulShutdownMillis, 20_000);
+
+      const configured = yield* loadWorkloadClientProxyConfig().pipe(
+        Effect.provide(environment({
+          AI_GATEWAY_URL: "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+          AI_GATEWAY_IDLE_TIMEOUT_SECONDS: "120",
+          AI_GATEWAY_GRACEFUL_SHUTDOWN_MILLIS: "45000",
+        })),
+      );
+      assert.strictEqual(configured.idleTimeoutSeconds, 120);
+      assert.strictEqual(configured.gracefulShutdownMillis, 45_000);
 
       for (const invalidAssignmentId of [
         "caller-controlled-value",
@@ -181,6 +193,40 @@ suite("Hermes Responses workload client proxy", (it) => {
         );
         assert.strictEqual(invalid.code, "invalid_configuration");
       }
+    }));
+
+  it.effect("preserves upstream response streams across a long gap", () =>
+    Effect.gen(function*() {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const directory = yield* fileSystem.makeTempDirectoryScoped();
+      const tokenPath = `${directory}/token`;
+      yield* fileSystem.writeFileString(tokenPath, token);
+      const handler = yield* makeWorkloadClientProxyHandler({
+        upstreamBaseUrl: new URL("http://agentgateway-openai.agentos.svc.cluster.local:8788"),
+        tokenPath,
+        forward: () => Effect.succeed(new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode("first"));
+              setTimeout(() => {
+                controller.enqueue(new TextEncoder().encode("second"));
+                controller.close();
+              }, 1_100);
+            },
+          }),
+          { status: 200, headers: { "content-type": "text/plain" } },
+        )),
+      });
+
+      const response = yield* handler(new Request(
+        "http://127.0.0.1:8790/v1/responses",
+        { method: "POST" },
+      ));
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual(
+        yield* Effect.promise(() => response.text()),
+        "firstsecond",
+      );
     }));
 
   it.effect("reports readiness only for a bounded, trimmed, UTF-8 JWT-like token", () =>

@@ -60,7 +60,11 @@ import {
   AIGatewayTelemetry,
   makeAIGatewayTelemetry,
 } from "./observability.ts";
-import { AIProviderHttp, AIProviderHttpLive } from "./provider-http.ts";
+import {
+  AIProviderHttp,
+  AIProviderHttpLive,
+  AIProviderHttpRequestInit,
+} from "./provider-http.ts";
 import { AIGatewayOtlpLive } from "./otlp.ts";
 import { CodexQuota, makeCodexQuotaLayer } from "./quota.ts";
 import { makeEffectManagedAccountVaultLayer } from "./managed-account-live.ts";
@@ -304,10 +308,13 @@ const startup = Effect.gen(function*() {
 }).pipe(Effect.scoped);
 
 if (import.meta.main) {
+  const aiProviderHttpClientLayer = BunHttpClient.layer.pipe(
+    Layer.provide(AIProviderHttpRequestInit),
+  );
   const platform = Layer.mergeAll(
     BunCryptoLayer,
     BunFileSystem.layer,
-    BunHttpClient.layer,
+    aiProviderHttpClientLayer,
     BunPath.layer,
     ConfigProvider.layer(ConfigProvider.fromEnv()),
   );

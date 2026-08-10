@@ -1,5 +1,10 @@
 import { Config, Effect, FileSystem, Schema } from "effect";
 
+import {
+  defaultAIGatewayGracefulShutdownMillis,
+  defaultAIGatewayIdleTimeoutSeconds,
+} from "./config.ts";
+
 const maximumTokenBytes = 16 * 1024;
 const jwtLike = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const allowedPaths = new Set(["/v1/responses", "/v1/responses/compact"]);
@@ -46,6 +51,13 @@ const Port = Schema.Number.pipe(
 );
 const Configuration = Schema.Struct({
   port: Port,
+  idleTimeoutSeconds: Schema.Number.pipe(
+    Schema.check(
+      Schema.isInt(),
+      Schema.isGreaterThanOrEqualTo(0),
+      Schema.isLessThanOrEqualTo(255),
+    ),
+  ),
   tokenPath: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
   upstreamBaseUrl: Schema.URL,
   assignmentId: Schema.Union([
@@ -75,6 +87,9 @@ export const loadWorkloadClientProxyConfig = Effect.fn(
     port: Config.int("AI_GATEWAY_WORKLOAD_PROXY_PORT").pipe(
       Config.withDefault(8_790),
     ),
+    idleTimeoutSeconds: Config.int("AI_GATEWAY_IDLE_TIMEOUT_SECONDS").pipe(
+      Config.withDefault(defaultAIGatewayIdleTimeoutSeconds),
+    ),
     tokenPath: Config.string("AGENTOS_EGRESS_TOKEN_FILE").pipe(
       Config.withDefault("/var/run/secrets/agentos-egress/token"),
     ),
@@ -82,9 +97,9 @@ export const loadWorkloadClientProxyConfig = Effect.fn(
     assignmentId: Config.string("AGENTOS_ASSIGNMENT_ID").pipe(
       Config.withDefault(""),
     ),
-    gracefulShutdownMillis: Config.int(
-      "AI_GATEWAY_WORKLOAD_PROXY_GRACEFUL_SHUTDOWN_MILLIS",
-    ).pipe(Config.withDefault(10_000)),
+    gracefulShutdownMillis: Config.int("AI_GATEWAY_GRACEFUL_SHUTDOWN_MILLIS").pipe(
+      Config.withDefault(defaultAIGatewayGracefulShutdownMillis),
+    ),
   }).pipe(Effect.mapError(configurationError));
   const config = yield* Schema.decodeUnknownEffect(Configuration)(raw).pipe(
     Effect.mapError(configurationError),

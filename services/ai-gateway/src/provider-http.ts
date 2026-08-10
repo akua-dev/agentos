@@ -1,6 +1,7 @@
 import { classifyAIError } from "@akua-dev/agentos";
 import { Context, Effect, Layer, Schema, Stream } from "effect";
 import {
+  FetchHttpClient,
   HttpClient,
   HttpClientError,
   HttpClientRequest,
@@ -67,6 +68,11 @@ export const AIProviderHttpLive = Layer.effect(
     );
     return AIProviderHttp.of({ execute });
   }),
+);
+
+export const AIProviderHttpRequestInit = Layer.succeed(
+  FetchHttpClient.RequestInit,
+  { redirect: "manual" },
 );
 
 function providerHttpError(code: AIProviderHttpError["code"]) {

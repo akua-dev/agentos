@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer, Option, Ref, Stream } from "effect";
 import {
+  FetchHttpClient,
   HttpClient,
   HttpClientError,
   HttpClientRequest,
@@ -11,6 +12,7 @@ import {
   AIProviderHttp,
   AIProviderHttpError,
   AIProviderHttpLive,
+  AIProviderHttpRequestInit,
 } from "../src/provider-http.ts";
 
 function providerLayer(
@@ -94,6 +96,59 @@ describe("AI provider HTTP adapter", () => {
         authorization: "Bearer provider-secret",
         url: "https://api.openai.test/v1/responses?trace=1",
       });
+    }));
+
+  it.effect("keeps credential-bearing redirects manual at the fetch boundary", () =>
+    Effect.gen(function*() {
+      const calls: Array<{
+        readonly authorization: string | null;
+        readonly redirect: RequestInit["redirect"] | "default";
+        readonly url: string;
+      }> = [];
+      const fetch: typeof globalThis.fetch = (input, init) => {
+        const request = input instanceof Request
+          ? input
+          : new Request(input, init);
+        calls.push({
+          authorization: new Headers(init?.headers).get("authorization"),
+          redirect: init?.redirect ?? "default",
+          url: request.url,
+        });
+        if (init?.redirect !== "manual") {
+          calls.push({
+            authorization: new Headers(init?.headers).get("authorization"),
+            redirect: init?.redirect ?? "default",
+            url: "https://redirect-target.invalid/v1/responses",
+          });
+        }
+        return Promise.resolve(new Response(null, {
+          status: 307,
+          headers: { location: "https://redirect-target.invalid/v1/responses" },
+        }));
+      };
+      const fetchLayer = FetchHttpClient.layer.pipe(
+        Layer.provide(AIProviderHttpRequestInit),
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      );
+      const layer = AIProviderHttpLive.pipe(
+        Layer.provide(fetchLayer),
+      );
+      const provider = yield* AIProviderHttp.pipe(Effect.provide(layer));
+      const response = yield* provider.execute(new Request(
+        "https://api.openai.test/v1/responses",
+        {
+          method: "POST",
+          headers: { authorization: "Bearer projected-workload-token" },
+          body: "{}",
+        },
+      ));
+
+      assert.strictEqual(response.status, 307);
+      assert.deepStrictEqual(calls, [{
+        authorization: "Bearer projected-workload-token",
+        redirect: "manual",
+        url: "https://api.openai.test/v1/responses",
+      }]);
     }));
 
   it.effect("maps request construction and transport failures to closed typed errors", () =>

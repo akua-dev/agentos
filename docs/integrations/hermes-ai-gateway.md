@@ -86,11 +86,20 @@ binary and the governed backend topology, but does not own or apply a foreign
 Hermes StatefulSet. Add the selected-client label, projected identity volume,
 and loopback sidecar to the reviewed workload manifest:
 
+The current Agentgateway NetworkPolicy admits client Pods from the `agentos`
+namespace, or from an already approved namespace labeled
+`agentos.akua.dev/managed-by: agentos-firstmate`, only when the Pod has an
+`agentos.akua.dev/agent` label. Deploy Hermes in one of those approved
+namespaces and preserve that reachability label. These labels only permit
+network reachability; the projected ServiceAccount token and Agentgateway
+authorizer provide authentication and authorization.
+
 ```yaml
 spec:
   template:
     metadata:
       labels:
+        agentos.akua.dev/agent: "hermes"
         agentos.akua.dev/agentgateway-client: "true"
     spec:
       automountServiceAccountToken: false
@@ -110,10 +119,22 @@ spec:
           ports:
             - name: workload-proxy
               containerPort: 8790
+          livenessProbe:
+            exec:
+              command:
+                - /usr/bin/curl
+                - --fail
+                - --silent
+                - --show-error
+                - http://127.0.0.1:8790/livez
           readinessProbe:
-            httpGet:
-              path: /readyz
-              port: workload-proxy
+            exec:
+              command:
+                - /usr/bin/curl
+                - --fail
+                - --silent
+                - --show-error
+                - http://127.0.0.1:8790/readyz
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

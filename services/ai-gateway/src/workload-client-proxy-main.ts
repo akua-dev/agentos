@@ -20,6 +20,7 @@ import {
 import {
   AIProviderHttp,
   AIProviderHttpLive,
+  AIProviderHttpRequestInit,
   type AIProviderResponse,
 } from "./provider-http.ts";
 import {
@@ -85,6 +86,7 @@ const startup = Effect.gen(function*() {
     Layer.provide(BunHttpServer.layer({
       hostname: config.hostname,
       port: config.port,
+      idleTimeout: config.idleTimeoutSeconds,
       gracefulShutdownTimeout: config.gracefulShutdownMillis,
     })),
   );
@@ -97,11 +99,14 @@ const startup = Effect.gen(function*() {
 });
 
 if (import.meta.main) {
+  const aiProviderHttpClientLayer = BunHttpClient.layer.pipe(
+    Layer.provide(AIProviderHttpRequestInit),
+  );
   const platform = Layer.mergeAll(
     BunFileSystem.layer,
-    BunHttpClient.layer,
+    aiProviderHttpClientLayer,
     ConfigProvider.layer(ConfigProvider.fromEnv()),
-    AIProviderHttpLive.pipe(Layer.provide(BunHttpClient.layer)),
+    AIProviderHttpLive.pipe(Layer.provide(aiProviderHttpClientLayer)),
   );
   BunRuntime.runMain(startup.pipe(
     Effect.tapError(() =>
