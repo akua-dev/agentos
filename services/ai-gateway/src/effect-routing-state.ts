@@ -50,7 +50,7 @@ export function makeEffectAIRoutingStateLayer(
       const releaseRoutingLease = (leaseToken: LeaseToken) =>
         routing.release(leaseToken).pipe(
           Effect.asVoid,
-          Effect.retry(Schedule.spaced("1 second")),
+          Effect.retry({ schedule: Schedule.spaced("1 second"), times: 3 }),
         );
 
       const summary: AIRoutingState["Service"]["summary"] = (now) =>
