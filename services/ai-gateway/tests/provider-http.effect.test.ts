@@ -146,15 +146,17 @@ describe("AI provider HTTP adapter", () => {
       const layer = AIProviderHttpLive.pipe(
         Layer.provide(fetchLayer),
       );
-      const provider = yield* AIProviderHttp.pipe(Effect.provide(layer));
-      const response = yield* provider.execute(new Request(
-        "https://api.openai.test/v1/responses",
-        {
-          method: "POST",
-          headers: { authorization: "Bearer projected-workload-token" },
-          body: "{}",
-        },
-      ));
+      const response = yield* Effect.gen(function*() {
+        const provider = yield* AIProviderHttp;
+        return yield* provider.execute(new Request(
+          "https://api.openai.test/v1/responses",
+          {
+            method: "POST",
+            headers: { authorization: "Bearer projected-workload-token" },
+            body: "{}",
+          },
+        ));
+      }).pipe(Effect.provide(layer));
 
       assert.strictEqual(response.status, 307);
       assert.deepStrictEqual(calls, [{
@@ -177,21 +179,22 @@ describe("AI provider HTTP adapter", () => {
       const ordinaryClientLayer = FetchHttpClient.layer.pipe(
         Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetchImpl)),
       );
-      const provider = yield* AIProviderHttp.pipe(
+      yield* Effect.gen(function*() {
+        const ordinaryClient = yield* HttpClient.HttpClient;
+        yield* Effect.scoped(
+          HttpClient.withScope(ordinaryClient).execute(
+            HttpClientRequest.get("https://api.openai.test/status"),
+          ),
+        );
+      }).pipe(Effect.provide(ordinaryClientLayer));
+      yield* Effect.gen(function*() {
+        const provider = yield* AIProviderHttp;
+        yield* provider.execute(new Request(
+          "https://api.openai.test/v1/responses",
+        ));
+      }).pipe(
         Effect.provide(makeAIProviderHttpLive(ordinaryClientLayer)),
       );
-      const ordinaryClient = yield* HttpClient.HttpClient.pipe(
-        Effect.provide(ordinaryClientLayer),
-      );
-
-      yield* Effect.scoped(
-        HttpClient.withScope(ordinaryClient).execute(
-          HttpClientRequest.get("https://api.openai.test/status"),
-        ),
-      );
-      yield* provider.execute(new Request(
-        "https://api.openai.test/v1/responses",
-      ));
 
       assert.deepStrictEqual(redirects, ["default", "manual"]);
     }));
