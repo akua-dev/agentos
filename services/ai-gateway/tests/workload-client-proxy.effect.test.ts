@@ -133,6 +133,7 @@ suite("Hermes Responses workload client proxy", (it) => {
           "x-agentos-assignment-id": "forged-assignment",
           "x-agentos-decision": "forged-decision",
           "x-agentos-grant": "forged-grant",
+          "x-ai-gateway-token": "legacy-shared-token",
         },
         body: "{\"model\":\"gpt-exact\"}",
       }));
@@ -152,6 +153,7 @@ suite("Hermes Responses workload client proxy", (it) => {
       assert.strictEqual(forwarded[0]?.headers.get("x-agentos-assignment-id"), assignmentId);
       assert.isNull(forwarded[0]?.headers.get("x-agentos-decision"));
       assert.isNull(forwarded[0]?.headers.get("x-agentos-grant"));
+      assert.isNull(forwarded[0]?.headers.get("x-ai-gateway-token"));
       assert.strictEqual(
         forwarded[0]?.headers.get("traceparent"),
         "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",

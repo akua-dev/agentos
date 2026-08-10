@@ -23,6 +23,7 @@ const removedHeaders = new Set([
   "trailer",
   "transfer-encoding",
   "upgrade",
+  "x-ai-gateway-token",
 ]);
 
 export class WorkloadClientProxyError extends Schema.TaggedErrorClass<WorkloadClientProxyError>()(
