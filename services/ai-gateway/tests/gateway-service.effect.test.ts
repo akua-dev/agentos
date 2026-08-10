@@ -140,14 +140,14 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
         activeReservations: 0,
         reservationsByAccount: {},
       }),
-      acquire: () => Effect.succeed(withAccounts
+      acquire: (_input, use) => use(withAccounts
         ? {
-          accountId: "managed-a",
-          leaseToken: "lease-a",
-          expiresAt: now + 60_000,
-          decisionReason: "best_candidate",
-        }
-        : undefined),
+            accountId: "managed-a",
+            leaseToken: "lease-a",
+            expiresAt: now + 60_000,
+            decisionReason: "best_candidate",
+          }
+        : undefined, Effect.void),
       evaluate: () => Effect.succeed(withAccounts
         ? {
           accountId: "managed-a",

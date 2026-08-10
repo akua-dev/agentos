@@ -49,9 +49,13 @@ export class AIRoutingState extends Context.Service<
     readonly summary: (
       now: number,
     ) => Effect.Effect<AIRoutingSummary, AIRoutingStateError>;
-    readonly acquire: (
+    readonly acquire: <A, E>(
       input: AIRoutingAcquireInput,
-    ) => Effect.Effect<AIAcquiredReservation | undefined, AIRoutingStateError>;
+      use: (
+        reservation: AIAcquiredReservation | undefined,
+        transfer: Effect.Effect<void>,
+      ) => Effect.Effect<A, E>,
+    ) => Effect.Effect<A, E | AIRoutingStateError>;
     readonly evaluate: (
       input: AIRoutingEvaluateInput,
     ) => Effect.Effect<SelectionDecision, AIRoutingStateError>;

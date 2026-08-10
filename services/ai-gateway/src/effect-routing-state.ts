@@ -8,7 +8,6 @@ import {
 } from "@akua-dev/codex-router/core";
 import {
   Effect,
-  Exit,
   Layer,
   Option,
   Ref,
@@ -68,9 +67,9 @@ export function makeEffectAIRoutingStateLayer(
           };
         }));
 
-      const acquire: AIRoutingState["Service"]["acquire"] = (input) =>
-        routeEffect(Effect.gen(function*() {
-          let durable = yield* routing.summary(input.now);
+      const acquire: AIRoutingState["Service"]["acquire"] = (input, use) =>
+        Effect.gen(function*() {
+          let durable = yield* routeEffect(routing.summary(input.now));
           const recovered = durable.accounts.filter((account) =>
             account.requiresReauthentication &&
             input.candidates.some((candidate) =>
@@ -78,7 +77,7 @@ export function makeEffectAIRoutingStateLayer(
               !candidate.needsReauth
             )
           );
-          yield* Effect.forEach(
+          yield* routeEffect(Effect.forEach(
             recovered,
             (account) =>
               routing.recordResponse(
@@ -87,19 +86,20 @@ export function makeEffectAIRoutingStateLayer(
                 input.now,
               ),
             { discard: true },
-          );
+          ));
           if (recovered.length > 0) {
-            durable = yield* routing.summary(input.now);
+            durable = yield* routeEffect(routing.summary(input.now));
           }
           const diagnosticCandidates = overlayRoutingSummary(
             input.candidates,
             durable,
           );
-          const decision = yield* selectEffect(
+          const decision = yield* routeEffect(selectEffect(
             diagnosticCandidates,
             config,
             input.now,
-          );
+          ));
+          const transferred = yield* Ref.make(false);
           return yield* Effect.acquireUseRelease(
             routing.acquire({
               candidates: input.candidates.map(toRouterCandidate),
@@ -107,7 +107,11 @@ export function makeEffectAIRoutingStateLayer(
               ...(input.sessionKey === undefined
                 ? {}
                 : { sessionKey: SessionKey.make(input.sessionKey) }),
-            }),
+            }).pipe(
+              Effect.mapError(() =>
+                AIRoutingStateError.make({ code: "state_unavailable" })
+              ),
+            ),
             (lease) => Effect.gen(function*() {
               const acquired = Option.getOrUndefined(lease);
               const decisionReason = acquired === undefined
@@ -120,28 +124,33 @@ export function makeEffectAIRoutingStateLayer(
                 reason: decisionReason,
                 candidates: decision.candidates,
               }));
-              return acquired === undefined
-                ? undefined
-                : {
-                    accountId: acquired.accountId,
-                    leaseToken: acquired.leaseToken,
-                    expiresAt: acquired.expiresAt,
-                    decisionReason,
-                  };
+              const transfer = Effect.uninterruptible(
+                Ref.set(transferred, true),
+              );
+              return yield* use(
+                acquired === undefined
+                  ? undefined
+                  : {
+                      accountId: acquired.accountId,
+                      leaseToken: acquired.leaseToken,
+                      expiresAt: acquired.expiresAt,
+                      decisionReason,
+                    },
+                transfer,
+              );
             }),
-            (lease, exit) => {
+            (lease, exit) => Effect.uninterruptible(Effect.gen(function*() {
               const acquired = Option.getOrUndefined(lease);
-              if (acquired === undefined || Exit.isSuccess(exit)) {
-                return Effect.void;
-              }
-              return routing.release(acquired.leaseToken).pipe(
+              if (acquired === undefined) return;
+              const wasTransferred = yield* Ref.get(transferred);
+              if (wasTransferred && exit._tag === "Success") return;
+              yield* routing.release(acquired.leaseToken).pipe(
                 Effect.asVoid,
                 Effect.catchCause(() => Effect.void),
-                Effect.uninterruptible,
               );
-            },
+            })),
           );
-        }));
+        });
 
       const evaluate: AIRoutingState["Service"]["evaluate"] = (input) =>
         routeEffect(Effect.gen(function*() {
