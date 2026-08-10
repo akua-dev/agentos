@@ -842,6 +842,35 @@ describe("Effect AI Gateway forwarding", () => {
       assert.strictEqual(yield* Ref.get(route.releases), 1);
     }));
 
+  it.effect("releases an acquired route when post-acquisition work defects", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const settlement = yield* makeSettlementRecorder();
+      const brokenLease: AIForwardLease = {
+        kind: route.lease.kind,
+        get accessToken(): string {
+          throw new Error("invalid lease");
+        },
+        renew: route.lease.renew,
+        release: route.lease.release,
+      };
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: () => Effect.succeed(brokenLease),
+        provider: AIProviderHttp.of({
+          execute: () => Effect.die("provider must not execute"),
+        }),
+        settlements: settlement.settlements,
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const exit = yield* Effect.exit(handler(gatewayRequest()));
+
+      assert.isFalse(Exit.isSuccess(exit));
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+    }));
+
   it.effect("ends telemetry when a finite provider response cannot be constructed", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
