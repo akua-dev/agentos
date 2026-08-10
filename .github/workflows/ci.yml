@@ -33,6 +33,8 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run repository checks
+        env:
+          TMPDIR: ${{ runner.temp }}
         run: bun run check
 
       - name: Build the Cloudflare Worker
