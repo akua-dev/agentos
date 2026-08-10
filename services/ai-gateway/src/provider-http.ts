@@ -47,7 +47,10 @@ export const AIProviderHttpLive = Layer.effect(
           try: () => HttpClientRequest.fromWeb(request),
           catch: () => providerHttpError("request_invalid"),
         });
-        const response = yield* client.execute(clientRequest).pipe(
+        const response = yield* Effect.raceFirst(
+          client.execute(clientRequest),
+          abortOnSignal(request.signal),
+        ).pipe(
           Effect.mapError((error) => providerHttpError(httpErrorCode(error))),
         );
         const hasNoBody = request.method === "HEAD" ||
@@ -74,6 +77,18 @@ export const AIProviderHttpRequestInit = Layer.succeed(
   FetchHttpClient.RequestInit,
   { redirect: "manual" },
 );
+
+function abortOnSignal(signal: AbortSignal) {
+  return Effect.callback<never, never>((resume) => {
+    const onAbort = () => resume(Effect.interrupt);
+    if (signal.aborted) {
+      onAbort();
+      return Effect.void;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+    return Effect.sync(() => signal.removeEventListener("abort", onAbort));
+  });
+}
 
 function providerHttpError(code: AIProviderHttpError["code"]) {
   return AIProviderHttpError.make({ code });

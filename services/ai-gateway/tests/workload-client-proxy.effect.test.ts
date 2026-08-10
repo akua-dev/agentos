@@ -1,6 +1,13 @@
 import * as BunServices from "@effect/platform-bun/BunServices";
 import { assert, layer } from "@effect/vitest";
-import { ConfigProvider, Effect, FileSystem, Ref, Schema } from "effect";
+import {
+  ConfigProvider,
+  Effect,
+  FileSystem,
+  Ref,
+  Schema,
+  Stream,
+} from "effect";
 import { parse } from "yaml";
 
 import {
@@ -9,6 +16,7 @@ import {
   workloadClientProxyErrorResponse,
   workloadClientProxyReadinessResponse,
 } from "../src/workload-client-proxy.ts";
+import { responseFromUpstream } from "../src/workload-client-proxy-main.ts";
 
 const suite = layer(BunServices.layer);
 const token = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJmaXh0dXJlIn0.signature";
@@ -179,6 +187,20 @@ suite("Hermes Responses workload client proxy", (it) => {
       assert.strictEqual(configured.idleTimeoutSeconds, 120);
       assert.strictEqual(configured.gracefulShutdownMillis, 45_000);
 
+      for (const invalidUrl of [
+        "ftp://agentgateway-openai.agentos.svc.cluster.local:8788",
+        "http://user:password@agentgateway-openai.agentos.svc.cluster.local:8788",
+        "http://agentgateway-openai.agentos.svc.cluster.local:8788?trace=1",
+        "http://agentgateway-openai.agentos.svc.cluster.local:8788#fragment",
+        "http://agentgateway-openai.agentos.svc.cluster.local:8788/v1",
+      ]) {
+        const invalid = yield* loadWorkloadClientProxyConfig().pipe(
+          Effect.provide(environment({ AI_GATEWAY_URL: invalidUrl })),
+          Effect.flip,
+        );
+        assert.strictEqual(invalid.code, "invalid_configuration");
+      }
+
       for (const invalidAssignmentId of [
         "caller-controlled-value",
         "20000000-0000-1000-8000-000000000001",
@@ -193,6 +215,49 @@ suite("Hermes Responses workload client proxy", (it) => {
         );
         assert.strictEqual(invalid.code, "invalid_configuration");
       }
+    }));
+
+  it.effect("strips hop-by-hop response headers while preserving provider data", () =>
+    Effect.gen(function*() {
+      const response = yield* responseFromUpstream({
+        status: 429,
+        headers: {
+          connection: "keep-alive, x-connection-hop",
+          "keep-alive": "timeout=5",
+          "proxy-authenticate": "Basic",
+          "proxy-authorization": "Basic secret",
+          te: "trailers",
+          trailer: "x-trailer",
+          "transfer-encoding": "chunked",
+          upgrade: "websocket",
+          "x-connection-hop": "private",
+          "x-provider-request-id": "provider-1",
+        },
+        body: Stream.succeed(new TextEncoder().encode("provider-body")),
+      });
+
+      assert.strictEqual(response.status, 429);
+      for (const name of [
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+        "x-connection-hop",
+      ]) {
+        assert.isNull(response.headers.get(name));
+      }
+      assert.strictEqual(
+        response.headers.get("x-provider-request-id"),
+        "provider-1",
+      );
+      assert.strictEqual(
+        yield* Effect.promise(() => response.text()),
+        "provider-body",
+      );
     }));
 
   it.effect("preserves upstream response streams across a long gap", () =>

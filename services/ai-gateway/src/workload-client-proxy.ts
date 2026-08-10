@@ -80,6 +80,15 @@ function configurationError() {
   });
 }
 
+function isValidUpstreamBaseUrl(url: URL) {
+  return (url.protocol === "http:" || url.protocol === "https:") &&
+    url.username === "" &&
+    url.password === "" &&
+    url.pathname === "/" &&
+    url.search === "" &&
+    url.hash === "";
+}
+
 export const loadWorkloadClientProxyConfig = Effect.fn(
   "agentos.aiGateway.workloadClient.loadConfig",
 )(function*() {
@@ -104,10 +113,7 @@ export const loadWorkloadClientProxyConfig = Effect.fn(
   const config = yield* Schema.decodeUnknownEffect(Configuration)(raw).pipe(
     Effect.mapError(configurationError),
   );
-  if (
-    config.upstreamBaseUrl.protocol !== "http:" &&
-    config.upstreamBaseUrl.protocol !== "https:"
-  ) {
+  if (!isValidUpstreamBaseUrl(config.upstreamBaseUrl)) {
     return yield* configurationError();
   }
   return {
@@ -172,10 +178,7 @@ export const workloadClientProxyReadinessResponse = Effect.fn(
 export const makeWorkloadClientProxyHandler = Effect.fn(
   "agentos.aiGateway.workloadClient.makeHandler",
 )(function*(options: WorkloadClientProxyOptions) {
-  if (
-    options.upstreamBaseUrl.protocol !== "http:" &&
-    options.upstreamBaseUrl.protocol !== "https:"
-  ) {
+  if (!isValidUpstreamBaseUrl(options.upstreamBaseUrl)) {
     return yield* proxyError("invalid_request");
   }
   const handle = Effect.fn("agentos.aiGateway.workloadClient.forward")(

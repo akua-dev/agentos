@@ -1,5 +1,14 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Layer, Option, Ref, Stream } from "effect";
+import {
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Option,
+  Ref,
+  Stream,
+} from "effect";
 import {
   FetchHttpClient,
   HttpClient,
@@ -149,6 +158,29 @@ describe("AI provider HTTP adapter", () => {
         redirect: "manual",
         url: "https://api.openai.test/v1/responses",
       }]);
+    }));
+
+  it.effect("aborts the transport when the caller aborts before upstream headers", () =>
+    Effect.gen(function*() {
+      const transportSignal = yield* Deferred.make<AbortSignal>();
+      const layer = providerLayer((_request, _url, signal) =>
+        Deferred.succeed(transportSignal, signal).pipe(
+          Effect.andThen(Effect.never),
+        ));
+      const controller = new AbortController();
+      const provider = yield* AIProviderHttp.pipe(Effect.provide(layer));
+      const fiber = yield* Effect.forkChild(Effect.exit(provider.execute(
+        new Request("https://api.openai.test/v1/responses", {
+          method: "POST",
+          signal: controller.signal,
+        }),
+      )));
+      const signal = yield* Deferred.await(transportSignal);
+      yield* Effect.sync(() => controller.abort());
+      const exit = yield* Fiber.join(fiber);
+
+      assert.isFalse(Exit.isSuccess(exit));
+      assert.isTrue(signal.aborted);
     }));
 
   it.effect("maps request construction and transport failures to closed typed errors", () =>

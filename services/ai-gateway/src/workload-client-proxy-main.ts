@@ -31,13 +31,37 @@ import {
   WorkloadClientProxyError,
 } from "./workload-client-proxy.ts";
 
-function responseFromUpstream(
+const hopByHopResponseHeaders = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+]);
+const httpToken = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+function responseHeaders(upstream: AIProviderResponse) {
+  const headers = new Headers(upstream.headers);
+  const connection = headers.get("connection");
+  headers.delete("connection");
+  for (const name of connection?.split(",") ?? []) {
+    const normalized = name.trim().toLowerCase();
+    if (httpToken.test(normalized)) headers.delete(normalized);
+  }
+  for (const name of hopByHopResponseHeaders) headers.delete(name);
+  headers.delete("content-encoding");
+  headers.delete("content-length");
+  return headers;
+}
+
+export function responseFromUpstream(
   upstream: AIProviderResponse,
 ) {
   return Effect.gen(function*() {
-    const headers = new Headers(upstream.headers);
-    headers.delete("content-encoding");
-    headers.delete("content-length");
+    const headers = responseHeaders(upstream);
     if (upstream.body === null) {
       return new Response(null, { status: upstream.status, headers });
     }
