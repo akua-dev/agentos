@@ -117,6 +117,15 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
     >>([]);
     const released = yield* Ref.make(0);
     const quotaCalls = yield* Ref.make(0);
+    const reservation = withAccounts
+      ? {
+          accountId: "managed-a",
+          leaseToken: "lease-a",
+          expiresAt: now + 60_000,
+          decisionReason: "best_candidate",
+        }
+      : undefined;
+    const releaseReservation = Ref.update(released, (count) => count + 1);
     const vault = ManagedAccountVault.of({
       list: Effect.succeed(withAccounts
         ? [{
@@ -140,14 +149,22 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
         activeReservations: 0,
         reservationsByAccount: {},
       }),
-      acquire: (_input, use) => use(withAccounts
-        ? {
-            accountId: "managed-a",
-            leaseToken: "lease-a",
-            expiresAt: now + 60_000,
-            decisionReason: "best_candidate",
-          }
-        : undefined, Effect.void),
+      acquire: (_input, use) => Effect.gen(function*() {
+        const transferred = yield* Ref.make(false);
+        return yield* Effect.acquireUseRelease(
+          Effect.succeed(reservation),
+          (acquired) => use(
+            acquired,
+            Effect.uninterruptible(Ref.set(transferred, true)),
+          ),
+          (acquired, exit) => Effect.gen(function*() {
+            if (acquired === undefined) return;
+            const wasTransferred = yield* Ref.get(transferred);
+            if (wasTransferred && exit._tag === "Success") return;
+            yield* releaseReservation;
+          }),
+        );
+      }),
       evaluate: () => Effect.succeed(withAccounts
         ? {
           accountId: "managed-a",
@@ -159,7 +176,7 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
           candidates: [],
         }),
       renew: () => Effect.succeed(true),
-      release: () => Ref.update(released, (count) => count + 1).pipe(
+      release: () => releaseReservation.pipe(
         Effect.as(true),
       ),
       recordResponse: () => Effect.void,
