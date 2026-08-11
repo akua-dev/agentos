@@ -59,6 +59,13 @@ composes only the approved clients. Repeated Gateway-owned device logins create
 the multi-subscription pool; `$agentos-ai-gateway` owns the exact lifecycle and
 native Pi/Codex configuration.
 
+Responses clients that cannot reread a projected Kubernetes token on every
+request use the loopback-only `ai-gateway-workload-proxy` sidecar. Its exact
+Responses paths, identity and failure contract, timeout settings, health
+checks, Pod wiring, and migration from the legacy shared-token topology are
+documented in
+[`docs/integrations/hermes-ai-gateway.md`](../../docs/integrations/hermes-ai-gateway.md).
+
 `GET /healthz` proves only that the process is serving. `GET /readyz` requires
 both usable pooled/provider fallback capacity and the current
 `agentos-provider-budget-settlement` Pod token to pass the authorizer's

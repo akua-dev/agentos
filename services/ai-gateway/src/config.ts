@@ -9,6 +9,9 @@ import {
   Schema,
 } from "effect";
 
+export const defaultAIGatewayIdleTimeoutSeconds = 255;
+export const defaultAIGatewayGracefulShutdownMillis = 20_000;
+
 const RawConfig = Config.all({
   home: Config.string("HOME").pipe(Config.withDefault(".")),
   stateDirectory: Config.string("AI_GATEWAY_STATE_DIR").pipe(
@@ -21,11 +24,11 @@ const RawConfig = Config.all({
     Config.withDefault(8787),
   ),
   idleTimeoutSeconds: Config.int("AI_GATEWAY_IDLE_TIMEOUT_SECONDS").pipe(
-    Config.withDefault(255),
+    Config.withDefault(defaultAIGatewayIdleTimeoutSeconds),
   ),
   gracefulShutdownMillis: Config.int(
     "AI_GATEWAY_GRACEFUL_SHUTDOWN_MILLIS",
-  ).pipe(Config.withDefault(20_000)),
+  ).pipe(Config.withDefault(defaultAIGatewayGracefulShutdownMillis)),
   clientAuthenticationMode: Config.string(
     "AI_GATEWAY_CLIENT_AUTH_MODE",
   ).pipe(Config.withDefault("shared_token")),

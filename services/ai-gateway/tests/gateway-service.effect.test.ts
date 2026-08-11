@@ -10,7 +10,7 @@ import {
   type ProviderBudgetSettlementReceiptV1,
   type ProviderBudgetSettlementReportV1,
 } from "@akua-dev/agentos";
-import { Effect, Ref, Stream } from "effect";
+import { Deferred, Effect, Fiber, Ref, Stream } from "effect";
 import { TestClock } from "effect/testing";
 
 import {
@@ -117,6 +117,15 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
     >>([]);
     const released = yield* Ref.make(0);
     const quotaCalls = yield* Ref.make(0);
+    const reservation = withAccounts
+      ? {
+          accountId: "managed-a",
+          leaseToken: "lease-a",
+          expiresAt: now + 60_000,
+          decisionReason: "best_candidate",
+        }
+      : undefined;
+    const releaseReservation = Ref.update(released, (count) => count + 1);
     const vault = ManagedAccountVault.of({
       list: Effect.succeed(withAccounts
         ? [{
@@ -140,14 +149,22 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
         activeReservations: 0,
         reservationsByAccount: {},
       }),
-      acquire: () => Effect.succeed(withAccounts
-        ? {
-          accountId: "managed-a",
-          leaseToken: "lease-a",
-          expiresAt: now + 60_000,
-          decisionReason: "best_candidate",
-        }
-        : undefined),
+      acquire: (_input, use) => Effect.gen(function*() {
+        const transferred = yield* Ref.make(false);
+        return yield* Effect.acquireUseRelease(
+          Effect.succeed(reservation),
+          (acquired) => use(
+            acquired,
+            Effect.uninterruptible(Ref.set(transferred, true)),
+          ),
+          (acquired, exit) => Effect.gen(function*() {
+            if (acquired === undefined) return;
+            const wasTransferred = yield* Ref.get(transferred);
+            if (wasTransferred && exit._tag === "Success") return;
+            yield* releaseReservation;
+          }),
+        );
+      }),
       evaluate: () => Effect.succeed(withAccounts
         ? {
           accountId: "managed-a",
@@ -159,7 +176,7 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
           candidates: [],
         }),
       renew: () => Effect.succeed(true),
-      release: () => Ref.update(released, (count) => count + 1).pipe(
+      release: () => releaseReservation.pipe(
         Effect.as(true),
       ),
       recordResponse: () => Effect.void,
@@ -377,6 +394,42 @@ describe("Effect AI Gateway application", () => {
         cachedInputTokens: 5,
         spendMicros: 0,
       }]);
+    }));
+
+  it.effect("releases a reservation when credential acquisition is interrupted", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const credentialStarted = yield* Deferred.make<void>();
+      const credentialCalls = yield* Ref.make(0);
+      const application = yield* makeApplication({
+        ...services,
+        vault: ManagedAccountVault.of({
+          ...services.vault,
+          getFreshCredential: () => Effect.gen(function*() {
+            const call = yield* Ref.modify(
+              credentialCalls,
+              (count): readonly [number, number] => [count, count + 1],
+            );
+            if (call === 0) {
+              return {
+                providerAccountId: "provider-a",
+                accessToken: "oauth-provider-secret",
+                expiresAt: now + 60_000,
+              };
+            }
+            yield* Deferred.succeed(credentialStarted, undefined);
+            return yield* Effect.never;
+          }),
+        }),
+      });
+      const requestFiber = yield* Effect.forkChild(Effect.exit(
+        application.handle(providerRequest()),
+      ));
+      yield* Deferred.await(credentialStarted);
+      yield* Fiber.interrupt(requestFiber);
+
+      assert.strictEqual(yield* Ref.get(services.released), 1);
     }));
 
   it.effect("preserves serving behavior with native telemetry enabled and disabled", () =>

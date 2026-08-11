@@ -8,7 +8,17 @@ import {
   type ProviderBudgetSettlementReceiptV1,
   type ProviderBudgetSettlementReportV1,
 } from "@akua-dev/agentos";
-import { Effect, Fiber, Layer, Metric, Ref, Stream, Tracer } from "effect";
+import {
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Metric,
+  Option,
+  Ref,
+  Stream,
+  Tracer,
+} from "effect";
 import { TestClock } from "effect/testing";
 
 import {
@@ -96,6 +106,7 @@ const encoder = new TextEncoder();
 
 const makeLease = Effect.fn("test.aiForward.makeLease")(function*() {
   const releases = yield* Ref.make(0);
+  const released = yield* Ref.make(false);
   const renewals = yield* Ref.make(0);
   const lease: AIForwardLease = {
     kind: "openai_api_key",
@@ -103,11 +114,52 @@ const makeLease = Effect.fn("test.aiForward.makeLease")(function*() {
     renew: Ref.updateAndGet(renewals, (count) => count + 1).pipe(
       Effect.as(true),
     ),
-    release: Ref.update(releases, (count) => count + 1),
+    release: Effect.gen(function*() {
+      const shouldRelease = yield* Ref.modify(
+        released,
+        (state): readonly [boolean, boolean] => [!state, true],
+      );
+      if (shouldRelease) yield* Ref.update(releases, (count) => count + 1);
+    }),
     recordResponse: () => Effect.void,
   };
   return { lease, releases, renewals };
 });
+
+function acquireLease(lease: AIForwardLease | undefined) {
+  return <A>(
+    _session: string | undefined,
+    _signal: AbortSignal,
+    _authorization: ProviderAuthorizationGrantV1 | undefined,
+    _telemetry: AIGatewayRequestTelemetry,
+    use: (
+      lease: AIForwardLease | undefined,
+      transfer: Effect.Effect<void>,
+    ) => Effect.Effect<A, AIForwardRouteError>,
+  ) => {
+    if (lease === undefined) return use(undefined, Effect.void);
+    return Effect.gen(function*() {
+      const transferred = yield* Ref.make(false);
+      return yield* Effect.acquireUseRelease(
+        Effect.succeed(lease),
+        (acquired) => use(
+          acquired,
+          Effect.uninterruptible(Ref.set(transferred, true)),
+        ),
+        (acquired, exit) =>
+          exit._tag === "Success" && acquired !== undefined
+            ? Ref.get(transferred).pipe(
+              Effect.flatMap((wasTransferred) =>
+                wasTransferred ? Effect.void : acquired.release
+              ),
+            )
+            : acquired === undefined
+            ? Effect.void
+            : acquired.release,
+      );
+    });
+  };
+}
 
 const makeSettlementRecorder = Effect.fn(
   "test.aiForward.makeSettlementRecorder",
@@ -195,7 +247,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 200,
@@ -253,7 +305,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeAIGatewayTelemetry();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 200,
@@ -300,7 +352,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({ status: 500, headers: {}, body: null }),
         }),
@@ -341,7 +393,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "shared_token", token: "client-secret" },
-        acquire: () => Effect.succeed(undefined),
+        acquire: acquireLease(undefined),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({ status: 500, headers: {}, body: null }),
         }),
@@ -385,7 +437,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(undefined),
+        acquire: acquireLease(undefined),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({ status: 500, headers: {}, body: null }),
         }),
@@ -467,7 +519,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(undefined),
+        acquire: acquireLease(undefined),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({ status: 500, headers: {}, body: null }),
         }),
@@ -514,7 +566,7 @@ describe("Effect AI Gateway forwarding", () => {
       };
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(lease),
+        acquire: acquireLease(lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({ status: 500, headers: {}, body: null }),
         }),
@@ -572,8 +624,10 @@ describe("Effect AI Gateway forwarding", () => {
       });
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: (_session, _signal, authorization) =>
-          Ref.set(attribution, authorization).pipe(Effect.as(route.lease)),
+        acquire: (_session, _signal, authorization, _telemetry, use) =>
+          Ref.set(attribution, authorization).pipe(
+            Effect.flatMap(() => use(route.lease, Effect.void)),
+          ),
         provider,
         settlements: settlement.settlements,
         now: Effect.succeed(now),
@@ -624,7 +678,7 @@ describe("Effect AI Gateway forwarding", () => {
       const settlement = yield* makeSettlementRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 200,
@@ -651,7 +705,7 @@ describe("Effect AI Gateway forwarding", () => {
       const settlement = yield* makeSettlementRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 429,
@@ -712,7 +766,7 @@ describe("Effect AI Gateway forwarding", () => {
           };
         const handler = yield* makeAIForwardHandler({
           authentication: { kind: "workload_identity" },
-          acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
           provider: AIProviderHttp.of({
             execute: () => Effect.succeed({
               status,
@@ -779,7 +833,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 204,
@@ -821,6 +875,56 @@ describe("Effect AI Gateway forwarding", () => {
       ]);
     }));
 
+  it.effect("releases an acquired route when the provider is interrupted before headers", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const settlement = yield* makeSettlementRecorder();
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: acquireLease(route.lease),
+        provider: AIProviderHttp.of({
+          execute: () => Effect.interrupt,
+        }),
+        settlements: settlement.settlements,
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const exit = yield* Effect.exit(handler(gatewayRequest()));
+
+      assert.isFalse(Exit.isSuccess(exit));
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+    }));
+
+  it.effect("releases an acquired route when post-acquisition work defects", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const settlement = yield* makeSettlementRecorder();
+      const brokenLease: AIForwardLease = {
+        kind: route.lease.kind,
+        get accessToken(): string {
+          return Option.getOrThrow(Option.none());
+        },
+        renew: route.lease.renew,
+        release: route.lease.release,
+      };
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: acquireLease(brokenLease),
+        provider: AIProviderHttp.of({
+          execute: () => Effect.die("provider must not execute"),
+        }),
+        settlements: settlement.settlements,
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const exit = yield* Effect.exit(handler(gatewayRequest()));
+
+      assert.isFalse(Exit.isSuccess(exit));
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+    }));
+
   it.effect("ends telemetry when a finite provider response cannot be constructed", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
@@ -828,7 +932,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({ status: 700, headers: {}, body: null }),
         }),
@@ -875,7 +979,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 700,
@@ -926,7 +1030,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 204,
@@ -977,9 +1081,10 @@ describe("Effect AI Gateway forwarding", () => {
       const settlement = yield* makeSettlementRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Ref.update(acquireCalls, (count) => count + 1).pipe(
-          Effect.as(undefined),
-        ),
+        acquire: (_session, _signal, _authorization, _telemetry, use) =>
+          Ref.update(acquireCalls, (count) => count + 1).pipe(
+            Effect.flatMap(() => use(undefined, Effect.void)),
+          ),
         provider: AIProviderHttp.of({
           execute: () => Ref.update(providerCalls, (count) => count + 1).pipe(
             Effect.as({ status: 500, headers: {}, body: null }),
@@ -1004,7 +1109,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.fail(AIProviderHttpError.make({
             code: "provider_unavailable",
@@ -1055,7 +1160,7 @@ describe("Effect AI Gateway forwarding", () => {
       headers.revoke();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 200,
@@ -1105,7 +1210,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 200,
@@ -1160,7 +1265,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 200,
@@ -1225,7 +1330,7 @@ describe("Effect AI Gateway forwarding", () => {
       });
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 200,
@@ -1254,7 +1359,7 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeTelemetryRecorder("upstream_headers");
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 200,
@@ -1284,7 +1389,7 @@ describe("Effect AI Gateway forwarding", () => {
       const settlement = yield* makeSettlementRecorder();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: () => Effect.succeed(route.lease),
+        acquire: acquireLease(route.lease),
         provider: AIProviderHttp.of({
           execute: () => Effect.succeed({
             status: 200,

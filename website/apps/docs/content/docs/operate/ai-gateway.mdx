@@ -6,6 +6,8 @@ canonical:
     path: packages/agentos/skills/agentos-ai-gateway/SKILL.md
   - label: AI Gateway service
     path: services/ai-gateway
+  - label: Hermes integration contract
+    path: docs/integrations/hermes-ai-gateway.md
 ---
 
 The Fleet AI Gateway is optional pooled capacity for reviewed Codex subscription accounts with an
@@ -17,13 +19,15 @@ retiring the gateway. It keeps server-owned provider OAuth and quota-aware routi
 deliberate service boundary. Client Agents receive only the scoped connection material intended
 for them; they never receive a provider credential or Fleet-shared inference token.
 
-Clients may live in `agentos` or a Second-Mate domain namespace. They call
+Native AgentOS clients may live in `agentos` or a Second-Mate domain namespace. They call
 `agentgateway-openai.agentos.svc.cluster.local` and authenticate with their kubelet-rotated,
-audience-bound ServiceAccount token. Agentgateway asks the TokenReview/OpenFGA authorizer for a
-closed grant lasting at most 15 seconds. Only Agentgateway can reach the AI Gateway through its
-NetworkPolicy; provider OAuth, the operator Secret and the Gateway vault remain in the core
-namespace. This lets a Second Mate manage Crewmates in its namespace without gaining another
-domain’s identity or provider credentials, while unrelated Internet traffic stays direct.
+audience-bound ServiceAccount token. A Responses client that cannot reread that token for every
+request uses the loopback-only workload proxy documented in the Hermes integration contract.
+Agentgateway asks the TokenReview/OpenFGA authorizer for a closed grant lasting at most 15 seconds.
+Only Agentgateway can reach the AI Gateway through its NetworkPolicy; provider OAuth, the operator
+Secret and the Gateway vault remain in the core namespace. This lets a Second Mate manage
+Crewmates in its namespace without gaining another domain’s identity or provider credentials,
+while unrelated Internet traffic stays direct.
 
 ## What it does not own
 

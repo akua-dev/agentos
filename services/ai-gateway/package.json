@@ -5,7 +5,8 @@
   "private": true,
   "type": "module",
   "bin": {
-    "ai-gateway": "./src/main.ts"
+    "ai-gateway": "./src/main.ts",
+    "ai-gateway-workload-proxy": "./src/workload-client-proxy-main.ts"
   },
   "scripts": {
     "test": "bun ../../node_modules/vitest/vitest.mjs run tests",

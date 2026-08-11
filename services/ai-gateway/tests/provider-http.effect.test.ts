@@ -1,6 +1,16 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Layer, Option, Ref, Stream } from "effect";
 import {
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Option,
+  Ref,
+  Stream,
+} from "effect";
+import {
+  FetchHttpClient,
   HttpClient,
   HttpClientError,
   HttpClientRequest,
@@ -11,6 +21,8 @@ import {
   AIProviderHttp,
   AIProviderHttpError,
   AIProviderHttpLive,
+  AIProviderHttpRequestInit,
+  makeAIProviderHttpLive,
 } from "../src/provider-http.ts";
 
 function providerLayer(
@@ -94,6 +106,152 @@ describe("AI provider HTTP adapter", () => {
         authorization: "Bearer provider-secret",
         url: "https://api.openai.test/v1/responses?trace=1",
       });
+    }));
+
+  it.effect("keeps credential-bearing redirects manual at the fetch boundary", () =>
+    Effect.gen(function*() {
+      const calls: Array<{
+        readonly authorization: string | null;
+        readonly redirect: RequestInit["redirect"] | "default";
+        readonly url: string;
+      }> = [];
+      const fetchImpl = Object.assign(
+        (input: string | Request | URL, init?: RequestInit) => {
+          const url = input instanceof Request ? input.url : input.toString();
+          calls.push({
+            authorization: new Headers(init?.headers).get("authorization"),
+            redirect: init?.redirect ?? "default",
+            url,
+          });
+          if (init?.redirect !== "manual") {
+            calls.push({
+              authorization: new Headers(init?.headers).get("authorization"),
+              redirect: init?.redirect ?? "default",
+              url: "https://redirect-target.invalid/v1/responses",
+            });
+          }
+          return Promise.resolve(new Response(null, {
+            status: 307,
+            headers: { location: "https://redirect-target.invalid/v1/responses" },
+          }));
+        },
+        { preconnect: globalThis["fetch"].preconnect },
+      );
+      const fetchLayer = FetchHttpClient.layer.pipe(
+        Layer.provide(AIProviderHttpRequestInit),
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetchImpl)),
+      );
+      const layer = AIProviderHttpLive.pipe(
+        Layer.provide(fetchLayer),
+      );
+      const response = yield* Effect.gen(function*() {
+        const provider = yield* AIProviderHttp;
+        return yield* provider.execute(new Request(
+          "https://api.openai.test/v1/responses",
+          {
+            method: "POST",
+            headers: { authorization: "Bearer projected-workload-token" },
+            body: "{}",
+          },
+        ));
+      }).pipe(Effect.provide(layer));
+
+      assert.strictEqual(response.status, 307);
+      assert.deepStrictEqual(calls, [{
+        authorization: "Bearer projected-workload-token",
+        redirect: "manual",
+        url: "https://api.openai.test/v1/responses",
+      }]);
+    }));
+
+  it.effect("scopes manual redirects to the provider client", () =>
+    Effect.gen(function*() {
+      const redirects: Array<RequestInit["redirect"] | "default"> = [];
+      const fetchImpl = Object.assign(
+        (_input: string | Request | URL, init?: RequestInit) => {
+          redirects.push(init?.redirect ?? "default");
+          return Promise.resolve(new Response(null, { status: 204 }));
+        },
+        { preconnect: globalThis["fetch"].preconnect },
+      );
+      const ordinaryClientLayer = FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetchImpl)),
+      );
+      yield* Effect.gen(function*() {
+        const ordinaryClient = yield* HttpClient.HttpClient;
+        yield* Effect.scoped(
+          HttpClient.withScope(ordinaryClient).execute(
+            HttpClientRequest.get("https://api.openai.test/status"),
+          ),
+        );
+      }).pipe(Effect.provide(ordinaryClientLayer));
+      yield* Effect.gen(function*() {
+        const provider = yield* AIProviderHttp;
+        yield* provider.execute(new Request(
+          "https://api.openai.test/v1/responses",
+        ));
+      }).pipe(
+        Effect.provide(makeAIProviderHttpLive(ordinaryClientLayer)),
+      );
+
+      assert.deepStrictEqual(redirects, ["default", "manual"]);
+    }));
+
+  it.effect("aborts the transport when the caller aborts before upstream headers", () =>
+    Effect.gen(function*() {
+      const transportSignal = yield* Deferred.make<AbortSignal>();
+      const layer = providerLayer((_request, _url, signal) =>
+        Deferred.succeed(transportSignal, signal).pipe(
+          Effect.andThen(Effect.never),
+        ));
+      const controller = new AbortController();
+      const provider = yield* AIProviderHttp.pipe(Effect.provide(layer));
+      const fiber = yield* Effect.forkChild(Effect.exit(provider.execute(
+        new Request("https://api.openai.test/v1/responses", {
+          method: "POST",
+          signal: controller.signal,
+        }),
+      )));
+      const signal = yield* Deferred.await(transportSignal);
+      yield* Effect.sync(() => controller.abort());
+      const exit = yield* Fiber.join(fiber);
+
+      assert.isFalse(Exit.isSuccess(exit));
+      assert.isTrue(signal.aborted);
+    }));
+
+  it.effect("interrupts an in-flight provider stream when the caller aborts", () =>
+    Effect.gen(function*() {
+      const transportSignal = yield* Deferred.make<AbortSignal>();
+      let bodyStarted = false;
+      const layer = providerLayer((request, _url, signal) =>
+        Deferred.succeed(transportSignal, signal).pipe(
+          Effect.andThen(Effect.succeed(HttpClientResponse.fromWeb(
+            request,
+            new Response(new ReadableStream<Uint8Array>({
+              start(controller) {
+                bodyStarted = true;
+                controller.enqueue(new Uint8Array([1]));
+              },
+            })),
+          ))),
+        ));
+      const controller = new AbortController();
+      const provider = yield* AIProviderHttp.pipe(Effect.provide(layer));
+      const response = yield* provider.execute(new Request(
+        "https://api.openai.test/v1/responses",
+        { signal: controller.signal },
+      ));
+      const bodyFiber = yield* Effect.forkChild(Effect.exit(
+        Stream.runDrain(response.body ?? Stream.empty),
+      ));
+      while (!bodyStarted) yield* Effect.yieldNow;
+      const signal = yield* Deferred.await(transportSignal);
+      yield* Effect.sync(() => controller.abort());
+      const exit = yield* Fiber.join(bodyFiber);
+
+      assert.isFalse(Exit.isSuccess(exit));
+      assert.isTrue(signal.aborted);
     }));
 
   it.effect("maps request construction and transport failures to closed typed errors", () =>

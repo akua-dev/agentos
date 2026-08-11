@@ -11,6 +11,7 @@ import {
   Layer,
   Option,
   Ref,
+  Schedule,
 } from "effect";
 
 import {
@@ -34,11 +35,12 @@ type LastSelection = NonNullable<AIRoutingSummary["lastSelection"]>;
 export function makeEffectAIRoutingStateLayer(
   path: string,
   config: RoutingConfig,
-) {
-  const infrastructure = sqliteRoutingStateLayer(
+  routingLayer: Layer.Layer<CodexRoutingState, unknown> =
+    sqliteRoutingStateLayer(
     path,
     toRouterConfig(config),
-  );
+  ),
+) {
   return Layer.effect(
     AIRoutingState,
     Effect.gen(function*() {
@@ -46,6 +48,11 @@ export function makeEffectAIRoutingStateLayer(
       const lastSelection = yield* Ref.make<Option.Option<LastSelection>>(
         Option.none(),
       );
+      const releaseRoutingLease = (leaseToken: LeaseToken) =>
+        routing.release(leaseToken).pipe(
+          Effect.asVoid,
+          Effect.retry({ schedule: Schedule.spaced("1 second"), times: 3 }),
+        );
 
       const summary: AIRoutingState["Service"]["summary"] = (now) =>
         routeEffect(Effect.gen(function*() {
@@ -67,9 +74,9 @@ export function makeEffectAIRoutingStateLayer(
           };
         }));
 
-      const acquire: AIRoutingState["Service"]["acquire"] = (input) =>
-        routeEffect(Effect.gen(function*() {
-          let durable = yield* routing.summary(input.now);
+      const acquire: AIRoutingState["Service"]["acquire"] = (input, use) =>
+        Effect.gen(function*() {
+          let durable = yield* routeEffect(routing.summary(input.now));
           const recovered = durable.accounts.filter((account) =>
             account.requiresReauthentication &&
             input.candidates.some((candidate) =>
@@ -77,7 +84,7 @@ export function makeEffectAIRoutingStateLayer(
               !candidate.needsReauth
             )
           );
-          yield* Effect.forEach(
+          yield* routeEffect(Effect.forEach(
             recovered,
             (account) =>
               routing.recordResponse(
@@ -86,46 +93,70 @@ export function makeEffectAIRoutingStateLayer(
                 input.now,
               ),
             { discard: true },
-          );
+          ));
           if (recovered.length > 0) {
-            durable = yield* routing.summary(input.now);
+            durable = yield* routeEffect(routing.summary(input.now));
           }
           const diagnosticCandidates = overlayRoutingSummary(
             input.candidates,
             durable,
           );
-          const decision = yield* selectEffect(
+          const decision = yield* routeEffect(selectEffect(
             diagnosticCandidates,
             config,
             input.now,
+          ));
+          const transferred = yield* Ref.make(false);
+          return yield* Effect.acquireUseRelease(
+            routing.acquire({
+              candidates: input.candidates.map(toRouterCandidate),
+              now: input.now,
+              ...(input.sessionKey === undefined
+                ? {}
+                : { sessionKey: SessionKey.make(input.sessionKey) }),
+            }).pipe(
+              Effect.mapError(() =>
+                AIRoutingStateError.make({ code: "state_unavailable" })
+              ),
+            ),
+            (lease) => Effect.gen(function*() {
+              const acquired = Option.getOrUndefined(lease);
+              const decisionReason = acquired === undefined
+                ? decision.reason
+                : acquired.accountId === decision.accountId
+                  ? decision.reason
+                  : "current_account_hysteresis";
+              yield* Ref.set(lastSelection, Option.some({
+                observedAt: input.now,
+                reason: decisionReason,
+                candidates: decision.candidates,
+              }));
+              const transfer = Effect.uninterruptible(
+                Ref.set(transferred, true),
+              );
+              return yield* use(
+                acquired === undefined
+                  ? undefined
+                  : {
+                      accountId: acquired.accountId,
+                      leaseToken: acquired.leaseToken,
+                      expiresAt: acquired.expiresAt,
+                      decisionReason,
+                    },
+                transfer,
+              );
+            }),
+            (lease, exit) => Effect.uninterruptible(Effect.gen(function*() {
+              const acquired = Option.getOrUndefined(lease);
+              if (acquired === undefined) return;
+              const wasTransferred = yield* Ref.get(transferred);
+              if (wasTransferred && exit._tag === "Success") return;
+              yield* routeEffect(releaseRoutingLease(acquired.leaseToken)).pipe(
+                Effect.catchCause(() => Effect.void),
+              );
+            })),
           );
-          const lease = yield* routing.acquire({
-            candidates: input.candidates.map(toRouterCandidate),
-            now: input.now,
-            ...(input.sessionKey === undefined
-              ? {}
-              : { sessionKey: SessionKey.make(input.sessionKey) }),
-          });
-          const acquired = Option.getOrUndefined(lease);
-          const decisionReason = acquired === undefined
-            ? decision.reason
-            : acquired.accountId === decision.accountId
-              ? decision.reason
-              : "current_account_hysteresis";
-          yield* Ref.set(lastSelection, Option.some({
-            observedAt: input.now,
-            reason: decisionReason,
-            candidates: decision.candidates,
-          }));
-          return acquired === undefined
-            ? undefined
-            : {
-                accountId: acquired.accountId,
-                leaseToken: acquired.leaseToken,
-                expiresAt: acquired.expiresAt,
-                decisionReason,
-              };
-        }));
+        });
 
       const evaluate: AIRoutingState["Service"]["evaluate"] = (input) =>
         routeEffect(Effect.gen(function*() {
@@ -148,7 +179,7 @@ export function makeEffectAIRoutingStateLayer(
         renew: (leaseToken, now) =>
           routeEffect(routing.renew(LeaseToken.make(leaseToken), now)),
         release: (leaseToken) =>
-          routeEffect(routing.release(LeaseToken.make(leaseToken))).pipe(
+          routeEffect(releaseRoutingLease(LeaseToken.make(leaseToken))).pipe(
             Effect.as(true),
           ),
         recordResponse: (accountId, status, headers, now) =>
@@ -159,7 +190,7 @@ export function makeEffectAIRoutingStateLayer(
           )),
       });
     }),
-  ).pipe(Layer.provide(infrastructure));
+  ).pipe(Layer.provide(routingLayer));
 }
 
 function overlayRoutingSummary(

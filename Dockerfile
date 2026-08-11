@@ -225,6 +225,7 @@ RUN chmod 0644 \
     /opt/agentos/services/a2a/src/main.ts \
     /opt/agentos/services/agentgateway/src/readiness-main.ts \
     /opt/agentos/services/ai-gateway/src/main.ts \
+    /opt/agentos/services/ai-gateway/src/workload-client-proxy-main.ts \
     /opt/agentos/services/egress-authz/src/main.ts \
     /opt/agentos/services/github-broker/src/main.ts \
     /opt/agentos/services/openfga/src/bootstrap.ts \
@@ -247,6 +248,9 @@ RUN chmod 0644 \
   && ln -s \
     /opt/agentos/services/ai-gateway/src/main.ts \
     /usr/local/bin/ai-gateway \
+  && ln -s \
+    /opt/agentos/services/ai-gateway/src/workload-client-proxy-main.ts \
+    /usr/local/bin/ai-gateway-workload-proxy \
   && ln -s \
     /opt/agentos/services/egress-authz/src/main.ts \
     /usr/local/bin/agentos-egress-authz \
