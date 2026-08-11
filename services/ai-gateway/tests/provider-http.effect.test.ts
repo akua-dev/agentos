@@ -117,13 +117,11 @@ describe("AI provider HTTP adapter", () => {
       }> = [];
       const fetchImpl = Object.assign(
         (input: string | Request | URL, init?: RequestInit) => {
-          const request = input instanceof Request
-            ? input
-            : new Request(input.toString(), init);
+          const url = input instanceof Request ? input.url : input.toString();
           calls.push({
             authorization: new Headers(init?.headers).get("authorization"),
             redirect: init?.redirect ?? "default",
-            url: request.url,
+            url,
           });
           if (init?.redirect !== "manual") {
             calls.push({
