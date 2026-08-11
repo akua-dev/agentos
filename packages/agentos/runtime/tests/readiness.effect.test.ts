@@ -617,42 +617,24 @@ describe("semantic Agent readiness", () => {
     const codexProviderMarker = `${home}/.local/state/agentos/codex-provider.json`;
     const codexEntry = {
       name: "AgentOS workload gateway",
-      base_url:
-        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+      base_url: "http://127.0.0.1:8790",
       wire_api: "responses",
+      requires_openai_auth: false,
       supports_websockets: false,
       request_max_retries: 0,
       stream_max_retries: 0,
-      env_http_headers: {
-        "X-AgentOS-Assignment-Id": "AGENTOS_ASSIGNMENT_ID",
-      },
-      auth: {
-        command: "/home/agent/.local/share/mise/shims/bun",
-        args: [
-          "/opt/agentos/packages/agentos/runtime/codex-token.ts",
-          egressTokenPath,
-        ],
-        timeout_ms: 5_000,
-        refresh_interval_ms: 60_000,
-      },
     };
     const codexConfig = [
       'model_provider = "agentos-gateway"',
       "",
       "[model_providers.agentos-gateway]",
       'name = "AgentOS workload gateway"',
-      'base_url = "http://agentgateway-openai.agentos.svc.cluster.local:8788"',
+      'base_url = "http://127.0.0.1:8790"',
       'wire_api = "responses"',
+      "requires_openai_auth = false",
       "supports_websockets = false",
       "request_max_retries = 0",
       "stream_max_retries = 0",
-      'env_http_headers = { "X-AgentOS-Assignment-Id" = "AGENTOS_ASSIGNMENT_ID" }',
-      "",
-      "[model_providers.agentos-gateway.auth]",
-      'command = "/home/agent/.local/share/mise/shims/bun"',
-      `args = ["/opt/agentos/packages/agentos/runtime/codex-token.ts","${egressTokenPath}"]`,
-      "timeout_ms = 5000",
-      "refresh_interval_ms = 60000",
       "",
     ].join("\n");
     const gatewayCrewEnvironment = {
@@ -661,7 +643,7 @@ describe("semantic Agent readiness", () => {
       AGENTOS_RELEASE_ROOT: "/opt/agentos",
       AGENTOS_PROVIDER_CREDENTIAL_KIND: "ai_gateway",
       AI_GATEWAY_URL:
-        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+        "http://127.0.0.1:8790",
     };
     const gatewayCrewFiles = {
       [briefPath]: crewBrief,
@@ -699,7 +681,7 @@ describe("semantic Agent readiness", () => {
         files: {
           ...gatewayCrewFiles,
           [codexConfigPath]: codexConfig.replace(
-            "agentgateway-openai.agentos.svc.cluster.local",
+            "127.0.0.1",
             "unreviewed.example",
           ),
         },

@@ -77,9 +77,22 @@ spec:
             capabilities:
               drop:
                 - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          resources: &runtime-resources
+            requests:
+              cpu: 100m
+              memory: 256Mi
+              ephemeral-storage: 128Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+              ephemeral-storage: 1Gi
           volumeMounts: &home-volume
             - name: home
               mountPath: /home/agent
+            - name: tmp
+              mountPath: /tmp
       containers:
         - name: agentos
           image: agentos:dev
@@ -93,9 +106,12 @@ spec:
             - agentos-agent
           env: *runtime-environment
           securityContext: *container-security
+          resources: *runtime-resources
           volumeMounts:
             - name: home
               mountPath: /home/agent
+            - name: tmp
+              mountPath: /tmp
             - name: agentos-egress-identity
               mountPath: /var/run/secrets/agentos-egress
               readOnly: true
@@ -132,6 +148,9 @@ spec:
                   audience: agentos-egress-authz
                   expirationSeconds: 600
                   path: token
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
   volumeClaimTemplates:
     - metadata:
         name: home

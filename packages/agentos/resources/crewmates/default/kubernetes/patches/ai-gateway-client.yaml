@@ -12,20 +12,77 @@ spec:
         - name: install-tools
         - name: prepare-home
           env:
+            - name: AGENTOS_EGRESS_TOKEN_FILE
+              $patch: delete
             - name: AGENTOS_CODEX_PROVIDER_MODE
               value: ai-gateway
-            - name: AGENTOS_EGRESS_TOKEN_FILE
-              value: /var/run/secrets/agentos-egress/token
             - name: AI_GATEWAY_URL
-              value: http://agentgateway-openai.agentos.svc.cluster.local:8788
+              value: http://127.0.0.1:8790
       containers:
         - name: crewmate
           env:
+            - name: AGENTOS_EGRESS_TOKEN_FILE
+              $patch: delete
             - name: AGENTOS_CODEX_PROVIDER_MODE
               value: ai-gateway
-            - name: AGENTOS_EGRESS_TOKEN_FILE
-              value: /var/run/secrets/agentos-egress/token
             - name: AGENTOS_PROVIDER_CREDENTIAL_KIND
               value: ai_gateway
             - name: AI_GATEWAY_URL
+              value: http://127.0.0.1:8790
+        - name: ai-gateway-workload-proxy
+          image: agentos:dev
+          imagePullPolicy: Never
+          command:
+            - ai-gateway-workload-proxy
+          env:
+            - name: AI_GATEWAY_URL
               value: http://agentgateway-openai.agentos.svc.cluster.local:8788
+            - name: AI_GATEWAY_IDLE_TIMEOUT_SECONDS
+              value: "255"
+            - name: AI_GATEWAY_GRACEFUL_SHUTDOWN_MILLIS
+              value: "20000"
+            - name: AGENTOS_EGRESS_TOKEN_FILE
+              value: /var/run/secrets/agentos-egress/token
+          ports:
+            - name: workload-proxy
+              containerPort: 8790
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: workload-proxy
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: workload-proxy
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+              ephemeral-storage: 32Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+              ephemeral-storage: 128Mi
+          volumeMounts:
+            - name: agentos-egress-identity
+              mountPath: /var/run/secrets/agentos-egress
+              readOnly: true
+      volumes:
+        - name: agentos-egress-identity
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  audience: agentos-egress-authz
+                  expirationSeconds: 600
+                  path: token

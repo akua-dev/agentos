@@ -241,8 +241,11 @@ describe("First Mate Kubernetes resources", () => {
       );
       assert.deepStrictEqual(install.volumeMounts, [
         { mountPath: "/home/agent", name: "home" },
+        { mountPath: "/tmp", name: "tmp" },
       ]);
-      assert.deepStrictEqual(prepare.volumeMounts, install.volumeMounts);
+      assert.deepStrictEqual(prepare.volumeMounts, [
+        { mountPath: "/home/agent", name: "home" },
+      ]);
       assert.deepStrictEqual(firstMate.volumeMounts, [
         ...(install.volumeMounts ?? []),
         {
@@ -296,6 +299,8 @@ describe("First Mate Kubernetes resources", () => {
       assert.deepStrictEqual(firstMate.securityContext, {
         allowPrivilegeEscalation: false,
         capabilities: { drop: ["ALL"] },
+        readOnlyRootFilesystem: true,
+        runAsNonRoot: true,
       });
       assert.deepInclude(pod.volumes, {
         name: "agentos-egress-identity",
