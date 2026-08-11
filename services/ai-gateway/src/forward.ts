@@ -25,7 +25,6 @@ import {
 } from "effect";
 
 import { attributedSessionKey } from "./attribution.ts";
-import { timingSafeStringEqual } from "./constant-time.ts";
 import {
   AIGatewayTelemetry,
   type AIGatewayRequestTelemetry,
@@ -71,14 +70,7 @@ export interface AIForwardLease {
   ) => Effect.Effect<void, AIForwardRouteError>;
 }
 
-export type AIForwardClientAuthentication =
-  | {
-      readonly kind: "shared_token";
-      readonly token: string;
-    }
-  | {
-      readonly kind: "workload_identity";
-    };
+export type AIForwardClientAuthentication = { readonly kind: "workload_identity" };
 
 export interface AIForwardOptions {
   readonly authentication: AIForwardClientAuthentication;
@@ -155,6 +147,22 @@ export const makeAIForwardHandler = Effect.fn(
         authentication.status,
         authentication.status === 403 ? "forbidden" : "unauthorized",
       );
+    }
+    if (
+      authentication.authorization !== undefined &&
+      "model" in authentication.authorization
+    ) {
+      const bounded = yield* Effect.result(validateWorkloadRequestCeiling(
+        request,
+        authentication.authorization,
+      ));
+      if (Result.isFailure(bounded)) {
+        yield* diagnostic(requestTelemetry.end({
+          status: 403,
+          streamOutcome: "not_streamed",
+        }));
+        return jsonResponse(403, "forbidden");
+      }
     }
     if (
       request.method !== "POST" ||
@@ -255,6 +263,11 @@ export const makeAIForwardHandler = Effect.fn(
             yield* diagnostic(
               requestTelemetry.upstreamFailed(upstreamResult.failure),
             );
+            yield* settleAttempt(
+              options.settlements,
+              authentication.authorization,
+              "transport_failed",
+            );
             yield* releaseLeaseOnce;
             yield* diagnostic(requestTelemetry.end({
               status: 502,
@@ -273,6 +286,11 @@ export const makeAIForwardHandler = Effect.fn(
           if (Result.isFailure(headersResult)) {
             yield* diagnostic(
               requestTelemetry.upstreamFailed(headersResult.failure),
+            );
+            yield* settleAttempt(
+              options.settlements,
+              authentication.authorization,
+              "transport_failed",
             );
             yield* releaseLeaseOnce;
             yield* diagnostic(requestTelemetry.end({
@@ -295,6 +313,11 @@ export const makeAIForwardHandler = Effect.fn(
           if (Result.isFailure(responseMetadata)) {
             yield* diagnostic(
               requestTelemetry.upstreamFailed(responseMetadata.failure),
+            );
+            yield* settleAttempt(
+              options.settlements,
+              authentication.authorization,
+              "transport_failed",
             );
             yield* releaseLeaseOnce;
             yield* diagnostic(requestTelemetry.end({
@@ -323,6 +346,11 @@ export const makeAIForwardHandler = Effect.fn(
               code: "invalid_configuration",
             });
             yield* diagnostic(requestTelemetry.upstreamFailed(failure));
+            yield* settleAttempt(
+              options.settlements,
+              authentication.authorization,
+              "transport_failed",
+            );
             yield* releaseLeaseOnce;
             yield* diagnostic(requestTelemetry.end({
               status: 502,
@@ -339,6 +367,11 @@ export const makeAIForwardHandler = Effect.fn(
             }))
             : undefined;
           if (observerResult !== undefined && Result.isFailure(observerResult)) {
+            yield* settleAttempt(
+              options.settlements,
+              authentication.authorization,
+              "transport_failed",
+            );
             yield* releaseLeaseOnce;
             return jsonResponse(503, "accounting_unavailable");
           }
@@ -378,6 +411,11 @@ export const makeAIForwardHandler = Effect.fn(
             responseHeaders,
           ));
           if (Result.isFailure(responseResult)) {
+            yield* settleAttempt(
+              options.settlements,
+              authentication.authorization,
+              "transport_failed",
+            );
             yield* releaseLeaseOnce;
             return jsonResponse(502, "invalid_provider_response");
           }
@@ -420,13 +458,6 @@ function authenticateClient(
   url: URL,
   now: Effect.Effect<number>,
 ): Effect.Effect<ClientAuthenticationResult> {
-  if (authentication.kind === "shared_token") {
-    return Effect.succeed(
-      isClientAuthorized(request, authentication.token)
-        ? { authenticated: true, authorization: undefined }
-        : { authenticated: false, status: 401 },
-    );
-  }
   return Effect.gen(function*() {
     const currentTime = yield* now;
     const body = request.headers.get("x-agentos-authz-principal-kind") ===
@@ -482,15 +513,35 @@ function authorizationFailureStatus(
     : 401;
 }
 
-function isClientAuthorized(request: Request, expected: string): boolean {
-  if (expected.length === 0) return false;
-  const dedicated = request.headers.get("x-ai-gateway-token")?.trim();
-  const authorization = request.headers.get("authorization")?.trim();
-  const bearer = authorization?.toLowerCase().startsWith("bearer ")
-    ? authorization.slice(7).trim()
-    : undefined;
-  const actual = dedicated ?? bearer ?? "";
-  return timingSafeStringEqual(actual, expected);
+const WorkloadResponsesRequestSchema = Schema.fromJsonString(Schema.Struct({
+  model: Schema.String,
+  max_output_tokens: Schema.Number.pipe(
+    Schema.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  ),
+}));
+
+function validateWorkloadRequestCeiling(
+  request: Request,
+  grant: Extract<ProviderAuthorizationGrantV1, { readonly model: string }>,
+) {
+  return Effect.tryPromise({
+    try: () => request.clone().text(),
+    catch: () => AIForwardConfigurationError.make({ code: "invalid_configuration" }),
+  }).pipe(
+    Effect.flatMap((body) =>
+      Schema.decodeUnknownEffect(WorkloadResponsesRequestSchema)(body).pipe(
+        Effect.map((payload) => ({ body, payload })),
+      )
+    ),
+    Effect.filterOrFail(
+      ({ body, payload }) =>
+        payload.model === grant.model &&
+        new TextEncoder().encode(body).byteLength + payload.max_output_tokens <=
+          grant.limits.maximumTokens,
+      () => AIForwardConfigurationError.make({ code: "invalid_configuration" }),
+    ),
+    Effect.asVoid,
+  );
 }
 
 function makeUpstreamRequest(
@@ -585,7 +636,17 @@ function finalizeStream(
             forwardOutcome: streamOutcome(exit),
             ...usage.value,
           });
+        } else {
+          yield* reportSettlement(
+            settlements,
+            zeroUsageReport(authorization.decisionRef, streamOutcome(exit)),
+          );
         }
+      } else {
+        yield* reportSettlement(
+          settlements,
+          zeroUsageReport(authorization.decisionRef, streamOutcome(exit)),
+        );
       }
     }
     yield* releaseStreamLease;
@@ -610,12 +671,24 @@ function settleWithoutBody(
   authorization: ProviderAuthorizationGrantV1 | undefined,
   status: number,
 ) {
-  return authorization !== undefined && status >= 400
-    ? reportSettlement(
+  return settleAttempt(
+    settlements,
+    authorization,
+    status >= 400 ? "provider_rejected" : "completed",
+  );
+}
+
+function settleAttempt(
+  settlements: ProviderBudgetSettlementReporter["Service"],
+  authorization: ProviderAuthorizationGrantV1 | undefined,
+  outcome: ProviderBudgetSettlementReportV1["forwardOutcome"],
+) {
+  return authorization === undefined
+    ? Effect.void
+    : reportSettlement(
       settlements,
-      zeroUsageReport(authorization.decisionRef, "provider_rejected"),
-    )
-    : Effect.void;
+      zeroUsageReport(authorization.decisionRef, outcome),
+    );
 }
 
 function zeroUsageReport(
@@ -638,6 +711,7 @@ function reportSettlement(
   report: ProviderBudgetSettlementReportV1,
 ) {
   return settlements.report(report).pipe(
+    Effect.retry({ times: 2 }),
     Effect.asVoid,
     Effect.catchCause(() => Effect.void),
     Effect.uninterruptible,

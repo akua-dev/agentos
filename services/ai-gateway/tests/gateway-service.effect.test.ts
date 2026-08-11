@@ -122,7 +122,7 @@ function providerRequest(
   return new Request("http://ai-gateway.test/v1/responses", {
     method: "POST",
     headers,
-    body: JSON.stringify({ model: "gpt-test", stream: true }),
+    body: JSON.stringify({ model: "gpt-test", max_output_tokens: 100, stream: true }),
   });
 }
 

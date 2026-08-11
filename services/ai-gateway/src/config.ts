@@ -29,12 +29,6 @@ const RawConfig = Config.all({
   gracefulShutdownMillis: Config.int(
     "AI_GATEWAY_GRACEFUL_SHUTDOWN_MILLIS",
   ).pipe(Config.withDefault(defaultAIGatewayGracefulShutdownMillis)),
-  clientAuthenticationMode: Config.string(
-    "AI_GATEWAY_CLIENT_AUTH_MODE",
-  ).pipe(Config.withDefault("shared_token")),
-  clientToken: Config.redacted("AI_GATEWAY_TOKEN").pipe(
-    Config.withDefault(Redacted.make("")),
-  ),
   operatorToken: Config.redacted("AI_GATEWAY_OPERATOR_TOKEN").pipe(
     Config.withDefault(Redacted.make("")),
   ),
@@ -92,8 +86,6 @@ export interface AIGatewayConfig {
   readonly port: number;
   readonly idleTimeoutSeconds: number;
   readonly gracefulShutdownMillis: number;
-  readonly clientAuthenticationMode: "shared_token" | "workload_identity";
-  readonly clientToken: Redacted.Redacted<string>;
   readonly operatorToken: Redacted.Redacted<string>;
   readonly allowApiKeyFallback: boolean;
   readonly openAIApiKey: Redacted.Redacted<string>;
@@ -107,14 +99,7 @@ export interface AIGatewayConfig {
   readonly settlementMaximumResponseBytes: number;
 }
 
-export type AIGatewayServeAuthentication =
-  | {
-      readonly kind: "shared_token";
-      readonly token: Redacted.Redacted<string>;
-    }
-  | {
-      readonly kind: "workload_identity";
-    };
+export type AIGatewayServeAuthentication = { readonly kind: "workload_identity" };
 
 export interface AIGatewayServeConfig extends AIGatewayConfig {
   readonly authentication: AIGatewayServeAuthentication;
@@ -133,18 +118,12 @@ export const loadAIGatewayConfig = Effect.fn(
   if (!validConfiguration(raw, stateDirectory)) {
     return yield* aiGatewayEntrypointError("invalid_configuration");
   }
-  const clientAuthenticationMode = raw.clientAuthenticationMode ===
-      "workload_identity"
-    ? "workload_identity"
-    : "shared_token";
   return {
     stateDirectory,
     hostname: raw.hostname,
     port: raw.port,
     idleTimeoutSeconds: raw.idleTimeoutSeconds,
     gracefulShutdownMillis: raw.gracefulShutdownMillis,
-    clientAuthenticationMode,
-    clientToken: raw.clientToken,
     operatorToken: raw.operatorToken,
     allowApiKeyFallback: raw.allowApiKeyFallback,
     openAIApiKey: raw.openAIApiKey,
@@ -162,21 +141,8 @@ export const loadAIGatewayConfig = Effect.fn(
 export const requireAIGatewayServeConfig = Effect.fn(
   "agentos.aiGateway.requireServeConfig",
 )(function*(config: AIGatewayConfig) {
-  const clientToken = Redacted.value(config.clientToken);
-  const configuredOperatorToken = Redacted.value(config.operatorToken);
-  const operatorToken = configuredOperatorToken === ""
-    ? config.clientToken
-    : config.operatorToken;
-  if (
-    config.clientAuthenticationMode === "shared_token" &&
-    clientToken === ""
-  ) {
-    return yield* aiGatewayEntrypointError("client_identity_unavailable");
-  }
-  const authentication: AIGatewayServeAuthentication =
-    config.clientAuthenticationMode === "workload_identity"
-      ? { kind: "workload_identity" }
-      : { kind: "shared_token", token: config.clientToken };
+  const operatorToken = config.operatorToken;
+  const authentication: AIGatewayServeAuthentication = { kind: "workload_identity" };
   return {
     ...config,
     authentication,
@@ -188,17 +154,12 @@ function validConfiguration(
   raw: Config.Success<typeof RawConfig>,
   stateDirectory: string,
 ): boolean {
-  const clientToken = Redacted.value(raw.clientToken);
   const operatorToken = Redacted.value(raw.operatorToken);
   const openAIApiKey = Redacted.value(raw.openAIApiKey);
   return (
-    ["shared_token", "workload_identity"].includes(
-      raw.clientAuthenticationMode,
-    ) &&
     validString(raw.hostname, 253) &&
     validPath(stateDirectory) &&
     validPath(raw.settlementTokenPath) &&
-    validSecret(clientToken) &&
     validSecret(operatorToken) &&
     validSecret(openAIApiKey) &&
     validPositiveInteger(raw.port, 65_535) &&

@@ -251,10 +251,6 @@ describe("optional Fleet AI Gateway", () => {
         environment.AI_GATEWAY_STATE_DIR,
         "/var/lib/ai-gateway",
       );
-      assert.strictEqual(
-        environment.AI_GATEWAY_CLIENT_AUTH_MODE,
-        "workload_identity",
-      );
       assert.deepStrictEqual(environment.AI_GATEWAY_OPERATOR_TOKEN, {
         secretKeyRef: { key: "token", name: "ai-gateway-operator" },
       });

@@ -4,7 +4,11 @@ ALTER TABLE agentos.provider_budget_reservations
   ADD COLUMN workload_principal jsonb,
   ADD COLUMN model text,
   ADD COLUMN effective_limits jsonb,
-  ADD COLUMN policy_expires_at_millis bigint;
+  ADD COLUMN policy_expires_at_millis bigint,
+  ADD COLUMN reserved_tokens bigint CHECK (reserved_tokens > 0),
+  ADD COLUMN reserved_spend_micros bigint CHECK (reserved_spend_micros > 0),
+  ADD COLUMN token_window_started_at_millis bigint,
+  ADD COLUMN spend_window_started_at_millis bigint;
 
 ALTER TABLE agentos.provider_budget_reservations
   DROP CONSTRAINT provider_budget_reservations_subject_check,
@@ -79,6 +83,7 @@ DECLARE
   v_request_start bigint; v_token_start bigint; v_spend_start bigint;
   v_request_end bigint; v_token_end bigint; v_spend_end bigint;
   v_request_consumed bigint; v_token_consumed bigint; v_spend_consumed bigint;
+  v_token_reserved bigint; v_spend_reserved bigint;
   v_active_concurrent bigint; v_concurrency_retry bigint; v_retry bigint;
   v_lease_expires bigint;
 BEGIN
@@ -117,6 +122,11 @@ BEGIN
       OR v_existing.effective_limits <> p_limits
       OR v_existing.policy_expires_at_millis <> p_policy_expires_at_millis THEN
       RAISE EXCEPTION 'workload provider budget decision reference conflicts';
+    END IF;
+    IF v_existing.state <> 'active'
+      OR v_existing.lease_expires_at_millis <= p_now_millis
+      OR v_existing.policy_expires_at_millis <= p_now_millis THEN
+      RAISE EXCEPTION 'workload provider budget reservation is not active';
     END IF;
     RETURN QUERY SELECT 'reserved'::text, v_existing.rate_class,
       NULL::double precision,
@@ -162,12 +172,27 @@ BEGIN
    WHERE budget_key = p_budget_key AND dimension = 'spend'
      AND window_started_at_millis = v_spend_start FOR UPDATE;
 
-  IF v_token_consumed >= (p_limits ->> 'maximumTokens')::bigint
-    OR v_spend_consumed >= (p_limits ->> 'maximumSpendMicros')::bigint THEN
+  SELECT coalesce(sum(reserved_tokens), 0) INTO v_token_reserved
+    FROM agentos.provider_budget_reservations
+   WHERE budget_key = p_budget_key AND state = 'active'
+     AND lease_expires_at_millis > p_now_millis
+     AND token_window_started_at_millis = v_token_start;
+  SELECT coalesce(sum(reserved_spend_micros), 0) INTO v_spend_reserved
+    FROM agentos.provider_budget_reservations
+   WHERE budget_key = p_budget_key AND state = 'active'
+     AND lease_expires_at_millis > p_now_millis
+     AND spend_window_started_at_millis = v_spend_start;
+
+  IF v_token_consumed + v_token_reserved +
+      (p_limits ->> 'maximumTokens')::bigint >
+      (p_limits ->> 'maximumTokens')::bigint
+    OR v_spend_consumed + v_spend_reserved +
+      (p_limits ->> 'maximumSpendMicros')::bigint >
+      (p_limits ->> 'maximumSpendMicros')::bigint THEN
     v_retry := greatest(
-      CASE WHEN v_token_consumed >= (p_limits ->> 'maximumTokens')::bigint
+      CASE WHEN v_token_consumed + v_token_reserved > 0
         THEN v_token_end ELSE 0 END,
-      CASE WHEN v_spend_consumed >= (p_limits ->> 'maximumSpendMicros')::bigint
+      CASE WHEN v_spend_consumed + v_spend_reserved > 0
         THEN v_spend_end ELSE 0 END);
     RETURN QUERY SELECT 'budget_exhausted'::text, p_rate_class,
       v_retry::double precision, v_request_end::double precision,
@@ -202,11 +227,14 @@ BEGIN
     decision_ref, budget_key, workload_principal, provider, credential_domain,
     capability, resource, environment, model, rate_class, effective_limits,
     policy_expires_at_millis, correlation_id, reserved_at_millis,
-    lease_expires_at_millis
+    lease_expires_at_millis, reserved_tokens, reserved_spend_micros,
+    token_window_started_at_millis, spend_window_started_at_millis
   ) VALUES (
     p_decision_ref, p_budget_key, p_principal, p_provider, p_credential_domain,
     p_capability, p_resource, p_environment, p_model, p_rate_class, p_limits,
-    p_policy_expires_at_millis, p_correlation_id, p_now_millis, v_lease_expires
+    p_policy_expires_at_millis, p_correlation_id, p_now_millis, v_lease_expires,
+    (p_limits ->> 'maximumTokens')::bigint,
+    (p_limits ->> 'maximumSpendMicros')::bigint, v_token_start, v_spend_start
   );
   RETURN QUERY SELECT 'reserved'::text, p_rate_class, NULL::double precision,
     v_request_end::double precision, v_token_end::double precision,
@@ -361,6 +389,10 @@ BEGIN
   END IF;
   IF p_settled_at_millis < v_reservation.reserved_at_millis THEN
     RAISE EXCEPTION 'provider budget settlement predates reservation';
+  END IF;
+  IF p_input_tokens + p_output_tokens > v_reservation.reserved_tokens
+    OR p_spend_micros > v_reservation.reserved_spend_micros THEN
+    RAISE EXCEPTION 'provider budget settlement exceeds reservation';
   END IF;
   v_token_start := p_settled_at_millis - mod(p_settled_at_millis,
     (v_reservation.effective_limits ->> 'tokenWindowMillis')::bigint);

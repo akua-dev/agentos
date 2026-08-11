@@ -75,9 +75,7 @@ export const makeAIGatewayApplication = Effect.fn(
     options.maximumUsageEventBytes < 1 ||
     !Number.isSafeInteger(options.usageCacheMillis) ||
     options.usageCacheMillis < 1 ||
-    options.operatorToken.length > 16 * 1_024 ||
-    (options.authentication.kind === "shared_token" &&
-      options.authentication.token.length === 0)
+    options.operatorToken.length > 16 * 1_024
   ) {
     return yield* AIGatewayApplicationError.make({
       code: "invalid_configuration",

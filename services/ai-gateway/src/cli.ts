@@ -101,7 +101,7 @@ export const runAIGatewayCli = Effect.fn(
     const token = operatorCredential(config);
     if (Redacted.value(token) === "") {
       yield* output.error(
-        "AI_GATEWAY_OPERATOR_TOKEN or legacy AI_GATEWAY_TOKEN is required for status",
+        "AI_GATEWAY_OPERATOR_TOKEN is required for status",
       );
       return 1;
     }
@@ -139,11 +139,7 @@ export const runAIGatewayCli = Effect.fn(
       requireAIGatewayServeConfig(config),
     );
     if (Result.isFailure(serveConfigResult)) {
-      yield* output.error(
-        serveConfigResult.failure.code === "client_identity_unavailable"
-          ? "AI_GATEWAY_TOKEN is required to serve"
-          : "ai-gateway serve failed (AIGatewayEntrypointError)",
-      );
+      yield* output.error("ai-gateway serve failed (AIGatewayEntrypointError)");
       return 1;
     }
     const serveConfig = serveConfigResult.success;
@@ -166,9 +162,7 @@ export const runAIGatewayCli = Effect.fn(
 function operatorCredential(
   config: AIGatewayConfig,
 ): Redacted.Redacted<string> {
-  return Redacted.value(config.operatorToken) === ""
-    ? config.clientToken
-    : config.operatorToken;
+  return config.operatorToken;
 }
 
 function exitStatus<A, E extends { readonly _tag: string }, R>(

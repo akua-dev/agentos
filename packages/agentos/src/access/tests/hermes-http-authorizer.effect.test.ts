@@ -132,7 +132,11 @@ function policy(
 }
 
 function request(model = "gpt-5.6-sol") {
-  const body = JSON.stringify({ model, input: "not inspected for authority" });
+  const body = JSON.stringify({
+    model,
+    max_output_tokens: 100,
+    input: "not inspected for authority",
+  });
   return new Request("http://authorizer.test/authorize", {
     method: "POST",
     headers: {
@@ -307,7 +311,11 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
             method: "POST",
             path: "/v1/responses",
             nowMillis: now,
-            body: JSON.stringify({ model: "gpt-5.6-sol" }),
+            body: JSON.stringify({
+              model: "gpt-5.6-sol",
+              max_output_tokens: 100,
+              input: "not inspected for authority",
+            }),
           },
         );
         assert.deepStrictEqual(grant.identity, {

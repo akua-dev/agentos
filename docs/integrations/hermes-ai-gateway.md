@@ -194,6 +194,5 @@ followed.
 ## Operator workflow
 
 Use `$agentos-ai-gateway` for the approval, migration, rollout, verification,
-rollback, and retirement workflow, including migration from the live v0.1.24
-shared-token topology. This page owns only the Hermes client contract and Pod
-wiring.
+rollback, and retirement workflow. This page owns only the Hermes client
+contract and Pod wiring.

@@ -17,6 +17,9 @@ import {
 
 const ResponsesRequestModelSchema = Schema.fromJsonString(Schema.Struct({
   model: Schema.String,
+  max_output_tokens: Schema.Number.pipe(
+    Schema.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  ),
 }));
 
 export class HermesProviderAccessPolicyDependencyUnavailable extends Schema.TaggedErrorClass<HermesProviderAccessPolicyDependencyUnavailable>()(
@@ -137,6 +140,15 @@ export const createHermesProviderAuthorization = Effect.fn(
         capability,
         atMillis: request.atMillis,
       });
+      const requestBytes = new TextEncoder().encode(request.body).byteLength;
+      if (
+        !Number.isSafeInteger(requestBytes) ||
+        requestBytes + payload.max_output_tokens > grant.limits.maximumTokens
+      ) {
+        return yield* HermesProviderAccessPolicyError.make({
+          code: "access_denied",
+        });
+      }
       const authorized: HermesProviderAuthorizationResult = {
         kind: "authorized",
         tokenExpiresAtMillis: bound.tokenExpiresAtMillis,

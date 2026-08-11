@@ -312,7 +312,7 @@ layer(databaseLayer)("durable provider budgets", (it) => {
       assert.match(conflict.message, /decision reference conflicts/);
       assert.strictEqual((yield* reserveWorkload({
         decision: `decision_${"bc".repeat(16)}`,
-      })).outcome, "rate_limited");
+      })).outcome, "budget_exhausted");
       assert.strictEqual((yield* reserveWorkload({
         decision: `decision_${"cd".repeat(16)}`,
         atMillis: now + 15_001,
@@ -352,6 +352,31 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         inputTokens: 81,
       }));
       assert.match(conflict.message, /settlement conflicts/);
+    }));
+
+  it.effect("atomically reserves token and spend capacity and never replays settled work", () =>
+    Effect.gen(function*() {
+      const budgetKey = `budget_${"7".repeat(64)}`;
+      const limits = { ...workloadLimits, maximumConcurrent: 2, maximumTokens: 100, maximumSpendMicros: 100 };
+      const firstDecision = `decision_${"71".repeat(16)}`;
+      const secondDecision = `decision_${"72".repeat(16)}`;
+      assert.strictEqual((yield* reserveWorkload({ decision: firstDecision, budgetKey, limits })).outcome, "reserved");
+      assert.strictEqual((yield* reserveWorkload({ decision: secondDecision, budgetKey, limits })).outcome, "budget_exhausted");
+      yield* settleProvider({ decision: firstDecision, provider: "openai", credentialDomain: "openai-responses", inputTokens: 80, outputTokens: 20, spendMicros: 100 });
+      const replay = yield* Effect.flip(reserveWorkload({ decision: firstDecision, budgetKey, limits }));
+      assert.match(replay.message, /reservation is not active/);
+    }));
+
+  it.effect("rejects settlement larger than the exact token or spend reservation", () =>
+    Effect.gen(function*() {
+      const budgetKey = `budget_${"6".repeat(64)}`;
+      const limits = { ...workloadLimits, maximumTokens: 100, maximumSpendMicros: 100 };
+      const decision = `decision_${"61".repeat(16)}`;
+      yield* reserveWorkload({ decision, budgetKey, limits });
+      const tokenOverage = yield* Effect.flip(settleProvider({ decision, provider: "openai", credentialDomain: "openai-responses", inputTokens: 101 }));
+      assert.match(tokenOverage.message, /exceeds reservation/);
+      const spendOverage = yield* Effect.flip(settleProvider({ decision, provider: "openai", credentialDomain: "openai-responses", spendMicros: 101 }));
+      assert.match(spendOverage.message, /exceeds reservation/);
     }));
 
   it.effect("isolates request and concurrency capacity by durable subject", () =>
