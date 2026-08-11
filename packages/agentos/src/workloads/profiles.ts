@@ -186,7 +186,7 @@ const persistentMateProfile = profileDefinition({
     podLocalHerdr: true,
     stableWorkload: true,
     oneWriter: true,
-    projectedSupervisionIdentity: true,
+    projectedSupervisionIdentity: false,
     longLivedServiceIdentity: true,
   },
   defaults: persistentDefaults,

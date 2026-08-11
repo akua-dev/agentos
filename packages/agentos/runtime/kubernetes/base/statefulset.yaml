@@ -24,6 +24,7 @@ spec:
         app.kubernetes.io/name: agentos-agent
         app.kubernetes.io/part-of: agentos
     spec:
+      automountServiceAccountToken: false
       serviceAccountName: agentos-agent
       terminationGracePeriodSeconds: 30
       securityContext:
@@ -112,9 +113,6 @@ spec:
               mountPath: /home/agent
             - name: tmp
               mountPath: /tmp
-            - name: agentos-egress-identity
-              mountPath: /var/run/secrets/agentos-egress
-              readOnly: true
           livenessProbe:
             exec:
               command:
@@ -140,14 +138,6 @@ spec:
             timeoutSeconds: 3
             failureThreshold: 3
       volumes:
-        - name: agentos-egress-identity
-          projected:
-            defaultMode: 0440
-            sources:
-              - serviceAccountToken:
-                  audience: agentos-egress-authz
-                  expirationSeconds: 600
-                  path: token
         - name: tmp
           emptyDir:
             sizeLimit: 256Mi

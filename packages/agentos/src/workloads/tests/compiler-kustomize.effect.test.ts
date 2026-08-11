@@ -3,10 +3,6 @@ import { assert, layer } from "@effect/vitest";
 import { Effect, FileSystem, Path, Schema } from "effect";
 
 import { renderKustomize } from "../../../../../tooling/testing/kubernetes.ts";
-import {
-  AGENTOS_EGRESS_TOKEN_AUDIENCE,
-  AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
-} from "../../access/identity.ts";
 import { compileAgentWorkloadSpec } from "../compiler.ts";
 
 const packageRootUrl = new URL("../../../", import.meta.url);
@@ -214,43 +210,6 @@ const findStatefulSet = Effect.fn("test.workloadCompiler.findStatefulSet")(
   },
 );
 
-function assertEgressIdentityProjection(pod: PodSpec) {
-  const identityVolume = pod.volumes.find(
-    ({ name }) => name === "agentos-egress-identity",
-  );
-  assert.deepStrictEqual(identityVolume?.projected, {
-    defaultMode: 288,
-    sources: [
-      {
-        serviceAccountToken: {
-          audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
-          expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
-          path: "token",
-        },
-      },
-    ],
-  });
-  for (const container of pod.containers) {
-    assert.deepStrictEqual(
-      container.volumeMounts?.find(({ name }) =>
-        name === "agentos-egress-identity"
-      ),
-      {
-        mountPath: "/var/run/secrets/agentos-egress",
-        name: "agentos-egress-identity",
-        readOnly: true,
-      },
-    );
-  }
-  for (const container of pod.initContainers) {
-    assert.isUndefined(
-      container.volumeMounts?.find(({ name }) =>
-        name === "agentos-egress-identity"
-      ),
-    );
-  }
-}
-
 function assertNoEgressIdentityProjection(pod: PodSpec) {
   assert.isUndefined(
     pod.volumes.find(({ name }) => name === "agentos-egress-identity"),
@@ -343,7 +302,7 @@ layer(BunServices.layer)("AgentWorkloadSpec native Kustomize output", (it) => {
         ],
         plan.summary.profileDefinitionDigest,
       );
-      assert.isTrue(pod.automountServiceAccountToken);
+      assert.isFalse(pod.automountServiceAccountToken);
       assert.strictEqual(pod.serviceAccountName, "agentos-platform-mate");
       assert.deepStrictEqual(
         pod.containers.map(({ args, image, name }) => ({ args, image, name })),
@@ -355,7 +314,7 @@ layer(BunServices.layer)("AgentWorkloadSpec native Kustomize output", (it) => {
       );
       assert.deepStrictEqual(
         pod.initContainers.map(({ image, name }) => ({ image, name })),
-        ["install-tools", "prepare-home", "prepare-github-provider"].map(
+        ["install-tools", "prepare-home"].map(
           (name) => ({ name, image: workloadImage }),
         ),
       );
@@ -370,6 +329,6 @@ layer(BunServices.layer)("AgentWorkloadSpec native Kustomize output", (it) => {
         databaseVolume?.secret?.secretName,
         "agentos-secondmate-postgres",
       );
-      assertEgressIdentityProjection(pod);
+      assertNoEgressIdentityProjection(pod);
     }));
 });
