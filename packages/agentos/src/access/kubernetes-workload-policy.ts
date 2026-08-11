@@ -329,7 +329,8 @@ export const matchHermesProviderAccessConfigMapV1 = Effect.fn(
     binding.disabled ||
     (binding.expiresAtMillis !== null &&
       binding.expiresAtMillis <= target.atMillis) ||
-    provider === undefined
+    provider === undefined ||
+    provider.rateClass === "disabled"
   ) {
     return yield* HermesProviderAccessPolicyError.make({
       code: "access_denied",
