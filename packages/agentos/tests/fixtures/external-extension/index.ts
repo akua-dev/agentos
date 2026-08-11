@@ -1,5 +1,6 @@
 import {
   AGENTOS_EGRESS_TOKEN_AUDIENCE,
+  HERMES_EGRESS_TOKEN_AUDIENCE,
   buildAgentOSStartupPromptEffect,
   decodeHermesProviderAccessConfigMapV1,
   defineAgentOSPiCommandHandler,
@@ -24,6 +25,7 @@ import {
 import { Effect } from "effect";
 
 export const exampleEgressAudience = AGENTOS_EGRESS_TOKEN_AUDIENCE;
+export const exampleHermesEgressAudience = HERMES_EGRESS_TOKEN_AUDIENCE;
 export const exampleHermesPrincipal: KubernetesWorkloadPrincipalV1 = {
   kind: "kubernetes_workload",
   namespace: "hermes-akua",

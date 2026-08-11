@@ -9,8 +9,10 @@ import {
   type HermesProviderAccessGrantV1,
 } from "./kubernetes-workload-policy.ts";
 import {
+  AGENTOS_EGRESS_TOKEN_AUDIENCE,
+  HERMES_EGRESS_TOKEN_AUDIENCE,
   KubernetesBoundServiceAccountAuthenticator,
-  type WorkloadAuthenticationError,
+  WorkloadAuthenticationError,
   type WorkloadIdentityDependencyUnavailable,
 } from "./identity.ts";
 
@@ -41,7 +43,7 @@ export interface HermesProviderAuthorizationRequest {
 }
 
 export type HermesProviderAuthorizationResult =
-  | { readonly kind: "not_bound" }
+  | { readonly kind: "not_selected" }
   | {
       readonly kind: "authorized";
       readonly tokenExpiresAtMillis: number;
@@ -49,8 +51,8 @@ export type HermesProviderAuthorizationResult =
       readonly grant: HermesProviderAccessGrantV1;
     };
 
-const NotBoundHermesProviderAuthorization: HermesProviderAuthorizationResult = {
-  kind: "not_bound",
+const HermesProviderAuthorizationNotSelected: HermesProviderAuthorizationResult = {
+  kind: "not_selected",
 };
 
 export interface HermesProviderAuthorization {
@@ -75,10 +77,36 @@ export const createHermesProviderAuthorization = Effect.fn(
     authorize: Effect.fn("agentos.access.authorizeHermesProvider")(function*(
       request: HermesProviderAuthorizationRequest,
     ) {
-      const bound = yield* boundServiceAccounts.authenticate({
-        bearerToken: request.bearerToken,
-        audience: "agentos-egress-authz",
-      });
+      const authentication = yield* Effect.result(
+        boundServiceAccounts.authenticate({
+          bearerToken: request.bearerToken,
+          audience: HERMES_EGRESS_TOKEN_AUDIENCE,
+        }),
+      );
+      if (authentication._tag === "Failure") {
+        if (
+          authentication.failure instanceof WorkloadAuthenticationError &&
+          (authentication.failure.code === "wrong_audience" ||
+            authentication.failure.code === "token_review_rejected")
+        ) {
+          const legacyAuthentication = yield* Effect.result(
+            boundServiceAccounts.authenticate({
+              bearerToken: request.bearerToken,
+              audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
+            }),
+          );
+          if (legacyAuthentication._tag === "Success") {
+            return HermesProviderAuthorizationNotSelected;
+          }
+          if (
+            !(legacyAuthentication.failure instanceof WorkloadAuthenticationError)
+          ) {
+            return yield* legacyAuthentication.failure;
+          }
+        }
+        return yield* authentication.failure;
+      }
+      const bound = authentication.success;
       const configMap = yield* policies.current;
       const policy = yield* decodeHermesProviderAccessConfigMapV1(configMap);
       const exactBinding = policy.bindings.some((binding) =>
@@ -86,16 +114,9 @@ export const createHermesProviderAuthorization = Effect.fn(
         binding.principal.serviceAccountName === bound.serviceAccountName
       );
       if (!exactBinding) {
-        const targetsHermesPrincipal = policy.bindings.some((binding) =>
-          binding.principal.namespace === bound.kubernetesNamespace ||
-          binding.principal.serviceAccountName === bound.serviceAccountName
-        );
-        if (targetsHermesPrincipal) {
-          return yield* HermesProviderAccessPolicyError.make({
-            code: "binding_not_found",
-          });
-        }
-        return NotBoundHermesProviderAuthorization;
+        return yield* HermesProviderAccessPolicyError.make({
+          code: "binding_not_found",
+        });
       }
       const bindingResult = yield* Effect.result(
         loadHermesProviderAccessConfigMapV1(configMap, {
