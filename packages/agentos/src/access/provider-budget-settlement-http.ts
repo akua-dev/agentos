@@ -16,6 +16,12 @@ import {
   ProviderBudgetSettlementReportV1Schema,
   type ProviderBudgetSettlementReportV1,
 } from "./provider-budget.ts";
+import {
+  ProviderBudgetReservationAcceptanceV1Schema,
+  ProviderBudgetReservationRequestError,
+  ProviderBudgetReservationRequestV1Schema,
+  ProviderBudgetReservationRequester,
+} from "./http-authorizer.ts";
 
 const PositiveInteger = Schema.Number.pipe(
   Schema.check(Schema.isInt(), Schema.isGreaterThan(0)),
@@ -163,6 +169,58 @@ export function makeProviderBudgetSettlementHttpLayer(
         },
       );
 
+      const validate = Effect.fn("agentos.providerBudgetReservation.validate")(
+        function*(untrusted: unknown) {
+          const body = yield* Schema.decodeUnknownEffect(
+            ProviderBudgetReservationRequestV1Schema,
+            { onExcessProperty: "error" },
+          )(untrusted).pipe(Effect.mapError(() =>
+            ProviderBudgetReservationRequestError.make({ code: "rejected" })
+          ));
+          const token = yield* fileSystem.readFileString(options.tokenPath).pipe(
+            Effect.flatMap(validateProjectedToken),
+            Effect.mapError(() =>
+              ProviderBudgetReservationRequestError.make({ code: "unavailable" })
+            ),
+          );
+          let request = HttpClientRequest.post(endpoints.validation).pipe(
+            HttpClientRequest.acceptJson,
+            HttpClientRequest.setHeader("authorization", `Bearer ${token}`),
+          );
+          request = yield* HttpClientRequest.bodyJson(request, body).pipe(
+            Effect.mapError(() =>
+              ProviderBudgetReservationRequestError.make({ code: "rejected" })
+            ),
+          );
+          return yield* client.execute(request).pipe(
+            Effect.flatMap((response) =>
+              response.status >= 200 && response.status < 300
+                ? readBoundedReservationAcceptance(
+                  response,
+                  options.maximumResponseBytes,
+                )
+                : Effect.fail(ProviderBudgetReservationRequestError.make({
+                  code: response.status >= 500 ? "unavailable" : "rejected",
+                }))
+            ),
+            Effect.timeoutOrElse({
+              duration: options.timeoutMillis,
+              orElse: () => ProviderBudgetReservationRequestError.make({
+                code: "unavailable",
+              }),
+            }),
+            Effect.mapError((error) =>
+              error instanceof ProviderBudgetReservationRequestError
+                ? error
+                : ProviderBudgetReservationRequestError.make({
+                  code: "invalid_response",
+                })
+            ),
+            Effect.scoped,
+          );
+        },
+      );
+
       const check = Effect.fn("agentos.providerBudgetSettlement.readiness")(
         function*() {
           const token = yield* fileSystem.readFileString(options.tokenPath).pipe(
@@ -203,6 +261,10 @@ export function makeProviderBudgetSettlementHttpLayer(
           ProviderBudgetSettlementReadiness,
           ProviderBudgetSettlementReadiness.of({ check }),
         ),
+        Context.add(
+          ProviderBudgetReservationRequester,
+          ProviderBudgetReservationRequester.of({ request: validate }),
+        ),
       );
     }),
   );
@@ -226,6 +288,7 @@ function settlementEndpoints(baseUrl: string) {
     }
     return {
       settlement: new URL("/settle", base),
+      validation: new URL("/validate", base),
       readiness: new URL("/readyz/settlement", base),
     };
   });
@@ -321,6 +384,23 @@ function readBoundedSettlementReadiness(
         : settlementHttpError("invalid_response", response.status)
     ),
     Effect.asVoid,
+  );
+}
+
+function readBoundedReservationAcceptance(
+  response: HttpClientResponse.HttpClientResponse,
+  maximumResponseBytes: number,
+) {
+  return readBoundedResponseSource(response, maximumResponseBytes).pipe(
+    Effect.flatMap((source) =>
+      Schema.decodeUnknownEffect(
+        Schema.fromJsonString(ProviderBudgetReservationAcceptanceV1Schema),
+        { onExcessProperty: "error" },
+      )(source)
+    ),
+    Effect.mapError(() => ProviderBudgetReservationRequestError.make({
+      code: "invalid_response",
+    })),
   );
 }
 

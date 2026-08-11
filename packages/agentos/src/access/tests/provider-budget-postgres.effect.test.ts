@@ -12,10 +12,49 @@ import {
   type ProviderBudgetProviderSettlementInputV1,
   type ProviderBudgetReservationInputV1,
   type ProviderBudgetSettlementInputV1,
+  type ProviderBudgetWorkloadReservationInputV1,
 } from "../provider-budget.ts";
 import { ProviderBudgetEnforcerPostgresLayer } from "../provider-budget-postgres.ts";
 
 const now = 1_785_585_600_000;
+const workloadInput = {
+  schemaVersion: 1,
+  decisionRef: `decision_${"a".repeat(32)}`,
+  correlationId: `corr_${"b".repeat(32)}`,
+  principal: {
+    kind: "kubernetes_workload",
+    namespace: "agentos",
+    serviceAccountName: "hermes",
+    serviceAccountUid: "11111111-1111-4111-8111-111111111111",
+    podName: "hermes-0",
+    podUid: "22222222-2222-4222-8222-222222222222",
+    policyRevision: 7,
+    policyResourceVersion: "18422",
+    hermesProfile: "fleet-codex",
+  },
+  provider: "openai",
+  credentialDomain: "openai-responses",
+  capability: "openai.responses.create",
+  resource: {
+    kind: "provider_service",
+    provider: "openai",
+    service: "responses",
+  },
+  environment: "production",
+  model: "gpt-5.6-sol",
+  rateClass: "low",
+  limits: {
+    requestWindowMillis: 60_000,
+    maximumRequests: 12,
+    maximumConcurrent: 2,
+    tokenWindowMillis: 60_000,
+    maximumTokens: 100_000,
+    spendWindowMillis: 3_600_000,
+    maximumSpendMicros: 1_000_000,
+  },
+  policyExpiresAtMillis: now + 60_000,
+  nowMillis: now,
+} satisfies ProviderBudgetWorkloadReservationInputV1;
 const input: ProviderBudgetReservationInputV1 = {
   schemaVersion: 1,
   decisionRef: `decision_${"1".repeat(32)}`,
@@ -96,6 +135,30 @@ function liveLayer(
 }
 
 describe("PostgreSQL provider budget enforcer", () => {
+  it.effect("uses the workload reservation function without a legacy binding", () =>
+    Effect.gen(function*() {
+      const calls: Array<{ readonly statement: string; readonly parameters: ReadonlyArray<unknown> }> = [];
+      const layer = liveLayer((statement, parameters) => {
+        calls.push({ statement, parameters });
+        return Effect.succeed([{
+          outcome: "reserved",
+          effectiveRateClass: "low",
+          retryAtMillis: null,
+          requestWindowEndsAtMillis: now + 60_000,
+          tokenWindowEndsAtMillis: now + 60_000,
+          spendWindowEndsAtMillis: now + 3_600_000,
+          leaseExpiresAtMillis: now + 15_000,
+        }]);
+      });
+      yield* ProviderBudgetEnforcer.pipe(
+        Effect.flatMap((budgets) => budgets.reserveWorkload(workloadInput)),
+        Effect.provide(layer),
+      );
+      assert.match(calls[0]!.statement, /reserve_workload_provider_budget/);
+      assert.notInclude(calls[0]!.statement, "access_bindings");
+      assert.notInclude(calls[0]!.parameters, "binding_");
+    }));
+
   it.effect("reserves one stable subject/route budget through the narrow function", () =>
     Effect.gen(function*() {
       const calls: Array<{

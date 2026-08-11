@@ -139,6 +139,8 @@ function decisionLayer(input?: {
       next: Effect.succeed("44444444444444444444444444444444"),
     }),
     Layer.succeed(ProviderBudgetEnforcer, {
+      validateWorkload: () => Effect.die("workload validation not expected in legacy PDP"),
+      reserveWorkload: () => Effect.die("workload reservation not expected in legacy PDP"),
       reserve: input?.reserve ?? ((reservation) => Effect.succeed({
         schemaVersion: 1,
         decisionRef: reservation.decisionRef,

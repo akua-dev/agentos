@@ -1,10 +1,11 @@
 # Provider budget enforcement
 
-Status: durable enforcement foundation for AgentOS issue #107.
+Status: LC2 workload-principal reservation and broker-validation boundary.
 
-AgentOS reserves governed provider capacity after current PostgreSQL policy and
-higher-consistency OpenFGA authorization succeed, but before it returns an
-authorization grant. PostgreSQL is authoritative; metrics, traces, gateway
+AgentOS reserves governed provider capacity after verified projected Kubernetes
+identity and the current versioned Hermes workload policy succeed, but before
+the egress authorizer returns an authorization grant. PostgreSQL is
+authoritative; metrics, traces, gateway
 process memory, Pod identity and process lifetime are not counters or policy.
 An unavailable budget store therefore fails the governed route closed even
 when telemetry is unavailable.
@@ -19,23 +20,27 @@ The implementation is Effect-native end to end:
 - [`provider-budget-settlement-http.ts`](../../packages/agentos/src/access/provider-budget-settlement-http.ts)
   rereads a rotating audience-bound Pod token for each closed settlement
   report and uses only Effect FileSystem, HTTP, timeout and stream boundaries;
-- [`policy-decision.ts`](../../packages/agentos/src/access/policy-decision.ts)
-  reserves capacity only after exact live policy and OpenFGA checks; and
+- [`http-authorizer.ts`](../../packages/agentos/src/access/http-authorizer.ts)
+  reserves modern Hermes workload capacity before emitting allow headers;
 - [`0020_provider_budget_enforcement.sql`](../../database/migrations/0020_provider_budget_enforcement.sql)
   atomically revalidates the binding and policy, locks deterministic windows,
   records reservations and settlements, and applies First-Mate overrides; and
 - [`0021_provider_budget_provider_settlement.sql`](../../database/migrations/0021_provider_budget_provider_settlement.sql)
   removes subject-bearing settlement authority from the egress-authorizer
-  role and exposes only exact provider/credential-domain settlement.
+  role and exposes only exact provider/credential-domain settlement; and
+- [`0026_workload_provider_budget.sql`](../../database/migrations/0026_workload_provider_budget.sql)
+  evolves that same counter and reservation authority for the full verified
+  Kubernetes workload principal, exact model, route, policy version, finite
+  limits, broker validation and workload settlement.
 
 ## Stable isolation key
 
-The budget key is a one-way digest over the contract version, canonical Mate
-or Assignment subject, provider, credential domain, capability, canonical
-resource and environment. It deliberately excludes decision reference,
-correlation ID, Pod name, Pod UID and ServiceAccount token. A Pod restart or
-identity recreation therefore cannot reset capacity, while two Mates or a Mate
-and Assignment cannot consume each other's counters.
+The supported forwarding key is a one-way digest over the canonical workload
+principal, provider, credential domain, capability, canonical resource and
+environment. The durable reservation additionally records ServiceAccount and
+Pod names and UIDs, policy revision/resource version, Hermes profile, model and
+the exact effective finite limits. Historical Mate/Assignment rows remain
+interpretable, but they are not a callable fallback for modern forwarding.
 
 Dynamic subjects, decisions, correlations and budget keys are persisted only
 where needed for enforcement and bounded audit. They are not metric labels.
@@ -71,7 +76,9 @@ usage becomes authoritative promptly. `agentos-egress-authz` exposes a private
 domain: a dedicated Kubernetes TokenReview audience binds the live Pod and
 ServiceAccount, and a finite registry derives those two authority fields.
 
-The GitHub broker settles after a streamed response terminates, distinguishes
+The AI Gateway validates an exact active reservation with its own projected
+broker identity before selecting or injecting a credential. It and the GitHub
+broker settle after a streamed response terminates, distinguish
 native provider rejection, downstream cancellation and transport failure, and
 uses zero token/spend values. A settlement dependency failure never replaces
 the provider response; the still-active 15-minute lease remains the fail-closed

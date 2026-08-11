@@ -22,6 +22,7 @@ import {
   createProviderAuthorizationHttpHandler,
   decodeProviderAuthorizationGrantHeaders,
 } from "../http-authorizer.ts";
+import type { ProviderBudgetEnforcer } from "../provider-budget.ts";
 
 const now = 1_785_586_000_000;
 const tokenExpiresAtMillis = now + 600_000;
@@ -33,6 +34,23 @@ const limits = {
   maximumTokens: 100_000,
   spendWindowMillis: 3_600_000,
   maximumSpendMicros: 2_000_000,
+};
+const budgets: ProviderBudgetEnforcer["Service"] = {
+  validateWorkload: () => Effect.void,
+  reserveWorkload: (input) => Effect.succeed({
+    schemaVersion: 1,
+    decisionRef: input.decisionRef,
+    budgetKey: `budget_${"7".repeat(64)}`,
+    outcome: "reserved",
+    effectiveRateClass: input.rateClass,
+    requestWindowEndsAtMillis: input.nowMillis + 60_000,
+    tokenWindowEndsAtMillis: input.nowMillis + 60_000,
+    spendWindowEndsAtMillis: input.nowMillis + 3_600_000,
+    leaseExpiresAtMillis: input.policyExpiresAtMillis,
+  }),
+  reserve: () => Effect.die("legacy reservation is not expected"),
+  settle: () => Effect.die("settlement is not expected"),
+  settleProvider: () => Effect.die("provider settlement is not expected"),
 };
 
 const boundIdentity: KubernetesBoundServiceAccountIdentityV1 = {
@@ -199,6 +217,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("44444444444444444444444444444444"),
           hermes,
+          budgets,
         });
         return yield* handler(request());
       }).pipe(Effect.provide(layer));
@@ -250,6 +269,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("44444444444444444444444444444444"),
           hermes,
+          budgets,
         });
         const nonHermesRequest = request();
         nonHermesRequest.headers.set("x-agentos-hermes-profile", "default");
@@ -275,6 +295,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("44444444444444444444444444444444"),
           hermes,
+          budgets,
         });
 
         const response = yield* handler(request());
@@ -315,6 +336,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("44444444444444444444444444444444"),
           hermes,
+          budgets,
         });
         const response = yield* handler(request());
         assert.strictEqual(
@@ -334,6 +356,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("55555555555555555555555555555555"),
           hermes,
+          budgets,
         });
         const forged = request("gpt-4.1");
         forged.headers.set("x-agentos-hermes-profile", "default");
@@ -354,6 +377,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
           hermes,
+          budgets,
         });
         assert.strictEqual((yield* handler(request())).status, 403);
         assert.strictEqual(yield* Ref.get(identityStoreCalls), 0);
@@ -374,6 +398,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
           hermes,
+          budgets,
         });
         assert.strictEqual((yield* handler(request())).status, 403);
         assert.strictEqual(yield* Ref.get(identityStoreCalls), 0);
@@ -394,6 +419,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("66666666666666666666666666666666"),
           hermes,
+          budgets,
         });
         assert.strictEqual((yield* handler(request())).status, 200);
         yield* Ref.set(currentPolicy, policy("18423", null, true));
@@ -416,8 +442,9 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           const handler = yield* createProviderAuthorizationHttpHandler({
             clock: Effect.succeed(now),
             id: Effect.succeed("77777777777777777777777777777777"),
-            hermes,
-          });
+          hermes,
+          budgets,
+        });
           assert.strictEqual((yield* handler(request())).status, 401);
           assert.strictEqual(yield* Ref.get(identityStoreCalls), 0);
         }).pipe(Effect.provide(dependencies(
@@ -464,6 +491,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("77777777777777777777777777777777"),
           hermes,
+          budgets,
         });
         return yield* handler(request());
       }).pipe(Effect.provide(layer));
@@ -483,6 +511,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("88888888888888888888888888888888"),
           hermes,
+          budgets,
         });
         assert.strictEqual((yield* handler(request())).status, 403);
         assert.strictEqual(yield* Ref.get(identityStoreCalls), 0);
@@ -499,6 +528,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           clock: Effect.succeed(now),
           id: Effect.succeed("99999999999999999999999999999999"),
           hermes,
+          budgets,
         });
         assert.strictEqual((yield* handler(request())).status, 503);
         assert.strictEqual(yield* Ref.get(identityStoreCalls), 0);

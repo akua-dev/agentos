@@ -72,7 +72,7 @@ export function makeEgressAuthorizerLiveLayer(
             SELECT
               has_function_privilege(
                 current_user,
-                'agentos.reserve_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,bigint)',
+                'agentos.reserve_workload_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,bigint,bigint)',
                 'EXECUTE'
               )
               AND has_function_privilege(

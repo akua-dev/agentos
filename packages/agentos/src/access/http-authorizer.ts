@@ -19,6 +19,10 @@ import {
 } from "./identity.ts";
 import type { HermesProviderAuthorization } from "./hermes-authorizer.ts";
 import {
+  ProviderBudgetEnforcementError,
+  type ProviderBudgetEnforcer,
+} from "./provider-budget.ts";
+import {
   HermesProviderLimitsV1Schema,
   HermesProviderModelIdSchema,
   normalizeHermesProviderModelId,
@@ -437,6 +441,7 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
   readonly id: Effect.Effect<string, ProviderPolicyDecisionError>;
   readonly telemetry?: ProviderAccessTelemetry["Service"];
   readonly hermes: HermesProviderAuthorization;
+  readonly budgets?: ProviderBudgetEnforcer["Service"];
 }) {
   const clock = options.clock ?? Clock.currentTimeMillis;
   const id = options.id;
@@ -506,6 +511,30 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
         limits: hermes.grant.limits,
       }).pipe(Effect.mapError(() => authorizerError("invalid_grant")));
       if (grant.expiresAtMillis <= issuedAtMillis) return forbiddenResponse();
+      if (
+        options.budgets?.reserveWorkload === undefined ||
+        hermes.workloadIdentity === undefined
+      ) {
+        return unavailableResponse();
+      }
+      yield* options.budgets.reserveWorkload({
+        schemaVersion: 1,
+        decisionRef: grant.decisionRef,
+        correlationId: grant.correlationId,
+        principal: { ...hermes.grant.principal, ...hermes.workloadIdentity },
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        capability: grant.capability === "openai.responses.create"
+          ? "openai.responses.create"
+          : "openai.responses.compact",
+        resource: grant.resource,
+        environment: "production",
+        model: hermes.grant.model,
+        rateClass: grant.rateClass,
+        limits: hermes.grant.limits,
+        policyExpiresAtMillis: grant.expiresAtMillis,
+        nowMillis: issuedAtMillis,
+      });
       if (telemetry !== undefined) yield* telemetry.correlate(grant);
       return new Response(null, {
         status: 200,
@@ -1255,6 +1284,14 @@ function authorizerError(code: ProviderAuthorizationError["code"]) {
 }
 
 function responseForAuthorizationFailure(error: unknown): Response {
+  if (error instanceof ProviderBudgetEnforcementError) {
+    if (error.outcome === "rate_limited" || error.outcome === "budget_exhausted") {
+      return quotaDeniedResponse(error.outcome);
+    }
+    return error.outcome === "rate_class_disabled"
+      ? forbiddenResponse()
+      : unavailableResponse();
+  }
   if (error instanceof ProviderPolicyDecisionError) {
     switch (error.outcome) {
       case "database_unavailable":

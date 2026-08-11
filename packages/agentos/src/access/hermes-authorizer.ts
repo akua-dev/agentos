@@ -46,6 +46,11 @@ export interface HermesProviderAuthorizationResult {
   readonly tokenExpiresAtMillis: number;
   readonly policyExpiresAtMillis: number | null;
   readonly grant: HermesProviderAccessGrantV1;
+  readonly workloadIdentity?: {
+    readonly serviceAccountUid: string;
+    readonly podName: string;
+    readonly podUid: string;
+  };
 }
 
 export interface HermesProviderAuthorization {
@@ -137,6 +142,11 @@ export const createHermesProviderAuthorization = Effect.fn(
         tokenExpiresAtMillis: bound.tokenExpiresAtMillis,
         policyExpiresAtMillis: bindingResult.success.expiresAtMillis,
         grant,
+        workloadIdentity: {
+          serviceAccountUid: bound.serviceAccountUid,
+          podName: bound.kubernetesPod,
+          podUid: bound.podUid,
+        },
       };
       return authorized;
     }),
