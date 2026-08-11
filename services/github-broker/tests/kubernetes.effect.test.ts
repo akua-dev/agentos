@@ -104,12 +104,11 @@ describe("GitHub broker Kubernetes boundary", () => {
       assert.notInclude(rendered, "ClusterRoleBinding");
     }).pipe(Effect.provide(platform)));
 
-  it.effect("gives every Mate type only workload identity and the public CA", () =>
+  it.effect("gives First and Second Mates workload identity and the public CA", () =>
     Effect.gen(function*() {
       for (const directory of [
         "packages/agentos/resources/roles/firstmate/kubernetes/base",
         "packages/agentos/resources/roles/secondmate/kubernetes/base",
-        "packages/agentos/resources/crewmates/default/kubernetes/base",
       ]) {
         const resources = yield* render(directory);
         const rendered = JSON.stringify(resources);
@@ -121,5 +120,22 @@ describe("GitHub broker Kubernetes boundary", () => {
         assert.notInclude(rendered, '"GITHUB_APP_PRIVATE_KEY_FILE"');
         assert.notInclude(rendered, '"GITHUB_APP_ID"');
       }
+    }).pipe(Effect.provide(platform)));
+
+  it.effect("keeps GitHub credential material out of disposable Crewmates", () =>
+    Effect.gen(function*() {
+      const resources = yield* render(
+        "packages/agentos/resources/crewmates/default/kubernetes/base",
+      );
+      const rendered = JSON.stringify(resources);
+      assert.notInclude(rendered, '"agentos.akua.dev/github-client"');
+      assert.notInclude(rendered, '"prepare-github-provider"');
+      assert.notInclude(rendered, '"agentos-github-ca"');
+      assert.notInclude(rendered, '"AGENTOS_GITHUB_');
+      assert.notInclude(rendered, '"AGENTOS_EGRESS_TOKEN_FILE"');
+      assert.notInclude(rendered, '"agentos-egress-identity"');
+      assert.notInclude(rendered, '"secretName":"agentos-github-app"');
+      assert.notInclude(rendered, '"GITHUB_APP_PRIVATE_KEY_FILE"');
+      assert.notInclude(rendered, '"GITHUB_APP_ID"');
     }).pipe(Effect.provide(platform)));
 });

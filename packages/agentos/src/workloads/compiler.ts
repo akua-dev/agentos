@@ -708,11 +708,13 @@ function workloadPatch(
               spec.resources.init,
               environment,
             ),
-            {
-              name: "prepare-github-provider",
-              image: spec.image.reference,
-              imagePullPolicy: spec.image.pullPolicy,
-            },
+            ...(profile.definition.mechanics.projectedSupervisionIdentity
+              ? [{
+                name: "prepare-github-provider",
+                image: spec.image.reference,
+                imagePullPolicy: spec.image.pullPolicy,
+              }]
+              : []),
           ],
           containers: [
             containerPatch(
