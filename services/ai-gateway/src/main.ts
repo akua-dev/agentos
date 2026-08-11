@@ -7,6 +7,8 @@ import * as BunHttpServer from "@effect/platform-bun/BunHttpServer";
 import * as BunPath from "@effect/platform-bun/BunPath";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import {
+  ProviderBudgetReservationRequester,
+  denyProviderBudgetReservationRequester,
   makeProviderBudgetSettlementHttpLayer,
   ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
@@ -233,6 +235,10 @@ function makeAIGatewayRuntimeLive(
             Effect.provideService(AIRoutingState, routing),
             Effect.provideService(AIProviderHttp, provider),
             Effect.provideService(CodexQuota, quota),
+            Effect.provideService(
+              ProviderBudgetReservationRequester,
+              denyProviderBudgetReservationRequester,
+            ),
             Effect.provideService(
               ProviderBudgetSettlementReporter,
               settlementServices.reporter,

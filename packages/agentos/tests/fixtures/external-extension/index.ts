@@ -7,6 +7,10 @@ import {
   loadHermesProviderAccessConfigMapV1,
   matchHermesProviderAccessConfigMapV1,
   ProviderBudgetKeyInputV1Schema,
+  ProviderBudgetReservationRequestError,
+  ProviderBudgetReservationRequester,
+  ProviderBudgetReservationRequestV1Schema,
+  denyProviderBudgetReservationRequester,
   providerBudgetSubjectName,
   registerAgentOSInstructionsEffect,
   registerAgentOSRuntimeEffect,
@@ -32,6 +36,13 @@ export const exampleHermesBudgetSubject = providerBudgetSubjectName(
   exampleHermesPrincipal,
 );
 export const exampleHermesBudgetKeySchema = ProviderBudgetKeyInputV1Schema;
+export const exampleHermesReservationRequestSchema =
+  ProviderBudgetReservationRequestV1Schema;
+export const exampleHermesReservationRequester:
+  ProviderBudgetReservationRequester["Service"] =
+    denyProviderBudgetReservationRequester;
+export const exampleHermesReservationError =
+  ProviderBudgetReservationRequestError.make({ code: "unavailable" });
 export const exampleHermesPolicyDecoders = {
   decode: decodeHermesProviderAccessConfigMapV1,
   load: loadHermesProviderAccessConfigMapV1,

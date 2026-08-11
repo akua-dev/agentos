@@ -1,4 +1,4 @@
-import { Clock, Effect, Encoding, Option, Result, Schema } from "effect";
+import { Clock, Context, Effect, Encoding, Option, Result, Schema } from "effect";
 
 import {
   AccessCapabilityIdSchema,
@@ -73,7 +73,7 @@ const AgentOSProviderAuthorizationGrantV1Schema = Schema.Struct({
   ceiling: AccessCeilingRefV1Schema,
 });
 
-const HermesProviderAuthorizationGrantV1Schema = Schema.Struct({
+export const HermesProviderAuthorizationGrantV1Schema = Schema.Struct({
   ...ProviderAuthorizationGrantCommonV1Fields,
   identity: KubernetesWorkloadPrincipalV1Schema,
   model: HermesProviderModelIdSchema,
@@ -106,6 +106,70 @@ export type ProviderAuthorizedIdentityV1 =
   typeof ProviderAuthorizedIdentityV1Schema.Type;
 export type ProviderAuthorizationGrantV1 =
   typeof ProviderAuthorizationGrantV1Schema.Type;
+
+const reservationSubjectMatchesGrant = Schema.makeFilter((input: {
+  readonly grant: typeof HermesProviderAuthorizationGrantV1Schema.Type;
+  readonly subject: typeof KubernetesWorkloadPrincipalV1Schema.Type;
+}) => sameKubernetesWorkloadPrincipal(input.grant.identity, input.subject), {
+  title: "reservation subject must match the workload grant",
+});
+
+export const ProviderBudgetReservationRequestV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  grant: HermesProviderAuthorizationGrantV1Schema,
+  subject: KubernetesWorkloadPrincipalV1Schema,
+}).pipe(Schema.check(reservationSubjectMatchesGrant));
+
+export const ProviderBudgetReservationAcceptanceV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  outcome: Schema.Literal("reserved"),
+  grant: HermesProviderAuthorizationGrantV1Schema,
+  subject: KubernetesWorkloadPrincipalV1Schema,
+}).pipe(Schema.check(reservationSubjectMatchesGrant));
+
+export type ProviderBudgetReservationRequestV1 =
+  typeof ProviderBudgetReservationRequestV1Schema.Type;
+export type ProviderBudgetReservationAcceptanceV1 =
+  typeof ProviderBudgetReservationAcceptanceV1Schema.Type;
+
+const ProviderBudgetReservationRequestErrorCode = Schema.Literals([
+  "unavailable",
+  "rejected",
+  "invalid_response",
+]);
+
+export class ProviderBudgetReservationRequestError extends Schema.TaggedErrorClass<ProviderBudgetReservationRequestError>()(
+  "ProviderBudgetReservationRequestError",
+  { code: ProviderBudgetReservationRequestErrorCode },
+) {}
+
+export class ProviderBudgetReservationRequester extends Context.Service<
+  ProviderBudgetReservationRequester,
+  {
+    readonly request: (
+      request: ProviderBudgetReservationRequestV1,
+    ) => Effect.Effect<unknown, ProviderBudgetReservationRequestError>;
+  }
+>()("agentos/access/ProviderBudgetReservationRequester") {}
+
+export const denyProviderBudgetReservationRequester =
+  ProviderBudgetReservationRequester.of({
+    request: () => Effect.fail(ProviderBudgetReservationRequestError.make({
+      code: "unavailable",
+    })),
+  });
+
+function sameKubernetesWorkloadPrincipal(
+  left: typeof KubernetesWorkloadPrincipalV1Schema.Type,
+  right: typeof KubernetesWorkloadPrincipalV1Schema.Type,
+): boolean {
+  return left.kind === right.kind &&
+    left.namespace === right.namespace &&
+    left.serviceAccountName === right.serviceAccountName &&
+    left.policyRevision === right.policyRevision &&
+    left.policyResourceVersion === right.policyResourceVersion &&
+    left.hermesProfile === right.hermesProfile;
+}
 
 export type ProviderAuthorizationRouteV1 =
   | {
