@@ -207,7 +207,13 @@ spec:
           podSelector:
             matchLabels:
               agentos.akua.dev/agentgateway-client: "true"
-              app.kubernetes.io/name: agentos-crewmate
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - agentos-crewmate
+                  - agentos-firstmate
+                  - agentos-secondmate
         - namespaceSelector:
             matchLabels:
               agentos.akua.dev/managed-by: agentos-firstmate
