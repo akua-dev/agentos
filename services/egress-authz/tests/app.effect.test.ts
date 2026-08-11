@@ -70,6 +70,11 @@ const hermesAuthorized: HermesProviderAuthorizationResult = {
   kind: "authorized",
   tokenExpiresAtMillis: now + 10_000,
   policyExpiresAtMillis: null,
+  workloadIdentity: {
+    serviceAccountUid: "service-account-uid-1",
+    podName: "worker-0",
+    podUid: "pod-uid-1",
+  },
   grant: {
     decision: "allow",
     principal: {
@@ -152,6 +157,7 @@ function services(options?: {
   readonly decide?: ProviderPolicyDecisionPoint["Service"]["decide"];
   readonly authenticateSettlement?: ProviderBudgetSettlementCallerAuthenticator["Service"]["authenticate"];
   readonly settleProvider?: ProviderBudgetEnforcer["Service"]["settleProvider"];
+  readonly reserveWorkload?: ProviderBudgetEnforcer["Service"]["reserveWorkload"];
   readonly ready?: Effect.Effect<boolean, unknown>;
 }) {
   return Layer.mergeAll(
@@ -176,6 +182,18 @@ function services(options?: {
         (() => Effect.succeed(settlementCaller)),
     }),
     Layer.succeed(ProviderBudgetEnforcer, {
+      validateWorkload: () => Effect.void,
+      reserveWorkload: options?.reserveWorkload ?? ((input) => Effect.succeed({
+        schemaVersion: 1,
+        decisionRef: input.decisionRef,
+        budgetKey: `budget_${"6".repeat(64)}`,
+        outcome: "reserved",
+        effectiveRateClass: input.rateClass,
+        requestWindowEndsAtMillis: input.nowMillis + 60_000,
+        tokenWindowEndsAtMillis: input.nowMillis + 60_000,
+        spendWindowEndsAtMillis: input.nowMillis + 60_000,
+        leaseExpiresAtMillis: input.policyExpiresAtMillis,
+      })),
       reserve: () => Effect.die("reserve is owned by the policy decision point"),
       settle: () => Effect.die("subject settlement is not an HTTP boundary"),
       settleProvider: options?.settleProvider ?? ((input) => Effect.succeed({

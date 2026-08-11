@@ -253,7 +253,107 @@ const settleProvider = Effect.fn("test.providerBudget.settleProvider")(
   },
 );
 
+const workloadPrincipal = {
+  kind: "kubernetes_workload",
+  namespace: "hermes-workers",
+  serviceAccountName: "hermes-codex",
+  serviceAccountUid: "11111111-1111-4111-8111-111111111111",
+  podName: "hermes-0",
+  podUid: "22222222-2222-4222-8222-222222222222",
+  policyRevision: 7,
+  policyResourceVersion: "18422",
+  hermesProfile: "fleet-codex",
+};
+const workloadLimits = {
+  requestWindowMillis: 60_000,
+  maximumRequests: 2,
+  maximumConcurrent: 1,
+  tokenWindowMillis: 60_000,
+  maximumTokens: 1_000,
+  spendWindowMillis: 3_600_000,
+  maximumSpendMicros: 100_000,
+};
+const reserveWorkload = Effect.fn("test.providerBudget.reserveWorkload")(
+  function*(input: {
+    readonly decision: string;
+    readonly budgetKey?: string;
+    readonly principal?: object;
+    readonly limits?: object;
+    readonly rateClass?: string;
+    readonly atMillis?: number;
+  }) {
+    const database = yield* TestDatabase;
+    const rows = yield* database.query<ReservationRow>(`
+      SELECT * FROM agentos.reserve_workload_provider_budget(
+        '${input.decision}', '${input.budgetKey ?? `budget_${"9".repeat(64)}`}',
+        'corr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        '${JSON.stringify(input.principal ?? workloadPrincipal)}'::jsonb,
+        'openai', 'openai-responses', 'openai.responses.create',
+        '{"kind":"provider_service","provider":"openai","service":"responses"}'::jsonb,
+        'production', 'gpt-5.6-sol', '${input.rateClass ?? "low"}',
+        '${JSON.stringify(input.limits ?? workloadLimits)}'::jsonb,
+        ${(input.atMillis ?? now) + 15_000}, ${input.atMillis ?? now}
+      )
+    `);
+    return rows[0]!;
+  },
+);
+
 layer(databaseLayer)("durable provider budgets", (it) => {
+  it.effect("reserves only an exact modern workload decision and reclaims expired concurrency", () =>
+    Effect.gen(function*() {
+      const decision = `decision_${"ab".repeat(16)}`;
+      assert.strictEqual((yield* reserveWorkload({ decision })).outcome, "reserved");
+      assert.strictEqual((yield* reserveWorkload({ decision })).outcome, "reserved");
+      const conflict = yield* Effect.flip(reserveWorkload({
+        decision,
+        principal: { ...workloadPrincipal, podUid: "different-pod-uid" },
+      }));
+      assert.match(conflict.message, /decision reference conflicts/);
+      assert.strictEqual((yield* reserveWorkload({
+        decision: `decision_${"bc".repeat(16)}`,
+      })).outcome, "rate_limited");
+      assert.strictEqual((yield* reserveWorkload({
+        decision: `decision_${"cd".repeat(16)}`,
+        atMillis: now + 15_001,
+      })).outcome, "reserved");
+    }));
+
+  it.effect("settles modern usage exactly once and rejects a conflict", () =>
+    Effect.gen(function*() {
+      const decision = `decision_${"de".repeat(16)}`;
+      yield* reserveWorkload({ decision, budgetKey: `budget_${"8".repeat(64)}` });
+      const first = yield* settleProvider({
+        decision,
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        inputTokens: 80,
+        outputTokens: 20,
+        cachedInputTokens: 10,
+        spendMicros: 5_000,
+      });
+      assert.deepStrictEqual(
+        [first.outcome, first.inputTokens, first.outputTokens, first.spendMicros],
+        ["settled", 80, 20, 5_000],
+      );
+      assert.strictEqual((yield* settleProvider({
+        decision,
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        inputTokens: 80,
+        outputTokens: 20,
+        cachedInputTokens: 10,
+        spendMicros: 5_000,
+      })).outcome, "settled");
+      const conflict = yield* Effect.flip(settleProvider({
+        decision,
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        inputTokens: 81,
+      }));
+      assert.match(conflict.message, /settlement conflicts/);
+    }));
+
   it.effect("isolates request and concurrency capacity by durable subject", () =>
     Effect.gen(function*() {
       const first = yield* reserve({
@@ -491,7 +591,7 @@ layer(databaseLayer)("durable provider budgets", (it) => {
           ) AS "countersSelect",
           has_function_privilege(
             'provider_budget_egress',
-            'agentos.reserve_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,bigint)',
+            'agentos.reserve_workload_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,bigint,bigint)',
             'EXECUTE'
           ) AS "reserveExecute",
           has_function_privilege(

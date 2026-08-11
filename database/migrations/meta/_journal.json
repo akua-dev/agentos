@@ -183,6 +183,13 @@
       "when": 1785747600000,
       "tag": "0025_assignment_execution_epochs",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786464018520,
+      "tag": "0026_workload_provider_budget",
+      "breakpoints": true
     }
   ]
 }

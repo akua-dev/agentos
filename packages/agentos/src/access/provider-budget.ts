@@ -13,6 +13,7 @@ import {
   AccessProviderIdSchema,
   AccessRateClassIdSchema,
   AuthorizationResourceV1Schema,
+  KubernetesWorkloadPrincipalV1Schema,
   authorizationResourceName,
   ProviderBudgetSubjectV1Schema,
   providerBudgetSubjectName,
@@ -49,6 +50,21 @@ const Environment = Schema.NullOr(Schema.String.pipe(
     Schema.isPattern(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/),
   ),
 ));
+const KubernetesUid = Schema.String.pipe(
+  Schema.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+);
+const KubernetesName = Schema.String.pipe(
+  Schema.check(
+    Schema.isMaxLength(63),
+    Schema.isPattern(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/),
+  ),
+);
+const ProviderModel = Schema.String.pipe(
+  Schema.check(
+    Schema.isMaxLength(128),
+    Schema.isPattern(/^[a-z0-9][a-z0-9._:-]*$/),
+  ),
+);
 
 export const ProviderBudgetRateClassV1Schema = Schema.Struct({
   schemaVersion: Schema.Literal(1),
@@ -134,6 +150,68 @@ export const ProviderBudgetReservationInputV1Schema = Schema.Struct({
   resource: AuthorizationResourceV1Schema,
   environment: Environment,
   rateClass: AccessRateClassIdSchema,
+  nowMillis: EpochMillis,
+});
+
+export const ProviderBudgetWorkloadPrincipalV1Schema = Schema.Struct({
+  ...KubernetesWorkloadPrincipalV1Schema.fields,
+  serviceAccountUid: KubernetesUid,
+  podName: KubernetesName,
+  podUid: KubernetesUid,
+});
+
+export const ProviderBudgetWorkloadReservationInputV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  decisionRef: DecisionRef,
+  correlationId: CorrelationId,
+  principal: ProviderBudgetWorkloadPrincipalV1Schema,
+  provider: Schema.Literal("openai"),
+  credentialDomain: Schema.Literal("openai-responses"),
+  capability: Schema.Literals([
+    "openai.responses.create",
+    "openai.responses.compact",
+  ]),
+  resource: AuthorizationResourceV1Schema,
+  environment: Environment,
+  model: ProviderModel,
+  rateClass: AccessRateClassIdSchema,
+  limits: Schema.Struct({
+    requestWindowMillis: SafePositiveInteger,
+    maximumRequests: SafePositiveInteger,
+    maximumConcurrent: SafePositiveInteger,
+    tokenWindowMillis: SafePositiveInteger,
+    maximumTokens: SafePositiveInteger,
+    spendWindowMillis: SafePositiveInteger,
+    maximumSpendMicros: SafePositiveInteger,
+  }),
+  policyExpiresAtMillis: EpochMillis,
+  nowMillis: EpochMillis,
+});
+
+export const ProviderBudgetWorkloadValidationInputV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  decisionRef: DecisionRef,
+  correlationId: CorrelationId,
+  principal: KubernetesWorkloadPrincipalV1Schema,
+  provider: Schema.Literal("openai"),
+  credentialDomain: Schema.Literal("openai-responses"),
+  capability: Schema.Literals([
+    "openai.responses.create",
+    "openai.responses.compact",
+  ]),
+  resource: AuthorizationResourceV1Schema,
+  model: ProviderModel,
+  rateClass: AccessRateClassIdSchema,
+  limits: Schema.Struct({
+    requestWindowMillis: SafePositiveInteger,
+    maximumRequests: SafePositiveInteger,
+    maximumConcurrent: SafePositiveInteger,
+    tokenWindowMillis: SafePositiveInteger,
+    maximumTokens: SafePositiveInteger,
+    spendWindowMillis: SafePositiveInteger,
+    maximumSpendMicros: SafePositiveInteger,
+  }),
+  expiresAtMillis: EpochMillis,
   nowMillis: EpochMillis,
 });
 
@@ -224,6 +302,10 @@ export const ProviderBudgetSettlementV1Schema = Schema.Struct({
 
 export type ProviderBudgetReservationInputV1 =
   typeof ProviderBudgetReservationInputV1Schema.Type;
+export type ProviderBudgetWorkloadReservationInputV1 =
+  typeof ProviderBudgetWorkloadReservationInputV1Schema.Type;
+export type ProviderBudgetWorkloadValidationInputV1 =
+  typeof ProviderBudgetWorkloadValidationInputV1Schema.Type;
 export type ProviderBudgetKeyInputV1 = typeof ProviderBudgetKeyInputV1Schema.Type;
 export type ProviderBudgetReservationV1 =
   typeof ProviderBudgetReservationV1Schema.Type;
@@ -253,6 +335,12 @@ export type ProviderBudgetStoreReservationResult =
   typeof ProviderBudgetStoreReservationResultSchema.Type;
 
 export interface ProviderBudgetStore {
+  readonly reserveWorkload?: (
+    input: ProviderBudgetWorkloadReservationInputV1,
+  ) => Effect.Effect<unknown, unknown>;
+  readonly validateWorkload?: (
+    input: ProviderBudgetWorkloadValidationInputV1,
+  ) => Effect.Effect<unknown, unknown>;
   readonly reserve: (
     input: ProviderBudgetReservationInputV1,
   ) => Effect.Effect<unknown, unknown>;
@@ -286,6 +374,12 @@ export class ProviderBudgetEnforcementError extends Schema.TaggedErrorClass<Prov
 export class ProviderBudgetEnforcer extends Context.Service<
   ProviderBudgetEnforcer,
   {
+    readonly reserveWorkload: (
+      input: ProviderBudgetWorkloadReservationInputV1,
+    ) => Effect.Effect<ProviderBudgetReservationV1, ProviderBudgetEnforcementError>;
+    readonly validateWorkload: (
+      input: ProviderBudgetWorkloadValidationInputV1,
+    ) => Effect.Effect<void, ProviderBudgetEnforcementError>;
     readonly reserve: (
       input: ProviderBudgetReservationInputV1,
     ) => Effect.Effect<
@@ -320,6 +414,58 @@ function enforcementError(
 }
 
 export function makeProviderBudgetEnforcerLayer(store: ProviderBudgetStore) {
+  const validateWorkload = Effect.fn("agentos.providerBudget.validateWorkload")(function*(
+    untrusted: unknown,
+  ) {
+    const input = yield* Schema.decodeUnknownEffect(
+      ProviderBudgetWorkloadValidationInputV1Schema,
+      { onExcessProperty: "error" },
+    )(untrusted).pipe(
+      Effect.mapError(() => enforcementError("invalid_reservation", false)),
+    );
+    if (store.validateWorkload === undefined) {
+      return yield* enforcementError("database_unavailable", true);
+    }
+    const raw = yield* store.validateWorkload(input).pipe(
+      Effect.mapError(() => enforcementError("database_unavailable", true)),
+    );
+    const decoded = yield* Schema.decodeUnknownEffect(
+      Schema.Struct({ outcome: Schema.Literal("active") }),
+      { onExcessProperty: "error" },
+    )(raw).pipe(Effect.mapError(() => enforcementError("policy_stale", false)));
+    return void decoded;
+  });
+  const reserveWorkload = Effect.fn("agentos.providerBudget.reserveWorkload")(function*(
+    untrusted: unknown,
+  ) {
+    const input = yield* Schema.decodeUnknownEffect(
+      ProviderBudgetWorkloadReservationInputV1Schema,
+      { onExcessProperty: "error" },
+    )(untrusted).pipe(
+      Effect.mapError(() => enforcementError("invalid_reservation", false)),
+    );
+    if (input.policyExpiresAtMillis <= input.nowMillis || input.rateClass === "disabled") {
+      return yield* enforcementError("policy_stale", false);
+    }
+    if (store.reserveWorkload === undefined) {
+      return yield* enforcementError("database_unavailable", true);
+    }
+    const raw = yield* store.reserveWorkload(input).pipe(
+      Effect.mapError(() => enforcementError("database_unavailable", true)),
+    );
+    const result = yield* Schema.decodeUnknownEffect(
+      ProviderBudgetStoreReservationResultSchema,
+      { onExcessProperty: "error" },
+    )(raw).pipe(Effect.mapError(() => enforcementError("policy_stale", true)));
+    if (result.outcome !== "reserved") {
+      return yield* enforcementError(
+        result.outcome,
+        result.outcome !== "rate_class_disabled",
+        result.retryAtMillis,
+      );
+    }
+    return result;
+  });
   const reserve = Effect.fn("agentos.providerBudget.reserve")(function*(
     untrusted: unknown,
   ) {
@@ -389,6 +535,8 @@ export function makeProviderBudgetEnforcerLayer(store: ProviderBudgetStore) {
   });
 
   return Layer.succeed(ProviderBudgetEnforcer, {
+    validateWorkload,
+    reserveWorkload,
     reserve,
     settle,
     settleProvider,

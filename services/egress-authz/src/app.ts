@@ -4,6 +4,8 @@ import {
   ProviderBudgetSettlementCallerAuthenticator,
   ProviderBudgetSettlementCallerAuthenticationError,
   ProviderBudgetSettlementReportV1Schema,
+  ProviderBudgetReservationAcceptanceV1Schema,
+  ProviderBudgetReservationRequestV1Schema,
   ProviderDecisionReferenceGenerator,
   HermesProviderAuthorizer,
   type ProviderAccessTelemetry,
@@ -92,6 +94,7 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
     clock,
     id: decisionReferences.next,
     hermes,
+    budgets: providerBudgets,
     ...(options.telemetry === undefined
       ? {}
       : { telemetry: options.telemetry }),
@@ -135,6 +138,43 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
         decisionRef: result.decisionRef,
         outcome: result.outcome,
       });
+    },
+  );
+
+  const validate = Effect.fn("agentos.egressAuthz.validateProviderBudget")(
+    function*(request: Request) {
+      const bearerToken = settlementBearerToken(request.headers);
+      if (bearerToken === null) return unauthorizedResponse();
+      const caller = yield* settlementCallers.authenticate(bearerToken);
+      if (caller.provider !== "openai" || caller.credentialDomain !== "openai-responses") {
+        return forbiddenResponse();
+      }
+      const body = yield* readReservationValidationRequest(
+        request,
+        limits.maximumSettlementBodyBytes,
+      );
+      yield* providerBudgets.validateWorkload({
+        schemaVersion: 1,
+        decisionRef: body.grant.decisionRef,
+        correlationId: body.grant.correlationId,
+        principal: body.subject,
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        capability: body.grant.capability === "openai.responses.create"
+          ? "openai.responses.create"
+          : "openai.responses.compact",
+        resource: body.grant.resource,
+        model: body.grant.model,
+        rateClass: body.grant.rateClass,
+        limits: body.grant.limits,
+        expiresAtMillis: body.grant.expiresAtMillis,
+        nowMillis: yield* clock,
+      });
+      const acceptance = yield* Schema.decodeUnknownEffect(
+        ProviderBudgetReservationAcceptanceV1Schema,
+        { onExcessProperty: "error" },
+      )({ ...body, outcome: "reserved" });
+      return Response.json(acceptance);
     },
   );
 
@@ -201,18 +241,49 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
       }
       return yield* handleSettlementReadiness(request);
     }
-    if (url.pathname === "/authorize" || url.pathname === "/settle") {
+    if (
+      url.pathname === "/authorize" || url.pathname === "/settle" ||
+      url.pathname === "/validate"
+    ) {
       if (request.method !== "POST") return methodNotAllowedResponse();
       if (!headersWithinLimits(request.headers, limits)) {
         return invalidRequestResponse();
       }
-      return url.pathname === "/authorize"
-        ? yield* handleAuthorization(request)
-        : yield* handleSettlement(request);
+      if (url.pathname === "/authorize") return yield* handleAuthorization(request);
+      if (url.pathname === "/settle") return yield* handleSettlement(request);
+      return yield* permits.withPermitsIfAvailable(1)(
+        validate(request).pipe(
+          Effect.catch((error) =>
+            Effect.succeed(responseForSettlementFailure(error))
+          ),
+          Effect.timeoutOption(limits.requestTimeoutMillis),
+        ),
+      ).pipe(Effect.map((result) => Option.isNone(result)
+        ? overloadedResponse()
+        : Option.match(result.value, {
+          onNone: unavailableResponse,
+          onSome: (response) => response,
+        })));
     }
     return notFoundResponse();
   });
   return handler;
+});
+
+const readReservationValidationRequest = Effect.fn(
+  "agentos.egressAuthz.readReservationValidationRequest",
+)(function*(request: Request, maximumBytes: number) {
+  const text = yield* Effect.tryPromise({
+    try: () => request.text(),
+    catch: () => InvalidSettlementRequest.make(),
+  });
+  if (new TextEncoder().encode(text).byteLength > maximumBytes) {
+    return yield* InvalidSettlementRequest.make();
+  }
+  return yield* Schema.decodeUnknownEffect(
+    Schema.fromJsonString(ProviderBudgetReservationRequestV1Schema),
+    { onExcessProperty: "error" },
+  )(text).pipe(Effect.mapError(() => InvalidSettlementRequest.make()));
 });
 
 export function makeEgressAuthorizerRoutesLayer(
