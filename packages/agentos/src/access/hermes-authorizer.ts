@@ -17,6 +17,7 @@ import {
 
 const ResponsesRequestModelSchema = Schema.fromJsonString(Schema.Struct({
   model: Schema.String,
+  stream: Schema.Literal(true),
   max_output_tokens: Schema.Number.pipe(
     Schema.check(Schema.isInt(), Schema.isGreaterThan(0)),
   ),
@@ -49,6 +50,8 @@ export interface HermesProviderAuthorizationResult {
   readonly tokenExpiresAtMillis: number;
   readonly policyExpiresAtMillis: number | null;
   readonly grant: HermesProviderAccessGrantV1;
+  readonly requestedTokens: number;
+  readonly requestedSpendMicros: number;
   readonly workloadIdentity?: {
     readonly serviceAccountUid: string;
     readonly podName: string;
@@ -141,9 +144,17 @@ export const createHermesProviderAuthorization = Effect.fn(
         atMillis: request.atMillis,
       });
       const requestBytes = new TextEncoder().encode(request.body).byteLength;
+      const requestedTokens = requestBytes + payload.max_output_tokens;
+      const requestedSpendMicros = Math.ceil((
+        requestBytes * grant.pricing.inputMicrosPerMillionTokens +
+        payload.max_output_tokens * grant.pricing.outputMicrosPerMillionTokens
+      ) / 1_000_000);
       if (
         !Number.isSafeInteger(requestBytes) ||
-        requestBytes + payload.max_output_tokens > grant.limits.maximumTokens
+        !Number.isSafeInteger(requestedTokens) || requestedTokens <= 0 ||
+        requestedTokens > grant.limits.maximumTokens ||
+        !Number.isSafeInteger(requestedSpendMicros) || requestedSpendMicros <= 0 ||
+        requestedSpendMicros > grant.limits.maximumSpendMicros
       ) {
         return yield* HermesProviderAccessPolicyError.make({
           code: "access_denied",
@@ -154,6 +165,8 @@ export const createHermesProviderAuthorization = Effect.fn(
         tokenExpiresAtMillis: bound.tokenExpiresAtMillis,
         policyExpiresAtMillis: bindingResult.success.expiresAtMillis,
         grant,
+        requestedTokens,
+        requestedSpendMicros,
         workloadIdentity: {
           serviceAccountUid: bound.serviceAccountUid,
           podName: bound.kubernetesPod,

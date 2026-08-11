@@ -33,6 +33,11 @@ const validPolicy = {
             spendWindowMillis: 3_600_000,
             maximumSpendMicros: 10_000_000,
           },
+          pricing: {
+            version: 1,
+            inputMicrosPerMillionTokens: 2_000_000,
+            outputMicrosPerMillionTokens: 8_000_000,
+          },
         },
       ],
       expiresAtMillis: null,
@@ -218,7 +223,8 @@ describe("Hermes Kubernetes workload provider policy", () => {
         model: "gpt-5.6-sol",
         capability: "responses.create",
         rateClass: "standard",
-        limits: validPolicy.bindings[0]?.providers[0]?.limits,
+        limits: validPolicy.bindings[0]!.providers[0]!.limits,
+        pricing: validPolicy.bindings[0]!.providers[0]!.pricing,
       });
     }));
 

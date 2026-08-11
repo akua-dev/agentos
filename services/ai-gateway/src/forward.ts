@@ -515,6 +515,7 @@ function authorizationFailureStatus(
 
 const WorkloadResponsesRequestSchema = Schema.fromJsonString(Schema.Struct({
   model: Schema.String,
+  stream: Schema.Literal(true),
   max_output_tokens: Schema.Number.pipe(
     Schema.check(Schema.isInt(), Schema.isGreaterThan(0)),
   ),
@@ -535,9 +536,21 @@ function validateWorkloadRequestCeiling(
     ),
     Effect.filterOrFail(
       ({ body, payload }) =>
-        payload.model === grant.model &&
-        new TextEncoder().encode(body).byteLength + payload.max_output_tokens <=
-          grant.limits.maximumTokens,
+        payload.model === grant.model && (() => {
+          const inputCeiling = new TextEncoder().encode(body).byteLength;
+          const requestedTokens = inputCeiling + payload.max_output_tokens;
+          const requestedSpendMicros = pricedSpend(
+            inputCeiling,
+            payload.max_output_tokens,
+            grant.pricing.inputMicrosPerMillionTokens,
+            grant.pricing.outputMicrosPerMillionTokens,
+          );
+          return Number.isSafeInteger(requestedTokens) &&
+            requestedTokens === grant.requestedTokens &&
+            requestedTokens <= grant.limits.maximumTokens &&
+            requestedSpendMicros === grant.requestedSpendMicros &&
+            requestedSpendMicros <= grant.limits.maximumSpendMicros;
+        })(),
       () => AIForwardConfigurationError.make({ code: "invalid_configuration" }),
     ),
     Effect.asVoid,
@@ -630,18 +643,31 @@ function finalizeStream(
       } else if (observer !== undefined) {
         const usage = yield* Effect.option(observer.finish);
         if (Option.isSome(usage)) {
+          const spendMicros = "model" in authorization
+            ? pricedSpend(
+              usage.value.inputTokens,
+              usage.value.outputTokens,
+              authorization.pricing.inputMicrosPerMillionTokens,
+              authorization.pricing.outputMicrosPerMillionTokens,
+            )
+            : usage.value.spendMicros;
           yield* reportSettlement(settlements, {
             schemaVersion: 1,
             decisionRef: authorization.decisionRef,
             forwardOutcome: streamOutcome(exit),
             ...usage.value,
+            spendMicros,
           });
+        } else if (Exit.isSuccess(exit)) {
+          return yield* Effect.die("successful provider stream omitted terminal usage");
         } else {
-          yield* reportSettlement(
-            settlements,
-            zeroUsageReport(authorization.decisionRef, streamOutcome(exit)),
-          );
+          yield* reportSettlement(settlements, zeroUsageReport(
+            authorization.decisionRef,
+            streamOutcome(exit),
+          ));
         }
+      } else if (status < 400 && Exit.isSuccess(exit)) {
+        return yield* Effect.die("successful provider response was not an accounted event stream");
       } else {
         yield* reportSettlement(
           settlements,
@@ -660,10 +686,24 @@ function finalizeStream(
       ...(failure === undefined ? {} : { error: failure }),
     }));
   }).pipe(
-    Effect.catchCause(() => releaseStreamLease),
-    Effect.catchCause(() => Effect.void),
+    Effect.catchCause((cause) =>
+      releaseStreamLease.pipe(Effect.andThen(Effect.failCause(cause)))
+    ),
     Effect.uninterruptible,
   );
+}
+
+function pricedSpend(
+  inputTokens: number,
+  outputTokens: number,
+  inputMicrosPerMillionTokens: number,
+  outputMicrosPerMillionTokens: number,
+) {
+  const numerator = inputTokens * inputMicrosPerMillionTokens +
+    outputTokens * outputMicrosPerMillionTokens;
+  return Number.isSafeInteger(numerator) && numerator > 0
+    ? Math.ceil(numerator / 1_000_000)
+    : Number.NaN;
 }
 
 function settleWithoutBody(
@@ -712,8 +752,8 @@ function reportSettlement(
 ) {
   return settlements.report(report).pipe(
     Effect.retry({ times: 2 }),
+    Effect.orDie,
     Effect.asVoid,
-    Effect.catchCause(() => Effect.void),
     Effect.uninterruptible,
   );
 }

@@ -59,6 +59,11 @@ export const HermesProviderRuleV1Schema = Schema.Struct({
   ),
   rateClass: AccessRateClassIdSchema,
   limits: HermesProviderLimitsV1Schema,
+  pricing: Schema.Struct({
+    version: PositiveInt,
+    inputMicrosPerMillionTokens: PositiveInt,
+    outputMicrosPerMillionTokens: PositiveInt,
+  }),
 });
 
 export const HermesProviderAccessBindingDocumentV1Schema = Schema.Struct({
@@ -250,6 +255,7 @@ export const HermesProviderAccessGrantV1Schema = Schema.Struct({
   capability: Schema.Literals(["responses.create", "responses.compact"]),
   rateClass: AccessRateClassIdSchema,
   limits: HermesProviderLimitsV1Schema,
+  pricing: HermesProviderRuleV1Schema.fields.pricing,
 });
 export type HermesProviderAccessGrantV1 =
   typeof HermesProviderAccessGrantV1Schema.Type;
@@ -345,6 +351,7 @@ export const matchHermesProviderAccessConfigMapV1 = Effect.fn(
     capability: target.capability,
     rateClass: provider.rateClass,
     limits: provider.limits,
+    pricing: provider.pricing,
   } satisfies HermesProviderAccessGrantV1;
 });
 

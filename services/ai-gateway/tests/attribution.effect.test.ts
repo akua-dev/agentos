@@ -73,6 +73,9 @@ function workloadGrant(): Extract<
       spendWindowMillis: 3_600_000,
       maximumSpendMicros: 2_000_000,
     },
+    pricing: { version: 1, inputMicrosPerMillionTokens: 2_000_000, outputMicrosPerMillionTokens: 8_000_000 },
+    requestedTokens: 1_024,
+    requestedSpendMicros: 8_192,
   };
 }
 

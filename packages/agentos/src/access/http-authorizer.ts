@@ -23,6 +23,7 @@ import {
   type ProviderBudgetEnforcer,
 } from "./provider-budget.ts";
 import {
+  HermesProviderAccessGrantV1Schema,
   HermesProviderLimitsV1Schema,
   HermesProviderModelIdSchema,
   normalizeHermesProviderModelId,
@@ -79,6 +80,9 @@ export const HermesProviderAuthorizationGrantV1Schema = Schema.Struct({
   identity: KubernetesWorkloadPrincipalV1Schema,
   model: HermesProviderModelIdSchema,
   limits: HermesProviderLimitsV1Schema,
+  pricing: HermesProviderAccessGrantV1Schema.fields.pricing,
+  requestedTokens: EpochMillis,
+  requestedSpendMicros: EpochMillis,
 });
 
 export const ProviderAuthorizationGrantV1Schema = Schema.Union([
@@ -317,6 +321,11 @@ export function providerAuthorizationGrantHeaders(
     headers.set("x-agentos-authz-maximum-tokens", String(grant.limits.maximumTokens));
     headers.set("x-agentos-authz-spend-window-millis", String(grant.limits.spendWindowMillis));
     headers.set("x-agentos-authz-maximum-spend-micros", String(grant.limits.maximumSpendMicros));
+    headers.set("x-agentos-authz-pricing-version", String(grant.pricing.version));
+    headers.set("x-agentos-authz-input-micros-per-million-tokens", String(grant.pricing.inputMicrosPerMillionTokens));
+    headers.set("x-agentos-authz-output-micros-per-million-tokens", String(grant.pricing.outputMicrosPerMillionTokens));
+    headers.set("x-agentos-authz-requested-tokens", String(grant.requestedTokens));
+    headers.set("x-agentos-authz-requested-spend-micros", String(grant.requestedSpendMicros));
   } else {
     headers.set("x-agentos-authz-principal-kind", "agentos");
     headers.set("x-agentos-authz-agent-id", grant.identity.agentId);
@@ -509,6 +518,9 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
         rateClass: hermes.grant.rateClass,
         model: hermes.grant.model,
         limits: hermes.grant.limits,
+        pricing: hermes.grant.pricing,
+        requestedTokens: hermes.requestedTokens,
+        requestedSpendMicros: hermes.requestedSpendMicros,
       }).pipe(Effect.mapError(() => authorizerError("invalid_grant")));
       if (grant.expiresAtMillis <= issuedAtMillis) return forbiddenResponse();
       if (
@@ -532,7 +544,10 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
         model: hermes.grant.model,
         rateClass: grant.rateClass,
         limits: hermes.grant.limits,
+        pricing: hermes.grant.pricing,
         policyExpiresAtMillis: grant.expiresAtMillis,
+        requestedTokens: hermes.requestedTokens,
+        requestedSpendMicros: hermes.requestedSpendMicros,
         nowMillis: issuedAtMillis,
       });
       if (telemetry !== undefined) yield* telemetry.correlate(grant);
@@ -1253,6 +1268,22 @@ function authorizationPolicyFieldsFromHeaders(headers: Headers) {
           "x-agentos-authz-maximum-spend-micros",
         ),
       },
+      pricing: {
+        version: integerHeader(headers, "x-agentos-authz-pricing-version"),
+        inputMicrosPerMillionTokens: integerHeader(
+          headers,
+          "x-agentos-authz-input-micros-per-million-tokens",
+        ),
+        outputMicrosPerMillionTokens: integerHeader(
+          headers,
+          "x-agentos-authz-output-micros-per-million-tokens",
+        ),
+      },
+      requestedTokens: integerHeader(headers, "x-agentos-authz-requested-tokens"),
+      requestedSpendMicros: integerHeader(
+        headers,
+        "x-agentos-authz-requested-spend-micros",
+      ),
     };
   }
   return {

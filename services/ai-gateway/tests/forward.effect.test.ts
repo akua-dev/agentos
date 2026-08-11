@@ -73,6 +73,8 @@ function workloadGrant(): Extract<
   ProviderAuthorizationGrantV1,
   { readonly model: string }
 > {
+  const body = JSON.stringify({ model: "gpt-policy", stream: true, max_output_tokens: 100 });
+  const inputTokens = new TextEncoder().encode(body).byteLength;
   return {
     schemaVersion: 1,
     correlationId: "corr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -104,6 +106,9 @@ function workloadGrant(): Extract<
       spendWindowMillis: 3_600_000,
       maximumSpendMicros: 2_000_000,
     },
+    pricing: { version: 1, inputMicrosPerMillionTokens: 2_000_000, outputMicrosPerMillionTokens: 8_000_000 },
+    requestedTokens: inputTokens + 100,
+    requestedSpendMicros: Math.ceil((inputTokens * 2_000_000 + 100 * 8_000_000) / 1_000_000),
   };
 }
 
@@ -119,7 +124,7 @@ function gatewayRequest(
   return new Request("http://ai-gateway.test/v1/responses", {
     method: "POST",
     headers,
-    body: JSON.stringify({ model: "gpt-test", stream: true }),
+    body: JSON.stringify({ model: "gpt-test", stream: true, max_output_tokens: 100 }),
   });
 }
 
@@ -328,9 +333,8 @@ describe("Effect AI Gateway forwarding", () => {
       ]);
     }));
 
-  it.effect("traces a successful non-streaming response through lease release", () =>
+  it.effect("rejects a non-streaming workload before credential or provider access", () =>
     Effect.gen(function*() {
-      const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
       const spans: Array<Tracer.NativeSpan> = [];
       const tracer = Tracer.make({
@@ -343,44 +347,26 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeAIGatewayTelemetry();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: acquireLease(route.lease),
+        acquire: () => Effect.die("non-streaming request must not acquire credentials"),
         provider: AIProviderHttp.of({
-          execute: () => Effect.succeed({
-            status: 200,
-            headers: { "content-type": "application/json" },
-            body: Stream.make(encoder.encode('{"id":"response-safe"}')),
-          }),
+          execute: () => Effect.die("non-streaming request must not reach provider"),
         }),
         settlements: settlement.settlements,
         now: Effect.succeed(now),
         heartbeatMillis: 40_000,
         maximumUsageEventBytes: 4_096,
       }).pipe(Effect.provideService(AIGatewayTelemetry, telemetry));
-      const base = gatewayRequest();
+      const base = gatewayRequest(workloadGrant());
       const headers = new Headers(base.headers);
       headers.set("x-agentos-stream-mode", "non_streaming");
       const request = new Request(base.url, {
         method: "POST",
         headers,
-        body: JSON.stringify({ model: "gpt-test", stream: false }),
+        body: JSON.stringify({ model: "gpt-policy", stream: false, max_output_tokens: 100 }),
       });
       const response = yield* handler(request).pipe(Effect.withTracer(tracer));
-      assert.strictEqual(
-        yield* Effect.tryPromise(() => response.text()),
-        '{"id":"response-safe"}',
-      );
-      assert.strictEqual(yield* Ref.get(route.releases), 1);
-      assert.include(spans.map(({ name }) => name), "ai-gateway.route.release");
-      assert.strictEqual(
-        spans.find(({ name }) => name === "ai-gateway.request")
-          ?.attributes.get("agentos.ai.stream.mode"),
-        "non_streaming",
-      );
-      assert.strictEqual(
-        spans.find(({ name }) => name === "ai-gateway.stream")
-          ?.attributes.get("agentos.ai.stream.outcome"),
-        "completed",
-      );
+      assert.strictEqual(response.status, 403);
+      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
     }));
 
   it.effect("ends telemetry at authentication rejection without starting a route", () =>
@@ -440,6 +426,38 @@ describe("Effect AI Gateway forwarding", () => {
         maximumUsageEventBytes: 4_096,
       });
       assert.strictEqual((yield* handler(gatewayRequest(workloadGrant()))).status, 403);
+    }));
+
+  it.effect("revalidates the exact modern ceiling and settles policy-priced usage", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const settlement = yield* makeSettlementRecorder();
+      const authorization = workloadGrant();
+      const headers = providerAuthorizationGrantHeaders(authorization);
+      headers.set("authorization", "Bearer projected-workload-token");
+      headers.set("content-type", "application/json");
+      const request = new Request("http://ai-gateway.test/v1/responses", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ model: "gpt-policy", stream: true, max_output_tokens: 100 }),
+      });
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: acquireLease(route.lease),
+        provider: AIProviderHttp.of({ execute: () => Effect.succeed({
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+          body: Stream.make(encoder.encode(completedEvent)),
+        }) }),
+        settlements: settlement.settlements,
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const response = yield* handler(request);
+      yield* Effect.tryPromise(() => response.arrayBuffer());
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.spendMicros, 134);
     }));
 
   it.effect("ends telemetry for an invalid explicit session before acquisition", () =>
@@ -683,7 +701,7 @@ describe("Effect AI Gateway forwarding", () => {
       }]);
     }));
 
-  it.effect("settles a successful stream even when terminal usage is unavailable", () =>
+  it.effect("fails a nominally successful stream closed when terminal usage is unavailable", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
@@ -705,9 +723,10 @@ describe("Effect AI Gateway forwarding", () => {
         maximumUsageEventBytes: 4_096,
       });
       const response = yield* handler(gatewayRequest());
-      yield* Effect.tryPromise(() => response.arrayBuffer());
+      const read = yield* Effect.exit(Effect.tryPromise(() => response.arrayBuffer()));
+      assert.strictEqual(read._tag, "Failure");
       assert.strictEqual(yield* Ref.get(route.releases), 1);
-      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "completed");
+      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
     }));
 
   it.effect("settles provider rejections with zero usage and preserves their status/body", () =>
@@ -1325,7 +1344,7 @@ describe("Effect AI Gateway forwarding", () => {
       ]);
     }));
 
-  it.effect("never replaces a completed provider stream with settlement failure", () =>
+  it.effect("fails the client stream closed when settlement fails after every retry", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlementAttempts = yield* Ref.make(0);
@@ -1355,10 +1374,8 @@ describe("Effect AI Gateway forwarding", () => {
         maximumUsageEventBytes: 4_096,
       });
       const response = yield* handler(gatewayRequest());
-      assert.strictEqual(
-        yield* Effect.tryPromise(() => response.text()),
-        completedEvent,
-      );
+      const read = yield* Effect.exit(Effect.tryPromise(() => response.text()));
+      assert.strictEqual(read._tag, "Failure");
       assert.strictEqual(yield* Ref.get(settlementAttempts), 3);
       assert.strictEqual(yield* Ref.get(route.releases), 1);
     }));

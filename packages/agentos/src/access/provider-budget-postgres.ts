@@ -109,7 +109,9 @@ export const ProviderBudgetEnforcerPostgresLayer = Layer.unwrap(
           ${input.model},
           ${input.rateClass},
           ${JSON.stringify(input.limits)}::jsonb,
+          ${JSON.stringify(input.pricing)}::jsonb,
           ${input.policyExpiresAtMillis},
+          ${input.requestedTokens}, ${input.requestedSpendMicros},
           ${input.nowMillis}
         )
       `;
@@ -125,6 +127,8 @@ export const ProviderBudgetEnforcerPostgresLayer = Layer.unwrap(
           ${input.provider}, ${input.credentialDomain}, ${input.capability},
           ${JSON.stringify(input.resource)}::jsonb, ${input.model},
           ${input.rateClass}, ${JSON.stringify(input.limits)}::jsonb,
+          ${JSON.stringify(input.pricing)}::jsonb,
+          ${input.requestedTokens}, ${input.requestedSpendMicros},
           ${input.expiresAtMillis}, ${input.nowMillis}
         )
       `;

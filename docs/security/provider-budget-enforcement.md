@@ -38,7 +38,8 @@ The implementation is Effect-native end to end:
 The supported forwarding key is a one-way digest over the canonical workload
 principal, provider, credential domain, capability, canonical resource and
 environment. The durable reservation additionally records ServiceAccount and
-Pod names and UIDs, policy revision/resource version, Hermes profile, model and
+Pod names and UIDs, policy revision/resource version, Hermes profile, model,
+versioned input/output pricing, exact request-specific token/spend ceilings and
 the exact effective finite limits. Historical Mate/Assignment rows remain
 interpretable, but they are not a callable fallback for modern forwarding.
 
@@ -62,13 +63,17 @@ ceiling.
 | `high` | 300 | 32 | 10,000,000 | 100,000,000 micros | 15 minutes |
 
 Request, token and spend windows use epoch-aligned boundaries, so reset time is
-deterministic across replicas and restarts. A reservation consumes one request
-and one concurrency lease. Settlement releases concurrency and records input,
-output, cached-input and spend values exactly once. Cached input is a subset of
-input tokens, not additional token consumption. Exact retries are idempotent;
-conflicting reuse of a decision or operation identity fails closed.
+deterministic across replicas and restarts. A reservation consumes one request,
+one concurrency lease and only the conservative request-specific token/spend
+ceiling derived from the exact streamed Responses body. Settlement charges the
+windows recorded by that reservation, releases only unused capacity and records
+input, output, cached-input and policy-priced spend exactly once. Cached input
+is a subset of input tokens, not additional token consumption. Exact retries
+are idempotent; conflicting reuse of a decision or operation identity fails
+closed.
 
-An expired lease prevents an abandoned call from holding concurrency forever.
+An expired unattempted lease releases concurrency. A reservation claimed for a
+provider attempt remains conservatively liable until terminal settlement.
 Provider components must settle every terminal result (`completed`,
 `cancelled`, `provider_rejected`, or `transport_failed`) so token and spend
 usage becomes authoritative promptly. `agentos-egress-authz` exposes a private
@@ -76,13 +81,15 @@ usage becomes authoritative promptly. `agentos-egress-authz` exposes a private
 domain: a dedicated Kubernetes TokenReview audience binds the live Pod and
 ServiceAccount, and a finite registry derives those two authority fields.
 
-The AI Gateway validates an exact active reservation with its own projected
-broker identity before selecting or injecting a credential. It and the GitHub
-broker settle after a streamed response terminates, distinguish
-native provider rejection, downstream cancellation and transport failure, and
-uses zero token/spend values. A settlement dependency failure never replaces
-the provider response; the still-active 15-minute lease remains the fail-closed
-fallback. The OpenAI adapter remains required before #107 can close.
+The AI Gateway atomically claims an exact active reservation with its own
+projected broker identity before selecting or injecting a credential. The
+modern OpenAI path requires literal `stream:true`, positive
+`max_output_tokens`, an exact model and a pricing-bound request ceiling at both
+boundaries. It settles streamed terminal usage from that pricing, while native
+provider rejection, downstream cancellation and transport failure settle
+known zero usage. Missing terminal usage, a second attempt claim or exhausted
+settlement retries fail the client stream closed and retain conservative
+database liability for deterministic recovery.
 
 ## Surgical kill switches
 
