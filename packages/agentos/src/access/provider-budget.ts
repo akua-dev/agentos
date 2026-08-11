@@ -14,7 +14,8 @@ import {
   AccessRateClassIdSchema,
   AuthorizationResourceV1Schema,
   authorizationResourceName,
-  authorizationSubjectName,
+  ProviderBudgetSubjectV1Schema,
+  providerBudgetSubjectName,
 } from "./contracts.ts";
 
 const SafeNonNegativeInteger = Schema.Number.pipe(
@@ -136,6 +137,15 @@ export const ProviderBudgetReservationInputV1Schema = Schema.Struct({
   nowMillis: EpochMillis,
 });
 
+export const ProviderBudgetKeyInputV1Schema = Schema.Struct({
+  subject: ProviderBudgetSubjectV1Schema,
+  provider: AccessProviderIdSchema,
+  credentialDomain: CredentialDomain,
+  capability: AccessCapabilityIdSchema,
+  resource: AuthorizationResourceV1Schema,
+  environment: Environment,
+});
+
 export const ProviderBudgetReservationV1Schema = Schema.Struct({
   schemaVersion: Schema.Literal(1),
   decisionRef: DecisionRef,
@@ -214,6 +224,7 @@ export const ProviderBudgetSettlementV1Schema = Schema.Struct({
 
 export type ProviderBudgetReservationInputV1 =
   typeof ProviderBudgetReservationInputV1Schema.Type;
+export type ProviderBudgetKeyInputV1 = typeof ProviderBudgetKeyInputV1Schema.Type;
 export type ProviderBudgetReservationV1 =
   typeof ProviderBudgetReservationV1Schema.Type;
 export type ProviderBudgetSettlementInputV1 =
@@ -386,11 +397,11 @@ export function makeProviderBudgetEnforcerLayer(store: ProviderBudgetStore) {
 
 export const providerBudgetKey = Effect.fn(
   "agentos.providerBudget.key",
-)(function*(input: ProviderBudgetReservationInputV1) {
+)(function*<Input extends ProviderBudgetKeyInputV1>(input: Input) {
   const crypto = yield* Crypto.Crypto;
   const source = [
     "agentos-provider-budget-v1",
-    authorizationSubjectName(input.subject),
+    providerBudgetSubjectName(input.subject),
     input.provider,
     input.credentialDomain,
     input.capability,
