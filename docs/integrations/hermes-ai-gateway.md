@@ -12,6 +12,12 @@ the recovery path.
 > fixture or Pod wiring below until a pinned Hermes revision with a verified
 > zero-retry Responses path is available.
 
+Implementation handoff invariant: P3 client and workload integration may
+proceed while Hermes provider forwarding remains fail-closed. P4 must implement
+and independently verify durable shared workload reservation and settlement;
+P5 must not enable Hermes forwarding before that reviewed P4 authority is in
+the production composition.
+
 ## Client contract
 
 The client keeps authority over the exact model and reasoning configuration. It
