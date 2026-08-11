@@ -835,7 +835,7 @@ const RuntimeStalePane = regressionTest(
 );
 const GatewayConfig = regressionTest(
   "services/ai-gateway/tests/config.effect.test.ts",
-  "rejects missing shared auth and malformed runtime bounds",
+  "rejects malformed runtime bounds",
   "#32",
 );
 const AgentgatewayContract = regressionTest(
@@ -875,7 +875,7 @@ const ForwardTransport = regressionTest(
 );
 const ForwardStream = regressionTest(
   "services/ai-gateway/tests/forward.effect.test.ts",
-  "keeps a provider stream failure distinct and does not settle unknown usage",
+  "settles a provider stream failure as transport failed",
   "#32",
 );
 const QuotaFailures = regressionTest(

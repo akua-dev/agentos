@@ -212,14 +212,9 @@ function makeAIGatewayRuntimeLive(
               aiGatewayEntrypointError("invalid_configuration")
             ),
           );
-          const clientAuthentication: AIForwardClientAuthentication =
-            serveConfig.authentication.kind ===
-              "workload_identity"
-            ? { kind: "workload_identity" }
-            : {
-                kind: "shared_token",
-                token: Redacted.value(serveConfig.authentication.token),
-              };
+          const clientAuthentication: AIForwardClientAuthentication = {
+            kind: "workload_identity",
+          };
           const openAIApiKey = Redacted.value(serveConfig.openAIApiKey);
           const application = yield* makeAIGatewayApplication({
             authentication: clientAuthentication,

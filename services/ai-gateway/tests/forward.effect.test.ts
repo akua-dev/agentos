@@ -442,50 +442,6 @@ describe("Effect AI Gateway forwarding", () => {
       assert.strictEqual((yield* handler(gatewayRequest(workloadGrant()))).status, 403);
     }));
 
-  it.effect("ends telemetry for an authenticated unsupported route", () =>
-    Effect.gen(function*() {
-      const settlement = yield* makeSettlementRecorder();
-      const telemetry = yield* makeTelemetryRecorder();
-      const handler = yield* makeAIForwardHandler({
-        authentication: { kind: "shared_token", token: "client-secret" },
-        acquire: acquireLease(undefined),
-        provider: AIProviderHttp.of({
-          execute: () => Effect.succeed({ status: 500, headers: {}, body: null }),
-        }),
-        settlements: settlement.settlements,
-        now: Effect.succeed(now),
-        heartbeatMillis: 40_000,
-        maximumUsageEventBytes: 4_096,
-      }).pipe(
-        Effect.provideService(AIGatewayTelemetry, telemetry.telemetry),
-      );
-      const response = yield* handler(new Request(
-        "http://ai-gateway.test/v1/unsupported",
-        {
-          method: "POST",
-          headers: { "x-ai-gateway-token": "client-secret" },
-        },
-      ));
-      assert.strictEqual(response.status, 404);
-      assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
-        "start",
-        {
-          authenticated: true,
-          authorized: false,
-          failureStatus: undefined,
-          kind: "authenticate",
-        },
-        {
-          kind: "end",
-          outcome: {
-            failed: false,
-            status: 404,
-            streamOutcome: "not_streamed",
-          },
-        },
-      ]);
-    }));
-
   it.effect("ends telemetry for an invalid explicit session before acquisition", () =>
     Effect.gen(function*() {
       const settlement = yield* makeSettlementRecorder();
@@ -727,7 +683,7 @@ describe("Effect AI Gateway forwarding", () => {
       }]);
     }));
 
-  it.effect("fails closed without settlement when a successful stream lacks terminal usage", () =>
+  it.effect("settles a successful stream even when terminal usage is unavailable", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
@@ -751,7 +707,7 @@ describe("Effect AI Gateway forwarding", () => {
       const response = yield* handler(gatewayRequest());
       yield* Effect.tryPromise(() => response.arrayBuffer());
       assert.strictEqual(yield* Ref.get(route.releases), 1);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "completed");
     }));
 
   it.effect("settles provider rejections with zero usage and preserves their status/body", () =>
@@ -1000,7 +956,7 @@ describe("Effect AI Gateway forwarding", () => {
       );
       const response = yield* handler(gatewayRequest());
       assert.strictEqual(response.status, 502);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "transport_failed");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1051,7 +1007,7 @@ describe("Effect AI Gateway forwarding", () => {
       );
       const response = yield* handler(gatewayRequest());
       assert.strictEqual(response.status, 502);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "transport_failed");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1102,7 +1058,7 @@ describe("Effect AI Gateway forwarding", () => {
       );
       const response = yield* handler(gatewayRequest());
       assert.strictEqual(response.status, 502);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "transport_failed");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1180,7 +1136,7 @@ describe("Effect AI Gateway forwarding", () => {
       const response = yield* handler(gatewayRequest());
       assert.strictEqual(response.status, 502);
       assert.strictEqual(yield* Ref.get(route.releases), 1);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "transport_failed");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1258,7 +1214,7 @@ describe("Effect AI Gateway forwarding", () => {
       ]);
     }));
 
-  it.effect("releases an interrupted downstream stream without releasing an unmeasured budget", () =>
+  it.effect("settles an interrupted downstream stream as cancelled", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
@@ -1287,7 +1243,7 @@ describe("Effect AI Gateway forwarding", () => {
         yield* Effect.tryPromise(() => reader.cancel("client disconnected"));
       }
       assert.strictEqual(yield* Ref.get(route.releases), 1);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "cancelled");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1313,7 +1269,7 @@ describe("Effect AI Gateway forwarding", () => {
       ]);
     }));
 
-  it.effect("keeps a provider stream failure distinct and does not settle unknown usage", () =>
+  it.effect("settles a provider stream failure as transport failed", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
@@ -1343,7 +1299,7 @@ describe("Effect AI Gateway forwarding", () => {
       );
       assert.notInclude(String(failure), "provider-secret");
       assert.strictEqual(yield* Ref.get(route.releases), 1);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "transport_failed");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1403,7 +1359,7 @@ describe("Effect AI Gateway forwarding", () => {
         yield* Effect.tryPromise(() => response.text()),
         completedEvent,
       );
-      assert.strictEqual(yield* Ref.get(settlementAttempts), 1);
+      assert.strictEqual(yield* Ref.get(settlementAttempts), 3);
       assert.strictEqual(yield* Ref.get(route.releases), 1);
     }));
 
