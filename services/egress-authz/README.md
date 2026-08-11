@@ -9,7 +9,7 @@ For every `/authorize` request the service:
 
 1. rejects unsupported routes, methods, forged grant headers, oversized
    metadata and overload before authentication;
-2. reviews the caller's `agentos-hermes-egress-authz` audience-bound
+2. reviews the caller's `agentos-egress-authz` audience-bound
    ServiceAccount JWT with Kubernetes and resolves the live Pod and
    ServiceAccount;
 3. matches that authenticated workload against the exact current GitOps Hermes

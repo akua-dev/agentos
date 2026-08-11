@@ -9,7 +9,7 @@ import {
   type HermesProviderAccessGrantV1,
 } from "./kubernetes-workload-policy.ts";
 import {
-  HERMES_EGRESS_TOKEN_AUDIENCE,
+  AGENTOS_EGRESS_TOKEN_AUDIENCE,
   KubernetesBoundServiceAccountAuthenticator,
   type WorkloadAuthenticationError,
   type WorkloadIdentityDependencyUnavailable,
@@ -72,7 +72,7 @@ export const createHermesProviderAuthorization = Effect.fn(
     ) {
       const bound = yield* boundServiceAccounts.authenticate({
         bearerToken: request.bearerToken,
-        audience: HERMES_EGRESS_TOKEN_AUDIENCE,
+        audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
       });
       const configMap = yield* policies.current;
       const policy = yield* decodeHermesProviderAccessConfigMapV1(configMap);

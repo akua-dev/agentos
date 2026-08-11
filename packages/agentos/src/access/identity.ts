@@ -42,7 +42,6 @@ const JwtExpirationPayload = Schema.Struct({
 });
 
 export const AGENTOS_EGRESS_TOKEN_AUDIENCE = "agentos-egress-authz";
-export const HERMES_EGRESS_TOKEN_AUDIENCE = "agentos-hermes-egress-authz";
 export const AGENTOS_EGRESS_TOKEN_MOUNT_PATH =
   "/var/run/secrets/agentos-egress";
 export const AGENTOS_EGRESS_TOKEN_PATH =

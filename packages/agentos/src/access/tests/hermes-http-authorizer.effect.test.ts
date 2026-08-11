@@ -11,7 +11,7 @@ import {
   type ProviderPolicyDecisionRefV1,
 } from "../credential-delivery.ts";
 import {
-  HERMES_EGRESS_TOKEN_AUDIENCE,
+  AGENTOS_EGRESS_TOKEN_AUDIENCE,
   KubernetesBoundServiceAccountAuthenticator,
   type KubernetesBoundServiceAccountIdentityV1,
   WorkloadAuthenticationError,
@@ -211,7 +211,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
       assert.strictEqual(yield* Ref.get(legacyPdpCalls), 0);
     }));
 
-  it.effect("rejects a non-Hermes token without invoking legacy authorization", () =>
+  it.effect("reviews modern Gateway tokens against the canonical audience without invoking legacy authorization", () =>
     Effect.gen(function*() {
       const hermesAudiences = yield* Ref.make<ReadonlyArray<string>>([]);
       const legacyIdentityCalls = yield* Ref.make(0);
@@ -259,7 +259,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
 
       assert.strictEqual(response.status, 401);
       assert.deepStrictEqual(yield* Ref.get(hermesAudiences), [
-        HERMES_EGRESS_TOKEN_AUDIENCE,
+        AGENTOS_EGRESS_TOKEN_AUDIENCE,
       ]);
       assert.strictEqual(yield* Ref.get(legacyIdentityCalls), 0);
       assert.strictEqual(yield* Ref.get(legacyPdpCalls), 0);
@@ -428,7 +428,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
       }
     }));
 
-  it.effect("denies a token outside both trusted audiences before either policy decision point", () =>
+  it.effect("denies a token outside the canonical audience before any policy decision point", () =>
     Effect.gen(function*() {
       const boundAuthenticationCalls = yield* Ref.make(0);
       const legacyIdentityCalls = yield* Ref.make(0);
