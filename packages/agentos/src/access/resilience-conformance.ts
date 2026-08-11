@@ -925,13 +925,13 @@ const DatabaseSettlement = regressionTest(
   "#92",
 );
 const HttpDependency = regressionTest(
-  "packages/agentos/src/access/tests/http-authorizer.effect.test.ts",
-  "reports policy-decision dependency failures as unavailable",
+  "packages/agentos/src/access/tests/hermes-http-authorizer.effect.test.ts",
+  "reports live policy dependency failure as unavailable without legacy fallback",
   "#92",
 );
 const HttpBudget = regressionTest(
-  "packages/agentos/src/access/tests/http-authorizer.effect.test.ts",
-  "returns stable AgentOS envelopes for rate and budget exhaustion",
+  "services/ai-gateway/tests/gateway-service.effect.test.ts",
+  "fails Hermes closed before credential access when no shared budget reservation authority exists",
   "#92",
 );
 const AuthorizerReadiness = regressionTest(

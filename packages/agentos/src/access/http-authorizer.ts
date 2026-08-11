@@ -13,12 +13,9 @@ import {
 } from "./contracts.ts";
 import {
   ProviderPolicyDecisionError,
-  ProviderPolicyDecisionPoint,
 } from "./credential-delivery.ts";
 import {
-  WorkloadIdentityAuthenticator,
   WorkloadIdentityV1Schema,
-  type WorkloadIdentityV1,
 } from "./identity.ts";
 import type { HermesProviderAuthorization } from "./hermes-authorizer.ts";
 import {
@@ -439,10 +436,8 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
   readonly clock?: Effect.Effect<number>;
   readonly id: Effect.Effect<string, ProviderPolicyDecisionError>;
   readonly telemetry?: ProviderAccessTelemetry["Service"];
-  readonly hermes?: HermesProviderAuthorization;
+  readonly hermes: HermesProviderAuthorization;
 }) {
-  const authenticator = yield* WorkloadIdentityAuthenticator;
-  const decisionPoint = yield* ProviderPolicyDecisionPoint;
   const clock = options.clock ?? Clock.currentTimeMillis;
   const id = options.id;
 
@@ -483,106 +478,33 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
       if (routeResult._tag === "Failure") return forbiddenResponse();
       const route = routeResult.success;
       const issuedAtMillis = yield* clock;
-      if (options.hermes !== undefined) {
-        const hermes = yield* options.hermes.authorize({
-          bearerToken,
-          route,
-          body,
-          atMillis: issuedAtMillis,
-        });
-        if (hermes.kind === "authorized") {
-          const correlationId = `corr_${yield* id}`;
-          const grant = yield* Schema.decodeUnknownEffect(
-            ProviderAuthorizationGrantV1Schema,
-            { onExcessProperty: "error" },
-          )({
-            schemaVersion: 1,
-            correlationId,
-            decisionRef: `decision_${correlationId.slice(5)}`,
-            expiresAtMillis: Math.min(
-              hermes.tokenExpiresAtMillis,
-              hermes.policyExpiresAtMillis ?? Number.MAX_SAFE_INTEGER,
-              issuedAtMillis + PROVIDER_AUTHORIZATION_GRANT_MAX_TTL_MILLIS,
-            ),
-            credentialDomain: hermes.grant.credentialDomain,
-            identity: hermes.grant.principal,
-            capability: route.capability,
-            resource: route.resource,
-            rateClass: hermes.grant.rateClass,
-            model: hermes.grant.model,
-            limits: hermes.grant.limits,
-          }).pipe(Effect.mapError(() => authorizerError("invalid_grant")));
-          if (grant.expiresAtMillis <= issuedAtMillis) return forbiddenResponse();
-          if (telemetry !== undefined) yield* telemetry.correlate(grant);
-          return new Response(null, {
-            status: 200,
-            headers: providerAuthorizationGrantHeaders(grant),
-          });
-        }
-      }
-      const requestedAssignmentId = optionalHeader(
-        request.headers,
-        "x-agentos-assignment-id",
-      );
-      let identity = yield* authenticator.authenticate({
+      const hermes = yield* options.hermes.authorize({
         bearerToken,
-        assignmentRequirement: requestedAssignmentId === undefined
-          ? "not_required"
-          : "required",
+        route,
+        body,
+        atMillis: issuedAtMillis,
       });
-      if (requestedAssignmentId === undefined && identity.role === "crewmate") {
-        identity = yield* authenticator.authenticate({
-          bearerToken,
-          assignmentRequirement: "required",
-        });
-      }
-      if (
-        requestedAssignmentId !== undefined &&
-        identity.assignmentId !== requestedAssignmentId
-      ) {
-        return forbiddenResponse();
-      }
-      const subject = subjectForIdentity(identity);
       const correlationId = `corr_${yield* id}`;
-      const decision = yield* decisionPoint.decide({
-        schemaVersion: 1,
-        correlationId,
-        credentialDomain: route.credentialDomain,
-        provider: route.provider,
-        capability: route.capability,
-        resource: route.resource,
-        subject,
-      });
-      if (
-        decision.correlationId !== correlationId ||
-        decision.credentialDomain !== route.credentialDomain
-      ) {
-        return forbiddenResponse();
-      }
-      if (decision.decision !== "allow" || decision.rateClass === "disabled") {
-        return forbiddenResponse();
-      }
       const grant = yield* Schema.decodeUnknownEffect(
         ProviderAuthorizationGrantV1Schema,
         { onExcessProperty: "error" },
       )({
         schemaVersion: 1,
-        correlationId: decision.correlationId,
-        decisionRef: decision.decisionRef,
+        correlationId,
+        decisionRef: `decision_${correlationId.slice(5)}`,
         expiresAtMillis: Math.min(
-          decision.expiresAtMillis,
+          hermes.tokenExpiresAtMillis,
+          hermes.policyExpiresAtMillis ?? Number.MAX_SAFE_INTEGER,
           issuedAtMillis + PROVIDER_AUTHORIZATION_GRANT_MAX_TTL_MILLIS,
         ),
-        credentialDomain: decision.credentialDomain,
-        identity: authorizedIdentity(identity),
+        credentialDomain: hermes.grant.credentialDomain,
+        identity: hermes.grant.principal,
         capability: route.capability,
         resource: route.resource,
-        profile: decision.profile,
-        ceiling: decision.ceiling,
-        rateClass: decision.rateClass,
-      }).pipe(
-        Effect.mapError(() => authorizerError("invalid_grant")),
-      );
+        rateClass: hermes.grant.rateClass,
+        model: hermes.grant.model,
+        limits: hermes.grant.limits,
+      }).pipe(Effect.mapError(() => authorizerError("invalid_grant")));
       if (grant.expiresAtMillis <= issuedAtMillis) return forbiddenResponse();
       if (telemetry !== undefined) yield* telemetry.correlate(grant);
       return new Response(null, {
@@ -1191,36 +1113,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function authorizedIdentity(
-  identity: WorkloadIdentityV1,
-): ProviderAuthorizedIdentityV1 {
-  return {
-    agentId: identity.agentId,
-    role: identity.role,
-    fleet: identity.fleet,
-    domain: identity.domain,
-    assignmentId: identity.assignmentId,
-  };
-}
-
-function subjectForIdentity(
-  identity: WorkloadIdentityV1,
-): AuthorizationSubjectV1 {
-  if (identity.assignmentId !== null) {
-    return {
-      kind: "assignment",
-      fleet: identity.fleet,
-      domain: identity.domain,
-      assignmentId: identity.assignmentId,
-    };
-  }
-  return {
-    kind: "mate",
-    fleet: identity.fleet,
-    domain: identity.domain,
-    agentId: identity.agentId,
-  };
-}
 
 function providerForAuthorizationResource(
   resource: AuthorizationResourceV1,

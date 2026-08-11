@@ -10,6 +10,7 @@ import {
   ProviderPolicyDecisionPoint,
   WorkloadAuthenticationError,
   WorkloadIdentityAuthenticator,
+  type HermesProviderAuthorization,
   type HermesProviderAuthorizationResult,
   type ProviderPolicyDecisionRefV1,
   type ProviderBudgetSettlementReportV1,
@@ -65,8 +66,35 @@ const decision: ProviderPolicyDecisionRefV1 = {
   rateClass: "standard",
 };
 
-const hermesNotSelected: HermesProviderAuthorizationResult = {
-  kind: "not_selected",
+const hermesAuthorized: HermesProviderAuthorizationResult = {
+  kind: "authorized",
+  tokenExpiresAtMillis: now + 10_000,
+  policyExpiresAtMillis: null,
+  grant: {
+    decision: "allow",
+    principal: {
+      kind: "kubernetes_workload",
+      namespace: "hermes-workers",
+      serviceAccountName: "hermes-codex",
+      policyRevision: 7,
+      policyResourceVersion: "18422",
+      hermesProfile: "default",
+    },
+    provider: "openai",
+    credentialDomain: "openai-responses",
+    model: "gpt-5.6-sol",
+    capability: "responses.create",
+    rateClass: "standard",
+    limits: {
+      requestWindowMillis: 60_000,
+      maximumRequests: 1,
+      maximumConcurrent: 1,
+      tokenWindowMillis: 60_000,
+      maximumTokens: 1_536,
+      spendWindowMillis: 60_000,
+      maximumSpendMicros: 1_000_000,
+    },
+  },
 };
 
 const settlementCaller: ProviderBudgetSettlementCallerV1 = {
@@ -120,6 +148,8 @@ function settlementRequest(
 
 function services(options?: {
   readonly authenticate?: WorkloadIdentityAuthenticator["Service"]["authenticate"];
+  readonly authorizeHermes?: HermesProviderAuthorization["authorize"];
+  readonly decide?: ProviderPolicyDecisionPoint["Service"]["decide"];
   readonly authenticateSettlement?: ProviderBudgetSettlementCallerAuthenticator["Service"]["authenticate"];
   readonly settleProvider?: ProviderBudgetEnforcer["Service"]["settleProvider"];
   readonly ready?: Effect.Effect<boolean, unknown>;
@@ -130,13 +160,13 @@ function services(options?: {
       invalidate: () => Effect.void,
     }),
     Layer.succeed(HermesProviderAuthorizer, {
-      authorize: () => Effect.succeed(hermesNotSelected),
+      authorize: options?.authorizeHermes ?? (() => Effect.succeed(hermesAuthorized)),
     }),
     Layer.succeed(ProviderPolicyDecisionPoint, {
-      decide: (input) => Effect.succeed({
+      decide: options?.decide ?? ((input) => Effect.succeed({
         ...decision,
         correlationId: input.correlationId,
-      }),
+      })),
     }),
     Layer.succeed(ProviderDecisionReferenceGenerator, {
       next: Effect.succeed("44444444444444444444444444444444"),
@@ -289,9 +319,9 @@ describe("Effect egress authorization HTTP application", () => {
       const calls = yield* Ref.make(0);
       const handler = yield* makeHandler.pipe(
         Effect.provide(services({
-          authenticate: () =>
+          authorizeHermes: () =>
             Ref.update(calls, (count) => count + 1).pipe(
-              Effect.as(identity),
+              Effect.as(hermesAuthorized),
             ),
         })),
       );
@@ -307,9 +337,9 @@ describe("Effect egress authorization HTTP application", () => {
       const calls = yield* Ref.make(0);
       const handler = yield* makeHandler.pipe(
         Effect.provide(services({
-          authenticate: () =>
+          authorizeHermes: () =>
             Ref.update(calls, (count) => count + 1).pipe(
-              Effect.as(identity),
+              Effect.as(hermesAuthorized),
             ),
         })),
       );
@@ -329,7 +359,7 @@ describe("Effect egress authorization HTTP application", () => {
     Effect.gen(function*() {
       const handler = yield* makeHandler.pipe(
         Effect.provide(services({
-          authenticate: () => Effect.fail(WorkloadAuthenticationError.make({
+          authorizeHermes: () => Effect.fail(WorkloadAuthenticationError.make({
             code: "invalid_token",
           })),
         })),
@@ -347,6 +377,32 @@ describe("Effect egress authorization HTTP application", () => {
       );
     }));
 
+  it.effect("never routes a rejected modern Gateway request to legacy Identity or PDP", () =>
+    Effect.gen(function*() {
+      const legacyIdentityCalls = yield* Ref.make(0);
+      const legacyPdpCalls = yield* Ref.make(0);
+      const handler = yield* makeHandler.pipe(
+        Effect.provide(services({
+          authorizeHermes: () =>
+            Effect.fail(WorkloadAuthenticationError.make({
+              code: "wrong_audience",
+            })),
+          authenticate: () =>
+            Ref.update(legacyIdentityCalls, (count) => count + 1).pipe(
+              Effect.as(identity),
+            ),
+          decide: (input) =>
+            Ref.update(legacyPdpCalls, (count) => count + 1).pipe(
+              Effect.as({ ...decision, correlationId: input.correlationId }),
+            ),
+        })),
+      );
+
+      assert.strictEqual((yield* handler(request())).status, 401);
+      assert.strictEqual(yield* Ref.get(legacyIdentityCalls), 0);
+      assert.strictEqual(yield* Ref.get(legacyPdpCalls), 0);
+    }));
+
   it.effect("fails overload immediately and releases its permit on interruption", () =>
     Effect.gen(function*() {
       const entered = yield* Deferred.make<void>();
@@ -354,10 +410,10 @@ describe("Effect egress authorization HTTP application", () => {
       const finalized = yield* Ref.make(false);
       const handler = yield* makeHandler.pipe(
         Effect.provide(services({
-          authenticate: () =>
+          authorizeHermes: () =>
             Deferred.succeed(entered, undefined).pipe(
               Effect.andThen(Deferred.await(release)),
-              Effect.as(identity),
+              Effect.as(hermesAuthorized),
               Effect.ensuring(Ref.set(finalized, true)),
             ),
         })),
@@ -383,7 +439,7 @@ describe("Effect egress authorization HTTP application", () => {
       const finalized = yield* Ref.make(false);
       const handler = yield* makeHandler.pipe(
         Effect.provide(services({
-          authenticate: () =>
+          authorizeHermes: () =>
             Effect.never.pipe(Effect.ensuring(Ref.set(finalized, true))),
         })),
       );

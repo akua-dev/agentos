@@ -9,15 +9,14 @@ For every `/authorize` request the service:
 
 1. rejects unsupported routes, methods, forged grant headers, oversized
    metadata and overload before authentication;
-2. reviews the caller's audience-bound ServiceAccount JWT with Kubernetes and
-   resolves the live Pod, ServiceAccount, Agent and optional Assignment;
-3. reads the exact active binding, access profile and First-Mate ceiling from
-   PostgreSQL;
-4. performs the profile, ceiling and effective-subject checks against the
-   pinned OpenFGA store/model with higher consistency;
-5. atomically reserves the subject/route's durable request and concurrency
-   capacity in PostgreSQL; and
-6. returns only a closed grant with a maximum 15-second lifetime and a lease
+2. reviews the caller's `agentos-hermes-egress-authz` audience-bound
+   ServiceAccount JWT with Kubernetes and resolves the live Pod and
+   ServiceAccount;
+3. matches that authenticated workload against the exact current GitOps Hermes
+   provider binding, including its policy revision and Kubernetes
+   `resourceVersion`;
+4. fails closed without any Agent, Assignment or OpenFGA/PDP fallback; and
+5. returns only a closed grant with a maximum 15-second lifetime and a lease
    bounded by that reservation.
 
 `POST /settle` is a separate private provider boundary. It accepts at most a
@@ -33,27 +32,24 @@ are interruptible, bounded by an immediate concurrency permit and timeout, and
 release their permit when the client disconnects or the fiber is interrupted.
 
 `GET /livez` proves only that the HTTP process is alive. `GET /readyz` requires
-the exact PostgreSQL function privileges needed for identity, policy,
-reservation and provider settlement plus the health tuple in the pinned
-OpenFGA model. `GET /readyz/settlement` additionally requires the caller's
+the exact PostgreSQL function privileges needed for reservation and provider
+settlement. `GET /readyz/settlement` additionally requires the caller's
 current `agentos-provider-budget-settlement` Pod token to pass TokenReview and
 live Pod/ServiceAccount lookup before returning ready. It performs no budget
 mutation. Authorization and settlement fail closed while any required
-dependency is unavailable. There is no independent policy-decision cache: each
-authorization observes current PostgreSQL and OpenFGA state. The
-workload-identity cache remains bounded by the shorter of the projected-token
-expiry and 15 seconds.
+dependency is unavailable. Each authorization rereads the current GitOps
+Hermes policy and live Kubernetes workload identity; no legacy policy-decision
+cache or fallback participates.
 
 ## OpenTelemetry
 
 The authorizer exports Effect-native spans and metrics through the Fleet OTLP
 Collector. A valid inbound `traceparent` continues the AgentGateway trace. The
 authorization span records only finite route, adapter, decision, reason and
-dependency values; a typed identity-store, Kubernetes or OpenFGA failure is
-classified before the public response is reduced to its content-free envelope.
-Successful spans add the validated Mate, optional Assignment, decision
-reference and immutable profile version. Those identifiers are explicitly
-excluded from metric labels.
+dependency values; a typed Kubernetes or GitOps-policy failure is classified
+before the public response is reduced to its content-free envelope. Successful
+spans add the validated workload principal and decision reference. Those
+identifiers are explicitly excluded from metric labels.
 
 Telemetry is fail-open and does not participate in authorization, readiness or
 budget enforcement. The runtime never observes a token value, arbitrary
