@@ -167,7 +167,6 @@ describe("Crewmate Kubernetes base", () => {
           "agentos.akua.dev/ai-runtime-version": "0.144.5",
           "agentos.akua.dev/assignment-id":
             "00000000-0000-4000-8000-000000000005",
-          "agentos.akua.dev/github-client": "true",
           "agentos.akua.dev/otel-client": "true",
           "agentos.akua.dev/owner-agent-id":
             "00000000-0000-4000-8000-000000000002",
@@ -189,14 +188,14 @@ describe("Crewmate Kubernetes base", () => {
         runAsUser: 1000,
         seccompProfile: { type: "RuntimeDefault" },
       });
-      assert.lengthOf(pod.initContainers, 3);
+      assert.lengthOf(pod.initContainers, 2);
       assert.lengthOf(pod.containers, 1);
       const install = yield* required(pod.initContainers[0], "Missing installer");
       const prepare = yield* required(pod.initContainers[1], "Missing prepare");
       const container = yield* required(pod.containers[0], "Missing Crewmate");
       assert.deepStrictEqual(
         [...pod.initContainers, container].map(({ image }) => image),
-        ["agentos:dev", "agentos:dev", "agentos:dev", "agentos:dev"],
+        ["agentos:dev", "agentos:dev", "agentos:dev"],
       );
       assert.deepStrictEqual(
         [...pod.initContainers, container].map(({ resources }) => resources),
@@ -210,10 +209,6 @@ describe("Crewmate Kubernetes base", () => {
             requests: { cpu: "250m", memory: "512Mi", "ephemeral-storage": "128Mi" },
           },
           {
-            limits: { cpu: "250m", memory: "128Mi", "ephemeral-storage": "128Mi" },
-            requests: { cpu: "25m", memory: "64Mi", "ephemeral-storage": "32Mi" },
-          },
-          {
             limits: { cpu: "2", memory: "4Gi", "ephemeral-storage": "1Gi" },
             requests: { cpu: "250m", memory: "512Mi", "ephemeral-storage": "128Mi" },
           },
@@ -224,7 +219,6 @@ describe("Crewmate Kubernetes base", () => {
         [
           "/opt/agentos/packages/agentos/resources/crewmates/default",
           "/opt/agentos/packages/agentos/resources/crewmates/default",
-          undefined,
           "/opt/agentos/packages/agentos/resources/crewmates/default",
         ],
       );
@@ -292,6 +286,24 @@ describe("Crewmate Kubernetes base", () => {
         );
       }
       assert.isUndefined(variables.PI_CODING_AGENT_DIR);
+      assert.isUndefined(variables.AGENTOS_EGRESS_TOKEN_FILE);
+      for (const name of Object.keys(variables)) {
+        assert.isFalse(name.startsWith("AGENTOS_GITHUB_"));
+      }
+      for (const initContainer of pod.initContainers) {
+        const initVariables = environment(initContainer.env ?? []);
+        assert.isUndefined(initVariables.AGENTOS_EGRESS_TOKEN_FILE);
+        for (const name of Object.keys(initVariables)) {
+          assert.isFalse(name.startsWith("AGENTOS_GITHUB_"));
+        }
+      }
+      assert.notProperty(
+        statefulSet.spec.template.metadata.labels,
+        "agentos.akua.dev/github-client",
+      );
+      assert.isUndefined(
+        pod.initContainers.find(({ name }) => name === "prepare-github-provider"),
+      );
       assert.deepStrictEqual(container.command, ["herdr"]);
       assert.deepStrictEqual(container.args, [
         "server",
@@ -327,11 +339,6 @@ describe("Crewmate Kubernetes base", () => {
       assert.deepStrictEqual(container.volumeMounts, [
         { mountPath: "/home/agent", name: "home" },
         { mountPath: "/tmp", name: "tmp" },
-        {
-          mountPath: "/var/run/config/agentos-github",
-          name: "agentos-github-ca",
-          readOnly: true,
-        },
       ]);
       assert.deepStrictEqual(prepare.volumeMounts, [
         { mountPath: "/home/agent", name: "home" },
@@ -347,14 +354,6 @@ describe("Crewmate Kubernetes base", () => {
           secret: { defaultMode: 288, secretName: "agentos-crewmate-postgres" },
         },
         { name: "tmp", emptyDir: { sizeLimit: "256Mi" } },
-        {
-          name: "agentos-github-ca",
-          configMap: {
-            defaultMode: 292,
-            items: [{ key: "ca.pem", path: "ca.pem" }],
-            name: "agentos-github-ca",
-          },
-        },
       ]);
     }).pipe(Effect.provide(BunServices.layer)));
 
@@ -412,6 +411,24 @@ describe("Crewmate Kubernetes base", () => {
         name: "agentos-egress-identity",
         readOnly: true,
       }]);
+      for (const workloadContainer of pod.containers.filter(
+        ({ name }) => name !== "ai-gateway-workload-proxy",
+      )) {
+        const mounts = yield* Schema.decodeUnknownEffect(
+          Schema.Array(Schema.Struct({ name: Schema.String })),
+        )(workloadContainer.volumeMounts ?? []);
+        assert.isUndefined(
+          mounts.find(({ name }) => name === "agentos-egress-identity"),
+        );
+      }
+      for (const initContainer of pod.initContainers) {
+        const mounts = yield* Schema.decodeUnknownEffect(
+          Schema.Array(Schema.Struct({ name: Schema.String })),
+        )(initContainer.volumeMounts ?? []);
+        assert.isUndefined(
+          mounts.find(({ name }) => name === "agentos-egress-identity"),
+        );
+      }
       const identityVolumes = pod.volumes
         .filter(({ name }) => name === "agentos-egress-identity");
       assert.deepStrictEqual(identityVolumes, [{

@@ -297,7 +297,7 @@ layer(BunServices.layer)("AgentWorkloadSpec native Kustomize output", (it) => {
       );
       assert.deepStrictEqual(
         pod.initContainers.map(({ image, name }) => ({ image, name })),
-        ["install-tools", "prepare-home", "prepare-github-provider"].map(
+        ["install-tools", "prepare-home"].map(
           (name) => ({ name, image: workloadImage }),
         ),
       );
