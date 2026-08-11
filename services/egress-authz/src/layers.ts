@@ -4,6 +4,7 @@ import {
   AGENTOS_OPENFGA_HEALTH_RELATION,
   AGENTOS_OPENFGA_HEALTH_USER,
   AgentOSWorkloadIdentityStorePostgresLayer,
+  HermesProviderAuthorizer,
   KubernetesBoundServiceAccountAuthenticator,
   OpenFgaAuthorizationApi,
   OpenFgaAuthorizationApiHttpLayer,
@@ -77,6 +78,12 @@ export function makeEgressAuthorizerLiveLayer(
     );
   const authenticator = WorkloadIdentityAuthenticator.layer.pipe(
     Layer.provide(Layer.merge(kubernetesIdentity, identityStore)),
+  );
+  const hermesAuthorizer = HermesProviderAuthorizer.layer.pipe(
+    Layer.provide(Layer.merge(
+      boundServiceAccountAuthenticator,
+      kubernetesIdentity,
+    )),
   );
   const settlementCallerAuthenticator =
     ProviderBudgetSettlementCallerAuthenticator.layer.pipe(
@@ -156,6 +163,7 @@ export function makeEgressAuthorizerLiveLayer(
 
   return Layer.mergeAll(
     authenticator,
+    hermesAuthorizer,
     settlementCallerAuthenticator,
     providerBudgets,
     decisionPoint,

@@ -266,6 +266,16 @@ function finishOperation(
 function authorizationAttributes(
   grant: ProviderAuthorizationGrantV1,
 ): AgentOSTelemetryAttributes {
+  if ("model" in grant) {
+    return safeTelemetryAttributes({
+      "agentos.identity.kubernetes_namespace": grant.identity.namespace,
+      "agentos.identity.service_account": grant.identity.serviceAccountName,
+      "agentos.identity.hermes_profile": grant.identity.hermesProfile,
+      "agentos.authz.policy_revision": grant.identity.policyRevision,
+      "agentos.authz.decision_ref": grant.decisionRef,
+      "agentos.authz.rate_class": grant.rateClass,
+    }, "span");
+  }
   return safeTelemetryAttributes({
     "agentos.identity.agent_id": grant.identity.agentId,
     ...(grant.identity.assignmentId === null

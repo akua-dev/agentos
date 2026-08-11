@@ -5,6 +5,7 @@ import {
   ProviderBudgetSettlementCallerAuthenticator,
   ProviderBudgetSettlementCallerAuthenticationError,
   ProviderDecisionReferenceGenerator,
+  HermesProviderAuthorizer,
   ProviderPolicyDecisionError,
   ProviderPolicyDecisionPoint,
   WorkloadAuthenticationError,
@@ -122,6 +123,9 @@ function services(options?: {
     Layer.succeed(WorkloadIdentityAuthenticator, {
       authenticate: options?.authenticate ?? (() => Effect.succeed(identity)),
       invalidate: () => Effect.void,
+    }),
+    Layer.succeed(HermesProviderAuthorizer, {
+      authorize: () => Effect.succeed({ kind: "not_bound" }),
     }),
     Layer.succeed(ProviderPolicyDecisionPoint, {
       decide: (input) => Effect.succeed({
