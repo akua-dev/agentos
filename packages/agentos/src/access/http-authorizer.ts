@@ -9,6 +9,7 @@ import {
   type AccessCapabilityId,
   type AuthorizationResourceV1,
   type AuthorizationSubjectV1,
+  KubernetesWorkloadPrincipalV1Schema,
 } from "./contracts.ts";
 import {
   ProviderPolicyDecisionError,
@@ -19,6 +20,12 @@ import {
   WorkloadIdentityV1Schema,
   type WorkloadIdentityV1,
 } from "./identity.ts";
+import type { HermesProviderAuthorization } from "./hermes-authorizer.ts";
+import {
+  HermesProviderLimitsV1Schema,
+  HermesProviderModelIdSchema,
+  normalizeHermesProviderModelId,
+} from "./kubernetes-workload-policy.ts";
 import type {
   ProviderAccessTelemetry,
   ProviderAccessTelemetryEnd,
@@ -48,19 +55,35 @@ export const ProviderAuthorizedIdentityV1Schema = Schema.Struct({
   assignmentId: Schema.NullOr(Uuid),
 });
 
-export const ProviderAuthorizationGrantV1Schema = Schema.Struct({
+const ProviderAuthorizationGrantCommonV1Fields = {
   schemaVersion: Schema.Literal(1),
   correlationId: CorrelationId,
   decisionRef: DecisionRef,
   expiresAtMillis: EpochMillis,
   credentialDomain: Schema.Literals(["github", "openai-responses"]),
-  identity: ProviderAuthorizedIdentityV1Schema,
   capability: AccessCapabilityIdSchema,
   resource: AuthorizationResourceV1Schema,
+  rateClass: AccessRateClassIdSchema,
+};
+
+const AgentOSProviderAuthorizationGrantV1Schema = Schema.Struct({
+  ...ProviderAuthorizationGrantCommonV1Fields,
+  identity: ProviderAuthorizedIdentityV1Schema,
   profile: AccessProfileRefV1Schema,
   ceiling: AccessCeilingRefV1Schema,
-  rateClass: AccessRateClassIdSchema,
 });
+
+const HermesProviderAuthorizationGrantV1Schema = Schema.Struct({
+  ...ProviderAuthorizationGrantCommonV1Fields,
+  identity: KubernetesWorkloadPrincipalV1Schema,
+  model: HermesProviderModelIdSchema,
+  limits: HermesProviderLimitsV1Schema,
+});
+
+export const ProviderAuthorizationGrantV1Schema = Schema.Union([
+  AgentOSProviderAuthorizationGrantV1Schema,
+  HermesProviderAuthorizationGrantV1Schema,
+]);
 
 const ProviderAuthorizationErrorCode = Schema.Literals([
   "invalid_request",
@@ -140,6 +163,20 @@ export const PROVIDER_AUTHORIZATION_GRANT_HEADERS = Object.freeze([
   "x-agentos-authz-ceiling-id",
   "x-agentos-authz-ceiling-revision",
   "x-agentos-authz-rate-class",
+  "x-agentos-authz-principal-kind",
+  "x-agentos-authz-workload-namespace",
+  "x-agentos-authz-service-account",
+  "x-agentos-authz-policy-revision",
+  "x-agentos-authz-policy-resource-version",
+  "x-agentos-authz-hermes-profile",
+  "x-agentos-authz-model",
+  "x-agentos-authz-request-window-millis",
+  "x-agentos-authz-maximum-requests",
+  "x-agentos-authz-maximum-concurrent",
+  "x-agentos-authz-token-window-millis",
+  "x-agentos-authz-maximum-tokens",
+  "x-agentos-authz-spend-window-millis",
+  "x-agentos-authz-maximum-spend-micros",
 ]);
 
 export function resolveProviderAuthorizationRoute(
@@ -192,26 +229,45 @@ export function providerAuthorizationGrantHeaders(
     "x-agentos-authz-decision-ref": grant.decisionRef,
     "x-agentos-authz-expires-at-millis": String(grant.expiresAtMillis),
     "x-agentos-authz-credential-domain": grant.credentialDomain,
-    "x-agentos-authz-agent-id": grant.identity.agentId,
-    "x-agentos-authz-role": grant.identity.role,
-    "x-agentos-authz-fleet": grant.identity.fleet,
-    "x-agentos-authz-domain": grant.identity.domain,
     "x-agentos-authz-capability": grant.capability,
     "x-agentos-authz-resource-kind": grant.resource.kind,
     "x-agentos-authz-provider":
       providerForAuthorizationResource(grant.resource),
     "x-agentos-authz-service": serviceForAuthorizationResource(grant.resource),
-    "x-agentos-authz-profile-id": grant.profile.profileId,
-    "x-agentos-authz-profile-version": String(grant.profile.profileVersion),
-    "x-agentos-authz-ceiling-id": grant.ceiling.ceilingId,
-    "x-agentos-authz-ceiling-revision": String(grant.ceiling.revision),
     "x-agentos-authz-rate-class": grant.rateClass,
   });
+  const workload = "model" in grant;
+  if (workload) {
+    headers.set("x-agentos-authz-principal-kind", "kubernetes_workload");
+    headers.set("x-agentos-authz-workload-namespace", grant.identity.namespace);
+    headers.set("x-agentos-authz-service-account", grant.identity.serviceAccountName);
+    headers.set("x-agentos-authz-policy-revision", String(grant.identity.policyRevision));
+    headers.set("x-agentos-authz-policy-resource-version", grant.identity.policyResourceVersion);
+    headers.set("x-agentos-authz-hermes-profile", grant.identity.hermesProfile);
+    headers.set("x-agentos-authz-model", grant.model);
+    headers.set("x-agentos-authz-request-window-millis", String(grant.limits.requestWindowMillis));
+    headers.set("x-agentos-authz-maximum-requests", String(grant.limits.maximumRequests));
+    headers.set("x-agentos-authz-maximum-concurrent", String(grant.limits.maximumConcurrent));
+    headers.set("x-agentos-authz-token-window-millis", String(grant.limits.tokenWindowMillis));
+    headers.set("x-agentos-authz-maximum-tokens", String(grant.limits.maximumTokens));
+    headers.set("x-agentos-authz-spend-window-millis", String(grant.limits.spendWindowMillis));
+    headers.set("x-agentos-authz-maximum-spend-micros", String(grant.limits.maximumSpendMicros));
+  } else {
+    headers.set("x-agentos-authz-principal-kind", "agentos");
+    headers.set("x-agentos-authz-agent-id", grant.identity.agentId);
+    headers.set("x-agentos-authz-role", grant.identity.role);
+    headers.set("x-agentos-authz-fleet", grant.identity.fleet);
+    headers.set("x-agentos-authz-domain", grant.identity.domain);
+    headers.set("x-agentos-authz-profile-id", grant.profile.profileId);
+    headers.set("x-agentos-authz-profile-version", String(grant.profile.profileVersion));
+    headers.set("x-agentos-authz-ceiling-id", grant.ceiling.ceilingId);
+    headers.set("x-agentos-authz-ceiling-revision", String(grant.ceiling.revision));
+  }
   // Emit the optional field even when it is absent so ext-auth overwrites a
   // caller-supplied grant header instead of accidentally preserving it.
   headers.set(
     "x-agentos-authz-assignment-id",
-    grant.identity.assignmentId ?? "",
+    workload ? "" : grant.identity.assignmentId ?? "",
   );
   headers.set(
     "x-agentos-authz-resource-owner",
@@ -270,30 +326,11 @@ export const decodeProviderAuthorizationGrantHeaders = Effect.fn(
       headers,
       "x-agentos-authz-credential-domain",
     ),
-    identity: {
-      agentId: requiredHeader(headers, "x-agentos-authz-agent-id"),
-      role: requiredHeader(headers, "x-agentos-authz-role"),
-      fleet: requiredHeader(headers, "x-agentos-authz-fleet"),
-      domain: requiredHeader(headers, "x-agentos-authz-domain"),
-      assignmentId: optionalHeader(
-        headers,
-        "x-agentos-authz-assignment-id",
-      ) ?? null,
-    },
+    identity: authorizationIdentityFromHeaders(headers),
     capability: requiredHeader(headers, "x-agentos-authz-capability"),
     resource: authorizationResourceFromHeaders(headers),
-    profile: {
-      profileId: requiredHeader(headers, "x-agentos-authz-profile-id"),
-      profileVersion: integerHeader(
-        headers,
-        "x-agentos-authz-profile-version",
-      ),
-    },
-    ceiling: {
-      ceilingId: requiredHeader(headers, "x-agentos-authz-ceiling-id"),
-      revision: integerHeader(headers, "x-agentos-authz-ceiling-revision"),
-    },
     rateClass: requiredHeader(headers, "x-agentos-authz-rate-class"),
+    ...authorizationPolicyFieldsFromHeaders(headers),
   };
   const grant = yield* Schema.decodeUnknownEffect(
     ProviderAuthorizationGrantV1Schema,
@@ -323,6 +360,12 @@ export const decodeProviderAuthorizationGrantHeaders = Effect.fn(
   if (grant.rateClass === "disabled") {
     return yield* authorizerError("policy_denied");
   }
+  if ("model" in grant) {
+    const model = modelFromAuthorizationBody(request.body);
+    if (model === null || normalizeHermesProviderModelId(model) !== grant.model) {
+      return yield* authorizerError("grant_route_mismatch");
+    }
+  }
   return grant;
 });
 
@@ -332,6 +375,7 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
   readonly clock?: Effect.Effect<number>;
   readonly id: Effect.Effect<string, ProviderPolicyDecisionError>;
   readonly telemetry?: ProviderAccessTelemetry["Service"];
+  readonly hermes?: HermesProviderAuthorization;
 }) {
   const authenticator = yield* WorkloadIdentityAuthenticator;
   const decisionPoint = yield* ProviderPolicyDecisionPoint;
@@ -374,6 +418,44 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
       );
       if (routeResult._tag === "Failure") return forbiddenResponse();
       const route = routeResult.success;
+      const issuedAtMillis = yield* clock;
+      if (options.hermes !== undefined) {
+        const hermes = yield* options.hermes.authorize({
+          bearerToken,
+          route,
+          body,
+          atMillis: issuedAtMillis,
+        });
+        if (hermes.kind === "authorized") {
+          const correlationId = `corr_${yield* id}`;
+          const grant = yield* Schema.decodeUnknownEffect(
+            ProviderAuthorizationGrantV1Schema,
+            { onExcessProperty: "error" },
+          )({
+            schemaVersion: 1,
+            correlationId,
+            decisionRef: `decision_${correlationId.slice(5)}`,
+            expiresAtMillis: Math.min(
+              hermes.tokenExpiresAtMillis,
+              hermes.policyExpiresAtMillis ?? Number.MAX_SAFE_INTEGER,
+              issuedAtMillis + PROVIDER_AUTHORIZATION_GRANT_MAX_TTL_MILLIS,
+            ),
+            credentialDomain: hermes.grant.credentialDomain,
+            identity: hermes.grant.principal,
+            capability: route.capability,
+            resource: route.resource,
+            rateClass: hermes.grant.rateClass,
+            model: hermes.grant.model,
+            limits: hermes.grant.limits,
+          }).pipe(Effect.mapError(() => authorizerError("invalid_grant")));
+          if (grant.expiresAtMillis <= issuedAtMillis) return forbiddenResponse();
+          if (telemetry !== undefined) yield* telemetry.correlate(grant);
+          return new Response(null, {
+            status: 200,
+            headers: providerAuthorizationGrantHeaders(grant),
+          });
+        }
+      }
       const requestedAssignmentId = optionalHeader(
         request.headers,
         "x-agentos-assignment-id",
@@ -416,7 +498,6 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
       if (decision.decision !== "allow" || decision.rateClass === "disabled") {
         return forbiddenResponse();
       }
-      const issuedAtMillis = yield* clock;
       const grant = yield* Schema.decodeUnknownEffect(
         ProviderAuthorizationGrantV1Schema,
         { onExcessProperty: "error" },
@@ -581,7 +662,8 @@ function providerAccessFailure(
   }
   if (
     typeof error === "object" && error !== null && "_tag" in error &&
-    error._tag === "WorkloadIdentityDependencyUnavailable"
+    (error._tag === "WorkloadIdentityDependencyUnavailable" ||
+      error._tag === "HermesProviderAccessPolicyDependencyUnavailable")
   ) {
     const dependency = "dependency" in error &&
         error.dependency === "identity_store"
@@ -1132,6 +1214,86 @@ function integerHeader(headers: Headers, name: string): number {
   return Number(source);
 }
 
+function authorizationIdentityFromHeaders(headers: Headers) {
+  if (requiredHeader(headers, "x-agentos-authz-principal-kind") === "kubernetes_workload") {
+    return {
+      kind: "kubernetes_workload",
+      namespace: requiredHeader(headers, "x-agentos-authz-workload-namespace"),
+      serviceAccountName: requiredHeader(headers, "x-agentos-authz-service-account"),
+      policyRevision: integerHeader(headers, "x-agentos-authz-policy-revision"),
+      policyResourceVersion: requiredHeader(
+        headers,
+        "x-agentos-authz-policy-resource-version",
+      ),
+      hermesProfile: requiredHeader(headers, "x-agentos-authz-hermes-profile"),
+    };
+  }
+  return {
+    agentId: requiredHeader(headers, "x-agentos-authz-agent-id"),
+    role: requiredHeader(headers, "x-agentos-authz-role"),
+    fleet: requiredHeader(headers, "x-agentos-authz-fleet"),
+    domain: requiredHeader(headers, "x-agentos-authz-domain"),
+    assignmentId: optionalHeader(
+      headers,
+      "x-agentos-authz-assignment-id",
+    ) ?? null,
+  };
+}
+
+function authorizationPolicyFieldsFromHeaders(headers: Headers) {
+  if (requiredHeader(headers, "x-agentos-authz-principal-kind") === "kubernetes_workload") {
+    return {
+      model: requiredHeader(headers, "x-agentos-authz-model"),
+      limits: {
+        requestWindowMillis: integerHeader(
+          headers,
+          "x-agentos-authz-request-window-millis",
+        ),
+        maximumRequests: integerHeader(headers, "x-agentos-authz-maximum-requests"),
+        maximumConcurrent: integerHeader(
+          headers,
+          "x-agentos-authz-maximum-concurrent",
+        ),
+        tokenWindowMillis: integerHeader(
+          headers,
+          "x-agentos-authz-token-window-millis",
+        ),
+        maximumTokens: integerHeader(headers, "x-agentos-authz-maximum-tokens"),
+        spendWindowMillis: integerHeader(
+          headers,
+          "x-agentos-authz-spend-window-millis",
+        ),
+        maximumSpendMicros: integerHeader(
+          headers,
+          "x-agentos-authz-maximum-spend-micros",
+        ),
+      },
+    };
+  }
+  return {
+    profile: {
+      profileId: requiredHeader(headers, "x-agentos-authz-profile-id"),
+      profileVersion: integerHeader(
+        headers,
+        "x-agentos-authz-profile-version",
+      ),
+    },
+    ceiling: {
+      ceilingId: requiredHeader(headers, "x-agentos-authz-ceiling-id"),
+      revision: integerHeader(headers, "x-agentos-authz-ceiling-revision"),
+    },
+  };
+}
+
+function modelFromAuthorizationBody(body: string | undefined): string | null {
+  if (body === undefined) return null;
+  const decoded = Schema.decodeUnknownOption(
+    Schema.fromJsonString(Schema.Struct({ model: Schema.String })),
+    { onExcessProperty: "ignore" },
+  )(body);
+  return Option.isSome(decoded) ? decoded.value.model : null;
+}
+
 function authorizerError(code: ProviderAuthorizationError["code"]) {
   return ProviderAuthorizationError.make({ code });
 }
@@ -1159,7 +1321,8 @@ function responseForAuthorizationFailure(error: unknown): Response {
   }
   if (
     typeof error === "object" && error !== null && "_tag" in error &&
-    error._tag === "WorkloadIdentityDependencyUnavailable"
+    (error._tag === "WorkloadIdentityDependencyUnavailable" ||
+      error._tag === "HermesProviderAccessPolicyDependencyUnavailable")
   ) {
     return unavailableResponse();
   }

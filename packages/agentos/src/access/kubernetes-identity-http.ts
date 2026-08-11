@@ -26,6 +26,10 @@ import {
   type KubernetesServiceAccountIdentityV1,
   type KubernetesTokenReviewRequest,
 } from "./identity.ts";
+import {
+  HermesProviderAccessPolicyDependencyUnavailable,
+  HermesProviderAccessPolicySource,
+} from "./hermes-authorizer.ts";
 
 export const KUBERNETES_SERVICE_ACCOUNT_TOKEN_PATH =
   "/var/run/secrets/kubernetes.io/serviceaccount/token";
@@ -68,6 +72,7 @@ const KubernetesOperation = Schema.Literals([
   "review",
   "get_pod",
   "get_service_account",
+  "get_policy",
 ]);
 const KubernetesDependencyCode = Schema.Literals([
   "credential_unavailable",
@@ -208,8 +213,22 @@ export function makeKubernetesWorkloadIdentityHttpLayer(
             ),
         ),
       });
+      const policySource = HermesProviderAccessPolicySource.of({
+        current: runScopedRequest(
+          getCurrentHermesProviderPolicy(runtime, options),
+          options,
+          "get_policy",
+        ).pipe(
+          Effect.mapError(() =>
+            HermesProviderAccessPolicyDependencyUnavailable.make({
+              operation: "get_policy",
+            })
+          ),
+        ),
+      });
       return Context.make(KubernetesTokenReviewer, reviewer).pipe(
         Context.add(KubernetesWorkloadIdentityLookup, lookup),
+        Context.add(HermesProviderAccessPolicySource, policySource),
       );
     }),
   );
@@ -407,6 +426,29 @@ function getServiceAccount(
   );
 }
 
+function getCurrentHermesProviderPolicy(
+  runtime: KubernetesHttpRuntime,
+  options: KubernetesWorkloadIdentityHttpOptions,
+) {
+  return executeRequest(
+    runtime,
+    options,
+    "get_policy",
+    "GET",
+    "/api/v1/namespaces/agentos/configmaps/agentos-hermes-provider-access-v1",
+  ).pipe(
+    Effect.flatMap((response) =>
+      response.status === 200
+        ? decodeResponse(response, "get_policy", options, Schema.Unknown)
+        : discardStatusResponse(response, "get_policy", options).pipe(
+          Effect.andThen(
+            dependencyError("get_policy", "unexpected_status", response.status),
+          ),
+        )
+    ),
+  );
+}
+
 function executeOptionalJsonRequest<S extends Schema.Top>(
   runtime: KubernetesHttpRuntime,
   options: KubernetesWorkloadIdentityHttpOptions,
@@ -488,7 +530,7 @@ function executeRequest(
 function runScopedRequest<A, E>(
   request: Effect.Effect<A, E, Scope.Scope>,
   options: KubernetesWorkloadIdentityHttpOptions,
-  operation: "review" | "get_pod" | "get_service_account",
+  operation: "review" | "get_pod" | "get_service_account" | "get_policy",
 ) {
   return request.pipe(
     Effect.timeoutOrElse({

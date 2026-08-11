@@ -429,11 +429,24 @@ function authenticateClient(
   }
   return Effect.gen(function*() {
     const currentTime = yield* now;
+    const body = request.headers.get("x-agentos-authz-principal-kind") ===
+        "kubernetes_workload"
+      ? yield* Effect.result(Effect.tryPromise({
+        try: () => request.clone().text(),
+        catch: () => AIForwardConfigurationError.make({
+          code: "invalid_configuration",
+        }),
+      }))
+      : undefined;
+    if (body !== undefined && Result.isFailure(body)) {
+      return { authenticated: false, status: 401 };
+    }
     const decoded = yield* Effect.result(
       decodeProviderAuthorizationGrantHeaders(request.headers, {
         method: request.method,
         path: url.pathname,
         nowMillis: currentTime,
+        ...(body === undefined ? {} : { body: body.success }),
       }),
     );
     if (Result.isFailure(decoded)) {

@@ -199,6 +199,7 @@ export class WorkloadIdentityDependencyUnavailable extends Schema.TaggedErrorCla
       "review",
       "get_pod",
       "get_service_account",
+      "get_policy",
       "find_agent",
       "find_assignment",
     ]),

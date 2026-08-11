@@ -61,7 +61,7 @@ const makeAccessTelemetryRecorder = Effect.fn(
 function grant(
   capability: ProviderAuthorizationGrantV1["capability"] =
     "github.issue.read",
-): ProviderAuthorizationGrantV1 {
+): Extract<ProviderAuthorizationGrantV1, { readonly profile: unknown }> {
   return {
     schemaVersion: 1,
     correlationId: "corr_44444444444444444444444444444444",

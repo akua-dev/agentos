@@ -104,6 +104,15 @@ export {
   type HermesProviderRuleV1,
 } from "./access/kubernetes-workload-policy.ts";
 export {
+  createHermesProviderAuthorization,
+  HermesProviderAccessPolicyDependencyUnavailable,
+  HermesProviderAccessPolicySource,
+  HermesProviderAuthorizer,
+  type HermesProviderAuthorization,
+  type HermesProviderAuthorizationRequest,
+  type HermesProviderAuthorizationResult,
+} from "./access/hermes-authorizer.ts";
+export {
   ACCESS_POLICY_RELOAD_SLO_MILLIS,
   ACCESS_POLICY_REVOCATION_SLO_MILLIS,
   AccessControlAuditDecodeError,
