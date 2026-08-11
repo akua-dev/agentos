@@ -222,6 +222,48 @@ describe("Hermes Kubernetes workload provider policy", () => {
       });
     }));
 
+  it.effect("denies an exact provider access tuple with a disabled rate class", () =>
+    Effect.gen(function*() {
+      const binding = validPolicy.bindings[0]!;
+      const provider = binding.providers[0]!;
+      const disabledPolicy = {
+        ...validPolicy,
+        bindings: [{
+          ...binding,
+          providers: [{
+            ...provider,
+            rateClass: "disabled",
+            limits: {
+              ...provider.limits,
+              maximumRequests: 0,
+              maximumConcurrent: 0,
+              maximumTokens: 0,
+              maximumSpendMicros: 0,
+            },
+          }],
+        }],
+      };
+
+      yield* matchHermesProviderAccessConfigMapV1(configMap(disabledPolicy), {
+        namespace: "hermes-akua",
+        serviceAccountName: "hermes-codex-worker",
+        policyRevision: 7,
+        policyResourceVersion: "18422",
+        provider: "openai",
+        credentialDomain: "fleet-codex",
+        model: "gpt-5.6-sol",
+        capability: "responses.create",
+        atMillis: 1_786_435_200_000,
+      }).pipe(
+        Effect.flip,
+        Effect.map((error) => {
+          assert.instanceOf(error, HermesProviderAccessPolicyError);
+          assert.strictEqual(error.code, "access_denied");
+          assert.deepStrictEqual(Object.keys(error), ["_tag", "code"]);
+        }),
+      );
+    }));
+
   it.effect("rejects a forged noncanonical model in an access grant", () =>
     Effect.gen(function*() {
       const grant = yield* matchHermesProviderAccessConfigMapV1(configMap(), {
