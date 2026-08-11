@@ -108,6 +108,21 @@ describe("egress authorizer Kubernetes boundary", () => {
       assert.include(rendered, '"verbs":["create"]');
       assert.include(rendered, '"resources":["pods","serviceaccounts"]');
       assert.include(rendered, '"verbs":["get"]');
+      assert.include(rendered, '"resources":["configmaps"]');
+      assert.include(
+        rendered,
+        '"resourceNames":["agentos-hermes-provider-access-v1"]',
+      );
+      for (const forbidden of [
+        '"resources":["secrets"]',
+        '"resources":["pods"],"verbs":["list"',
+        '"verbs":["*"',
+        '"resources":["*"',
+        '"apiGroups":["*"',
+        '"verbs":["update"',
+        '"verbs":["patch"',
+        '"verbs":["delete"',
+      ]) assert.notInclude(rendered, forbidden);
       assert.include(rendered, '"policyTypes":["Ingress"]');
       assert.include(
         rendered,
@@ -117,5 +132,9 @@ describe("egress authorizer Kubernetes boundary", () => {
       assert.notInclude(rendered, '"egress":');
       assert.include(rendered, '"port":9001');
       assert.include(rendered, '"targetPort":"http"');
+      assert.notInclude(rendered, '"kind":"Ingress"');
+      assert.notInclude(rendered, '"kind":"PersistentVolumeClaim"');
+      assert.notInclude(rendered, '"type":"LoadBalancer"');
+      assert.notInclude(rendered, '"type":"NodePort"');
     }).pipe(Effect.provide(platform)));
 });

@@ -17,7 +17,8 @@ const EnvironmentEntry = Schema.Struct({
 });
 type EnvironmentEntry = typeof EnvironmentEntry.Type;
 const ExecProbe = Schema.Struct({
-  exec: Schema.Struct({ command: Schema.Array(Schema.String) }),
+  exec: Schema.optional(Schema.Struct({ command: Schema.Array(Schema.String) })),
+  httpGet: Schema.optional(Schema.Unknown),
 });
 const Container = Schema.Struct({
   name: Schema.String,
@@ -31,6 +32,13 @@ const Container = Schema.Struct({
   readinessProbe: Schema.optional(ExecProbe),
   securityContext: Schema.optional(Schema.Unknown),
   volumeMounts: Schema.optional(Schema.Unknown),
+});
+const Volume = Schema.Struct({
+  name: Schema.String,
+  projected: Schema.optional(Schema.Unknown),
+  secret: Schema.optional(Schema.Unknown),
+  configMap: Schema.optional(Schema.Unknown),
+  emptyDir: Schema.optional(Schema.Unknown),
 });
 const Metadata = Schema.Struct({
   name: Schema.String,
@@ -69,7 +77,7 @@ const StatefulSet = Schema.Struct({
         securityContext: Schema.Unknown,
         initContainers: Schema.Array(Container),
         containers: Schema.Array(Container),
-        volumes: Schema.Unknown,
+        volumes: Schema.Array(Volume),
       }),
     }),
   }),
@@ -194,20 +202,20 @@ describe("Crewmate Kubernetes base", () => {
         [...pod.initContainers, container].map(({ resources }) => resources),
         [
           {
-            limits: { cpu: "2", memory: "2Gi" },
-            requests: { cpu: "250m", memory: "512Mi" },
+            limits: { cpu: "2", memory: "2Gi", "ephemeral-storage": "1Gi" },
+            requests: { cpu: "250m", memory: "512Mi", "ephemeral-storage": "128Mi" },
           },
           {
-            limits: { cpu: "2", memory: "2Gi" },
-            requests: { cpu: "250m", memory: "512Mi" },
+            limits: { cpu: "2", memory: "2Gi", "ephemeral-storage": "1Gi" },
+            requests: { cpu: "250m", memory: "512Mi", "ephemeral-storage": "128Mi" },
           },
           {
-            limits: { cpu: "250m", memory: "128Mi" },
-            requests: { cpu: "25m", memory: "64Mi" },
+            limits: { cpu: "250m", memory: "128Mi", "ephemeral-storage": "128Mi" },
+            requests: { cpu: "25m", memory: "64Mi", "ephemeral-storage": "32Mi" },
           },
           {
-            limits: { cpu: "2", memory: "4Gi" },
-            requests: { cpu: "250m", memory: "512Mi" },
+            limits: { cpu: "2", memory: "4Gi", "ephemeral-storage": "1Gi" },
+            requests: { cpu: "250m", memory: "512Mi", "ephemeral-storage": "128Mi" },
           },
         ],
       );
@@ -313,14 +321,12 @@ describe("Crewmate Kubernetes base", () => {
       assert.deepStrictEqual(container.securityContext, {
         allowPrivilegeEscalation: false,
         capabilities: { drop: ["ALL"] },
+        readOnlyRootFilesystem: true,
+        runAsNonRoot: true,
       });
       assert.deepStrictEqual(container.volumeMounts, [
         { mountPath: "/home/agent", name: "home" },
-        {
-          mountPath: "/var/run/secrets/agentos-egress",
-          name: "agentos-egress-identity",
-          readOnly: true,
-        },
+        { mountPath: "/tmp", name: "tmp" },
         {
           mountPath: "/var/run/config/agentos-github",
           name: "agentos-github-ca",
@@ -340,19 +346,7 @@ describe("Crewmate Kubernetes base", () => {
           name: "database-credentials",
           secret: { defaultMode: 288, secretName: "agentos-crewmate-postgres" },
         },
-        {
-          name: "agentos-egress-identity",
-          projected: {
-            defaultMode: 288,
-            sources: [{
-              serviceAccountToken: {
-                audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
-                expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
-                path: "token",
-              },
-            }],
-          },
-        },
+        { name: "tmp", emptyDir: { sizeLimit: "256Mi" } },
         {
           name: "agentos-github-ca",
           configMap: {
@@ -393,26 +387,44 @@ describe("Crewmate Kubernetes base", () => {
       });
       assert.strictEqual(
         variables.AI_GATEWAY_URL,
-        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+        "http://127.0.0.1:8790",
       );
       assert.isUndefined(variables.AI_GATEWAY_TOKEN);
       assert.strictEqual(variables.AGENTOS_CODEX_PROVIDER_MODE, "ai-gateway");
-      assert.strictEqual(
-        variables.AGENTOS_EGRESS_TOKEN_FILE,
-        "/var/run/secrets/agentos-egress/token",
-      );
+      assert.isUndefined(variables.AGENTOS_EGRESS_TOKEN_FILE);
       assert.deepInclude(prepareVariables, {
         AGENTOS_ASSIGNMENT_ID: "00000000-0000-4000-8000-000000000005",
         AGENTOS_CODEX_PROVIDER_MODE: "ai-gateway",
-        AGENTOS_EGRESS_TOKEN_FILE: "/var/run/secrets/agentos-egress/token",
-        AI_GATEWAY_URL:
-          "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+        AI_GATEWAY_URL: "http://127.0.0.1:8790",
       });
       assert.strictEqual(
         variables.AGENTOS_PROVIDER_CREDENTIAL_KIND,
         "ai_gateway",
       );
       assert.strictEqual(pod.serviceAccountName, "agentos-crewmate");
+      assert.lengthOf(pod.containers, 2);
+      const proxy = yield* required(
+        pod.containers.find(({ name }) => name === "ai-gateway-workload-proxy"),
+        "Missing workload proxy",
+      );
+      assert.deepStrictEqual(proxy.volumeMounts, [{
+        mountPath: "/var/run/secrets/agentos-egress",
+        name: "agentos-egress-identity",
+        readOnly: true,
+      }]);
+      const identityVolumes = pod.volumes
+        .filter(({ name }) => name === "agentos-egress-identity");
+      assert.deepStrictEqual(identityVolumes, [{
+        name: "agentos-egress-identity",
+        projected: {
+          defaultMode: 288,
+          sources: [{ serviceAccountToken: {
+            audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
+            expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+            path: "token",
+          } }],
+        },
+      }]);
       assert.strictEqual(statefulSet.spec.volumeClaimTemplates[0]?.metadata.name, "home");
     }).pipe(Effect.provide(BunServices.layer)));
 

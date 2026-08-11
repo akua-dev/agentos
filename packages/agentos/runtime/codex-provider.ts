@@ -15,25 +15,16 @@ import {
 export const CODEX_GATEWAY_PROVIDER_ID = "agentos-gateway";
 const providerId = CODEX_GATEWAY_PROVIDER_ID;
 const markerVersion = 1;
-const defaultTokenFile = "/var/run/secrets/agentos-egress/token";
 
 const JsonObject = Schema.Record(Schema.String, Schema.Unknown);
 const GatewayProviderEntry = Schema.Struct({
   name: Schema.Literal("AgentOS workload gateway"),
   base_url: Schema.String,
   wire_api: Schema.Literal("responses"),
+  requires_openai_auth: Schema.Literal(false),
   supports_websockets: Schema.Literal(false),
   request_max_retries: Schema.Literal(0),
   stream_max_retries: Schema.Literal(0),
-  env_http_headers: Schema.Struct({
-    "X-AgentOS-Assignment-Id": Schema.Literal("AGENTOS_ASSIGNMENT_ID"),
-  }),
-  auth: Schema.Struct({
-    command: Schema.String,
-    args: Schema.Array(Schema.String),
-    timeout_ms: Schema.Literal(5_000),
-    refresh_interval_ms: Schema.Literal(60_000),
-  }),
 });
 
 class ActiveMarker extends Schema.TaggedClass<ActiveMarker>()("Active", {
@@ -178,57 +169,14 @@ export const codexGatewayProviderEntry = Effect.fn(
   if (rawUrl === undefined) {
     return yield* configurationError("AI_GATEWAY_URL must be configured");
   }
-  const assignmentId = yield* optionalEnvironment(
-    environment,
-    "AGENTOS_ASSIGNMENT_ID",
-  );
-  if (
-    assignmentId === undefined ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      assignmentId,
-    )
-  ) {
-    return yield* configurationError(
-      "AGENTOS_ASSIGNMENT_ID must be a UUID v4 in Gateway mode",
-    );
-  }
-  const home = yield* requiredAbsolutePath(environment, paths, "HOME");
-  const releaseRoot = yield* requiredAbsolutePath(
-    environment,
-    paths,
-    "AGENTOS_RELEASE_ROOT",
-  );
-  const tokenFile = yield* requiredAbsolutePath(
-    environment,
-    paths,
-    "AGENTOS_EGRESS_TOKEN_FILE",
-    defaultTokenFile,
-  );
   const entry = {
     name: "AgentOS workload gateway",
     base_url: yield* normalizedGatewayUrl(rawUrl),
     wire_api: "responses",
+    requires_openai_auth: false,
     supports_websockets: false,
     request_max_retries: 0,
     stream_max_retries: 0,
-    env_http_headers: {
-      "X-AgentOS-Assignment-Id": "AGENTOS_ASSIGNMENT_ID",
-    },
-    auth: {
-      command: paths.join(home, ".local", "share", "mise", "shims", "bun"),
-      args: [
-        paths.join(
-          releaseRoot,
-          "packages",
-          "agentos",
-          "runtime",
-          "codex-token.ts",
-        ),
-        tokenFile,
-      ],
-      timeout_ms: 5_000,
-      refresh_interval_ms: 60_000,
-    },
   };
   return yield* Schema.decodeUnknownEffect(GatewayProviderEntry)(entry).pipe(
     Effect.mapError(() => configurationError("Invalid workload Gateway provider")),
@@ -398,16 +346,10 @@ function renderProvider(entry: GatewayProviderEntry): string {
     `name = ${JSON.stringify(entry.name)}`,
     `base_url = ${JSON.stringify(entry.base_url)}`,
     `wire_api = ${JSON.stringify(entry.wire_api)}`,
+    `requires_openai_auth = ${entry.requires_openai_auth}`,
     `supports_websockets = ${entry.supports_websockets}`,
     `request_max_retries = ${entry.request_max_retries}`,
     `stream_max_retries = ${entry.stream_max_retries}`,
-    `env_http_headers = { "X-AgentOS-Assignment-Id" = "AGENTOS_ASSIGNMENT_ID" }`,
-    "",
-    `[model_providers.${providerId}.auth]`,
-    `command = ${JSON.stringify(entry.auth.command)}`,
-    `args = ${JSON.stringify(entry.auth.args)}`,
-    `timeout_ms = ${entry.auth.timeout_ms}`,
-    `refresh_interval_ms = ${entry.auth.refresh_interval_ms}`,
   ].join("\n");
 }
 

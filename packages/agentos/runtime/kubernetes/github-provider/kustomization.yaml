@@ -49,13 +49,17 @@ patches:
             capabilities:
               drop:
                 - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
           resources:
             requests:
               cpu: 25m
               memory: 64Mi
+              ephemeral-storage: 32Mi
             limits:
               cpu: 250m
               memory: 128Mi
+              ephemeral-storage: 128Mi
           volumeMounts:
             - name: home
               mountPath: /home/agent

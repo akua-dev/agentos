@@ -251,6 +251,19 @@ function assertEgressIdentityProjection(pod: PodSpec) {
   }
 }
 
+function assertNoEgressIdentityProjection(pod: PodSpec) {
+  assert.isUndefined(
+    pod.volumes.find(({ name }) => name === "agentos-egress-identity"),
+  );
+  for (const container of [...pod.initContainers, ...pod.containers]) {
+    assert.isUndefined(
+      container.volumeMounts?.find(({ name }) =>
+        name === "agentos-egress-identity"
+      ),
+    );
+  }
+}
+
 layer(BunServices.layer)("AgentWorkloadSpec native Kustomize output", (it) => {
   it.effect("renders one isolated interactive Crewmate from ordinary native resources", () =>
     Effect.gen(function*() {
@@ -299,7 +312,7 @@ layer(BunServices.layer)("AgentWorkloadSpec native Kustomize output", (it) => {
         databaseVolume?.secret?.secretName,
         "agentos-crewmate-postgres",
       );
-      assertEgressIdentityProjection(pod);
+      assertNoEgressIdentityProjection(pod);
     }));
 
   it.effect("renders the persistent Mate and exact released domain controls", () =>

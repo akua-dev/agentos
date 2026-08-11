@@ -24,10 +24,9 @@ const platform = Layer.merge(
 const gatewayEnvironment = {
   AGENTOS_ASSIGNMENT_ID: "20000000-0000-4000-8000-000000000001",
   AGENTOS_CODEX_PROVIDER_MODE: "ai-gateway",
-  AGENTOS_EGRESS_TOKEN_FILE: "/var/run/secrets/agentos-egress/token",
   AGENTOS_RELEASE_ROOT: "/opt/agentos",
   AI_GATEWAY_URL:
-    "http://agentgateway-openai.agentos.svc.cluster.local:8788/",
+    "http://127.0.0.1:8790/",
   HOME: "/home/agent",
 };
 
@@ -123,18 +122,12 @@ describe("Effect Codex workload-authenticated provider", () => {
           assert.include(source, 'model_provider = "agentos-gateway"');
           assert.include(source, '[projects."/workspace"]');
           assert.include(source, 'trust_level = "trusted"');
+          assert.include(source, "requires_openai_auth = false");
           assert.include(
             source,
-            '[model_providers.agentos-gateway.auth]',
+            'base_url = "http://127.0.0.1:8790"',
           );
-          assert.include(
-            source,
-            'base_url = "http://agentgateway-openai.agentos.svc.cluster.local:8788"',
-          );
-          assert.include(
-            source,
-            'command = "/home/agent/.local/share/mise/shims/bun"',
-          );
+          assert.notInclude(source, "[model_providers.agentos-gateway.auth]");
           assert.notInclude(source, "header.payload.signature");
           assert.notInclude(source, "AI_GATEWAY_TOKEN");
           assert.strictEqual(
@@ -182,7 +175,7 @@ describe("Effect Codex workload-authenticated provider", () => {
     );
 
     it.effect(
-      "fails closed on ownership collisions and malformed identity inputs",
+      "fails closed on ownership collisions and malformed gateway inputs",
       () =>
         Effect.scoped(Effect.gen(function*() {
           const fileSystem = yield* FileSystem.FileSystem;
@@ -203,9 +196,9 @@ describe("Effect Codex workload-authenticated provider", () => {
           assert.include(
             (yield* reconcile(malformed, {
               ...gatewayEnvironment,
-              AGENTOS_ASSIGNMENT_ID: "not-an-assignment",
+              AI_GATEWAY_URL: "file:///tmp/not-http",
             }).pipe(Effect.flip)).message,
-            "AGENTOS_ASSIGNMENT_ID",
+            "AI_GATEWAY_URL",
           );
           assert.strictEqual(
             yield* fileSystem.readFileString(malformed.configPath),

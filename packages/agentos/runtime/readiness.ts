@@ -443,12 +443,19 @@ const verifyCredential = Effect.fn("agentos.readiness.verifyCredential")(
           : "pi_auth");
     let available: boolean;
     if (kind === "ai_gateway") {
-      const tokenPath =
-        requiredEnvironment(environment, "AGENTOS_EGRESS_TOKEN_FILE") ??
-        defaultEgressTokenPath;
-      available =
-        gatewayMetadataValid(environment) &&
-        isSecureProjectedToken(yield* probeRuntime.metadata(tokenPath));
+      if (
+        requiredEnvironment(environment, "AGENTOS_CODEX_PROVIDER_MODE") ===
+          "ai-gateway"
+      ) {
+        available = gatewayMetadataValid(environment);
+      } else {
+        const tokenPath =
+          requiredEnvironment(environment, "AGENTOS_EGRESS_TOKEN_FILE") ??
+          defaultEgressTokenPath;
+        available =
+          gatewayMetadataValid(environment) &&
+          isSecureProjectedToken(yield* probeRuntime.metadata(tokenPath));
+      }
     } else if (kind === "pi_auth") {
       const directory =
         requiredEnvironment(environment, "PI_CODING_AGENT_DIR") ??

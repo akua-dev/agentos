@@ -206,6 +206,7 @@ describe("Second Mate Kubernetes base", () => {
             }],
           },
         },
+        { name: "tmp", emptyDir: { sizeLimit: "256Mi" } },
         {
           name: "agentos-github-ca",
           configMap: {
@@ -235,8 +236,8 @@ describe("Second Mate Kubernetes base", () => {
         "Missing GitHub provider preparation container",
       );
       assert.deepStrictEqual(githubProvider.resources, {
-        limits: { cpu: "250m", memory: "128Mi" },
-        requests: { cpu: "25m", memory: "64Mi" },
+        limits: { cpu: "250m", memory: "128Mi", "ephemeral-storage": "128Mi" },
+        requests: { cpu: "25m", memory: "64Mi", "ephemeral-storage": "32Mi" },
       });
       assert.deepStrictEqual(
         allContainers.map(({ workingDir }) => workingDir),

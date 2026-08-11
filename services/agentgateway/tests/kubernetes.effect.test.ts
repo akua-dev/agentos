@@ -23,6 +23,11 @@ const ProbeSchema = Schema.Struct({
     port: Schema.Union([Schema.String, Schema.Number]),
   }),
 });
+const ResourceListSchema = Schema.Struct({
+  cpu: Schema.String,
+  memory: Schema.String,
+  "ephemeral-storage": Schema.optional(Schema.String),
+});
 
 const ContainerSchema = Schema.Struct({
   name: Schema.String,
@@ -32,6 +37,21 @@ const ContainerSchema = Schema.Struct({
   livenessProbe: Schema.optional(ProbeSchema),
   readinessProbe: Schema.optional(ProbeSchema),
   startupProbe: Schema.optional(ProbeSchema),
+  resources: Schema.Struct({
+    requests: ResourceListSchema,
+    limits: ResourceListSchema,
+  }),
+  securityContext: Schema.Struct({
+    allowPrivilegeEscalation: Schema.Literal(false),
+    capabilities: Schema.Struct({ drop: Schema.Tuple([Schema.Literal("ALL")]) }),
+    readOnlyRootFilesystem: Schema.Literal(true),
+    runAsNonRoot: Schema.Literal(true),
+    runAsUser: Schema.optional(Schema.Number),
+    runAsGroup: Schema.optional(Schema.Number),
+    seccompProfile: Schema.optional(
+      Schema.Struct({ type: Schema.Literal("RuntimeDefault") }),
+    ),
+  }),
   volumeMounts: Schema.optional(Schema.Array(Schema.Struct({
     name: Schema.String,
     mountPath: Schema.String,
@@ -67,7 +87,7 @@ const DeploymentSpecSchema = Schema.Struct({
 
 const PdbSpecSchema = Schema.Struct({ minAvailable: Schema.Literal(1) });
 const NetworkPolicySpecSchema = Schema.Struct({
-  policyTypes: Schema.Tuple([Schema.Literal("Ingress")]),
+  policyTypes: Schema.Array(Schema.Literals(["Ingress", "Egress"])),
 });
 const repositoryRoot = new URL("../../..", import.meta.url);
 
@@ -147,6 +167,23 @@ describe("owned agentgateway Kustomize workloads", () => {
             ? ["agentos-github-tls"]
             : [],
         );
+        for (const container of deployment.metadata.name === "agentgateway-openai"
+          ? spec.template.spec.containers
+          : []) {
+          assert.deepInclude(container.securityContext, {
+            allowPrivilegeEscalation: false,
+            capabilities: { drop: ["ALL"] },
+            readOnlyRootFilesystem: true,
+            runAsNonRoot: true,
+            seccompProfile: { type: "RuntimeDefault" },
+          });
+          assert.hasAllKeys(container.resources.requests, [
+            "cpu", "memory", "ephemeral-storage",
+          ]);
+          assert.hasAllKeys(container.resources.limits, [
+            "cpu", "memory", "ephemeral-storage",
+          ]);
+        }
       }
 
       const serviceAccounts = resources.filter(
@@ -171,8 +208,20 @@ describe("owned agentgateway Kustomize workloads", () => {
       assert.lengthOf(policies, 2);
       yield* Effect.forEach(policies, ({ spec }) =>
         Schema.decodeUnknownEffect(NetworkPolicySpecSchema)(spec));
-      assert.notInclude(manifest, "policyTypes:\n  - Egress");
+      const openaiPolicy = policies.find(({ metadata }) =>
+        metadata.name === "agentgateway-openai"
+      );
+      assert.deepStrictEqual(
+        yield* Schema.decodeUnknownEffect(NetworkPolicySpecSchema)(
+          openaiPolicy?.spec,
+        ),
+        { policyTypes: ["Ingress", "Egress"] },
+      );
       assert.notInclude(manifest, "kind: Secret");
+      assert.notInclude(manifest, "kind: Ingress");
+      assert.notInclude(manifest, "kind: PersistentVolumeClaim");
+      assert.notInclude(manifest, "type: LoadBalancer");
+      assert.notInclude(manifest, "type: NodePort");
     }).pipe(Effect.provide(BunServices.layer))));
 
   it.effect("rolls immutable route configuration through generated ConfigMaps", () =>
