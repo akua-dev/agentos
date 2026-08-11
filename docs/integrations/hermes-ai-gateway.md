@@ -25,7 +25,7 @@ sends only `POST /v1/responses` or `POST /v1/responses/compact` to a loopback
 `ai-gateway-workload-proxy` sidecar. The sidecar:
 
 - accepts no provider credential and listens on loopback only;
-- rereads the kubelet-rotated `agentos-egress-authz` ServiceAccount token for
+- rereads the kubelet-rotated `agentos-hermes-egress-authz` ServiceAccount token for
   every request;
 - removes caller-supplied authorization, assignment, decision, grant, and every
   other `x-agentos-*` header, then supplies only projected identity and an
@@ -172,7 +172,7 @@ spec:
             defaultMode: 0440
             sources:
               - serviceAccountToken:
-                  audience: agentos-egress-authz
+                  audience: agentos-hermes-egress-authz
                   expirationSeconds: 600
                   path: token
 ```

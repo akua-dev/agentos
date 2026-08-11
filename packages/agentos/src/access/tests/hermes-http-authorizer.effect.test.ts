@@ -8,12 +8,16 @@ import {
 } from "../hermes-authorizer.ts";
 import {
   ProviderPolicyDecisionPoint,
+  type ProviderPolicyDecisionRefV1,
 } from "../credential-delivery.ts";
 import {
+  AGENTOS_EGRESS_TOKEN_AUDIENCE,
+  HERMES_EGRESS_TOKEN_AUDIENCE,
   KubernetesBoundServiceAccountAuthenticator,
   type KubernetesBoundServiceAccountIdentityV1,
   WorkloadAuthenticationError,
   WorkloadIdentityAuthenticator,
+  type WorkloadIdentityV1,
 } from "../identity.ts";
 import {
   createProviderAuthorizationHttpHandler,
@@ -41,6 +45,37 @@ const boundIdentity: KubernetesBoundServiceAccountIdentityV1 = {
   serviceAccountName: "hermes-codex",
   serviceAccountUid: "service-account-uid-1",
 };
+
+const legacyIdentity: WorkloadIdentityV1 = {
+  schemaVersion: 1,
+  agentId: "10000000-0000-4000-8000-000000000001",
+  role: "crewmate",
+  fleet: "agentos",
+  domain: "engineering",
+  assignmentId: "20000000-0000-4000-8000-000000000001",
+  kubernetesNamespace: "agentos-engineering",
+  kubernetesPod: "worker-0",
+  podUid: "legacy-pod-uid",
+  serviceAccountName: "worker",
+  serviceAccountUid: "legacy-service-account-uid",
+};
+
+function legacyDecision(correlationId: string): ProviderPolicyDecisionRefV1 {
+  return {
+    schemaVersion: 1,
+    correlationId,
+    decisionRef: "decision_22222222222222222222222222222222",
+    decision: "allow",
+    credentialDomain: "openai-responses",
+    expiresAtMillis: now + 15_000,
+    profile: { profileId: "openai-responses", profileVersion: 7 },
+    ceiling: {
+      ceilingId: "ceiling_33333333333333333333333333333333",
+      revision: 9,
+    },
+    rateClass: "standard",
+  };
+}
 
 function policy(
   resourceVersion = "18422",
@@ -126,6 +161,120 @@ function dependencies(
 }
 
 describe("Hermes Kubernetes workload HTTP authorization", () => {
+  it.effect("denies an authenticated Hermes workload after its policy binding is removed", () =>
+    Effect.gen(function*() {
+      const legacyIdentityCalls = yield* Ref.make(0);
+      const legacyPdpCalls = yield* Ref.make(0);
+      const emptyPolicy = policy();
+      emptyPolicy.data["policy.json"] = JSON.stringify({
+        apiVersion: "agentos.akua.dev/hermes-provider-access/v1",
+        revision: 8,
+        bindings: [],
+      });
+      const currentPolicy = yield* Ref.make<unknown>(emptyPolicy);
+      const layer = Layer.mergeAll(
+        Layer.succeed(KubernetesBoundServiceAccountAuthenticator, {
+          authenticate: () => Effect.succeed(boundIdentity),
+        }),
+        Layer.succeed(HermesProviderAccessPolicySource, {
+          current: Ref.get(currentPolicy),
+        }),
+        Layer.succeed(WorkloadIdentityAuthenticator, {
+          authenticate: () =>
+            Ref.update(legacyIdentityCalls, (value) => value + 1).pipe(
+              Effect.as(legacyIdentity),
+            ),
+          invalidate: () => Effect.void,
+        }),
+        Layer.succeed(ProviderPolicyDecisionPoint, {
+          decide: (input) =>
+            Ref.update(legacyPdpCalls, (value) => value + 1).pipe(
+              Effect.as(legacyDecision(input.correlationId)),
+            ),
+        }),
+      );
+
+      const response = yield* Effect.gen(function*() {
+        const hermes = yield* createHermesProviderAuthorization();
+        const handler = yield* createProviderAuthorizationHttpHandler({
+          clock: Effect.succeed(now),
+          id: Effect.succeed("44444444444444444444444444444444"),
+          hermes,
+        });
+        return yield* handler(request());
+      }).pipe(Effect.provide(layer));
+
+      assert.strictEqual(response.status, 403);
+      assert.deepStrictEqual(yield* Effect.promise(() => response.json()), {
+        error: "forbidden",
+      });
+      assert.strictEqual(yield* Ref.get(legacyIdentityCalls), 0);
+      assert.strictEqual(yield* Ref.get(legacyPdpCalls), 0);
+    }));
+
+  it.effect("preserves genuine legacy authorization when the token is not for the Hermes audience", () =>
+    Effect.gen(function*() {
+      const hermesAudiences = yield* Ref.make<ReadonlyArray<string>>([]);
+      const legacyIdentityCalls = yield* Ref.make(0);
+      const legacyPdpCalls = yield* Ref.make(0);
+      const currentPolicy = yield* Ref.make<unknown>(policy());
+      const layer = Layer.mergeAll(
+        Layer.succeed(KubernetesBoundServiceAccountAuthenticator, {
+          authenticate: (input) =>
+            Ref.update(hermesAudiences, (values) => [...values, input.audience]).pipe(
+              Effect.andThen(
+                input.audience === HERMES_EGRESS_TOKEN_AUDIENCE
+                  ? Effect.fail(WorkloadAuthenticationError.make({
+                    code: "token_review_rejected",
+                  }))
+                  : Effect.succeed(boundIdentity),
+              ),
+            ),
+        }),
+        Layer.succeed(HermesProviderAccessPolicySource, {
+          current: Ref.get(currentPolicy),
+        }),
+        Layer.succeed(WorkloadIdentityAuthenticator, {
+          authenticate: () =>
+            Ref.update(legacyIdentityCalls, (value) => value + 1).pipe(
+              Effect.as(legacyIdentity),
+            ),
+          invalidate: () => Effect.void,
+        }),
+        Layer.succeed(ProviderPolicyDecisionPoint, {
+          decide: (input) =>
+            Ref.update(legacyPdpCalls, (value) => value + 1).pipe(
+              Effect.as(legacyDecision(input.correlationId)),
+            ),
+        }),
+      );
+
+      const response = yield* Effect.gen(function*() {
+        const hermes = yield* createHermesProviderAuthorization();
+        const handler = yield* createProviderAuthorizationHttpHandler({
+          clock: Effect.succeed(now),
+          id: Effect.succeed("44444444444444444444444444444444"),
+          hermes,
+        });
+        const legacyRequest = request();
+        legacyRequest.headers.set("x-agentos-hermes-profile", "default");
+        legacyRequest.headers.set("x-hermes-task-id", "spoofed-workload");
+        return yield* handler(legacyRequest);
+      }).pipe(Effect.provide(layer));
+
+      assert.strictEqual(response.status, 200);
+      assert.deepStrictEqual(yield* Ref.get(hermesAudiences), [
+        HERMES_EGRESS_TOKEN_AUDIENCE,
+        AGENTOS_EGRESS_TOKEN_AUDIENCE,
+      ]);
+      assert.strictEqual(yield* Ref.get(legacyIdentityCalls), 1);
+      assert.strictEqual(yield* Ref.get(legacyPdpCalls), 1);
+      assert.strictEqual(
+        response.headers.get("x-agentos-authz-principal-kind"),
+        "agentos",
+      );
+    }));
+
   it.effect("authorizes the exact live policy-bound model without Agent or Assignment lookup", () =>
     Effect.gen(function*() {
       const identityStoreCalls = yield* Ref.make(0);
@@ -266,7 +415,6 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
   it.effect("fails closed on bound identity rejection without consulting Agent or Assignment identity", () =>
     Effect.gen(function*() {
       const rejectionCodes: ReadonlyArray<WorkloadAuthenticationError["code"]> = [
-        "wrong_audience",
         "pod_uid_mismatch",
         "service_account_uid_mismatch",
       ];
@@ -288,6 +436,51 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           () => Effect.fail(WorkloadAuthenticationError.make({ code })),
         )));
       }
+    }));
+
+  it.effect("denies a token outside both trusted audiences before either policy decision point", () =>
+    Effect.gen(function*() {
+      const boundAuthenticationCalls = yield* Ref.make(0);
+      const legacyIdentityCalls = yield* Ref.make(0);
+      const currentPolicy = yield* Ref.make<unknown>(policy());
+      const layer = Layer.mergeAll(
+        Layer.succeed(KubernetesBoundServiceAccountAuthenticator, {
+          authenticate: () =>
+            Ref.update(boundAuthenticationCalls, (value) => value + 1).pipe(
+              Effect.andThen(Effect.fail(WorkloadAuthenticationError.make({
+                code: "wrong_audience",
+              }))),
+            ),
+        }),
+        Layer.succeed(HermesProviderAccessPolicySource, {
+          current: Ref.get(currentPolicy),
+        }),
+        Layer.succeed(WorkloadIdentityAuthenticator, {
+          authenticate: () =>
+            Ref.update(legacyIdentityCalls, (value) => value + 1).pipe(
+              Effect.andThen(Effect.fail(WorkloadAuthenticationError.make({
+                code: "wrong_audience",
+              }))),
+            ),
+          invalidate: () => Effect.void,
+        }),
+        Layer.succeed(ProviderPolicyDecisionPoint, {
+          decide: () => Effect.die("invalid identity must not reach the PDP"),
+        }),
+      );
+      const response = yield* Effect.gen(function*() {
+        const hermes = yield* createHermesProviderAuthorization();
+        const handler = yield* createProviderAuthorizationHttpHandler({
+          clock: Effect.succeed(now),
+          id: Effect.succeed("77777777777777777777777777777777"),
+          hermes,
+        });
+        return yield* handler(request());
+      }).pipe(Effect.provide(layer));
+
+      assert.strictEqual(response.status, 401);
+      assert.strictEqual(yield* Ref.get(boundAuthenticationCalls), 2);
+      assert.strictEqual(yield* Ref.get(legacyIdentityCalls), 0);
     }));
 
   it.effect("denies malformed policy without falling back to legacy Agent identity", () =>

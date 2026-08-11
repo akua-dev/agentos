@@ -10,6 +10,7 @@ import {
   ProviderPolicyDecisionPoint,
   WorkloadAuthenticationError,
   WorkloadIdentityAuthenticator,
+  type HermesProviderAuthorizationResult,
   type ProviderPolicyDecisionRefV1,
   type ProviderBudgetSettlementReportV1,
   type ProviderBudgetSettlementCallerV1,
@@ -62,6 +63,10 @@ const decision: ProviderPolicyDecisionRefV1 = {
     revision: 9,
   },
   rateClass: "standard",
+};
+
+const hermesNotSelected: HermesProviderAuthorizationResult = {
+  kind: "not_selected",
 };
 
 const settlementCaller: ProviderBudgetSettlementCallerV1 = {
@@ -125,7 +130,7 @@ function services(options?: {
       invalidate: () => Effect.void,
     }),
     Layer.succeed(HermesProviderAuthorizer, {
-      authorize: () => Effect.succeed({ kind: "not_bound" }),
+      authorize: () => Effect.succeed(hermesNotSelected),
     }),
     Layer.succeed(ProviderPolicyDecisionPoint, {
       decide: (input) => Effect.succeed({
