@@ -40,6 +40,7 @@ const kubernetesWorkload: KubernetesWorkloadPrincipalV1 = {
   namespace: "hermes-akua",
   serviceAccountName: "hermes-codex-worker",
   policyRevision: 7,
+  policyResourceVersion: "18422",
   hermesProfile: "fleet-codex",
 };
 const resource: AuthorizationResourceV1 = {
@@ -128,6 +129,10 @@ describe("provider budget enforcement", () => {
         ...reservationInput,
         subject: { ...kubernetesWorkload, policyRevision: 8 },
       });
+      const replacedPolicy = yield* providerBudgetKey({
+        ...reservationInput,
+        subject: { ...kubernetesWorkload, policyResourceVersion: "18423" },
+      });
       const renamedProfile = yield* providerBudgetKey({
         ...reservationInput,
         subject: { ...kubernetesWorkload, hermesProfile: "renamed-profile" },
@@ -146,6 +151,7 @@ describe("provider budget enforcement", () => {
 
       assert.match(first, /^budget_[0-9a-f]{64}$/);
       assert.notStrictEqual(first, nextRevision);
+      assert.notStrictEqual(first, replacedPolicy);
       assert.strictEqual(first, renamedProfile);
       assert.deepStrictEqual(decoded.subject, kubernetesWorkload);
       assert.notInclude(first, kubernetesWorkload.namespace);

@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect";
 import {
   AccessRateClassIdSchema,
   type KubernetesWorkloadPrincipalV1,
+  KubernetesResourceVersionSchema,
   KubernetesWorkloadPrincipalV1Schema,
 } from "./contracts.ts";
 
@@ -19,9 +20,7 @@ const NonNegativeInt = Schema.Number.pipe(
   Schema.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
 );
 const EpochMillis = NonNegativeInt;
-const ResourceVersion = Schema.String.pipe(
-  Schema.check(Schema.isMaxLength(128), Schema.isPattern(/^[0-9A-Za-z._:-]+$/)),
-);
+
 const HermesProfile = Schema.String.pipe(
   Schema.check(
     Schema.isMaxLength(96),
@@ -32,6 +31,12 @@ const ProviderModel = Schema.String.pipe(
   Schema.check(
     Schema.isMaxLength(128),
     Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
+  ),
+);
+export const HermesProviderModelIdSchema = Schema.String.pipe(
+  Schema.check(
+    Schema.isMaxLength(128),
+    Schema.isPattern(/^[a-z0-9][a-z0-9._:-]*$/),
   ),
 );
 
@@ -77,7 +82,7 @@ export const HermesProviderAccessConfigMapV1Schema = Schema.Struct({
   metadata: Schema.Struct({
     name: Schema.Literal("agentos-hermes-provider-access-v1"),
     namespace: Schema.Literal("agentos"),
-    resourceVersion: ResourceVersion,
+    resourceVersion: KubernetesResourceVersionSchema,
   }),
   data: Schema.Struct({
     "policy.json": Schema.fromJsonString(HermesProviderAccessPolicyDocumentV1Schema),
@@ -88,12 +93,14 @@ export class HermesProviderAccessPolicyError extends Schema.TaggedErrorClass<Her
   "HermesProviderAccessPolicyError",
   {
     code: Schema.Literals([
+      "access_denied",
       "binding_ambiguous",
       "binding_disabled",
       "binding_expired",
       "binding_not_found",
       "duplicate_binding",
       "invalid_config_map",
+      "invalid_access_request",
       "invalid_load_request",
       "invalid_provider_policy",
     ]),
@@ -102,6 +109,20 @@ export class HermesProviderAccessPolicyError extends Schema.TaggedErrorClass<Her
 
 function hasDuplicates(values: ReadonlyArray<string>) {
   return new Set(values).size !== values.length;
+}
+
+export function normalizeHermesProviderModelId(modelId: string) {
+  return modelId.toLowerCase();
+}
+
+function normalizeHermesProviderModelIds(
+  modelIds: readonly [string, ...string[]],
+): readonly [string, ...string[]] {
+  const [first, ...rest] = modelIds;
+  return [
+    normalizeHermesProviderModelId(first),
+    ...rest.map(normalizeHermesProviderModelId),
+  ];
 }
 
 function hasValidProviderLimits(rule: typeof HermesProviderRuleV1Schema.Type) {
@@ -131,6 +152,7 @@ export interface HermesProviderAccessPolicyV1 {
 }
 
 export type HermesProviderLimitsV1 = typeof HermesProviderLimitsV1Schema.Type;
+export type HermesProviderModelId = typeof HermesProviderModelIdSchema.Type;
 export type HermesProviderRuleV1 = typeof HermesProviderRuleV1Schema.Type;
 export type HermesProviderAccessBindingDocumentV1 =
   typeof HermesProviderAccessBindingDocumentV1Schema.Type;
@@ -163,7 +185,7 @@ export const decodeHermesProviderAccessConfigMapV1 = Effect.fn(
       if (
         providers.has(provider.provider) ||
         hasDuplicates(provider.credentialDomains) ||
-        hasDuplicates(provider.models) ||
+        hasDuplicates(normalizeHermesProviderModelIds(provider.models)) ||
         hasDuplicates(provider.capabilities) ||
         !hasValidProviderLimits(provider)
       ) {
@@ -184,9 +206,13 @@ export const decodeHermesProviderAccessConfigMapV1 = Effect.fn(
         namespace: binding.namespace,
         serviceAccountName: binding.serviceAccountName,
         policyRevision: policy.revision,
+        policyResourceVersion: decoded.metadata.resourceVersion,
         hermesProfile: binding.hermesProfile,
       },
-      providers: binding.providers,
+      providers: binding.providers.map((provider) => ({
+        ...provider,
+        models: normalizeHermesProviderModelIds(provider.models),
+      })),
       expiresAtMillis: binding.expiresAtMillis,
       disabled: binding.disabled,
     })),
@@ -200,6 +226,33 @@ export const HermesProviderAccessLoadRequestV1Schema = Schema.Struct({
 });
 export type HermesProviderAccessLoadRequestV1 =
   typeof HermesProviderAccessLoadRequestV1Schema.Type;
+
+export const HermesProviderAccessRequestV1Schema = Schema.Struct({
+  namespace: KubernetesName,
+  serviceAccountName: KubernetesName,
+  policyRevision: PositiveInt,
+  policyResourceVersion: KubernetesResourceVersionSchema,
+  provider: Schema.Literal("openai"),
+  credentialDomain: KubernetesName,
+  model: ProviderModel,
+  capability: Schema.Literals(["responses.create", "responses.compact"]),
+  atMillis: EpochMillis,
+});
+export type HermesProviderAccessRequestV1 =
+  typeof HermesProviderAccessRequestV1Schema.Type;
+
+export const HermesProviderAccessGrantV1Schema = Schema.Struct({
+  decision: Schema.Literal("allow"),
+  principal: KubernetesWorkloadPrincipalV1Schema,
+  provider: Schema.Literal("openai"),
+  credentialDomain: KubernetesName,
+  model: HermesProviderModelIdSchema,
+  capability: Schema.Literals(["responses.create", "responses.compact"]),
+  rateClass: AccessRateClassIdSchema,
+  limits: HermesProviderLimitsV1Schema,
+});
+export type HermesProviderAccessGrantV1 =
+  typeof HermesProviderAccessGrantV1Schema.Type;
 
 export const loadHermesProviderAccessConfigMapV1 = Effect.fn(
   "agentos.access.loadHermesProviderAccessConfigMapV1",
@@ -242,6 +295,56 @@ export const loadHermesProviderAccessConfigMapV1 = Effect.fn(
     });
   }
   return binding;
+});
+
+export const matchHermesProviderAccessConfigMapV1 = Effect.fn(
+  "agentos.access.matchHermesProviderAccessConfigMapV1",
+)(function*(configMap: unknown, request: unknown) {
+  const policy = yield* decodeHermesProviderAccessConfigMapV1(configMap);
+  const target = yield* Schema.decodeUnknownEffect(
+    HermesProviderAccessRequestV1Schema,
+    { onExcessProperty: "error" },
+  )(request).pipe(
+    Effect.mapError(() =>
+      HermesProviderAccessPolicyError.make({ code: "invalid_access_request" })
+    ),
+  );
+  const binding = policy.bindings.find((candidate) =>
+    candidate.principal.namespace === target.namespace &&
+    candidate.principal.serviceAccountName === target.serviceAccountName
+  );
+  const canonicalModel = normalizeHermesProviderModelId(target.model);
+  const provider = binding?.providers.find((candidate) =>
+    candidate.provider === target.provider &&
+    candidate.credentialDomains.includes(target.credentialDomain) &&
+    candidate.models.includes(canonicalModel) &&
+    candidate.capabilities.includes(target.capability)
+  );
+  if (
+    policy.revision !== target.policyRevision ||
+    policy.resourceVersion !== target.policyResourceVersion ||
+    binding === undefined ||
+    binding.principal.policyRevision !== target.policyRevision ||
+    binding.principal.policyResourceVersion !== target.policyResourceVersion ||
+    binding.disabled ||
+    (binding.expiresAtMillis !== null &&
+      binding.expiresAtMillis <= target.atMillis) ||
+    provider === undefined
+  ) {
+    return yield* HermesProviderAccessPolicyError.make({
+      code: "access_denied",
+    });
+  }
+  return {
+    decision: "allow",
+    principal: binding.principal,
+    provider: provider.provider,
+    credentialDomain: target.credentialDomain,
+    model: canonicalModel,
+    capability: target.capability,
+    rateClass: provider.rateClass,
+    limits: provider.limits,
+  } satisfies HermesProviderAccessGrantV1;
 });
 
 export { KubernetesWorkloadPrincipalV1Schema };
