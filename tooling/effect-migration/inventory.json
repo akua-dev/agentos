@@ -241,16 +241,6 @@
       "status": "migrated"
     },
     {
-      "id": "provider-http-authorizer-effect-tests",
-      "issue": 96,
-      "pattern": "^packages/agentos/src/access/tests/http-authorizer\\.effect\\.test\\.ts$",
-      "runtime": "bun",
-      "package": "@akua-dev/agentos",
-      "io": ["test", "clock", "http", "identity", "authorization"],
-      "migrationDependencies": [100, 101, 87, 88, 89, 90],
-      "status": "migrated"
-    },
-    {
       "id": "provider-http-authorizer",
       "issue": 96,
       "pattern": "^packages/agentos/src/access/http-authorizer\\.ts$",

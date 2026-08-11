@@ -9,10 +9,9 @@ import {
   type HermesProviderAccessGrantV1,
 } from "./kubernetes-workload-policy.ts";
 import {
-  AGENTOS_EGRESS_TOKEN_AUDIENCE,
   HERMES_EGRESS_TOKEN_AUDIENCE,
   KubernetesBoundServiceAccountAuthenticator,
-  WorkloadAuthenticationError,
+  type WorkloadAuthenticationError,
   type WorkloadIdentityDependencyUnavailable,
 } from "./identity.ts";
 
@@ -42,18 +41,12 @@ export interface HermesProviderAuthorizationRequest {
   readonly atMillis: number;
 }
 
-export type HermesProviderAuthorizationResult =
-  | { readonly kind: "not_selected" }
-  | {
-      readonly kind: "authorized";
-      readonly tokenExpiresAtMillis: number;
-      readonly policyExpiresAtMillis: number | null;
-      readonly grant: HermesProviderAccessGrantV1;
-    };
-
-const HermesProviderAuthorizationNotSelected: HermesProviderAuthorizationResult = {
-  kind: "not_selected",
-};
+export interface HermesProviderAuthorizationResult {
+  readonly kind: "authorized";
+  readonly tokenExpiresAtMillis: number;
+  readonly policyExpiresAtMillis: number | null;
+  readonly grant: HermesProviderAccessGrantV1;
+}
 
 export interface HermesProviderAuthorization {
   readonly authorize: (
@@ -77,36 +70,10 @@ export const createHermesProviderAuthorization = Effect.fn(
     authorize: Effect.fn("agentos.access.authorizeHermesProvider")(function*(
       request: HermesProviderAuthorizationRequest,
     ) {
-      const authentication = yield* Effect.result(
-        boundServiceAccounts.authenticate({
-          bearerToken: request.bearerToken,
-          audience: HERMES_EGRESS_TOKEN_AUDIENCE,
-        }),
-      );
-      if (authentication._tag === "Failure") {
-        if (
-          authentication.failure instanceof WorkloadAuthenticationError &&
-          (authentication.failure.code === "wrong_audience" ||
-            authentication.failure.code === "token_review_rejected")
-        ) {
-          const legacyAuthentication = yield* Effect.result(
-            boundServiceAccounts.authenticate({
-              bearerToken: request.bearerToken,
-              audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
-            }),
-          );
-          if (legacyAuthentication._tag === "Success") {
-            return HermesProviderAuthorizationNotSelected;
-          }
-          if (
-            !(legacyAuthentication.failure instanceof WorkloadAuthenticationError)
-          ) {
-            return yield* legacyAuthentication.failure;
-          }
-        }
-        return yield* authentication.failure;
-      }
-      const bound = authentication.success;
+      const bound = yield* boundServiceAccounts.authenticate({
+        bearerToken: request.bearerToken,
+        audience: HERMES_EGRESS_TOKEN_AUDIENCE,
+      });
       const configMap = yield* policies.current;
       const policy = yield* decodeHermesProviderAccessConfigMapV1(configMap);
       const exactBinding = policy.bindings.some((binding) =>

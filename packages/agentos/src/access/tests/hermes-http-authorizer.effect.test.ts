@@ -11,7 +11,6 @@ import {
   type ProviderPolicyDecisionRefV1,
 } from "../credential-delivery.ts";
 import {
-  AGENTOS_EGRESS_TOKEN_AUDIENCE,
   HERMES_EGRESS_TOKEN_AUDIENCE,
   KubernetesBoundServiceAccountAuthenticator,
   type KubernetesBoundServiceAccountIdentityV1,
@@ -212,7 +211,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
       assert.strictEqual(yield* Ref.get(legacyPdpCalls), 0);
     }));
 
-  it.effect("preserves genuine legacy authorization when the token is not for the Hermes audience", () =>
+  it.effect("rejects a non-Hermes token without invoking legacy authorization", () =>
     Effect.gen(function*() {
       const hermesAudiences = yield* Ref.make<ReadonlyArray<string>>([]);
       const legacyIdentityCalls = yield* Ref.make(0);
@@ -222,13 +221,9 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
         Layer.succeed(KubernetesBoundServiceAccountAuthenticator, {
           authenticate: (input) =>
             Ref.update(hermesAudiences, (values) => [...values, input.audience]).pipe(
-              Effect.andThen(
-                input.audience === HERMES_EGRESS_TOKEN_AUDIENCE
-                  ? Effect.fail(WorkloadAuthenticationError.make({
-                    code: "token_review_rejected",
-                  }))
-                  : Effect.succeed(boundIdentity),
-              ),
+              Effect.andThen(Effect.fail(WorkloadAuthenticationError.make({
+                code: "token_review_rejected",
+              }))),
             ),
         }),
         Layer.succeed(HermesProviderAccessPolicySource, {
@@ -256,23 +251,18 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
           id: Effect.succeed("44444444444444444444444444444444"),
           hermes,
         });
-        const legacyRequest = request();
-        legacyRequest.headers.set("x-agentos-hermes-profile", "default");
-        legacyRequest.headers.set("x-hermes-task-id", "spoofed-workload");
-        return yield* handler(legacyRequest);
+        const nonHermesRequest = request();
+        nonHermesRequest.headers.set("x-agentos-hermes-profile", "default");
+        nonHermesRequest.headers.set("x-hermes-task-id", "spoofed-workload");
+        return yield* handler(nonHermesRequest);
       }).pipe(Effect.provide(layer));
 
-      assert.strictEqual(response.status, 200);
+      assert.strictEqual(response.status, 401);
       assert.deepStrictEqual(yield* Ref.get(hermesAudiences), [
         HERMES_EGRESS_TOKEN_AUDIENCE,
-        AGENTOS_EGRESS_TOKEN_AUDIENCE,
       ]);
-      assert.strictEqual(yield* Ref.get(legacyIdentityCalls), 1);
-      assert.strictEqual(yield* Ref.get(legacyPdpCalls), 1);
-      assert.strictEqual(
-        response.headers.get("x-agentos-authz-principal-kind"),
-        "agentos",
-      );
+      assert.strictEqual(yield* Ref.get(legacyIdentityCalls), 0);
+      assert.strictEqual(yield* Ref.get(legacyPdpCalls), 0);
     }));
 
   it.effect("authorizes the exact live policy-bound model without Agent or Assignment lookup", () =>
@@ -479,7 +469,7 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
       }).pipe(Effect.provide(layer));
 
       assert.strictEqual(response.status, 401);
-      assert.strictEqual(yield* Ref.get(boundAuthenticationCalls), 2);
+      assert.strictEqual(yield* Ref.get(boundAuthenticationCalls), 1);
       assert.strictEqual(yield* Ref.get(legacyIdentityCalls), 0);
     }));
 
