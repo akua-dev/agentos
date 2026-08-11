@@ -1,18 +1,38 @@
 import {
   AGENTOS_EGRESS_TOKEN_AUDIENCE,
   buildAgentOSStartupPromptEffect,
+  decodeHermesProviderAccessConfigMapV1,
   defineAgentOSPiCommandHandler,
   defineAgentOSPiExtension,
+  loadHermesProviderAccessConfigMapV1,
+  ProviderBudgetKeyInputV1Schema,
+  providerBudgetSubjectName,
   registerAgentOSInstructionsEffect,
   registerAgentOSRuntimeEffect,
   registerAgentOSStartupEffect,
   type AgentOSRegistrationV1,
   type AgentOSStartupContributionV1,
+  type KubernetesWorkloadPrincipalV1,
   type WorkloadIdentityV1,
 } from "@akua-dev/agentos";
 import { Effect } from "effect";
 
 export const exampleEgressAudience = AGENTOS_EGRESS_TOKEN_AUDIENCE;
+export const exampleHermesPrincipal: KubernetesWorkloadPrincipalV1 = {
+  kind: "kubernetes_workload",
+  namespace: "hermes-akua",
+  serviceAccountName: "hermes-codex-worker",
+  policyRevision: 7,
+  hermesProfile: "fleet-codex",
+};
+export const exampleHermesBudgetSubject = providerBudgetSubjectName(
+  exampleHermesPrincipal,
+);
+export const exampleHermesBudgetKeySchema = ProviderBudgetKeyInputV1Schema;
+export const exampleHermesPolicyDecoders = {
+  decode: decodeHermesProviderAccessConfigMapV1,
+  load: loadHermesProviderAccessConfigMapV1,
+};
 export const exampleWorkloadIdentity: WorkloadIdentityV1 = {
   schemaVersion: 1,
   agentId: "11111111-1111-4111-8111-111111111111",

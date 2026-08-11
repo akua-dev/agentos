@@ -331,6 +331,16 @@
       "status": "migrated"
     },
     {
+      "id": "provider-kubernetes-workload-policy-effect-tests",
+      "issue": 88,
+      "pattern": "^packages/agentos/src/access/tests/kubernetes-workload-policy\\.effect\\.test\\.ts$",
+      "runtime": "bun",
+      "package": "@akua-dev/agentos",
+      "io": ["test", "schema", "kubernetes"],
+      "migrationDependencies": [100, 101, 88],
+      "status": "migrated"
+    },
+    {
       "id": "provider-workload-identity",
       "issue": 87,
       "pattern": "^packages/agentos/src/access/identity\\.ts$",
@@ -348,6 +358,16 @@
       "package": "@akua-dev/agentos",
       "io": ["schema"],
       "migrationDependencies": [100, 101],
+      "status": "migrated"
+    },
+    {
+      "id": "provider-kubernetes-workload-policy",
+      "issue": 88,
+      "pattern": "^packages/agentos/src/access/kubernetes-workload-policy\\.ts$",
+      "runtime": "shared-bun",
+      "package": "@akua-dev/agentos",
+      "io": ["schema", "kubernetes"],
+      "migrationDependencies": [100, 101, 88],
       "status": "migrated"
     },
     {
