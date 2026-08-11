@@ -7,6 +7,7 @@ import {
 import {
   Clock,
   Effect,
+  Exit,
   Ref,
   Result,
   Schema,
@@ -119,12 +120,16 @@ export const makeAIGatewayApplication = Effect.fn(
   );
 
   const acquire = Effect.fn("agentos.aiGateway.acquireRoute")(
-    function*(
+    function*<A>(
       sessionKey: string | undefined,
       _signal: AbortSignal,
       _authorization: ProviderAuthorizationGrantV1 | undefined,
       telemetry: AIGatewayRequestTelemetry,
-    ): Effect.fn.Return<AIForwardLease | undefined, AIForwardRouteError> {
+      use: (
+        lease: AIForwardLease | undefined,
+        transfer: Effect.Effect<void>,
+      ) => Effect.Effect<A, AIForwardRouteError>,
+    ): Effect.fn.Return<A, AIForwardRouteError> {
       const set = yield* candidateSet(telemetry);
       const currentTime = yield* Clock.currentTimeMillis;
       yield* Effect.forEach(
@@ -141,67 +146,99 @@ export const makeAIGatewayApplication = Effect.fn(
             ).pipe(Effect.catchCause(() => Effect.void)),
         { discard: true },
       );
-      const reservation = yield* routing.acquire({
+      return yield* routing.acquire({
         candidates: set.candidates,
         now: currentTime,
         ...(sessionKey === undefined ? {} : { sessionKey }),
-      }).pipe(Effect.mapError(() => routeError("routing_unavailable")));
-      if (reservation === undefined) {
-        return fallbackAvailable && fallbackKey !== undefined
-          ? fallbackLease(fallbackKey)
-          : undefined;
-      }
-      const credentialResult = yield* Effect.result(
-        vault.getFreshCredential(reservation.accountId),
-      );
-      if (Result.isFailure(credentialResult)) {
-        yield* routing.release(reservation.leaseToken).pipe(
-          Effect.catchCause(() => Effect.void),
-        );
-        return yield* routeError(routeCodeForAccount(credentialResult.failure));
-      }
-      const credential = credentialResult.success;
-      const lease: AIForwardLease = {
-        kind: "codex_oauth",
-        accessToken: credential.accessToken,
-        providerAccountId: credential.providerAccountId,
-        renew: Clock.currentTimeMillis.pipe(
-          Effect.flatMap((renewedAt) =>
-            routing.renew(reservation.leaseToken, renewedAt)
-          ),
-          Effect.mapError(() => routeError("state_unavailable")),
-        ),
-        release: routing.release(reservation.leaseToken).pipe(
-          Effect.asVoid,
-          Effect.mapError(() => routeError("state_unavailable")),
-        ),
-        recordResponse: (status, headers) =>
-          Effect.gen(function*() {
-            const responseAt = yield* Clock.currentTimeMillis;
-            if (status === 401) {
-              yield* vault.markNeedsReauth(
-                reservation.accountId,
-                credential.accessToken,
-              ).pipe(Effect.catchCause(() => Effect.succeed(false)));
-            }
-            yield* routing.recordResponse(
-              reservation.accountId,
-              status,
-              headers,
-              responseAt,
-            ).pipe(
-              Effect.mapError(() => routeError("state_unavailable")),
+      }, (reservation, transfer) => {
+        if (reservation === undefined) {
+          return use(
+            fallbackAvailable && fallbackKey !== undefined
+              ? fallbackLease(fallbackKey)
+              : undefined,
+            Effect.void,
+          );
+        }
+        return Effect.gen(function*() {
+          const credential = yield* vault.getFreshCredential(
+            reservation.accountId,
+          ).pipe(
+            Effect.mapError((error) =>
+              routeError(routeCodeForAccount(error))
+            ),
+          );
+          type ReleaseState = "available" | "releasing" | "released";
+          const releaseState = yield* Ref.make<ReleaseState>("available");
+          const release = Effect.uninterruptible(Effect.gen(function*() {
+            const action = yield* Ref.modify(
+              releaseState,
+              (state): readonly ["attempt" | "done" | "wait", ReleaseState] =>
+                state === "available"
+                  ? ["attempt", "releasing"]
+                  : state === "released"
+                  ? ["done", state]
+                  : ["wait", state],
             );
-          }),
-      };
-      return lease;
+            if (action !== "attempt") return;
+            const released = yield* Effect.exit(
+              routing.release(reservation.leaseToken).pipe(
+                Effect.asVoid,
+                Effect.mapError(() => routeError("state_unavailable")),
+              ),
+            );
+            if (Exit.isSuccess(released)) {
+              yield* Ref.set(releaseState, "released");
+              return;
+            }
+            yield* Ref.set(releaseState, "available");
+            return yield* Effect.failCause(released.cause);
+          }));
+          const lease: AIForwardLease = {
+            kind: "codex_oauth",
+            accessToken: credential.accessToken,
+            providerAccountId: credential.providerAccountId,
+            renew: Clock.currentTimeMillis.pipe(
+              Effect.flatMap((renewedAt) =>
+                routing.renew(reservation.leaseToken, renewedAt)
+              ),
+              Effect.mapError(() => routeError("state_unavailable")),
+            ),
+            release,
+            recordResponse: (status, headers) =>
+              Effect.gen(function*() {
+                const responseAt = yield* Clock.currentTimeMillis;
+                if (status === 401) {
+                  yield* vault.markNeedsReauth(
+                    reservation.accountId,
+                    credential.accessToken,
+                  ).pipe(Effect.catchCause(() => Effect.succeed(false)));
+                }
+                yield* routing.recordResponse(
+                  reservation.accountId,
+                  status,
+                  headers,
+                  responseAt,
+                ).pipe(
+                  Effect.mapError(() => routeError("state_unavailable")),
+                );
+              }),
+          };
+          return yield* use(lease, transfer);
+        });
+      }).pipe(
+        Effect.mapError((error) =>
+          error._tag === "AIForwardRouteError"
+            ? error
+            : routeError("routing_unavailable")
+        ),
+      );
     },
   );
 
   const forward = yield* makeAIForwardHandler({
     authentication: options.authentication,
-    acquire: (sessionKey, signal, authorization, telemetry) =>
-      acquire(sessionKey, signal, authorization, telemetry),
+    acquire: (sessionKey, signal, authorization, telemetry, use) =>
+      acquire(sessionKey, signal, authorization, telemetry, use),
     provider,
     settlements,
     now: Clock.currentTimeMillis,

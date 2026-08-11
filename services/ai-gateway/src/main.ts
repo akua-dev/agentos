@@ -60,7 +60,10 @@ import {
   AIGatewayTelemetry,
   makeAIGatewayTelemetry,
 } from "./observability.ts";
-import { AIProviderHttp, AIProviderHttpLive } from "./provider-http.ts";
+import {
+  AIProviderHttp,
+  makeAIProviderHttpLive,
+} from "./provider-http.ts";
 import { AIGatewayOtlpLive } from "./otlp.ts";
 import { CodexQuota, makeCodexQuotaLayer } from "./quota.ts";
 import { makeEffectManagedAccountVaultLayer } from "./managed-account-live.ts";
@@ -129,6 +132,8 @@ const AIGatewayStatusClientLive = Layer.effect(
   }),
 );
 
+const aiProviderHttpLive = makeAIProviderHttpLive(BunHttpClient.layer);
+
 function acquireAIGatewayTelemetry() {
   return Effect.gen(function*() {
     const disabled = yield* Config.boolean("OTEL_SDK_DISABLED").pipe(
@@ -163,7 +168,7 @@ function makeAIGatewayRuntimeLive(
       const crypto = yield* Crypto.Crypto;
       const fileSystem = yield* FileSystem.FileSystem;
       const provider = yield* AIProviderHttp.pipe(
-        Effect.provide(AIProviderHttpLive),
+        Effect.provide(aiProviderHttpLive),
       );
       const quota = yield* CodexQuota.pipe(
         Effect.provide(makeCodexQuotaLayer(config.quotaTimeoutMillis)),

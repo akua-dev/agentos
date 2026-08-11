@@ -1,6 +1,7 @@
 import { classifyAIError } from "@akua-dev/agentos";
 import { Context, Effect, Layer, Schema, Stream } from "effect";
 import {
+  FetchHttpClient,
   HttpClient,
   HttpClientError,
   HttpClientRequest,
@@ -46,14 +47,19 @@ export const AIProviderHttpLive = Layer.effect(
           try: () => HttpClientRequest.fromWeb(request),
           catch: () => providerHttpError("request_invalid"),
         });
-        const response = yield* client.execute(clientRequest).pipe(
+        const response = yield* Effect.raceFirst(
+          client.execute(clientRequest),
+          abortOnSignal(request.signal),
+        ).pipe(
           Effect.mapError((error) => providerHttpError(httpErrorCode(error))),
         );
         const hasNoBody = request.method === "HEAD" ||
-          response.status === 204 || response.status === 304;
+          response.status === 204 || response.status === 205 ||
+          response.status === 304;
         const body: AIProviderResponse["body"] = hasNoBody
           ? null
           : response.stream.pipe(
+            Stream.interruptWhen(abortOnSignal(request.signal)),
             Stream.mapError((error) =>
               providerHttpError(streamErrorCode(error))
             ),
@@ -68,6 +74,31 @@ export const AIProviderHttpLive = Layer.effect(
     return AIProviderHttp.of({ execute });
   }),
 );
+
+export const AIProviderHttpRequestInit = Layer.succeed(
+  FetchHttpClient.RequestInit,
+  { redirect: "manual" },
+);
+
+export function makeAIProviderHttpLive(
+  clientLayer: Layer.Layer<HttpClient.HttpClient>,
+) {
+  return AIProviderHttpLive.pipe(
+    Layer.provide(clientLayer.pipe(Layer.provide(AIProviderHttpRequestInit))),
+  );
+}
+
+function abortOnSignal(signal: AbortSignal) {
+  return Effect.callback<never, never>((resume) => {
+    const onAbort = () => resume(Effect.interrupt);
+    if (signal.aborted) {
+      onAbort();
+      return Effect.void;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+    return Effect.sync(() => signal.removeEventListener("abort", onAbort));
+  });
+}
 
 function providerHttpError(code: AIProviderHttpError["code"]) {
   return AIProviderHttpError.make({ code });

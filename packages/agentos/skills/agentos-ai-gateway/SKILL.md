@@ -221,6 +221,41 @@ a real process/Pod restart; Pi `/reload` cannot change environment. Ask before
 interrupting a Mate and preserve its native session reference through the
 normal recovery procedure.
 
+## Hermes workload-proxy migration
+
+Before any Hermes migration, read the [Hermes integration
+contract](../../../../docs/integrations/hermes-ai-gateway.md) and verify that
+the selected pinned revision passes its deployment gate. Do not deploy or
+update this integration while that gate is unmet; auxiliary requests remain out
+of scope until the selected revision satisfies the contract's no-retry,
+no-redirect and no-fallback requirements.
+
+For the live v0.1.24 Hermes topology, the observed pre-migration state uses one
+`ai-gateway` replica with a shared `AI_GATEWAY_TOKEN`, while Hermes uses direct
+in-Pod provider authentication and has no projected egress identity. Do not
+mutate it in place.
+
+1. Keep Hermes on verified direct OAuth while deploying the reviewed
+   Agentgateway plus `agentos-egress-authz` topology and registering the Hermes
+   workload identity/access profile.
+2. Build and publish the reviewed AgentOS revision, then update the Hermes
+   manifest with the exact immutable adapter image digest and projected token
+   wiring. Do not copy the legacy shared token or any `ai-gateway-client` Secret.
+3. Render and review the StatefulSet and NetworkPolicies. Confirm the proxy is
+   loopback-only, Agentgateway is the only AI Gateway ingress, and ordinary
+   Internet egress is unchanged.
+4. After explicit rollout approval, start a new Hermes session with the exact
+   selected model and authorize one short fixed no-tool response. Verify the
+   effective provider/model and failure fidelity without reading prompts,
+   responses, tokens, account IDs, or vault state.
+5. Keep direct OAuth intact until that evidence is accepted. Roll back by
+   restoring the prior Hermes config/workload revision; do not delete provider
+   auth or retained homes as part of route rollback.
+6. Retire the legacy shared-token request path only after every selected client
+   has either passed the workload-identity route or returned to verified direct
+   authentication. Secret removal, deployment, restart, and provider login are
+   separate human approval gates.
+
 For First and Second Mate, the additive client patch sets
 `AGENTOS_PI_PROVIDER_MODE=ai-gateway` on `prepare-home`. Before Pi can start,
 AgentOS atomically reconciles only its marker-owned `openai-codex` transport
