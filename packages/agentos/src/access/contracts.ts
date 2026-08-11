@@ -39,6 +39,12 @@ const HermesProfile = Schema.String.pipe(
     Schema.isPattern(/^[a-z][a-z0-9._-]*$/),
   ),
 );
+export const KubernetesResourceVersionSchema = Schema.String.pipe(
+  Schema.check(
+    Schema.isMaxLength(128),
+    Schema.isPattern(/^[0-9A-Za-z._:-]+$/),
+  ),
+);
 const PositiveInt = Schema.Number.pipe(
   Schema.check(Schema.isInt(), Schema.isGreaterThan(0)),
 );
@@ -121,6 +127,7 @@ export const KubernetesWorkloadPrincipalV1Schema = Schema.Struct({
   namespace: KubernetesName,
   serviceAccountName: KubernetesName,
   policyRevision: PositiveInt,
+  policyResourceVersion: KubernetesResourceVersionSchema,
   hermesProfile: HermesProfile,
 });
 
@@ -562,7 +569,7 @@ export function authorizationSubjectName(subject: AuthorizationSubjectV1) {
 
 export function providerBudgetSubjectName(subject: ProviderBudgetSubjectV1) {
   if (subject.kind === "kubernetes_workload") {
-    return `k8s-workload:${subject.namespace}:${subject.serviceAccountName}:${subject.policyRevision}`;
+    return `k8s-workload:${subject.namespace}:${subject.serviceAccountName}:${subject.policyRevision}:${subject.policyResourceVersion}`;
   }
   return authorizationSubjectName(subject);
 }

@@ -5,6 +5,7 @@ import {
   defineAgentOSPiCommandHandler,
   defineAgentOSPiExtension,
   loadHermesProviderAccessConfigMapV1,
+  matchHermesProviderAccessConfigMapV1,
   ProviderBudgetKeyInputV1Schema,
   providerBudgetSubjectName,
   registerAgentOSInstructionsEffect,
@@ -13,6 +14,7 @@ import {
   type AgentOSRegistrationV1,
   type AgentOSStartupContributionV1,
   type KubernetesWorkloadPrincipalV1,
+  type HermesProviderAccessRequestV1,
   type WorkloadIdentityV1,
 } from "@akua-dev/agentos";
 import { Effect } from "effect";
@@ -23,6 +25,7 @@ export const exampleHermesPrincipal: KubernetesWorkloadPrincipalV1 = {
   namespace: "hermes-akua",
   serviceAccountName: "hermes-codex-worker",
   policyRevision: 7,
+  policyResourceVersion: "18422",
   hermesProfile: "fleet-codex",
 };
 export const exampleHermesBudgetSubject = providerBudgetSubjectName(
@@ -32,6 +35,18 @@ export const exampleHermesBudgetKeySchema = ProviderBudgetKeyInputV1Schema;
 export const exampleHermesPolicyDecoders = {
   decode: decodeHermesProviderAccessConfigMapV1,
   load: loadHermesProviderAccessConfigMapV1,
+  match: matchHermesProviderAccessConfigMapV1,
+};
+export const exampleHermesAccessRequest: HermesProviderAccessRequestV1 = {
+  namespace: "hermes-akua",
+  serviceAccountName: "hermes-codex-worker",
+  policyRevision: 7,
+  policyResourceVersion: "18422",
+  provider: "openai",
+  credentialDomain: "fleet-codex",
+  model: "gpt-5.6-sol",
+  capability: "responses.create",
+  atMillis: 1_786_435_200_000,
 };
 export const exampleWorkloadIdentity: WorkloadIdentityV1 = {
   schemaVersion: 1,

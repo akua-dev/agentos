@@ -1,11 +1,13 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import {
   decodeHermesProviderAccessConfigMapV1,
+  HermesProviderAccessGrantV1Schema,
   HermesProviderAccessPolicyError,
   loadHermesProviderAccessConfigMapV1,
-} from "../kubernetes-workload-policy.ts";
+  matchHermesProviderAccessConfigMapV1,
+} from "../../index.ts";
 
 const validPolicy = {
   apiVersion: "agentos.akua.dev/hermes-provider-access/v1",
@@ -64,6 +66,7 @@ describe("Hermes Kubernetes workload provider policy", () => {
         namespace: "hermes-akua",
         serviceAccountName: "hermes-codex-worker",
         policyRevision: 7,
+        policyResourceVersion: "18422",
         hermesProfile: "fleet-codex",
       });
       assert.strictEqual(
@@ -92,6 +95,7 @@ describe("Hermes Kubernetes workload provider policy", () => {
       const invalidProviders: ReadonlyArray<unknown> = [
         { ...provider, credentialDomains: ["fleet-codex", "fleet-codex"] },
         { ...provider, models: ["gpt-5.6-sol", "gpt-5.6-sol"] },
+        { ...provider, models: ["gpt-5.6-sol", "GPT-5.6-SOL"] },
         { ...provider, capabilities: ["responses.create", "responses.create"] },
         { ...provider, limits: { ...provider.limits, maximumConcurrent: 0 } },
         {
@@ -124,6 +128,24 @@ describe("Hermes Kubernetes workload provider policy", () => {
           );
           assert.strictEqual(result._tag, "Failure");
         }),
+      );
+    }));
+
+  it.effect("normalizes model IDs once at the ConfigMap decode boundary", () =>
+    Effect.gen(function*() {
+      const binding = validPolicy.bindings[0]!;
+      const provider = binding.providers[0]!;
+      const decoded = yield* decodeHermesProviderAccessConfigMapV1(configMap({
+        ...validPolicy,
+        bindings: [{
+          ...binding,
+          providers: [{ ...provider, models: ["GPT-5.6-SOL"] }],
+        }],
+      }));
+
+      assert.deepStrictEqual(
+        decoded.bindings[0]?.providers[0]?.models,
+        ["gpt-5.6-sol"],
       );
     }));
 
@@ -164,6 +186,164 @@ describe("Hermes Kubernetes workload provider policy", () => {
       assert.deepStrictEqual(
         failures.map(({ code }) => code),
         ["binding_not_found", "binding_disabled", "binding_expired"],
+      );
+    }));
+
+  it.effect("allows only one exact provider access tuple", () =>
+    Effect.gen(function*() {
+      const grant = yield* matchHermesProviderAccessConfigMapV1(configMap(), {
+        namespace: "hermes-akua",
+        serviceAccountName: "hermes-codex-worker",
+        policyRevision: 7,
+        policyResourceVersion: "18422",
+        provider: "openai",
+        credentialDomain: "fleet-codex",
+        model: "GPT-5.6-SOL",
+        capability: "responses.create",
+        atMillis: 1_786_435_200_000,
+      });
+
+      assert.deepStrictEqual(grant, {
+        decision: "allow",
+        principal: {
+          kind: "kubernetes_workload",
+          namespace: "hermes-akua",
+          serviceAccountName: "hermes-codex-worker",
+          policyRevision: 7,
+          policyResourceVersion: "18422",
+          hermesProfile: "fleet-codex",
+        },
+        provider: "openai",
+        credentialDomain: "fleet-codex",
+        model: "gpt-5.6-sol",
+        capability: "responses.create",
+        rateClass: "standard",
+        limits: validPolicy.bindings[0]?.providers[0]?.limits,
+      });
+    }));
+
+  it.effect("rejects a forged noncanonical model in an access grant", () =>
+    Effect.gen(function*() {
+      const grant = yield* matchHermesProviderAccessConfigMapV1(configMap(), {
+        namespace: "hermes-akua",
+        serviceAccountName: "hermes-codex-worker",
+        policyRevision: 7,
+        policyResourceVersion: "18422",
+        provider: "openai",
+        credentialDomain: "fleet-codex",
+        model: "gpt-5.6-sol",
+        capability: "responses.create",
+        atMillis: 1_786_435_200_000,
+      });
+      const result = yield* Effect.exit(Schema.decodeUnknownEffect(
+        HermesProviderAccessGrantV1Schema,
+        { onExcessProperty: "error" },
+      )({ ...grant, model: "GPT-5.6-SOL" }));
+
+      assert.strictEqual(result._tag, "Failure");
+    }));
+
+  it.effect("denies every wrong access tuple and workload-policy dimension", () =>
+    Effect.gen(function*() {
+      const request = {
+        namespace: "hermes-akua",
+        serviceAccountName: "hermes-codex-worker",
+        policyRevision: 7,
+        policyResourceVersion: "18422",
+        provider: "openai",
+        credentialDomain: "fleet-codex",
+        model: "gpt-5.6-sol",
+        capability: "responses.create",
+        atMillis: 1_786_435_200_000,
+      };
+      const mismatches: ReadonlyArray<unknown> = [
+        { ...request, namespace: "wrong-namespace" },
+        { ...request, serviceAccountName: "wrong-service-account" },
+        { ...request, policyRevision: 8 },
+        { ...request, policyResourceVersion: "18423" },
+        { ...request, provider: "github" },
+        { ...request, credentialDomain: "wrong-domain" },
+        { ...request, model: "gpt-5.5" },
+        { ...request, capability: "responses.compact" },
+      ];
+
+      yield* Effect.forEach(mismatches, (mismatch) =>
+        matchHermesProviderAccessConfigMapV1(configMap(), mismatch).pipe(
+          Effect.flip,
+          Effect.map((error) => {
+            assert.instanceOf(error, HermesProviderAccessPolicyError);
+            assert.include(
+              ["access_denied", "invalid_access_request"],
+              error.code,
+            );
+            assert.deepStrictEqual(Object.keys(error), ["_tag", "code"]);
+          }),
+        )
+      );
+    }));
+
+  it.effect("denies disabled and expired exact access tuples", () =>
+    Effect.gen(function*() {
+      const binding = validPolicy.bindings[0]!;
+      const request = {
+        namespace: "hermes-akua",
+        serviceAccountName: "hermes-codex-worker",
+        policyRevision: 7,
+        policyResourceVersion: "18422",
+        provider: "openai",
+        credentialDomain: "fleet-codex",
+        model: "gpt-5.6-sol",
+        capability: "responses.create",
+        atMillis: 1_786_435_200_000,
+      };
+      const policies = [
+        { ...validPolicy, bindings: [{ ...binding, disabled: true }] },
+        {
+          ...validPolicy,
+          bindings: [{ ...binding, expiresAtMillis: request.atMillis }],
+        },
+      ];
+
+      yield* Effect.forEach(policies, (policy) =>
+        matchHermesProviderAccessConfigMapV1(configMap(policy), request).pipe(
+          Effect.flip,
+          Effect.map((error) => {
+            assert.instanceOf(error, HermesProviderAccessPolicyError);
+            assert.strictEqual(error.code, "access_denied");
+          }),
+        )
+      );
+    }));
+
+  it.effect("rejects malformed requests and authority-shaped extra fields", () =>
+    Effect.gen(function*() {
+      const request = {
+        namespace: "hermes-akua",
+        serviceAccountName: "hermes-codex-worker",
+        policyRevision: 7,
+        policyResourceVersion: "18422",
+        provider: "openai",
+        credentialDomain: "fleet-codex",
+        model: "gpt-5.6-sol",
+        capability: "responses.create",
+        atMillis: 1_786_435_200_000,
+      };
+      const malformed: ReadonlyArray<unknown> = [
+        { ...request, taskId: "t_untrusted" },
+        { ...request, labels: { approved: "true" } },
+        { ...request, headers: { "x-agentos-authority": "allow" } },
+        { ...request, policyResourceVersion: "" },
+        { ...request, atMillis: Number.NaN },
+      ];
+
+      yield* Effect.forEach(malformed, (input) =>
+        matchHermesProviderAccessConfigMapV1(configMap(), input).pipe(
+          Effect.flip,
+          Effect.map((error) => {
+            assert.instanceOf(error, HermesProviderAccessPolicyError);
+            assert.strictEqual(error.code, "invalid_access_request");
+          }),
+        )
       );
     }));
 
