@@ -35,6 +35,11 @@ const limits = {
   spendWindowMillis: 3_600_000,
   maximumSpendMicros: 2_000_000,
 };
+const pricing = {
+  version: 1,
+  inputMicrosPerMillionTokens: 2_000_000,
+  outputMicrosPerMillionTokens: 8_000_000,
+};
 const budgets: ProviderBudgetEnforcer["Service"] = {
   validateWorkload: () => Effect.void,
   reserveWorkload: (input) => Effect.succeed({
@@ -122,6 +127,7 @@ function policy(
             capabilities: ["responses.create", "responses.compact"],
             rateClass: "standard",
             limits,
+            pricing,
           }],
           expiresAtMillis,
           disabled,
@@ -131,9 +137,10 @@ function policy(
   };
 }
 
-function request(model = "gpt-5.6-sol") {
+function request(model = "gpt-5.6-sol", stream = true) {
   const body = JSON.stringify({
     model,
+    stream,
     max_output_tokens: 100,
     input: "not inspected for authority",
   });
@@ -372,6 +379,25 @@ describe("Hermes Kubernetes workload HTTP authorization", () => {
         forged.headers.set("x-agentos-task-id", "trusted-task");
         assert.strictEqual((yield* handler(forged)).status, 403);
         assert.strictEqual(yield* Ref.get(identityStoreCalls), 0);
+      }).pipe(Effect.provide(dependencies(identityStoreCalls, currentPolicy)));
+    }));
+
+  it.effect("denies stream false before issuing or reserving a workload grant", () =>
+    Effect.gen(function*() {
+      const identityStoreCalls = yield* Ref.make(0);
+      const currentPolicy = yield* Ref.make<unknown>(policy());
+      yield* Effect.gen(function*() {
+        const hermes = yield* createHermesProviderAuthorization();
+        const handler = yield* createProviderAuthorizationHttpHandler({
+          clock: Effect.succeed(now),
+          id: Effect.succeed("56565656565656565656565656565656"),
+          hermes,
+          budgets: {
+            ...budgets,
+            reserveWorkload: () => Effect.die("stream false must not reserve"),
+          },
+        });
+        assert.strictEqual((yield* handler(request("gpt-5.6-sol", false))).status, 403);
       }).pipe(Effect.provide(dependencies(identityStoreCalls, currentPolicy)));
     }));
 

@@ -65,6 +65,11 @@ const ProviderModel = Schema.String.pipe(
     Schema.isPattern(/^[a-z0-9][a-z0-9._:-]*$/),
   ),
 );
+const ProviderPricing = Schema.Struct({
+  version: SafePositiveInteger,
+  inputMicrosPerMillionTokens: SafePositiveInteger,
+  outputMicrosPerMillionTokens: SafePositiveInteger,
+});
 
 export const ProviderBudgetRateClassV1Schema = Schema.Struct({
   schemaVersion: Schema.Literal(1),
@@ -184,7 +189,10 @@ export const ProviderBudgetWorkloadReservationInputV1Schema = Schema.Struct({
     spendWindowMillis: SafePositiveInteger,
     maximumSpendMicros: SafePositiveInteger,
   }),
+  pricing: ProviderPricing,
   policyExpiresAtMillis: EpochMillis,
+  requestedTokens: SafePositiveInteger,
+  requestedSpendMicros: SafePositiveInteger,
   nowMillis: EpochMillis,
 });
 
@@ -211,6 +219,9 @@ export const ProviderBudgetWorkloadValidationInputV1Schema = Schema.Struct({
     spendWindowMillis: SafePositiveInteger,
     maximumSpendMicros: SafePositiveInteger,
   }),
+  pricing: ProviderPricing,
+  requestedTokens: SafePositiveInteger,
+  requestedSpendMicros: SafePositiveInteger,
   expiresAtMillis: EpochMillis,
   nowMillis: EpochMillis,
 });
@@ -430,7 +441,7 @@ export function makeProviderBudgetEnforcerLayer(store: ProviderBudgetStore) {
       Effect.mapError(() => enforcementError("database_unavailable", true)),
     );
     const decoded = yield* Schema.decodeUnknownEffect(
-      Schema.Struct({ outcome: Schema.Literal("active") }),
+      Schema.Struct({ outcome: Schema.Literal("attempted") }),
       { onExcessProperty: "error" },
     )(raw).pipe(Effect.mapError(() => enforcementError("policy_stale", false)));
     return void decoded;

@@ -78,6 +78,8 @@ function workloadGrant(): Extract<
   ProviderAuthorizationGrantV1,
   { readonly model: string }
 > {
+  const body = JSON.stringify({ model: "gpt-test", max_output_tokens: 100, stream: true });
+  const inputTokens = new TextEncoder().encode(body).byteLength;
   return {
     schemaVersion: 1,
     correlationId: "corr_55555555555555555555555555555555",
@@ -109,6 +111,9 @@ function workloadGrant(): Extract<
       spendWindowMillis: 3_600_000,
       maximumSpendMicros: 1_000,
     },
+    pricing: { version: 1, inputMicrosPerMillionTokens: 2_000_000, outputMicrosPerMillionTokens: 8_000_000 },
+    requestedTokens: inputTokens + 100,
+    requestedSpendMicros: Math.ceil((inputTokens * 2_000_000 + 100 * 8_000_000) / 1_000_000),
   };
 }
 

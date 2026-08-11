@@ -167,6 +167,9 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
         model: body.grant.model,
         rateClass: body.grant.rateClass,
         limits: body.grant.limits,
+        pricing: body.grant.pricing,
+        requestedTokens: body.grant.requestedTokens,
+        requestedSpendMicros: body.grant.requestedSpendMicros,
         expiresAtMillis: body.grant.expiresAtMillis,
         nowMillis: yield* clock,
       });

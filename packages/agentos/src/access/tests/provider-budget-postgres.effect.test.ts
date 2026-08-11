@@ -53,6 +53,13 @@ const workloadInput = {
     maximumSpendMicros: 1_000_000,
   },
   policyExpiresAtMillis: now + 60_000,
+  pricing: {
+    version: 1,
+    inputMicrosPerMillionTokens: 1_000_000,
+    outputMicrosPerMillionTokens: 1_000_000,
+  },
+  requestedTokens: 500,
+  requestedSpendMicros: 5_000,
   nowMillis: now,
 } satisfies ProviderBudgetWorkloadReservationInputV1;
 const input: ProviderBudgetReservationInputV1 = {

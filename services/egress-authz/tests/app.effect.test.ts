@@ -70,6 +70,8 @@ const hermesAuthorized: HermesProviderAuthorizationResult = {
   kind: "authorized",
   tokenExpiresAtMillis: now + 10_000,
   policyExpiresAtMillis: null,
+  requestedTokens: 1_024,
+  requestedSpendMicros: 4_096,
   workloadIdentity: {
     serviceAccountUid: "service-account-uid-1",
     podName: "worker-0",
@@ -98,6 +100,11 @@ const hermesAuthorized: HermesProviderAuthorizationResult = {
       maximumTokens: 1_536,
       spendWindowMillis: 60_000,
       maximumSpendMicros: 1_000_000,
+    },
+    pricing: {
+      version: 1,
+      inputMicrosPerMillionTokens: 2_000_000,
+      outputMicrosPerMillionTokens: 8_000_000,
     },
   },
 };

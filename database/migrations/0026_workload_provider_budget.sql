@@ -4,11 +4,13 @@ ALTER TABLE agentos.provider_budget_reservations
   ADD COLUMN workload_principal jsonb,
   ADD COLUMN model text,
   ADD COLUMN effective_limits jsonb,
+  ADD COLUMN effective_pricing jsonb,
   ADD COLUMN policy_expires_at_millis bigint,
   ADD COLUMN reserved_tokens bigint CHECK (reserved_tokens > 0),
   ADD COLUMN reserved_spend_micros bigint CHECK (reserved_spend_micros > 0),
   ADD COLUMN token_window_started_at_millis bigint,
-  ADD COLUMN spend_window_started_at_millis bigint;
+  ADD COLUMN spend_window_started_at_millis bigint,
+  ADD COLUMN attempted_at_millis bigint CHECK (attempted_at_millis >= 0);
 
 ALTER TABLE agentos.provider_budget_reservations
   DROP CONSTRAINT provider_budget_reservations_subject_check,
@@ -20,11 +22,13 @@ ALTER TABLE agentos.provider_budget_reservations
   ADD CONSTRAINT provider_budget_reservation_authority_check CHECK (
     (binding_id IS NOT NULL AND subject IS NOT NULL
       AND workload_principal IS NULL AND model IS NULL
-      AND effective_limits IS NULL AND policy_expires_at_millis IS NULL)
+      AND effective_limits IS NULL AND effective_pricing IS NULL
+      AND policy_expires_at_millis IS NULL)
     OR
     (binding_id IS NULL AND subject IS NULL
       AND workload_principal IS NOT NULL AND model IS NOT NULL
-      AND effective_limits IS NOT NULL AND policy_expires_at_millis IS NOT NULL)
+      AND effective_limits IS NOT NULL AND effective_pricing IS NOT NULL
+      AND policy_expires_at_millis IS NOT NULL)
   );
 
 CREATE FUNCTION agentos.valid_workload_budget_principal(p_value jsonb)
@@ -67,8 +71,9 @@ CREATE FUNCTION agentos.reserve_workload_provider_budget(
   p_decision_ref text, p_budget_key text, p_correlation_id text,
   p_principal jsonb, p_provider text, p_credential_domain text,
   p_capability text, p_resource jsonb, p_environment text, p_model text,
-  p_rate_class text, p_limits jsonb, p_policy_expires_at_millis bigint,
-  p_now_millis bigint
+  p_rate_class text, p_limits jsonb, p_pricing jsonb,
+  p_policy_expires_at_millis bigint,
+  p_requested_tokens bigint, p_requested_spend_micros bigint, p_now_millis bigint
 )
 RETURNS TABLE (
   "outcome" text, "effectiveRateClass" text, "retryAtMillis" double precision,
@@ -101,6 +106,16 @@ BEGIN
     OR p_model !~ '^[a-z0-9][a-z0-9._:-]*$' OR length(p_model) > 128
     OR p_rate_class NOT IN ('low', 'standard', 'high')
     OR NOT agentos.valid_workload_budget_limits(p_limits)
+    OR jsonb_typeof(p_pricing) <> 'object'
+    OR (SELECT count(*) FROM jsonb_object_keys(p_pricing)) <> 3
+    OR NOT p_pricing ?& ARRAY['version','inputMicrosPerMillionTokens','outputMicrosPerMillionTokens']
+    OR EXISTS (SELECT 1 FROM jsonb_each(p_pricing) item
+      WHERE jsonb_typeof(item.value) <> 'number'
+        OR item.value::text !~ '^[1-9][0-9]*$')
+    OR p_requested_tokens IS NULL OR p_requested_tokens <= 0
+    OR p_requested_tokens > (p_limits ->> 'maximumTokens')::bigint
+    OR p_requested_spend_micros IS NULL OR p_requested_spend_micros <= 0
+    OR p_requested_spend_micros > (p_limits ->> 'maximumSpendMicros')::bigint
     OR p_policy_expires_at_millis IS NULL OR p_now_millis IS NULL
     OR p_now_millis < 0 OR p_policy_expires_at_millis <= p_now_millis THEN
     RAISE EXCEPTION 'invalid workload provider budget reservation';
@@ -120,10 +135,13 @@ BEGIN
       OR v_existing.environment IS DISTINCT FROM p_environment
       OR v_existing.model <> p_model OR v_existing.rate_class <> p_rate_class
       OR v_existing.effective_limits <> p_limits
+      OR v_existing.effective_pricing <> p_pricing
+      OR v_existing.reserved_tokens <> p_requested_tokens
+      OR v_existing.reserved_spend_micros <> p_requested_spend_micros
       OR v_existing.policy_expires_at_millis <> p_policy_expires_at_millis THEN
       RAISE EXCEPTION 'workload provider budget decision reference conflicts';
     END IF;
-    IF v_existing.state <> 'active'
+    IF v_existing.state <> 'active' OR v_existing.attempted_at_millis IS NOT NULL
       OR v_existing.lease_expires_at_millis <= p_now_millis
       OR v_existing.policy_expires_at_millis <= p_now_millis THEN
       RAISE EXCEPTION 'workload provider budget reservation is not active';
@@ -175,19 +193,17 @@ BEGIN
   SELECT coalesce(sum(reserved_tokens), 0) INTO v_token_reserved
     FROM agentos.provider_budget_reservations
    WHERE budget_key = p_budget_key AND state = 'active'
-     AND lease_expires_at_millis > p_now_millis
+     AND (attempted_at_millis IS NOT NULL OR lease_expires_at_millis > p_now_millis)
      AND token_window_started_at_millis = v_token_start;
   SELECT coalesce(sum(reserved_spend_micros), 0) INTO v_spend_reserved
     FROM agentos.provider_budget_reservations
    WHERE budget_key = p_budget_key AND state = 'active'
-     AND lease_expires_at_millis > p_now_millis
+     AND (attempted_at_millis IS NOT NULL OR lease_expires_at_millis > p_now_millis)
      AND spend_window_started_at_millis = v_spend_start;
 
-  IF v_token_consumed + v_token_reserved +
-      (p_limits ->> 'maximumTokens')::bigint >
+  IF v_token_consumed + v_token_reserved + p_requested_tokens >
       (p_limits ->> 'maximumTokens')::bigint
-    OR v_spend_consumed + v_spend_reserved +
-      (p_limits ->> 'maximumSpendMicros')::bigint >
+    OR v_spend_consumed + v_spend_reserved + p_requested_spend_micros >
       (p_limits ->> 'maximumSpendMicros')::bigint THEN
     v_retry := greatest(
       CASE WHEN v_token_consumed + v_token_reserved > 0
@@ -204,7 +220,7 @@ BEGIN
     INTO v_active_concurrent, v_concurrency_retry
     FROM agentos.provider_budget_reservations
    WHERE budget_key = p_budget_key AND state = 'active'
-     AND lease_expires_at_millis > p_now_millis;
+     AND (attempted_at_millis IS NOT NULL OR lease_expires_at_millis > p_now_millis);
   IF v_request_consumed >= (p_limits ->> 'maximumRequests')::bigint
     OR v_active_concurrent >= (p_limits ->> 'maximumConcurrent')::bigint THEN
     v_retry := greatest(
@@ -226,15 +242,16 @@ BEGIN
   INSERT INTO agentos.provider_budget_reservations (
     decision_ref, budget_key, workload_principal, provider, credential_domain,
     capability, resource, environment, model, rate_class, effective_limits,
+    effective_pricing,
     policy_expires_at_millis, correlation_id, reserved_at_millis,
     lease_expires_at_millis, reserved_tokens, reserved_spend_micros,
     token_window_started_at_millis, spend_window_started_at_millis
   ) VALUES (
     p_decision_ref, p_budget_key, p_principal, p_provider, p_credential_domain,
     p_capability, p_resource, p_environment, p_model, p_rate_class, p_limits,
+    p_pricing,
     p_policy_expires_at_millis, p_correlation_id, p_now_millis, v_lease_expires,
-    (p_limits ->> 'maximumTokens')::bigint,
-    (p_limits ->> 'maximumSpendMicros')::bigint, v_token_start, v_spend_start
+    p_requested_tokens, p_requested_spend_micros, v_token_start, v_spend_start
   );
   RETURN QUERY SELECT 'reserved'::text, p_rate_class, NULL::double precision,
     v_request_end::double precision, v_token_end::double precision,
@@ -245,17 +262,18 @@ $$;
 REVOKE ALL ON FUNCTION agentos.valid_workload_budget_principal(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION agentos.valid_workload_budget_limits(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION agentos.reserve_workload_provider_budget(
-  text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,bigint,bigint
+  text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,jsonb,bigint,bigint,bigint,bigint
 ) FROM PUBLIC;
 
 CREATE FUNCTION agentos.validate_workload_provider_budget(
   p_decision_ref text, p_correlation_id text, p_principal jsonb,
   p_provider text, p_credential_domain text, p_capability text,
   p_resource jsonb, p_model text, p_rate_class text, p_limits jsonb,
+  p_pricing jsonb, p_requested_tokens bigint, p_requested_spend_micros bigint,
   p_expires_at_millis bigint, p_now_millis bigint
 )
 RETURNS TABLE ("outcome" text)
-LANGUAGE plpgsql SECURITY DEFINER STABLE
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = agentos, pg_temp AS $$
 DECLARE v_count integer;
 BEGIN
@@ -266,6 +284,8 @@ BEGIN
     OR p_provider <> 'openai' OR p_credential_domain <> 'openai-responses'
     OR p_capability NOT IN ('openai.responses.create', 'openai.responses.compact')
     OR NOT agentos.valid_workload_budget_limits(p_limits)
+    OR jsonb_typeof(p_pricing) <> 'object'
+    OR p_requested_tokens <= 0 OR p_requested_spend_micros <= 0
     OR p_now_millis IS NULL OR p_now_millis < 0 THEN
     RAISE EXCEPTION 'invalid workload provider budget validation';
   END IF;
@@ -282,19 +302,31 @@ BEGIN
      AND reservation.model = p_model
      AND reservation.rate_class = p_rate_class
      AND reservation.effective_limits = p_limits
+     AND reservation.effective_pricing = p_pricing
+     AND reservation.reserved_tokens = p_requested_tokens
+     AND reservation.reserved_spend_micros = p_requested_spend_micros
      AND reservation.policy_expires_at_millis = p_expires_at_millis
      AND reservation.state = 'active'
+     AND reservation.attempted_at_millis IS NULL
      AND reservation.lease_expires_at_millis > p_now_millis
      AND reservation.policy_expires_at_millis > p_now_millis;
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'workload provider budget reservation unavailable';
   END IF;
-  RETURN QUERY SELECT 'active'::text;
+  UPDATE agentos.provider_budget_reservations
+     SET attempted_at_millis = p_now_millis, updated_at = transaction_timestamp()
+   WHERE decision_ref = p_decision_ref AND state = 'active'
+     AND attempted_at_millis IS NULL;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'workload provider budget attempt already claimed';
+  END IF;
+  RETURN QUERY SELECT 'attempted'::text;
 END;
 $$;
 
 REVOKE ALL ON FUNCTION agentos.validate_workload_provider_budget(
-  text,text,jsonb,text,text,text,jsonb,text,text,jsonb,bigint,bigint
+  text,text,jsonb,text,text,text,jsonb,text,text,jsonb,jsonb,bigint,bigint,bigint,bigint
 ) FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION agentos.configure_egress_authorizer_privileges(
@@ -321,7 +353,7 @@ BEGIN
   EXECUTE format('REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA agentos FROM %I', p_database_role);
   EXECUTE format('GRANT USAGE ON SCHEMA agentos TO %I', p_database_role);
   EXECUTE format(
-    'GRANT EXECUTE ON FUNCTION agentos.read_egress_workload_agents(text,text), agentos.read_egress_assignments(uuid), agentos.read_egress_policy_snapshots(jsonb), agentos.reserve_workload_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,bigint,bigint), agentos.validate_workload_provider_budget(text,text,jsonb,text,text,text,jsonb,text,text,jsonb,bigint,bigint), agentos.settle_provider_budget_for_provider(text,text,text,text,bigint,bigint,bigint,bigint,bigint) TO %I',
+    'GRANT EXECUTE ON FUNCTION agentos.read_egress_workload_agents(text,text), agentos.read_egress_assignments(uuid), agentos.read_egress_policy_snapshots(jsonb), agentos.reserve_workload_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,jsonb,bigint,bigint,bigint,bigint), agentos.validate_workload_provider_budget(text,text,jsonb,text,text,text,jsonb,text,text,jsonb,jsonb,bigint,bigint,bigint,bigint), agentos.settle_provider_budget_for_provider(text,text,text,text,bigint,bigint,bigint,bigint,bigint) TO %I',
     p_database_role);
 END;
 $$;
@@ -341,6 +373,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = agentos, pg_temp AS $$
 DECLARE
   v_reservation agentos.provider_budget_reservations%ROWTYPE;
   v_token_start bigint; v_spend_start bigint;
+  v_calculated_spend bigint;
 BEGIN
   IF p_decision_ref !~ '^decision_[0-9a-f]{32}$'
     OR p_provider NOT IN ('github', 'openai')
@@ -370,6 +403,13 @@ BEGIN
       p_settled_at_millis);
     RETURN;
   END IF;
+  v_calculated_spend := ceil((
+    p_input_tokens::numeric * (v_reservation.effective_pricing ->> 'inputMicrosPerMillionTokens')::numeric +
+    p_output_tokens::numeric * (v_reservation.effective_pricing ->> 'outputMicrosPerMillionTokens')::numeric
+  ) / 1000000)::bigint;
+  IF p_spend_micros <> v_calculated_spend THEN
+    RAISE EXCEPTION 'provider budget settlement pricing conflicts';
+  END IF;
   IF v_reservation.state = 'settled' THEN
     IF v_reservation.forward_outcome <> p_forward_outcome
       OR v_reservation.input_tokens <> p_input_tokens
@@ -387,6 +427,10 @@ BEGIN
       v_reservation.settled_at_millis::double precision;
     RETURN;
   END IF;
+  IF v_reservation.state <> 'active'
+    OR v_reservation.attempted_at_millis IS NULL THEN
+    RAISE EXCEPTION 'provider budget reservation has no claimed attempt';
+  END IF;
   IF p_settled_at_millis < v_reservation.reserved_at_millis THEN
     RAISE EXCEPTION 'provider budget settlement predates reservation';
   END IF;
@@ -394,10 +438,8 @@ BEGIN
     OR p_spend_micros > v_reservation.reserved_spend_micros THEN
     RAISE EXCEPTION 'provider budget settlement exceeds reservation';
   END IF;
-  v_token_start := p_settled_at_millis - mod(p_settled_at_millis,
-    (v_reservation.effective_limits ->> 'tokenWindowMillis')::bigint);
-  v_spend_start := p_settled_at_millis - mod(p_settled_at_millis,
-    (v_reservation.effective_limits ->> 'spendWindowMillis')::bigint);
+  v_token_start := v_reservation.token_window_started_at_millis;
+  v_spend_start := v_reservation.spend_window_started_at_millis;
   INSERT INTO agentos.provider_budget_counters
     (budget_key, dimension, window_started_at_millis, window_ends_at_millis,
      consumed, rate_class)
