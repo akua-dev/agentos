@@ -411,6 +411,25 @@ describe("Crewmate Kubernetes base", () => {
         name: "agentos-egress-identity",
         readOnly: true,
       }]);
+      assert.deepStrictEqual(environment(proxy.env ?? []), {
+        AGENTOS_EGRESS_TOKEN_FILE: "/var/run/secrets/agentos-egress/token",
+        AI_GATEWAY_GRACEFUL_SHUTDOWN_MILLIS: "20000",
+        AI_GATEWAY_IDLE_TIMEOUT_SECONDS: "255",
+        AI_GATEWAY_URL: "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+      });
+      assert.deepStrictEqual(proxy.securityContext, {
+        allowPrivilegeEscalation: false,
+        capabilities: { drop: ["ALL"] },
+        readOnlyRootFilesystem: true,
+        runAsGroup: 1000,
+        runAsNonRoot: true,
+        runAsUser: 1000,
+        seccompProfile: { type: "RuntimeDefault" },
+      });
+      assert.deepStrictEqual(proxy.resources, {
+        limits: { cpu: "250m", memory: "256Mi", "ephemeral-storage": "128Mi" },
+        requests: { cpu: "25m", memory: "64Mi", "ephemeral-storage": "32Mi" },
+      });
       for (const workloadContainer of pod.containers.filter(
         ({ name }) => name !== "ai-gateway-workload-proxy",
       )) {

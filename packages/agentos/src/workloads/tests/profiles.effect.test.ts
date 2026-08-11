@@ -84,7 +84,7 @@ describe("versioned Agent workload profiles", () => {
         podLocalHerdr: true,
         stableWorkload: true,
         oneWriter: true,
-        projectedSupervisionIdentity: true,
+        projectedSupervisionIdentity: false,
         longLivedServiceIdentity: true,
       });
 

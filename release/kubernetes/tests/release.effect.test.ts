@@ -176,11 +176,10 @@ describe("First Mate release artifacts", () => {
           image,
           image,
           image,
-          image,
         ]);
         assert.deepStrictEqual(
           containers.map(({ imagePullPolicy }) => imagePullPolicy),
-          ["IfNotPresent", "IfNotPresent", "IfNotPresent", "IfNotPresent"],
+          ["IfNotPresent", "IfNotPresent", "IfNotPresent"],
         );
       }
       assert.deepStrictEqual(database, [

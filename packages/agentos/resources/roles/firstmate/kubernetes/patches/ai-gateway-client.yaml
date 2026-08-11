@@ -4,9 +4,6 @@ metadata:
   name: agentos-firstmate
 spec:
   template:
-    metadata:
-      labels:
-        agentos.akua.dev/agentgateway-client: "true"
     spec:
       initContainers:
         - name: install-tools
@@ -17,7 +14,7 @@ spec:
             - name: AGENTOS_PROVIDER_CREDENTIAL_KIND
               value: ai_gateway
             - name: AI_GATEWAY_URL
-              value: http://agentgateway-openai.agentos.svc.cluster.local:8788
+              value: http://127.0.0.1:8790
       containers:
         - name: agentos
           env:
@@ -26,6 +23,4 @@ spec:
             - name: AGENTOS_PROVIDER_CREDENTIAL_KIND
               value: ai_gateway
             - name: AI_GATEWAY_URL
-              value: http://agentgateway-openai.agentos.svc.cluster.local:8788
-            - name: AGENTOS_EGRESS_TOKEN_FILE
-              value: /var/run/secrets/agentos-egress/token
+              value: http://127.0.0.1:8790

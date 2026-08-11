@@ -180,8 +180,6 @@ spec:
               memory: 512Mi
               ephemeral-storage: 128Mi
       volumes:
-        - name: agentos-egress-identity
-          $patch: delete
         - name: database-credentials
           secret:
             defaultMode: 0440

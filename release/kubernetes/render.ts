@@ -367,10 +367,10 @@ function validateFirstMate(
   }
   const pod = statefulSet.spec.template.spec;
   const containers = [...pod.initContainers, ...pod.containers];
-  if (containers.length !== 4) {
+  if (containers.length !== 3) {
     return Effect.fail(releaseError(
       "invalid_manifest",
-      `Expected four First Mate containers, found ${containers.length}.`,
+      `Expected three First Mate containers, found ${containers.length}.`,
     ));
   }
   if (
@@ -449,8 +449,6 @@ patches:
               - name: install-tools
                 imagePullPolicy: IfNotPresent
               - name: prepare-home
-                imagePullPolicy: IfNotPresent
-              - name: prepare-github-provider
                 imagePullPolicy: IfNotPresent
             containers:
               - name: agentos

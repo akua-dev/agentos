@@ -3,6 +3,8 @@ kind: Kustomization
 namespace: agentos
 resources:
   - ../../../base
+components:
+  - ../../../../../../../../../services/ai-gateway/kubernetes/workload-proxy/component
 patches:
   - path: ../../../patches/ai-gateway-client.yaml
     target:

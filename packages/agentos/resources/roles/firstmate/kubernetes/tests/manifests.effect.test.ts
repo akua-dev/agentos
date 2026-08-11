@@ -24,6 +24,10 @@ const VolumeMount = Schema.Struct({
   name: Schema.String,
   readOnly: Schema.optional(Schema.Boolean),
 });
+const Probe = Schema.Struct({
+  exec: Schema.optional(Schema.Struct({ command: Schema.Array(Schema.String) })),
+  httpGet: Schema.optional(Schema.Unknown),
+});
 const Container = Schema.Struct({
   name: Schema.String,
   image: Schema.String,
@@ -33,12 +37,8 @@ const Container = Schema.Struct({
   args: Schema.optional(Schema.Array(Schema.String)),
   env: Schema.optional(Schema.Array(EnvironmentEntry)),
   volumeMounts: Schema.optional(Schema.Array(VolumeMount)),
-  livenessProbe: Schema.optional(Schema.Struct({
-    exec: Schema.Struct({ command: Schema.Array(Schema.String) }),
-  })),
-  readinessProbe: Schema.optional(Schema.Struct({
-    exec: Schema.Struct({ command: Schema.Array(Schema.String) }),
-  })),
+  livenessProbe: Schema.optional(Probe),
+  readinessProbe: Schema.optional(Probe),
   securityContext: Schema.optional(Schema.Unknown),
   resources: Schema.optional(Schema.Unknown),
 });
@@ -49,6 +49,7 @@ const Metadata = Schema.Struct({
   labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
 });
 const Resource = Schema.Struct({
+  automountServiceAccountToken: Schema.optional(Schema.Boolean),
   apiVersion: Schema.String,
   kind: Schema.String,
   metadata: Metadata,
@@ -79,6 +80,7 @@ const StatefulSet = Schema.Struct({
         labels: Schema.Record(Schema.String, Schema.String),
       }),
       spec: Schema.Struct({
+        automountServiceAccountToken: Schema.Boolean,
         serviceAccountName: Schema.String,
         securityContext: Schema.Unknown,
         initContainers: Schema.Array(Container),
@@ -209,7 +211,6 @@ describe("First Mate Kubernetes resources", () => {
         },
         labels: {
           "agentos.akua.dev/agent": "firstmate",
-          "agentos.akua.dev/github-client": "true",
           "agentos.akua.dev/otel-client": "true",
           "app.kubernetes.io/name": "agentos-firstmate",
           "app.kubernetes.io/part-of": "agentos",
@@ -223,7 +224,10 @@ describe("First Mate Kubernetes resources", () => {
         runAsUser: 1000,
         seccompProfile: { type: "RuntimeDefault" },
       });
-      assert.lengthOf(pod.initContainers, 3);
+      assert.isFalse(pod.automountServiceAccountToken);
+      assert.isFalse((yield* resource(resources, "ServiceAccount", "agentos-firstmate"))
+        .automountServiceAccountToken ?? true);
+      assert.lengthOf(pod.initContainers, 2);
       assert.lengthOf(pod.containers, 1);
       const install = yield* required(pod.initContainers[0], "Missing installer");
       const prepare = yield* required(pod.initContainers[1], "Missing prepare");
@@ -248,16 +252,6 @@ describe("First Mate Kubernetes resources", () => {
       ]);
       assert.deepStrictEqual(firstMate.volumeMounts, [
         ...(install.volumeMounts ?? []),
-        {
-          mountPath: "/var/run/secrets/agentos-egress",
-          name: "agentos-egress-identity",
-          readOnly: true,
-        },
-        {
-          mountPath: "/var/run/config/agentos-github",
-          name: "agentos-github-ca",
-          readOnly: true,
-        },
       ]);
       assert.deepStrictEqual(install.command, ["mise"]);
       assert.deepStrictEqual(install.args, [
@@ -302,19 +296,8 @@ describe("First Mate Kubernetes resources", () => {
         readOnlyRootFilesystem: true,
         runAsNonRoot: true,
       });
-      assert.deepInclude(pod.volumes, {
-        name: "agentos-egress-identity",
-        projected: {
-          defaultMode: 288,
-          sources: [{
-            serviceAccountToken: {
-              audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
-              expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
-              path: "token",
-            },
-          }],
-        },
-      });
+      assert.isFalse(JSON.stringify(pod).includes("agentos-egress-identity"));
+      assert.isFalse(JSON.stringify(pod).includes("AGENTOS_GITHUB_"));
       assert.deepStrictEqual(
         resources.filter(({ kind }) =>
           ["Ingress", "LoadBalancer", "NodePort", "ClusterRoleBinding"].includes(kind)
@@ -483,7 +466,7 @@ describe("First Mate Kubernetes resources", () => {
       ).pipe(Effect.flatMap(statefulSet));
       assert.deepStrictEqual(
         workload.spec.template.spec.initContainers.map(({ name }) => name),
-        ["install-tools", "prepare-home", "prepare-github-provider"],
+        ["install-tools", "prepare-home"],
       );
     })));
 
@@ -511,33 +494,80 @@ describe("First Mate Kubernetes resources", () => {
       assert.deepStrictEqual(pod.initContainers.map(({ name }) => name), [
         "install-tools",
         "prepare-home",
-        "prepare-github-provider",
       ]);
       assert.deepInclude(spec.template.metadata.labels, {
         "agentos.akua.dev/agentgateway-client": "true",
       });
       assert.strictEqual(
         variables.AI_GATEWAY_URL,
-        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+        "http://127.0.0.1:8790",
       );
       assert.isUndefined(variables.AI_GATEWAY_TOKEN);
-      assert.strictEqual(
-        variables.AGENTOS_EGRESS_TOKEN_FILE,
-        "/var/run/secrets/agentos-egress/token",
-      );
+      assert.isUndefined(variables.AGENTOS_EGRESS_TOKEN_FILE);
       assert.strictEqual(variables.AGENTOS_PI_PROVIDER_MODE, "ai-gateway");
       assert.strictEqual(variables.AGENTOS_PROVIDER_CREDENTIAL_KIND, "ai_gateway");
       assert.deepInclude(prepareVariables, {
         AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
-        AI_GATEWAY_URL:
-          "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+        AI_GATEWAY_URL: "http://127.0.0.1:8790",
       });
       assert.isUndefined(prepareVariables.AI_GATEWAY_TOKEN);
+      assert.isUndefined(prepareVariables.AGENTOS_EGRESS_TOKEN_FILE);
       assert.isUndefined(variables.AGENTOS_MODEL);
       assert.isUndefined(variables.AGENTOS_THINKING);
       assert.isUndefined(prepareVariables.AGENTOS_MODEL);
       assert.isUndefined(prepareVariables.AGENTOS_THINKING);
       assert.strictEqual(pod.serviceAccountName, "agentos-firstmate");
+      const proxy = yield* required(
+        pod.containers.find(({ name }) => name === "ai-gateway-workload-proxy"),
+        "Missing workload proxy",
+      );
+      assert.deepStrictEqual(proxy.volumeMounts, [{
+        mountPath: "/var/run/secrets/agentos-egress",
+        name: "agentos-egress-identity",
+        readOnly: true,
+      }]);
+      assert.deepStrictEqual(environment(proxy.env ?? []), {
+        AGENTOS_EGRESS_TOKEN_FILE: "/var/run/secrets/agentos-egress/token",
+        AI_GATEWAY_GRACEFUL_SHUTDOWN_MILLIS: "20000",
+        AI_GATEWAY_IDLE_TIMEOUT_SECONDS: "255",
+        AI_GATEWAY_URL: "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+      });
+      assert.deepStrictEqual(proxy.livenessProbe, {
+        httpGet: { host: "127.0.0.1", path: "/livez", port: "workload-proxy" },
+      });
+      assert.deepStrictEqual(proxy.readinessProbe, {
+        httpGet: { host: "127.0.0.1", path: "/readyz", port: "workload-proxy" },
+      });
+      assert.deepStrictEqual(proxy.securityContext, {
+        allowPrivilegeEscalation: false,
+        capabilities: { drop: ["ALL"] },
+        readOnlyRootFilesystem: true,
+        runAsGroup: 1000,
+        runAsNonRoot: true,
+        runAsUser: 1000,
+        seccompProfile: { type: "RuntimeDefault" },
+      });
+      assert.deepStrictEqual(proxy.resources, {
+        limits: { cpu: "250m", memory: "256Mi", "ephemeral-storage": "128Mi" },
+        requests: { cpu: "25m", memory: "64Mi", "ephemeral-storage": "32Mi" },
+      });
+      assert.deepStrictEqual(pod.volumes.filter((volume) =>
+        JSON.stringify(volume).includes("agentos-egress-identity")
+      ), [{
+        name: "agentos-egress-identity",
+        projected: {
+          defaultMode: 288,
+          sources: [{ serviceAccountToken: {
+            audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
+            expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+            path: "token",
+          } }],
+        },
+      }]);
+      for (const candidate of [...pod.initContainers, firstMate]) {
+        assert.isFalse(JSON.stringify(candidate).includes("agentos-egress-identity"));
+        assert.isFalse(JSON.stringify(candidate).includes("AGENTOS_EGRESS_TOKEN_FILE"));
+      }
       assert.strictEqual(spec.volumeClaimTemplates[0]?.metadata.name, "home");
     })));
 
@@ -564,7 +594,6 @@ describe("First Mate Kubernetes resources", () => {
       assert.deepStrictEqual(pod.initContainers.map(({ name }) => name), [
         "install-tools",
         "prepare-home",
-        "prepare-github-provider",
       ]);
       assert.strictEqual(prepareVariables.AGENTOS_PI_PROVIDER_MODE, "direct");
       assert.isUndefined(prepareVariables.AI_GATEWAY_URL);
