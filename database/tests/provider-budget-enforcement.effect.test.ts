@@ -587,11 +587,14 @@ layer(databaseLayer)("durable provider budgets", (it) => {
   it.effect("linearizes concurrent attempt renewal and expiry recovery without double charge", () =>
     Effect.gen(function*() {
       const database = yield* TestDatabase;
+      let renewWins = 0;
+      let recoveryWins = 0;
       for (let repetition = 0; repetition < 12; repetition += 1) {
         const suffix = `f${repetition.toString(16).padStart(3, "0")}`;
         const decision = `decision_${suffix.repeat(8)}`;
         const budgetKey = `budget_${suffix.repeat(16)}`;
-        const raceAt = now + 899_999;
+        const expiryAt = now + 899_999;
+        const renewAt = expiryAt - 1;
         yield* reserveWorkload({
           decision,
           budgetKey,
@@ -605,52 +608,68 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         });
         yield* database.query(`
           UPDATE agentos.provider_budget_reservations
-             SET attempt_lease_expires_at_millis = ${raceAt}
+             SET attempt_lease_expires_at_millis = ${expiryAt}
            WHERE decision_ref = '${decision}'
         `);
-        const [renew, recover] = yield* Effect.all([
-          Effect.exit(renewProviderAttempt(
-            decision,
-            "openai",
-            "openai-responses",
-            raceAt,
-          )),
-          Effect.exit(database.query<{ readonly outcome: string }>(`
-            SELECT * FROM agentos.recover_expired_workload_provider_attempts(${raceAt}, 100)
-          `)),
-        ], { concurrency: "unbounded" });
+        const renew = Effect.exit(renewProviderAttempt(
+          decision,
+          "openai",
+          "openai-responses",
+          renewAt,
+        ));
+        const recover = Effect.exit(database.query<{ readonly outcome: string }>(`
+          SELECT * FROM agentos.recover_expired_workload_provider_attempts(${expiryAt}, 100)
+        `));
+        const [first, second] = yield* Effect.all(
+          repetition % 2 === 0 ? [renew, recover] : [recover, renew],
+          { concurrency: "unbounded" },
+        );
+        const [renewResult, recoverResult] = repetition % 2 === 0
+          ? [first, second]
+          : [second, first];
         const row = (yield* database.query<{
           readonly state: string;
           readonly lease: number | null;
           readonly tokenWindow: number;
           readonly spendWindow: number;
+          readonly tokens: number;
+          readonly spend: number;
         }>(`
           SELECT state, attempt_lease_expires_at_millis::double precision AS lease,
                  token_window_started_at_millis::double precision AS "tokenWindow",
-                 spend_window_started_at_millis::double precision AS "spendWindow"
+                 spend_window_started_at_millis::double precision AS "spendWindow",
+                 (input_tokens + output_tokens)::double precision AS tokens,
+                 spend_micros::double precision AS spend
             FROM agentos.provider_budget_reservations
            WHERE decision_ref = '${decision}'
         `))[0];
         assert.isDefined(row);
-        const renewed = Exit.isSuccess(renew);
+        const renewed = Exit.isSuccess(renewResult);
         assert.strictEqual(row?.state, renewed ? "active" : "settled");
+        assert.deepStrictEqual(
+          { tokens: row?.tokens, spend: row?.spend },
+          renewed ? { tokens: null, spend: null } : { tokens: 100, spend: 100 },
+        );
         if (renewed) {
-          assert.strictEqual(renew.value[0]?.outcome, "renewed");
-          assert.strictEqual(row?.lease, raceAt + 1);
-          assert.isTrue(Exit.isSuccess(recover));
-          if (Exit.isSuccess(recover)) {
-            assert.strictEqual(recover.value[0]?.outcome, "unchanged");
+          renewWins += 1;
+          assert.strictEqual(renewResult.value[0]?.outcome, "renewed");
+          assert.strictEqual(row?.lease, now + 900_000);
+          assert.isAbove(row?.lease ?? 0, expiryAt);
+          assert.isTrue(Exit.isSuccess(recoverResult));
+          if (Exit.isSuccess(recoverResult)) {
+            assert.strictEqual(recoverResult.value[0]?.outcome, "unchanged");
           }
         } else {
-          assert.isTrue(Exit.isSuccess(recover));
-          if (Exit.isSuccess(recover)) {
-            assert.strictEqual(recover.value[0]?.outcome, "recovered");
+          recoveryWins += 1;
+          assert.isTrue(Exit.isSuccess(recoverResult));
+          if (Exit.isSuccess(recoverResult)) {
+            assert.strictEqual(recoverResult.value[0]?.outcome, "recovered");
           }
           const laterRenew = yield* Effect.exit(renewProviderAttempt(
             decision,
             "openai",
             "openai-responses",
-            raceAt,
+            renewAt,
           ));
           assert.isTrue(Exit.isFailure(laterRenew));
         }
@@ -676,10 +695,26 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         ));
         assert.deepStrictEqual(
           yield* database.query<{ readonly outcome: string }>(`
-            SELECT * FROM agentos.recover_expired_workload_provider_attempts(${raceAt}, 100)
+            SELECT * FROM agentos.recover_expired_workload_provider_attempts(${expiryAt}, 100)
           `),
           [{ outcome: "unchanged" }],
         );
+        if (renewed) {
+          const blocked = yield* reserveWorkload({
+            decision: `decision_${suffix.repeat(7)}eeee`,
+            budgetKey,
+            requestedTokens: 1,
+            requestedSpendMicros: 1,
+            atMillis: expiryAt,
+          });
+          assert.strictEqual(blocked.outcome, "rate_limited");
+          assert.deepStrictEqual(
+            yield* database.query<{ readonly outcome: string }>(`
+              SELECT * FROM agentos.recover_expired_workload_provider_attempts(${now + 900_000}, 100)
+            `),
+            [{ outcome: "recovered" }],
+          );
+        }
         const later = yield* reserveWorkload({
           decision: `decision_${suffix.repeat(7)}ffff`,
           budgetKey,
@@ -689,6 +724,8 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         });
         assert.strictEqual(later.outcome, "reserved");
       }
+      assert.strictEqual(renewWins, 6);
+      assert.strictEqual(recoveryWins, 6);
     }));
 
   it.effect("atomically fits exact concurrent reservations and releases only unused capacity", () =>
