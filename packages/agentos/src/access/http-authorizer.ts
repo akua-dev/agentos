@@ -246,6 +246,11 @@ export const PROVIDER_AUTHORIZATION_GRANT_HEADERS = Object.freeze([
   "x-agentos-authz-maximum-tokens",
   "x-agentos-authz-spend-window-millis",
   "x-agentos-authz-maximum-spend-micros",
+  "x-agentos-authz-pricing-version",
+  "x-agentos-authz-input-micros-per-million-tokens",
+  "x-agentos-authz-output-micros-per-million-tokens",
+  "x-agentos-authz-requested-tokens",
+  "x-agentos-authz-requested-spend-micros",
 ]);
 
 export function resolveProviderAuthorizationRoute(

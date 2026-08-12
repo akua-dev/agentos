@@ -28,6 +28,20 @@ const PositiveInteger = Schema.Number.pipe(
 );
 const DecisionRef = ProviderBudgetSettlementReportV1Schema.fields.decisionRef;
 
+export const ProviderBudgetAttemptRenewalRequestV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  decisionRef: DecisionRef,
+});
+export const ProviderBudgetAttemptRenewalReceiptV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  decisionRef: DecisionRef,
+  outcome: Schema.Literal("renewed"),
+});
+export type ProviderBudgetAttemptRenewalRequestV1 =
+  typeof ProviderBudgetAttemptRenewalRequestV1Schema.Type;
+export type ProviderBudgetAttemptRenewalReceiptV1 =
+  typeof ProviderBudgetAttemptRenewalReceiptV1Schema.Type;
+
 export const AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL =
   "http://agentos-egress-authz.agentos.svc.cluster.local:9001";
 
@@ -93,6 +107,15 @@ export class ProviderBudgetSettlementReporter extends Context.Service<
     >;
   }
 >()("agentos/access/ProviderBudgetSettlementReporter") {}
+
+export class ProviderBudgetAttemptRenewalReporter extends Context.Service<
+  ProviderBudgetAttemptRenewalReporter,
+  {
+    readonly renew: (
+      request: ProviderBudgetAttemptRenewalRequestV1,
+    ) => Effect.Effect<ProviderBudgetAttemptRenewalReceiptV1, ProviderBudgetSettlementHttpError>;
+  }
+>()("agentos/access/ProviderBudgetAttemptRenewalReporter") {}
 
 export class ProviderBudgetSettlementReadiness extends Context.Service<
   ProviderBudgetSettlementReadiness,
@@ -221,6 +244,44 @@ export function makeProviderBudgetSettlementHttpLayer(
         },
       );
 
+      const renew = Effect.fn("agentos.providerBudgetAttempt.renew")(
+        function*(untrusted: ProviderBudgetAttemptRenewalRequestV1) {
+          const body = yield* Schema.decodeUnknownEffect(
+            ProviderBudgetAttemptRenewalRequestV1Schema,
+            { onExcessProperty: "error" },
+          )(untrusted).pipe(Effect.mapError(() => settlementHttpError("invalid_report")));
+          const token = yield* fileSystem.readFileString(options.tokenPath).pipe(
+            Effect.mapError(() => settlementHttpError("credential_unavailable")),
+            Effect.flatMap(validateProjectedToken),
+          );
+          let request = HttpClientRequest.post(endpoints.renewal).pipe(
+            HttpClientRequest.acceptJson,
+            HttpClientRequest.setHeader("authorization", `Bearer ${token}`),
+          );
+          request = yield* HttpClientRequest.bodyJson(request, body).pipe(
+            Effect.mapError(() => settlementHttpError("invalid_report")),
+          );
+          const receipt = yield* client.execute(request).pipe(
+            Effect.flatMap((response) => response.status >= 200 && response.status < 300
+              ? readBoundedResponseSource(response, options.maximumResponseBytes).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(
+                  Schema.fromJsonString(ProviderBudgetAttemptRenewalReceiptV1Schema),
+                  { onExcessProperty: "error" },
+                )),
+                Effect.mapError(() => settlementHttpError("invalid_response", response.status)),
+              )
+              : settlementStatusError(response.status)),
+            Effect.mapError((error) => error instanceof ProviderBudgetSettlementHttpError
+              ? error
+              : settlementHttpError("request_failed")),
+            Effect.timeoutOrElse({ duration: options.timeoutMillis, orElse: () => settlementHttpError("timeout") }),
+            Effect.scoped,
+          );
+          if (receipt.decisionRef !== body.decisionRef) return yield* settlementHttpError("invalid_response");
+          return receipt;
+        },
+      );
+
       const check = Effect.fn("agentos.providerBudgetSettlement.readiness")(
         function*() {
           const token = yield* fileSystem.readFileString(options.tokenPath).pipe(
@@ -257,6 +318,7 @@ export function makeProviderBudgetSettlementHttpLayer(
         ProviderBudgetSettlementReporter,
         ProviderBudgetSettlementReporter.of({ report }),
       ).pipe(
+        Context.add(ProviderBudgetAttemptRenewalReporter, ProviderBudgetAttemptRenewalReporter.of({ renew })),
         Context.add(
           ProviderBudgetSettlementReadiness,
           ProviderBudgetSettlementReadiness.of({ check }),
@@ -288,6 +350,7 @@ function settlementEndpoints(baseUrl: string) {
     }
     return {
       settlement: new URL("/settle", base),
+      renewal: new URL("/renew", base),
       validation: new URL("/validate", base),
       readiness: new URL("/readyz/settlement", base),
     };

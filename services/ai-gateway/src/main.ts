@@ -8,6 +8,7 @@ import * as BunPath from "@effect/platform-bun/BunPath";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import {
   ProviderBudgetReservationRequester,
+  ProviderBudgetAttemptRenewalReporter,
   makeProviderBudgetSettlementHttpLayer,
   ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
@@ -184,6 +185,7 @@ function makeAIGatewayRuntimeLive(
         readiness: ProviderBudgetSettlementReadiness,
         reporter: ProviderBudgetSettlementReporter,
         reservation: ProviderBudgetReservationRequester,
+        renewal: ProviderBudgetAttemptRenewalReporter,
       }).pipe(Effect.provide(settlementLayer));
 
       const serve = Effect.fn("agentos.aiGateway.serve")(
@@ -237,6 +239,10 @@ function makeAIGatewayRuntimeLive(
             Effect.provideService(
               ProviderBudgetSettlementReporter,
               settlementServices.reporter,
+            ),
+            Effect.provideService(
+              ProviderBudgetAttemptRenewalReporter,
+              settlementServices.renewal,
             ),
             Effect.provideService(
               ProviderBudgetSettlementReadiness,

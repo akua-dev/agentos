@@ -158,12 +158,29 @@ function settlementRequest(
   });
 }
 
+function renewalRequest(body: unknown = {
+  schemaVersion: 1,
+  decisionRef: settlementBody.decisionRef,
+}) {
+  const encoded = JSON.stringify(body);
+  return new Request("http://egress-authz.test/renew", {
+    method: "POST",
+    headers: {
+      authorization: "Bearer projected-provider-jwt",
+      "content-type": "application/json",
+      "content-length": String(new TextEncoder().encode(encoded).byteLength),
+    },
+    body: encoded,
+  });
+}
+
 function services(options?: {
   readonly authenticate?: WorkloadIdentityAuthenticator["Service"]["authenticate"];
   readonly authorizeHermes?: HermesProviderAuthorization["authorize"];
   readonly decide?: ProviderPolicyDecisionPoint["Service"]["decide"];
   readonly authenticateSettlement?: ProviderBudgetSettlementCallerAuthenticator["Service"]["authenticate"];
   readonly settleProvider?: ProviderBudgetEnforcer["Service"]["settleProvider"];
+  readonly renewProviderAttempt?: ProviderBudgetEnforcer["Service"]["renewProviderAttempt"];
   readonly reserveWorkload?: ProviderBudgetEnforcer["Service"]["reserveWorkload"];
   readonly ready?: Effect.Effect<boolean, unknown>;
 }) {
@@ -213,6 +230,12 @@ function services(options?: {
         cachedInputTokens: input.cachedInputTokens,
         spendMicros: input.spendMicros,
         settledAtMillis: input.settledAtMillis,
+      })),
+      renewProviderAttempt: options?.renewProviderAttempt ?? ((input) => Effect.succeed({
+        schemaVersion: 1,
+        decisionRef: input.decisionRef,
+        outcome: "renewed",
+        leaseExpiresAtMillis: input.renewedAtMillis + 60_000,
       })),
     }),
     Layer.succeed(EgressAuthorizerReadiness, {
@@ -514,6 +537,38 @@ describe("Effect egress authorization HTTP application", () => {
         credentialDomain: "github",
         settledAtMillis: now,
       });
+    }));
+
+  it.effect("authenticates attempt renewal and derives provider authority outside the closed body", () =>
+    Effect.gen(function*() {
+      const seen = yield* Ref.make<unknown>(null);
+      const handler = yield* makeHandler.pipe(Effect.provide(services({
+        renewProviderAttempt: (input) => Ref.set(seen, input).pipe(Effect.as({
+          schemaVersion: 1,
+          decisionRef: input.decisionRef,
+          outcome: "renewed",
+          leaseExpiresAtMillis: input.renewedAtMillis + 60_000,
+        })),
+      })));
+      const response = yield* handler(renewalRequest());
+      assert.strictEqual(response.status, 200);
+      assert.deepStrictEqual(yield* Effect.tryPromise(() => response.json()), {
+        schemaVersion: 1,
+        decisionRef: settlementBody.decisionRef,
+        outcome: "renewed",
+      });
+      assert.deepStrictEqual(yield* Ref.get(seen), {
+        schemaVersion: 1,
+        decisionRef: settlementBody.decisionRef,
+        provider: "github",
+        credentialDomain: "github",
+        renewedAtMillis: now,
+      });
+      assert.strictEqual((yield* handler(renewalRequest({
+        schemaVersion: 1,
+        decisionRef: settlementBody.decisionRef,
+        provider: "openai",
+      }))).status, 400);
     }));
 
   it.effect("rejects malformed or oversized settlement bodies before database work", () =>

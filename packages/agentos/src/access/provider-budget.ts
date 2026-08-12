@@ -311,6 +311,21 @@ export const ProviderBudgetSettlementV1Schema = Schema.Struct({
   settledAtMillis: EpochMillis,
 });
 
+export const ProviderBudgetAttemptRenewalInputV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  decisionRef: DecisionRef,
+  provider: AccessProviderIdSchema,
+  credentialDomain: CredentialDomain,
+  renewedAtMillis: EpochMillis,
+});
+
+export const ProviderBudgetAttemptRenewalV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  decisionRef: DecisionRef,
+  outcome: Schema.Literal("renewed"),
+  leaseExpiresAtMillis: EpochMillis,
+});
+
 export type ProviderBudgetReservationInputV1 =
   typeof ProviderBudgetReservationInputV1Schema.Type;
 export type ProviderBudgetWorkloadReservationInputV1 =
@@ -328,6 +343,10 @@ export type ProviderBudgetProviderSettlementInputV1 =
   typeof ProviderBudgetProviderSettlementInputV1Schema.Type;
 export type ProviderBudgetSettlementV1 =
   typeof ProviderBudgetSettlementV1Schema.Type;
+export type ProviderBudgetAttemptRenewalInputV1 =
+  typeof ProviderBudgetAttemptRenewalInputV1Schema.Type;
+export type ProviderBudgetAttemptRenewalV1 =
+  typeof ProviderBudgetAttemptRenewalV1Schema.Type;
 
 const ProviderBudgetStoreReservationResultSchema = Schema.Union([
   ProviderBudgetReservationV1Schema,
@@ -360,6 +379,9 @@ export interface ProviderBudgetStore {
   ) => Effect.Effect<unknown, unknown>;
   readonly settleProvider: (
     input: ProviderBudgetProviderSettlementInputV1,
+  ) => Effect.Effect<unknown, unknown>;
+  readonly renewProviderAttempt?: (
+    input: ProviderBudgetAttemptRenewalInputV1,
   ) => Effect.Effect<unknown, unknown>;
 }
 
@@ -409,6 +431,9 @@ export class ProviderBudgetEnforcer extends Context.Service<
       ProviderBudgetSettlementV1,
       ProviderBudgetEnforcementError
     >;
+    readonly renewProviderAttempt: (
+      input: ProviderBudgetAttemptRenewalInputV1,
+    ) => Effect.Effect<ProviderBudgetAttemptRenewalV1, ProviderBudgetEnforcementError>;
   }
 >()("agentos/access/ProviderBudgetEnforcer") {}
 
@@ -545,12 +570,45 @@ export function makeProviderBudgetEnforcerLayer(store: ProviderBudgetStore) {
     );
   });
 
+  const renewProviderAttempt = Effect.fn(
+    "agentos.providerBudget.renewProviderAttempt",
+  )(function*(untrusted: unknown) {
+    const input = yield* Schema.decodeUnknownEffect(
+      ProviderBudgetAttemptRenewalInputV1Schema,
+      { onExcessProperty: "error" },
+    )(untrusted).pipe(
+      Effect.mapError(() => enforcementError("invalid_settlement", false)),
+    );
+    if (store.renewProviderAttempt === undefined) {
+      return yield* enforcementError("database_unavailable", true);
+    }
+    const raw = yield* store.renewProviderAttempt(input).pipe(
+      Effect.mapError(() => enforcementError("database_unavailable", true)),
+    );
+    const result = yield* Schema.decodeUnknownEffect(
+      Schema.Struct({
+        outcome: Schema.Literal("renewed"),
+        leaseExpiresAtMillis: EpochMillis,
+      }),
+      { onExcessProperty: "error" },
+    )(raw).pipe(
+      Effect.mapError(() => enforcementError("policy_stale", false)),
+    );
+    return ProviderBudgetAttemptRenewalV1Schema.make({
+      schemaVersion: 1,
+      decisionRef: input.decisionRef,
+      outcome: result.outcome,
+      leaseExpiresAtMillis: result.leaseExpiresAtMillis,
+    });
+  });
+
   return Layer.succeed(ProviderBudgetEnforcer, {
     validateWorkload,
     reserveWorkload,
     reserve,
     settle,
     settleProvider,
+    renewProviderAttempt,
   });
 }
 

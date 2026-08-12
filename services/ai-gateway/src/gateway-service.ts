@@ -5,6 +5,7 @@ import {
   ProviderBudgetReservationRequester,
   ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
+  ProviderBudgetAttemptRenewalReporter,
   denyProviderBudgetReservationRequester,
   providerAuthorizationGrantHeaders,
   type ProviderAuthorizationGrantV1,
@@ -91,6 +92,9 @@ export const makeAIGatewayApplication = Effect.fn(
   );
   const settlementReadiness = yield* ProviderBudgetSettlementReadiness;
   const settlements = yield* ProviderBudgetSettlementReporter;
+  const attemptRenewals = Option.getOrUndefined(
+    yield* Effect.serviceOption(ProviderBudgetAttemptRenewalReporter),
+  );
   const usage = yield* Ref.make<ReadonlyMap<string, UsageSnapshot>>(new Map());
 
   const fallbackKey = options.openAIApiKey?.trim();
@@ -275,6 +279,7 @@ export const makeAIGatewayApplication = Effect.fn(
       acquire(sessionKey, signal, authorization, telemetry, use),
     provider,
     settlements,
+    ...(attemptRenewals === undefined ? {} : { attemptRenewals }),
     now: Clock.currentTimeMillis,
     heartbeatMillis: options.heartbeatMillis,
     maximumUsageEventBytes: options.maximumUsageEventBytes,
