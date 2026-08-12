@@ -5,6 +5,7 @@ import {
   makeProviderBudgetEnforcerLayer,
   providerBudgetKey,
   type ProviderBudgetProviderSettlementInputV1,
+  type ProviderBudgetAttemptRenewalInputV1,
   type ProviderBudgetReservationInputV1,
   type ProviderBudgetSettlementInputV1,
   type ProviderBudgetWorkloadReservationInputV1,
@@ -169,12 +170,24 @@ export const ProviderBudgetEnforcerPostgresLayer = Layer.unwrap(
       `;
       return normalizeSettlement(input, rows[0]);
     });
+    const renewProviderAttempt = Effect.fn(
+      "ProviderBudgetStorePostgres.renewProviderAttempt",
+    )(function*(input: ProviderBudgetAttemptRenewalInputV1) {
+      const rows = yield* sql<ProviderBudgetRow>`
+        SELECT * FROM agentos.renew_workload_provider_attempt(
+          ${input.decisionRef}, ${input.provider}, ${input.credentialDomain},
+          ${input.renewedAtMillis}
+        )
+      `;
+      return rows[0];
+    });
     const store: ProviderBudgetStore = {
       reserveWorkload,
       validateWorkload,
       reserve,
       settle,
       settleProvider,
+      renewProviderAttempt,
     };
     return makeProviderBudgetEnforcerLayer(store);
   }),

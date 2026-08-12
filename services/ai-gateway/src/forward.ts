@@ -10,11 +10,13 @@ import {
   type ProviderAuthorizationError,
   type ProviderAuthorizationGrantV1,
   type ProviderBudgetSettlementReporter,
+  type ProviderBudgetAttemptRenewalReporter,
   type ProviderBudgetSettlementReportV1,
 } from "@akua-dev/agentos";
 import {
   Cause,
   Crypto,
+  Deferred,
   Effect,
   Exit,
   Option,
@@ -86,6 +88,7 @@ export interface AIForwardOptions {
   ) => Effect.Effect<A, AIForwardRouteError>;
   readonly provider: AIProviderHttp["Service"];
   readonly settlements: ProviderBudgetSettlementReporter["Service"];
+  readonly attemptRenewals?: ProviderBudgetAttemptRenewalReporter["Service"];
   readonly now: Effect.Effect<number>;
   readonly heartbeatMillis: number;
   readonly maximumUsageEventBytes: number;
@@ -209,6 +212,11 @@ export const makeAIForwardHandler = Effect.fn(
       (lease, transfer) => {
         if (lease === undefined) {
           return Effect.gen(function*() {
+            yield* settleAttempt(
+              options.settlements,
+              authentication.authorization,
+              "transport_failed",
+            );
             yield* diagnostic(requestTelemetry.routeEnded("unavailable"));
             yield* diagnostic(requestTelemetry.end({
               status: 503,
@@ -246,6 +254,11 @@ export const makeAIForwardHandler = Effect.fn(
           yield* diagnostic(requestTelemetry.routeEnded("acquired"));
           const upstreamRequest = yield* makeUpstreamRequest(request, url, lease);
           if (upstreamRequest === undefined) {
+            yield* settleAttempt(
+              options.settlements,
+              authentication.authorization,
+              "transport_failed",
+            );
             yield* releaseLeaseOnce;
             yield* diagnostic(requestTelemetry.end({
               status: 400,
@@ -378,6 +391,7 @@ export const makeAIForwardHandler = Effect.fn(
           const observer = observerResult === undefined
             ? undefined
             : observerResult.success;
+          const heartbeatFailed = yield* Ref.make(false);
           const monitored = upstream.body.pipe(
             Stream.tap((chunk) =>
               diagnostic(requestTelemetry.streamChunk(chunk.byteLength))
@@ -395,14 +409,24 @@ export const makeAIForwardHandler = Effect.fn(
                 observer,
                 requestTelemetry,
                 request.signal,
+                heartbeatFailed,
               )
             ),
           );
           const scoped = Stream.unwrap(Effect.gen(function*() {
-            yield* heartbeat(lease, options.heartbeatMillis).pipe(
+            if (options.attemptRenewals === undefined) return monitored;
+            const heartbeatFailure = yield* Deferred.make<void>();
+            yield* heartbeat(
+              lease,
+              options.attemptRenewals,
+              authentication.authorization?.decisionRef,
+              options.heartbeatMillis,
+              heartbeatFailure,
+              heartbeatFailed,
+            ).pipe(
               Effect.forkScoped({ startImmediately: true }),
             );
-            return monitored;
+            return monitored.pipe(Stream.interruptWhen(Deferred.await(heartbeatFailure)));
           }));
           const body = yield* Stream.toReadableStreamEffect(scoped);
           const responseResult = yield* Effect.result(finiteResponse(
@@ -428,6 +452,11 @@ export const makeAIForwardHandler = Effect.fn(
     ).pipe(
       Effect.catchTag("AIForwardRouteError", (failure) =>
         Effect.gen(function*() {
+          yield* settleAttempt(
+            options.settlements,
+            authentication.authorization,
+            "transport_failed",
+          );
           yield* diagnostic(requestTelemetry.routeEnded("error", failure));
           yield* diagnostic(requestTelemetry.end({
             status: 503,
@@ -597,12 +626,34 @@ function makeUpstreamRequest(
   });
 }
 
-function heartbeat(lease: AIForwardLease, heartbeatMillis: number) {
+function heartbeat(
+  lease: AIForwardLease,
+  attemptRenewals: ProviderBudgetAttemptRenewalReporter["Service"],
+  decisionRef: string | undefined,
+  heartbeatMillis: number,
+  failure: Deferred.Deferred<void>,
+  failed: Ref.Ref<boolean>,
+) {
   return Effect.sleep(heartbeatMillis).pipe(
-    Effect.andThen(lease.renew),
-    Effect.flatMap((renewed) => renewed ? Effect.void : Effect.interrupt),
+    Effect.andThen(Effect.all([
+      lease.renew,
+      decisionRef === undefined
+        ? Effect.succeed(false)
+        : attemptRenewals.renew({ schemaVersion: 1, decisionRef }).pipe(Effect.as(true)),
+    ])),
+    Effect.flatMap(([routerRenewed, attemptRenewed]) => routerRenewed && attemptRenewed
+      ? Effect.void
+      : Ref.set(failed, true).pipe(
+        Effect.andThen(Deferred.succeed(failure, undefined)),
+        Effect.andThen(Effect.interrupt),
+      )),
+    Effect.catch((error) =>
+      Ref.set(failed, true).pipe(
+        Effect.andThen(Deferred.succeed(failure, undefined)),
+        Effect.andThen(Effect.fail(error)),
+      )
+    ),
     Effect.forever,
-    Effect.catchCause(() => Effect.void),
   );
 }
 
@@ -615,6 +666,7 @@ function finalizeStream(
   observer: OpenAITerminalUsageObserver | undefined,
   telemetry: AIGatewayRequestTelemetry,
   signal: AbortSignal,
+  heartbeatFailed: Ref.Ref<boolean>,
 ): Effect.Effect<void> {
   const maximumReleaseAttempts = 3;
   let attempts = 0;
@@ -634,6 +686,7 @@ function finalizeStream(
     },
   });
   return Effect.gen(function*() {
+    const failedHeartbeat = yield* Ref.get(heartbeatFailed);
     if (authorization !== undefined) {
       if (status >= 400) {
         yield* reportSettlement(
@@ -654,7 +707,7 @@ function finalizeStream(
           yield* reportSettlement(settlements, {
             schemaVersion: 1,
             decisionRef: authorization.decisionRef,
-            forwardOutcome: streamOutcome(exit),
+            forwardOutcome: streamOutcome(exit, failedHeartbeat),
             ...usage.value,
             spendMicros,
           });
@@ -663,7 +716,7 @@ function finalizeStream(
         } else {
           yield* reportSettlement(settlements, zeroUsageReport(
             authorization.decisionRef,
-            streamOutcome(exit),
+            streamOutcome(exit, failedHeartbeat),
           ));
         }
       } else if (status < 400 && Exit.isSuccess(exit)) {
@@ -671,7 +724,7 @@ function finalizeStream(
       } else {
         yield* reportSettlement(
           settlements,
-          zeroUsageReport(authorization.decisionRef, streamOutcome(exit)),
+          zeroUsageReport(authorization.decisionRef, streamOutcome(exit, failedHeartbeat)),
         );
       }
     }
@@ -792,8 +845,10 @@ function recordResponse(
 
 function streamOutcome(
   exit: Exit.Exit<unknown, AIProviderHttpError>,
+  heartbeatFailed = false,
 ): ProviderBudgetSettlementReportV1["forwardOutcome"] {
   if (Exit.isSuccess(exit)) return "completed";
+  if (heartbeatFailed) return "transport_failed";
   return Cause.interruptors(exit.cause).size > 0
     ? "cancelled"
     : "transport_failed";

@@ -2,6 +2,7 @@ import { layer as BunCryptoLayer } from "@effect/platform-bun/BunCrypto";
 import { assert, describe, layer } from "@effect/vitest";
 import {
   ProviderBudgetSettlementReporter,
+  ProviderBudgetAttemptRenewalReporter,
   ProviderBudgetSettlementHttpError,
   providerAuthorizationGrantHeaders,
   type ProviderAuthorizationGrantV1,
@@ -1344,6 +1345,44 @@ describe("Effect AI Gateway forwarding", () => {
       ]);
     }));
 
+  it.effect("settles an unusable claimed credential before provider contact", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const providerCalls = yield* Ref.make(0);
+      const settlement = yield* makeSettlementRecorder();
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: acquireLease({
+          ...route.lease,
+          kind: "codex_oauth",
+        }),
+        provider: AIProviderHttp.of({
+          execute: () => Ref.update(providerCalls, (count) => count + 1).pipe(
+            Effect.andThen(Effect.die("provider must not be contacted")),
+          ),
+        }),
+        settlements: settlement.settlements,
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const response = yield* handler(gatewayRequest());
+      assert.strictEqual(response.status, 400);
+      assert.strictEqual(yield* Ref.get(providerCalls), 0);
+      assert.deepStrictEqual(yield* Ref.get(settlement.reports), [
+        {
+          schemaVersion: 1,
+          decisionRef,
+          forwardOutcome: "transport_failed",
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedInputTokens: 0,
+          spendMicros: 0,
+        },
+      ]);
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+    }));
+
   it.effect("fails the client stream closed when settlement fails after every retry", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
@@ -1415,6 +1454,7 @@ describe("Effect AI Gateway forwarding", () => {
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
+      const attemptRenewals = yield* Ref.make(0);
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
         acquire: acquireLease(route.lease),
@@ -1426,6 +1466,11 @@ describe("Effect AI Gateway forwarding", () => {
           }),
         }),
         settlements: settlement.settlements,
+        attemptRenewals: ProviderBudgetAttemptRenewalReporter.of({
+          renew: (request) => Ref.updateAndGet(attemptRenewals, (count) => count + 1).pipe(
+            Effect.map(() => ({ schemaVersion: 1, decisionRef: request.decisionRef, outcome: "renewed" })),
+          ),
+        }),
         now: Effect.succeed(now),
         heartbeatMillis: 40_000,
         maximumUsageEventBytes: 4_096,
@@ -1440,11 +1485,141 @@ describe("Effect AI Gateway forwarding", () => {
         yield* TestClock.adjust(40_000);
         yield* Effect.yieldNow;
         assert.strictEqual(yield* Ref.get(route.renewals), 1);
+        assert.strictEqual(yield* Ref.get(attemptRenewals), 1);
         yield* Effect.tryPromise(() => reader.cancel("test complete"));
         yield* Fiber.interrupt(pending);
         yield* TestClock.adjust(80_000);
         assert.strictEqual(yield* Ref.get(route.renewals), 1);
+        assert.strictEqual(yield* Ref.get(attemptRenewals), 1);
       }
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+    }));
+
+  it.effect("fails the active provider stream when routing lease renewal is refused", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const settlement = yield* makeSettlementRecorder();
+      const terminalEmissions = yield* Ref.make(0);
+      const lease: AIForwardLease = {
+        ...route.lease,
+        renew: Ref.update(route.renewals, (count) => count + 1).pipe(
+          Effect.as(false),
+        ),
+      };
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: acquireLease(lease),
+        provider: AIProviderHttp.of({
+          execute: () => Effect.succeed({
+            status: 200,
+            headers: { "content-type": "text/event-stream" },
+            body: Stream.never.pipe(Stream.concat(
+              Ref.update(terminalEmissions, (count) => count + 1).pipe(
+                Effect.as(encoder.encode(completedEvent)),
+                Stream.fromEffect,
+              ),
+            )),
+          }),
+        }),
+        settlements: settlement.settlements,
+        attemptRenewals: ProviderBudgetAttemptRenewalReporter.of({
+          renew: (request) => Effect.succeed({
+            schemaVersion: 1,
+            decisionRef: request.decisionRef,
+            outcome: "renewed",
+          }),
+        }),
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const response = yield* handler(gatewayRequest());
+      const reader = response.body?.getReader();
+      assert.isDefined(reader);
+      if (reader === undefined) return;
+      const pending = yield* Effect.forkChild(Effect.tryPromise(() => reader.read()));
+      yield* TestClock.adjust(40_000);
+      const readExit = yield* Fiber.await(pending);
+      assert.strictEqual(readExit._tag, "Success");
+      if (Exit.isSuccess(readExit)) assert.isTrue(readExit.value.done);
+      assert.strictEqual(yield* Ref.get(route.renewals), 1);
+      assert.strictEqual(yield* Ref.get(terminalEmissions), 0);
+      assert.deepStrictEqual(yield* Ref.get(settlement.reports), [{
+        schemaVersion: 1,
+        decisionRef,
+        forwardOutcome: "transport_failed",
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedInputTokens: 0,
+        spendMicros: 0,
+      }]);
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+      yield* TestClock.adjust(120_000);
+      assert.strictEqual(yield* Ref.get(route.renewals), 1);
+      assert.strictEqual((yield* Ref.get(settlement.reports)).length, 1);
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+    }));
+
+  it.effect("fails the active provider stream when durable attempt renewal is unavailable", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const settlement = yield* makeSettlementRecorder();
+      const attemptRenewals = yield* Ref.make(0);
+      const terminalEmissions = yield* Ref.make(0);
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: acquireLease(route.lease),
+        provider: AIProviderHttp.of({
+          execute: () => Effect.succeed({
+            status: 200,
+            headers: { "content-type": "text/event-stream" },
+            body: Stream.never.pipe(Stream.concat(
+              Ref.update(terminalEmissions, (count) => count + 1).pipe(
+                Effect.as(encoder.encode(completedEvent)),
+                Stream.fromEffect,
+              ),
+            )),
+          }),
+        }),
+        settlements: settlement.settlements,
+        attemptRenewals: ProviderBudgetAttemptRenewalReporter.of({
+          renew: () => Ref.update(attemptRenewals, (count) => count + 1).pipe(
+            Effect.andThen(Effect.fail(ProviderBudgetSettlementHttpError.make({
+              code: "dependency_unavailable",
+              status: 503,
+            }))),
+          ),
+        }),
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const response = yield* handler(gatewayRequest());
+      const reader = response.body?.getReader();
+      assert.isDefined(reader);
+      if (reader === undefined) return;
+      const pending = yield* Effect.forkChild(Effect.tryPromise(() => reader.read()));
+      yield* TestClock.adjust(40_000);
+      const readExit = yield* Fiber.await(pending);
+      assert.strictEqual(readExit._tag, "Success");
+      if (Exit.isSuccess(readExit)) assert.isTrue(readExit.value.done);
+      assert.strictEqual(yield* Ref.get(route.renewals), 1);
+      assert.strictEqual(yield* Ref.get(attemptRenewals), 1);
+      assert.strictEqual(yield* Ref.get(terminalEmissions), 0);
+      assert.deepStrictEqual(yield* Ref.get(settlement.reports), [{
+        schemaVersion: 1,
+        decisionRef,
+        forwardOutcome: "transport_failed",
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedInputTokens: 0,
+        spendMicros: 0,
+      }]);
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+      yield* TestClock.adjust(120_000);
+      assert.strictEqual(yield* Ref.get(route.renewals), 1);
+      assert.strictEqual(yield* Ref.get(attemptRenewals), 1);
+      assert.strictEqual((yield* Ref.get(settlement.reports)).length, 1);
       assert.strictEqual(yield* Ref.get(route.releases), 1);
     }));
   });

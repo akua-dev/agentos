@@ -155,6 +155,8 @@ function decisionLayer(input?: {
       settle: () => Effect.die("settlement not expected in PDP"),
       settleProvider: () =>
         Effect.die("provider settlement not expected in PDP"),
+      renewProviderAttempt: () =>
+        Effect.die("provider renewal not expected in PDP"),
     }),
   );
   return makeProviderPolicyDecisionPointLayer({

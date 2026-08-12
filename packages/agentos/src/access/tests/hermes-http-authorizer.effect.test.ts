@@ -56,6 +56,7 @@ const budgets: ProviderBudgetEnforcer["Service"] = {
   reserve: () => Effect.die("legacy reservation is not expected"),
   settle: () => Effect.die("settlement is not expected"),
   settleProvider: () => Effect.die("provider settlement is not expected"),
+  renewProviderAttempt: () => Effect.die("provider renewal is not expected"),
 };
 
 const boundIdentity: KubernetesBoundServiceAccountIdentityV1 = {
