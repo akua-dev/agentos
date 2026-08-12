@@ -78,6 +78,10 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION agentos.settle_provider_budget_for_provider(
+  text,text,text,text,bigint,bigint,bigint,bigint,bigint
+) FROM PUBLIC;
+
 ALTER FUNCTION agentos.reserve_workload_provider_budget(
   text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,jsonb,
   bigint,bigint,bigint,bigint

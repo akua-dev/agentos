@@ -970,7 +970,9 @@ layer(databaseLayer)("durable provider budgets", (it) => {
       const database = yield* TestDatabase;
       yield* database.exec(`
         CREATE ROLE provider_budget_egress LOGIN;
+        CREATE ROLE provider_budget_unprivileged LOGIN;
         GRANT USAGE ON SCHEMA agentos TO provider_budget_egress;
+        GRANT USAGE ON SCHEMA agentos TO provider_budget_unprivileged;
         GRANT SELECT ON ALL TABLES IN SCHEMA agentos TO provider_budget_egress;
         GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA agentos
           TO provider_budget_egress;
@@ -979,6 +981,7 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         );
       `);
       const privileges = yield* database.query<{
+        readonly unprivilegedProviderSettleExecute: boolean;
         readonly countersSelect: boolean;
         readonly reserveExecute: boolean;
         readonly providerSettleExecute: boolean;
@@ -986,6 +989,11 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         readonly overrideExecute: boolean;
       }>(`
         SELECT
+          has_function_privilege(
+            'provider_budget_unprivileged',
+            'agentos.settle_provider_budget_for_provider(text,text,text,text,bigint,bigint,bigint,bigint,bigint)',
+            'EXECUTE'
+          ) AS "unprivilegedProviderSettleExecute",
           has_table_privilege(
             'provider_budget_egress',
             'agentos.provider_budget_counters', 'SELECT'
@@ -1012,12 +1020,28 @@ layer(databaseLayer)("durable provider budgets", (it) => {
           ) AS "overrideExecute"
       `);
       assert.deepStrictEqual(privileges, [{
+        unprivilegedProviderSettleExecute: false,
         countersSelect: false,
         reserveExecute: true,
         providerSettleExecute: true,
         subjectSettleExecute: false,
         overrideExecute: false,
       }]);
+      yield* database.exec("SET ROLE provider_budget_unprivileged");
+      const unprivilegedSettlement = yield* Effect.exit(database.exec(`
+        SELECT * FROM agentos.settle_provider_budget_for_provider(
+          'decision_${"f".repeat(32)}', 'openai', 'openai-responses',
+          'transport_failed', 0, 0, 0, 0, ${now}
+        )
+      `));
+      yield* database.exec("RESET ROLE");
+      assert.isTrue(Exit.isFailure(unprivilegedSettlement));
+      if (Exit.isFailure(unprivilegedSettlement)) {
+        assert.include(
+          String(unprivilegedSettlement.cause),
+          "permission denied for function settle_provider_budget_for_provider",
+        );
+      }
     }));
 
   it.effect("authorizes the explicit null environment as its own route", () =>
