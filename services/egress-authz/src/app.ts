@@ -5,9 +5,8 @@ import {
   ProviderBudgetSettlementCallerAuthenticationError,
   ProviderBudgetSettlementReportV1Schema,
   ProviderDecisionReferenceGenerator,
-  ProviderPolicyDecisionPoint,
+  HermesProviderAuthorizer,
   type ProviderAccessTelemetry,
-  WorkloadIdentityAuthenticator,
   createProviderAuthorizationHttpHandler,
 } from "@akua-dev/agentos";
 import {
@@ -88,9 +87,11 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
   const decisionReferences = yield* ProviderDecisionReferenceGenerator;
   const settlementCallers = yield* ProviderBudgetSettlementCallerAuthenticator;
   const providerBudgets = yield* ProviderBudgetEnforcer;
+  const hermes = yield* HermesProviderAuthorizer;
   const authorize = yield* createProviderAuthorizationHttpHandler({
     clock,
     id: decisionReferences.next,
+    hermes,
     ...(options.telemetry === undefined
       ? {}
       : { telemetry: options.telemetry }),

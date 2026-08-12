@@ -994,6 +994,19 @@ function requestAttributes(
 function authorizationAttributes(
   authorization: ProviderAuthorizationGrantV1,
 ): AgentOSTelemetryAttributes {
+  if ("model" in authorization) {
+    return safeTelemetryAttributes({
+      "agentos.access.decision": "allow",
+      "agentos.access.reason": "allowed",
+      "agentos.access.dependency": "none",
+      "agentos.identity.kubernetes_namespace": authorization.identity.namespace,
+      "agentos.identity.service_account": authorization.identity.serviceAccountName,
+      "agentos.identity.hermes_profile": authorization.identity.hermesProfile,
+      "agentos.authz.policy_revision": authorization.identity.policyRevision,
+      "agentos.authz.decision_ref": authorization.decisionRef,
+      "agentos.authz.rate_class": authorization.rateClass,
+    }, "span");
+  }
   return safeTelemetryAttributes({
     "agentos.access.decision": "allow",
     "agentos.access.reason": "allowed",

@@ -69,6 +69,44 @@ function grant(): ProviderAuthorizationGrantV1 {
   };
 }
 
+function workloadGrant(): Extract<
+  ProviderAuthorizationGrantV1,
+  { readonly model: string }
+> {
+  return {
+    schemaVersion: 1,
+    correlationId: "corr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    decisionRef: "decision_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    expiresAtMillis: now + 15_000,
+    credentialDomain: "openai-responses",
+    identity: {
+      kind: "kubernetes_workload",
+      namespace: "hermes-workers",
+      serviceAccountName: "hermes-codex",
+      policyRevision: 7,
+      policyResourceVersion: "18422",
+      hermesProfile: "default",
+    },
+    capability: "openai.responses.create",
+    resource: {
+      kind: "provider_service",
+      provider: "openai",
+      service: "responses",
+    },
+    rateClass: "standard",
+    model: "gpt-policy",
+    limits: {
+      requestWindowMillis: 60_000,
+      maximumRequests: 20,
+      maximumConcurrent: 2,
+      tokenWindowMillis: 60_000,
+      maximumTokens: 100_000,
+      spendWindowMillis: 3_600_000,
+      maximumSpendMicros: 2_000_000,
+    },
+  };
+}
+
 function gatewayRequest(
   authorization: ProviderAuthorizationGrantV1 = grant(),
 ): Request {
@@ -385,6 +423,23 @@ describe("Effect AI Gateway forwarding", () => {
           },
         },
       ]);
+    }));
+
+  it.effect("rejects a request body model that differs from the workload policy grant", () =>
+    Effect.gen(function*() {
+      const settlement = yield* makeSettlementRecorder();
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: () => Effect.die("model mismatch must not acquire a provider account"),
+        provider: AIProviderHttp.of({
+          execute: () => Effect.die("model mismatch must not reach the provider"),
+        }),
+        settlements: settlement.settlements,
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      assert.strictEqual((yield* handler(gatewayRequest(workloadGrant()))).status, 403);
     }));
 
   it.effect("ends telemetry for an authenticated unsupported route", () =>

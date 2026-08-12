@@ -5,10 +5,12 @@ import { Effect, Layer, Ref, Schema } from "effect";
 import type {
   AccessBindingSubjectV1,
   AuthorizationResourceV1,
+  KubernetesWorkloadPrincipalV1,
 } from "../contracts.ts";
 import {
   ProviderBudgetEnforcementError,
   ProviderBudgetEnforcer,
+  ProviderBudgetKeyInputV1Schema,
   ProviderBudgetReservationV1Schema,
   ProviderBudgetSettlementV1Schema,
   makeProviderBudgetEnforcerLayer,
@@ -32,6 +34,14 @@ const assignment: AccessBindingSubjectV1 = {
   fleet: "agentos",
   domain: "platform",
   assignmentId: "22222222-2222-4222-8222-222222222222",
+};
+const kubernetesWorkload: KubernetesWorkloadPrincipalV1 = {
+  kind: "kubernetes_workload",
+  namespace: "hermes-akua",
+  serviceAccountName: "hermes-codex-worker",
+  policyRevision: 7,
+  policyResourceVersion: "18422",
+  hermesProfile: "fleet-codex",
 };
 const resource: AuthorizationResourceV1 = {
   kind: "github_repository",
@@ -107,6 +117,45 @@ describe("provider budget enforcement", () => {
       assert.match(first, /^budget_[0-9a-f]{64}$/);
       assert.notInclude(first, subject.agentId);
       assert.notInclude(first, resource.repository);
+    }).pipe(Effect.provide(BunCryptoLayer)));
+
+  it.effect("binds Kubernetes workload budgets to principal and policy revision", () =>
+    Effect.gen(function*() {
+      const first = yield* providerBudgetKey({
+        ...reservationInput,
+        subject: kubernetesWorkload,
+      });
+      const nextRevision = yield* providerBudgetKey({
+        ...reservationInput,
+        subject: { ...kubernetesWorkload, policyRevision: 8 },
+      });
+      const replacedPolicy = yield* providerBudgetKey({
+        ...reservationInput,
+        subject: { ...kubernetesWorkload, policyResourceVersion: "18423" },
+      });
+      const renamedProfile = yield* providerBudgetKey({
+        ...reservationInput,
+        subject: { ...kubernetesWorkload, hermesProfile: "renamed-profile" },
+      });
+      const decoded = yield* Schema.decodeUnknownEffect(
+        ProviderBudgetKeyInputV1Schema,
+        { onExcessProperty: "error" },
+      )({
+        subject: kubernetesWorkload,
+        provider: reservationInput.provider,
+        credentialDomain: reservationInput.credentialDomain,
+        capability: reservationInput.capability,
+        resource: reservationInput.resource,
+        environment: reservationInput.environment,
+      });
+
+      assert.match(first, /^budget_[0-9a-f]{64}$/);
+      assert.notStrictEqual(first, nextRevision);
+      assert.notStrictEqual(first, replacedPolicy);
+      assert.strictEqual(first, renamedProfile);
+      assert.deepStrictEqual(decoded.subject, kubernetesWorkload);
+      assert.notInclude(first, kubernetesWorkload.namespace);
+      assert.notInclude(first, kubernetesWorkload.serviceAccountName);
     }).pipe(Effect.provide(BunCryptoLayer)));
 
   it.effect("decodes closed reservation and settlement results", () =>

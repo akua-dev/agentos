@@ -25,6 +25,7 @@ import {
   makeKubernetesWorkloadIdentityHttpLayer,
   type KubernetesWorkloadIdentityHttpOptions,
 } from "../kubernetes-identity-http.ts";
+import { HermesProviderAccessPolicySource } from "../hermes-authorizer.ts";
 
 const Namespace = "agentos-domain-platform";
 const PodName = "agentos-platform-mate-0";
@@ -125,6 +126,37 @@ function review() {
 }
 
 describe("Effect-native Kubernetes workload identity HTTP", () => {
+  it.effect("loads the exact live Hermes provider policy ConfigMap", () =>
+    Effect.gen(function*() {
+      const tokens = yield* Ref.make<ReadonlyArray<string>>(["client-token"]);
+      const requests = yield* Ref.make<ReadonlyArray<string>>([]);
+      const configMap = {
+        apiVersion: "v1",
+        kind: "ConfigMap",
+        metadata: {
+          name: "agentos-hermes-provider-access-v1",
+          namespace: "agentos",
+          resourceVersion: "18422",
+        },
+        data: { "policy.json": "{}" },
+      };
+      const loaded = yield* provideAdapters(
+        Effect.gen(function*() {
+          const policies = yield* HermesProviderAccessPolicySource;
+          return yield* policies.current;
+        }),
+        (request) =>
+          Ref.update(requests, (values) => [...values, request.url]).pipe(
+            Effect.as(new Response(JSON.stringify(configMap), { status: 200 })),
+          ),
+        tokens,
+      );
+      assert.deepStrictEqual(loaded, configMap);
+      assert.deepStrictEqual(yield* Ref.get(requests), [
+        "https://kubernetes.default.svc/api/v1/namespaces/agentos/configmaps/agentos-hermes-provider-access-v1",
+      ]);
+    }));
+
   it.effect("rereads the client token and sends the exact TokenReview contract", () =>
     Effect.gen(function*() {
       const tokens = yield* Ref.make<ReadonlyArray<string>>([
