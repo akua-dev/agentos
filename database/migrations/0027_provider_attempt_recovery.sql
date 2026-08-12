@@ -113,6 +113,11 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION agentos.reserve_workload_provider_budget(
+  text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,jsonb,
+  bigint,bigint,bigint,bigint
+) FROM PUBLIC;
+
 CREATE FUNCTION agentos.renew_workload_provider_attempt(
   p_decision_ref text, p_provider text, p_credential_domain text,
   p_now_millis bigint

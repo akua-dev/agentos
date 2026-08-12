@@ -981,6 +981,7 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         );
       `);
       const privileges = yield* database.query<{
+        readonly unprivilegedReserveExecute: boolean;
         readonly unprivilegedProviderSettleExecute: boolean;
         readonly countersSelect: boolean;
         readonly reserveExecute: boolean;
@@ -989,6 +990,11 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         readonly overrideExecute: boolean;
       }>(`
         SELECT
+          has_function_privilege(
+            'provider_budget_unprivileged',
+            'agentos.reserve_workload_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,jsonb,bigint,bigint,bigint,bigint)',
+            'EXECUTE'
+          ) AS "unprivilegedReserveExecute",
           has_function_privilege(
             'provider_budget_unprivileged',
             'agentos.settle_provider_budget_for_provider(text,text,text,text,bigint,bigint,bigint,bigint,bigint)',
@@ -1019,15 +1025,20 @@ layer(databaseLayer)("durable provider budgets", (it) => {
             'EXECUTE'
           ) AS "overrideExecute"
       `);
-      assert.deepStrictEqual(privileges, [{
-        unprivilegedProviderSettleExecute: false,
-        countersSelect: false,
-        reserveExecute: true,
-        providerSettleExecute: true,
-        subjectSettleExecute: false,
-        overrideExecute: false,
-      }]);
       yield* database.exec("SET ROLE provider_budget_unprivileged");
+      const unprivilegedReserve = yield* Effect.exit(database.exec(`
+        SELECT * FROM agentos.reserve_workload_provider_budget(
+          'decision_${"ef".repeat(16)}', 'budget_${"ef".repeat(32)}',
+          'corr_efefefefefefefefefefefefefefefef',
+          '${JSON.stringify(workloadPrincipal)}'::jsonb,
+          'openai', 'openai-responses', 'openai.responses.create',
+          '{"kind":"provider_service","provider":"openai","service":"responses"}'::jsonb,
+          'production', 'gpt-5.6-sol', 'low',
+          '${JSON.stringify(workloadLimits)}'::jsonb,
+          '${JSON.stringify(workloadPricing)}'::jsonb,
+          ${now + 15_000}, 1, 1, ${now}
+        )
+      `));
       const unprivilegedSettlement = yield* Effect.exit(database.exec(`
         SELECT * FROM agentos.settle_provider_budget_for_provider(
           'decision_${"f".repeat(32)}', 'openai', 'openai-responses',
@@ -1035,6 +1046,22 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         )
       `));
       yield* database.exec("RESET ROLE");
+      assert.isTrue(Exit.isFailure(unprivilegedReserve));
+      assert.deepStrictEqual(privileges, [{
+        unprivilegedReserveExecute: false,
+        unprivilegedProviderSettleExecute: false,
+        countersSelect: false,
+        reserveExecute: true,
+        providerSettleExecute: true,
+        subjectSettleExecute: false,
+        overrideExecute: false,
+      }]);
+      if (Exit.isFailure(unprivilegedReserve)) {
+        assert.include(
+          String(unprivilegedReserve.cause),
+          "permission denied for function reserve_workload_provider_budget",
+        );
+      }
       assert.isTrue(Exit.isFailure(unprivilegedSettlement));
       if (Exit.isFailure(unprivilegedSettlement)) {
         assert.include(
