@@ -2,15 +2,19 @@ import { layer as BunCryptoLayer } from "@effect/platform-bun/BunCrypto";
 import { assert, describe, it } from "@effect/vitest";
 import {
   AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
+  ProviderBudgetReservationRequestError,
+  ProviderBudgetReservationRequester,
+  ProviderBudgetReservationRequestV1Schema,
   ProviderBudgetSettlementHttpError,
   ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
   providerAuthorizationGrantHeaders,
   type ProviderAuthorizationGrantV1,
+  type ProviderBudgetReservationRequestV1,
   type ProviderBudgetSettlementReceiptV1,
   type ProviderBudgetSettlementReportV1,
 } from "@akua-dev/agentos";
-import { Deferred, Effect, Fiber, Ref, Stream } from "effect";
+import { Deferred, Effect, Fiber, Ref, Schema, Stream } from "effect";
 import { TestClock } from "effect/testing";
 
 import {
@@ -70,8 +74,48 @@ function grant(): ProviderAuthorizationGrantV1 {
   };
 }
 
-function providerRequest(): Request {
-  const headers = providerAuthorizationGrantHeaders(grant());
+function workloadGrant(): Extract<
+  ProviderAuthorizationGrantV1,
+  { readonly model: string }
+> {
+  return {
+    schemaVersion: 1,
+    correlationId: "corr_55555555555555555555555555555555",
+    decisionRef: "decision_66666666666666666666666666666666",
+    expiresAtMillis: now + 15_000,
+    credentialDomain: "openai-responses",
+    identity: {
+      kind: "kubernetes_workload",
+      namespace: "hermes-workers",
+      serviceAccountName: "hermes-codex",
+      policyRevision: 7,
+      policyResourceVersion: "18422",
+      hermesProfile: "default",
+    },
+    capability: "openai.responses.create",
+    resource: {
+      kind: "provider_service",
+      provider: "openai",
+      service: "responses",
+    },
+    rateClass: "standard",
+    model: "gpt-test",
+    limits: {
+      requestWindowMillis: 60_000,
+      maximumRequests: 1,
+      maximumConcurrent: 1,
+      tokenWindowMillis: 60_000,
+      maximumTokens: 1_000,
+      spendWindowMillis: 3_600_000,
+      maximumSpendMicros: 1_000,
+    },
+  };
+}
+
+function providerRequest(
+  authorization: ProviderAuthorizationGrantV1 = grant(),
+): Request {
+  const headers = providerAuthorizationGrantHeaders(authorization);
   headers.set("authorization", "Bearer projected-workload-token");
   headers.set("content-type", "application/json");
   headers.set("session-id", "conversation-a");
@@ -107,6 +151,7 @@ interface TestServices {
   >>;
   readonly released: Ref.Ref<number>;
   readonly quotaCalls: Ref.Ref<number>;
+  readonly credentialCalls: Ref.Ref<number>;
 }
 
 const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
@@ -117,6 +162,8 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
     >>([]);
     const released = yield* Ref.make(0);
     const quotaCalls = yield* Ref.make(0);
+    const credentialCalls = yield* Ref.make(0);
+    const accessToken = ["oauth", "provider", "secret"].join("-");
     const reservation = withAccounts
       ? {
           accountId: "managed-a",
@@ -136,11 +183,14 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
         }]
         : []),
       addFromOAuth: () => Effect.succeed("managed-a"),
-      getFreshCredential: () => Effect.succeed({
-        providerAccountId: "provider-a",
-        accessToken: "oauth-provider-secret",
-        expiresAt: now + 60_000,
-      }),
+      getFreshCredential: () =>
+        Ref.update(credentialCalls, (count) => count + 1).pipe(
+          Effect.as({
+            providerAccountId: "provider-a",
+            accessToken,
+            expiresAt: now + 60_000,
+          }),
+        ),
       remove: () => Effect.succeed(true),
       markNeedsReauth: () => Effect.succeed(true),
     });
@@ -231,6 +281,7 @@ const makeTestServices = Effect.fn("test.aiGateway.makeServices")(
       settlementReports,
       released,
       quotaCalls,
+      credentialCalls,
     } satisfies TestServices;
   },
 );
@@ -239,8 +290,9 @@ function makeApplication(
   services: TestServices,
   applicationOptions: AIGatewayApplicationOptions = options,
   telemetry: AIGatewayTelemetry["Service"] = noopAIGatewayTelemetry,
+  reservationRequester?: ProviderBudgetReservationRequester["Service"],
 ) {
-  return makeAIGatewayApplication(applicationOptions).pipe(
+  const application = makeAIGatewayApplication(applicationOptions).pipe(
     Effect.provideService(ManagedAccountVault, services.vault),
     Effect.provideService(AIRoutingState, services.routing),
     Effect.provideService(CodexQuota, services.quota),
@@ -256,6 +308,12 @@ function makeApplication(
     Effect.provideService(AIGatewayTelemetry, telemetry),
     Effect.provide(BunCryptoLayer),
   );
+  return reservationRequester === undefined
+    ? application
+    : application.pipe(Effect.provideService(
+      ProviderBudgetReservationRequester,
+      reservationRequester,
+    ));
 }
 
 const makeQuotaTelemetryRecorder = Effect.fn(
@@ -297,6 +355,244 @@ const makeQuotaTelemetryRecorder = Effect.fn(
 });
 
 describe("Effect AI Gateway application", () => {
+  it.effect("rejects a reservation request whose explicit subject differs from its Hermes grant", () =>
+    Effect.gen(function*() {
+      const grant = workloadGrant();
+      const decoded = yield* Effect.exit(Schema.decodeUnknownEffect(
+        ProviderBudgetReservationRequestV1Schema,
+        { onExcessProperty: "error" },
+      )({
+        schemaVersion: 1,
+        grant,
+        subject: {
+          ...grant.identity,
+          policyResourceVersion: "18423",
+        },
+      }));
+
+      assert.strictEqual(decoded._tag, "Failure");
+    }));
+
+  it.effect("fails Hermes closed before credential access when no shared budget reservation authority exists", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const application = yield* makeApplication(services);
+
+      const response = yield* application.handle(providerRequest(workloadGrant()));
+
+      assert.strictEqual(response.status, 503);
+      assert.deepStrictEqual(yield* Effect.tryPromise(() => response.json()), {
+        error: "route_unavailable",
+      });
+      assert.strictEqual((yield* Ref.get(services.providerRequests)).length, 0);
+      assert.strictEqual(yield* Ref.get(services.credentialCalls), 0);
+    }));
+
+  it.effect("passes the exact Hermes grant to an injected non-production reservation interface before forwarding", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const seen = yield* Ref.make<ReadonlyArray<
+        ProviderBudgetReservationRequestV1
+      >>([]);
+      const reservationRequester = ProviderBudgetReservationRequester.of({
+        request: (request) => Ref.update(seen, (current) => [
+          ...current,
+          request,
+        ]).pipe(Effect.as({
+          schemaVersion: 1,
+          outcome: "reserved",
+          grant: request.grant,
+          subject: request.subject,
+        })),
+      });
+      const application = yield* makeApplication(
+        services,
+        options,
+        noopAIGatewayTelemetry,
+        reservationRequester,
+      );
+      const expectedGrant = workloadGrant();
+
+      const response = yield* application.handle(providerRequest(expectedGrant));
+      yield* Effect.tryPromise(() => response.arrayBuffer());
+
+      assert.strictEqual(response.status, 200);
+      assert.deepStrictEqual(yield* Ref.get(seen), [{
+        schemaVersion: 1,
+        grant: expectedGrant,
+        subject: expectedGrant.identity,
+      }]);
+      assert.strictEqual((yield* Ref.get(services.providerRequests)).length, 1);
+    }));
+
+  it.effect("denies a rejected Hermes reservation before credential access", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const application = yield* makeApplication(
+        services,
+        options,
+        noopAIGatewayTelemetry,
+        ProviderBudgetReservationRequester.of({
+          request: () => Effect.fail(
+            ProviderBudgetReservationRequestError.make({ code: "rejected" }),
+          ),
+        }),
+      );
+
+      const response = yield* application.handle(providerRequest(workloadGrant()));
+
+      assert.strictEqual(response.status, 503);
+      assert.strictEqual((yield* Ref.get(services.providerRequests)).length, 0);
+      assert.strictEqual(yield* Ref.get(services.credentialCalls), 0);
+    }));
+
+  it.effect("denies a malformed Hermes reservation decision before credential access", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const application = yield* makeApplication(
+        services,
+        options,
+        noopAIGatewayTelemetry,
+        ProviderBudgetReservationRequester.of({
+          request: () => Effect.succeed({ outcome: "reserved" }),
+        }),
+      );
+
+      const response = yield* application.handle(providerRequest(workloadGrant()));
+
+      assert.strictEqual(response.status, 503);
+      assert.strictEqual((yield* Ref.get(services.providerRequests)).length, 0);
+      assert.strictEqual(yield* Ref.get(services.credentialCalls), 0);
+    }));
+
+  it.effect("denies an ambiguous Hermes reservation decision before credential access", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const application = yield* makeApplication(
+        services,
+        options,
+        noopAIGatewayTelemetry,
+        ProviderBudgetReservationRequester.of({
+          request: (request) => Effect.succeed({
+            schemaVersion: 1,
+            outcome: "reserved",
+            grant: request.grant,
+            subject: request.subject,
+            alternateOutcome: "rejected",
+          }),
+        }),
+      );
+
+      const response = yield* application.handle(providerRequest(workloadGrant()));
+
+      assert.strictEqual(response.status, 503);
+      assert.strictEqual((yield* Ref.get(services.providerRequests)).length, 0);
+      assert.strictEqual(yield* Ref.get(services.credentialCalls), 0);
+    }));
+
+  it.effect("denies a mismatched Hermes reservation decision before credential access", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const application = yield* makeApplication(
+        services,
+        options,
+        noopAIGatewayTelemetry,
+        ProviderBudgetReservationRequester.of({
+          request: (request) => Effect.succeed({
+            schemaVersion: 1,
+            outcome: "reserved",
+            grant: {
+              ...request.grant,
+              identity: {
+                ...request.grant.identity,
+                policyResourceVersion: "18423",
+              },
+            },
+            subject: request.subject,
+          }),
+        }),
+      );
+
+      const response = yield* application.handle(providerRequest(workloadGrant()));
+
+      assert.strictEqual(response.status, 503);
+      assert.strictEqual((yield* Ref.get(services.providerRequests)).length, 0);
+      assert.strictEqual(yield* Ref.get(services.credentialCalls), 0);
+    }));
+
+  it.effect("denies a defective Hermes reservation authority before credential access", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const application = yield* makeApplication(
+        services,
+        options,
+        noopAIGatewayTelemetry,
+        ProviderBudgetReservationRequester.of({
+          request: () => Effect.die("reservation authority defect"),
+        }),
+      );
+
+      const response = yield* application.handle(providerRequest(workloadGrant()));
+
+      assert.strictEqual(response.status, 503);
+      assert.strictEqual((yield* Ref.get(services.providerRequests)).length, 0);
+      assert.strictEqual(yield* Ref.get(services.credentialCalls), 0);
+    }));
+
+  it.effect("keeps sequential Hermes requests denied without a reservation authority", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const application = yield* makeApplication(services);
+
+      const first = yield* application.handle(providerRequest(workloadGrant()));
+      const second = yield* application.handle(providerRequest(workloadGrant()));
+
+      assert.deepStrictEqual([first.status, second.status], [503, 503]);
+      assert.strictEqual((yield* Ref.get(services.providerRequests)).length, 0);
+      assert.strictEqual(yield* Ref.get(services.credentialCalls), 0);
+    }));
+
+  it.effect("keeps concurrent Hermes requests denied without a reservation authority", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const application = yield* makeApplication(services);
+
+      const responses = yield* Effect.all([
+        application.handle(providerRequest(workloadGrant())),
+        application.handle(providerRequest(workloadGrant())),
+      ], { concurrency: "unbounded" });
+
+      assert.deepStrictEqual(responses.map(({ status }) => status), [503, 503]);
+      assert.strictEqual((yield* Ref.get(services.providerRequests)).length, 0);
+      assert.strictEqual(yield* Ref.get(services.credentialCalls), 0);
+    }));
+
+  it.effect("does not treat spoofed Hermes task profile or label headers as reservation authority", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(now);
+      const services = yield* makeTestServices(true);
+      const application = yield* makeApplication(services);
+      const request = providerRequest(workloadGrant());
+      request.headers.set("x-hermes-task-id", "task-spoof");
+      request.headers.set("x-hermes-profile", "admin");
+      request.headers.set("x-hermes-pod-label", "budget-authority=true");
+
+      const response = yield* application.handle(request);
+
+      assert.strictEqual(response.status, 503);
+      assert.strictEqual((yield* Ref.get(services.providerRequests)).length, 0);
+      assert.strictEqual(yield* Ref.get(services.credentialCalls), 0);
+    }));
+
   it.effect("emits bounded quota age and staleness during route acquisition", () =>
     Effect.gen(function*() {
       yield* TestClock.setTime(now);

@@ -12,10 +12,10 @@ export class GatewayRequestAttributionError extends Schema.TaggedErrorClass<Gate
 ) {}
 
 export interface GatewayRequestAttribution {
-  readonly kind: "mate" | "assignment";
+  readonly kind: "mate" | "assignment" | "kubernetes_workload";
   readonly id: string;
   readonly key: string;
-  readonly agentId: string;
+  readonly agentId: string | null;
   readonly profileId: string;
   readonly profileVersion: number;
   readonly rateClass: "low" | "standard" | "high";
@@ -25,14 +25,33 @@ export interface GatewayRequestAttribution {
 export const gatewayRequestAttribution = Effect.fn(
   "agentos.aiGateway.gatewayRequestAttribution",
 )(function*(grant: ProviderAuthorizationGrantV1) {
-  const assignmentId = grant.identity.assignmentId;
-  const kind = assignmentId === null ? "mate" : "assignment";
-  const id = assignmentId ?? grant.identity.agentId;
   if (grant.rateClass === "disabled") {
     return yield* GatewayRequestAttributionError.make({
       code: "disabled_grant",
     });
   }
+  if ("model" in grant) {
+    const id = [
+      grant.identity.namespace,
+      grant.identity.serviceAccountName,
+      grant.identity.policyRevision,
+      grant.identity.policyResourceVersion,
+      grant.identity.hermesProfile,
+    ].join(":");
+    return {
+      kind: "kubernetes_workload",
+      id,
+      key: `kubernetes_workload:${id}`,
+      agentId: null,
+      profileId: grant.identity.hermesProfile,
+      profileVersion: grant.identity.policyRevision,
+      rateClass: grant.rateClass,
+      decisionRef: grant.decisionRef,
+    } satisfies GatewayRequestAttribution;
+  }
+  const assignmentId = grant.identity.assignmentId;
+  const kind = assignmentId === null ? "mate" : "assignment";
+  const id = assignmentId ?? grant.identity.agentId;
   return {
     kind,
     id,

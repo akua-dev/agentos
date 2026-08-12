@@ -1,13 +1,20 @@
 import {
   AGENTOS_AI_MAX_QUOTA_OBSERVATION_AGE_SECONDS,
+  PROVIDER_AUTHORIZATION_GRANT_HEADERS,
+  ProviderBudgetReservationAcceptanceV1Schema,
+  ProviderBudgetReservationRequester,
   ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
+  denyProviderBudgetReservationRequester,
+  providerAuthorizationGrantHeaders,
   type ProviderAuthorizationGrantV1,
+  type ProviderBudgetReservationRequestV1,
 } from "@akua-dev/agentos";
 import {
   Clock,
   Effect,
   Exit,
+  Option,
   Ref,
   Result,
   Schema,
@@ -80,6 +87,10 @@ export const makeAIGatewayApplication = Effect.fn(
   const routing = yield* AIRoutingState;
   const quota = yield* CodexQuota;
   const provider = yield* AIProviderHttp;
+  const budgetReservations = Option.getOrElse(
+    yield* Effect.serviceOption(ProviderBudgetReservationRequester),
+    () => denyProviderBudgetReservationRequester,
+  );
   const settlementReadiness = yield* ProviderBudgetSettlementReadiness;
   const settlements = yield* ProviderBudgetSettlementReporter;
   const usage = yield* Ref.make<ReadonlyMap<string, UsageSnapshot>>(new Map());
@@ -123,13 +134,38 @@ export const makeAIGatewayApplication = Effect.fn(
     function*<A>(
       sessionKey: string | undefined,
       _signal: AbortSignal,
-      _authorization: ProviderAuthorizationGrantV1 | undefined,
+      authorization: ProviderAuthorizationGrantV1 | undefined,
       telemetry: AIGatewayRequestTelemetry,
       use: (
         lease: AIForwardLease | undefined,
         transfer: Effect.Effect<void>,
       ) => Effect.Effect<A, AIForwardRouteError>,
     ): Effect.fn.Return<A, AIForwardRouteError> {
+      if (authorization !== undefined && "model" in authorization) {
+        const request = {
+          schemaVersion: 1,
+          grant: authorization,
+          subject: authorization.identity,
+        } satisfies ProviderBudgetReservationRequestV1;
+        const acceptanceExit = yield* Effect.exit(Effect.suspend(() =>
+          budgetReservations.request(request)
+        ));
+        if (Exit.isFailure(acceptanceExit)) {
+          return yield* routeError("state_unavailable");
+        }
+        const acceptanceResult = yield* Effect.result(
+          Schema.decodeUnknownEffect(
+            ProviderBudgetReservationAcceptanceV1Schema,
+            { onExcessProperty: "error" },
+          )(acceptanceExit.value),
+        );
+        if (
+          Result.isFailure(acceptanceResult) ||
+          !reservationAcceptanceMatches(request, acceptanceResult.success)
+        ) {
+          return yield* routeError("state_unavailable");
+        }
+      }
       const set = yield* candidateSet(telemetry);
       const currentTime = yield* Clock.currentTimeMillis;
       yield* Effect.forEach(
@@ -472,6 +508,24 @@ function routeCodeForAccount(
 
 function routeError(code: AIForwardRouteError["code"]) {
   return AIForwardRouteError.make({ code });
+}
+
+function reservationAcceptanceMatches(
+  request: ProviderBudgetReservationRequestV1,
+  acceptance: typeof ProviderBudgetReservationAcceptanceV1Schema.Type,
+): boolean {
+  const expectedHeaders = providerAuthorizationGrantHeaders(request.grant);
+  const acceptedHeaders = providerAuthorizationGrantHeaders(acceptance.grant);
+  return PROVIDER_AUTHORIZATION_GRANT_HEADERS.every((name) =>
+    expectedHeaders.get(name) === acceptedHeaders.get(name)
+  ) &&
+    request.subject.kind === acceptance.subject.kind &&
+    request.subject.namespace === acceptance.subject.namespace &&
+    request.subject.serviceAccountName === acceptance.subject.serviceAccountName &&
+    request.subject.policyRevision === acceptance.subject.policyRevision &&
+    request.subject.policyResourceVersion ===
+      acceptance.subject.policyResourceVersion &&
+    request.subject.hermesProfile === acceptance.subject.hermesProfile;
 }
 
 function isOperatorAuthorized(request: Request, expected: string): boolean {

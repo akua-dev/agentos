@@ -33,6 +33,18 @@ const GitHubRepository = Schema.String.pipe(
 const AccessProfileId = Schema.String.pipe(
   Schema.check(Schema.isMaxLength(63), Schema.isPattern(/^[a-z][a-z0-9-]*$/)),
 );
+const HermesProfile = Schema.String.pipe(
+  Schema.check(
+    Schema.isMaxLength(96),
+    Schema.isPattern(/^[a-z][a-z0-9._-]*$/),
+  ),
+);
+export const KubernetesResourceVersionSchema = Schema.String.pipe(
+  Schema.check(
+    Schema.isMaxLength(128),
+    Schema.isPattern(/^[0-9A-Za-z._:-]+$/),
+  ),
+);
 const PositiveInt = Schema.Number.pipe(
   Schema.check(Schema.isInt(), Schema.isGreaterThan(0)),
 );
@@ -110,6 +122,15 @@ const AssignmentSubjectV1Schema = Schema.Struct({
   assignmentId: Uuid,
 });
 
+export const KubernetesWorkloadPrincipalV1Schema = Schema.Struct({
+  kind: Schema.Literal("kubernetes_workload"),
+  namespace: KubernetesName,
+  serviceAccountName: KubernetesName,
+  policyRevision: PositiveInt,
+  policyResourceVersion: KubernetesResourceVersionSchema,
+  hermesProfile: HermesProfile,
+});
+
 export const AuthorizationSubjectV1Schema = Schema.Union([
   FleetSubjectV1Schema,
   DomainSubjectV1Schema,
@@ -120,6 +141,11 @@ export const AuthorizationSubjectV1Schema = Schema.Union([
 export const AccessBindingSubjectV1Schema = Schema.Union([
   MateSubjectV1Schema,
   AssignmentSubjectV1Schema,
+]);
+
+export const ProviderBudgetSubjectV1Schema = Schema.Union([
+  AccessBindingSubjectV1Schema,
+  KubernetesWorkloadPrincipalV1Schema,
 ]);
 
 export const AccessCeilingScopeV1Schema = Schema.Union([
@@ -326,6 +352,9 @@ export type AccessRateClassId = typeof AccessRateClassIdSchema.Type;
 export type AccessCapabilityId = typeof AccessCapabilityIdSchema.Type;
 export type AuthorizationSubjectV1 = typeof AuthorizationSubjectV1Schema.Type;
 export type AccessBindingSubjectV1 = typeof AccessBindingSubjectV1Schema.Type;
+export type KubernetesWorkloadPrincipalV1 =
+  typeof KubernetesWorkloadPrincipalV1Schema.Type;
+export type ProviderBudgetSubjectV1 = typeof ProviderBudgetSubjectV1Schema.Type;
 export type AccessCeilingScopeV1 = typeof AccessCeilingScopeV1Schema.Type;
 export type AuthorizationResourceV1 = typeof AuthorizationResourceV1Schema.Type;
 export type AccessPermissionV1 = typeof AccessPermissionV1Schema.Type;
@@ -536,6 +565,13 @@ export function authorizationSubjectName(subject: AuthorizationSubjectV1) {
     case "assignment":
       return `fleet:${subject.fleet}/domain:${subject.domain}/assignment:${subject.assignmentId}`;
   }
+}
+
+export function providerBudgetSubjectName(subject: ProviderBudgetSubjectV1) {
+  if (subject.kind === "kubernetes_workload") {
+    return `k8s-workload:${subject.namespace}:${subject.serviceAccountName}:${subject.policyRevision}:${subject.policyResourceVersion}`;
+  }
+  return authorizationSubjectName(subject);
 }
 
 export function authorizationResourceName(resource: AuthorizationResourceV1) {
