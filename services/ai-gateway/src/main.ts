@@ -8,7 +8,7 @@ import * as BunPath from "@effect/platform-bun/BunPath";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import {
   ProviderBudgetReservationRequester,
-  denyProviderBudgetReservationRequester,
+  ProviderBudgetAttemptRenewalReporter,
   makeProviderBudgetSettlementHttpLayer,
   ProviderBudgetSettlementReadiness,
   ProviderBudgetSettlementReporter,
@@ -184,6 +184,8 @@ function makeAIGatewayRuntimeLive(
       const settlementServices = yield* Effect.all({
         readiness: ProviderBudgetSettlementReadiness,
         reporter: ProviderBudgetSettlementReporter,
+        reservation: ProviderBudgetReservationRequester,
+        renewal: ProviderBudgetAttemptRenewalReporter,
       }).pipe(Effect.provide(settlementLayer));
 
       const serve = Effect.fn("agentos.aiGateway.serve")(
@@ -212,14 +214,9 @@ function makeAIGatewayRuntimeLive(
               aiGatewayEntrypointError("invalid_configuration")
             ),
           );
-          const clientAuthentication: AIForwardClientAuthentication =
-            serveConfig.authentication.kind ===
-              "workload_identity"
-            ? { kind: "workload_identity" }
-            : {
-                kind: "shared_token",
-                token: Redacted.value(serveConfig.authentication.token),
-              };
+          const clientAuthentication: AIForwardClientAuthentication = {
+            kind: "workload_identity",
+          };
           const openAIApiKey = Redacted.value(serveConfig.openAIApiKey);
           const application = yield* makeAIGatewayApplication({
             authentication: clientAuthentication,
@@ -237,11 +234,15 @@ function makeAIGatewayRuntimeLive(
             Effect.provideService(CodexQuota, quota),
             Effect.provideService(
               ProviderBudgetReservationRequester,
-              denyProviderBudgetReservationRequester,
+              settlementServices.reservation,
             ),
             Effect.provideService(
               ProviderBudgetSettlementReporter,
               settlementServices.reporter,
+            ),
+            Effect.provideService(
+              ProviderBudgetAttemptRenewalReporter,
+              settlementServices.renewal,
             ),
             Effect.provideService(
               ProviderBudgetSettlementReadiness,

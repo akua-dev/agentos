@@ -4,6 +4,9 @@ import {
   ProviderBudgetSettlementCallerAuthenticator,
   ProviderBudgetSettlementCallerAuthenticationError,
   ProviderBudgetSettlementReportV1Schema,
+  ProviderBudgetAttemptRenewalInputV1Schema,
+  ProviderBudgetReservationAcceptanceV1Schema,
+  ProviderBudgetReservationRequestV1Schema,
   ProviderDecisionReferenceGenerator,
   HermesProviderAuthorizer,
   type ProviderAccessTelemetry,
@@ -92,6 +95,7 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
     clock,
     id: decisionReferences.next,
     hermes,
+    budgets: providerBudgets,
     ...(options.telemetry === undefined
       ? {}
       : { telemetry: options.telemetry }),
@@ -124,11 +128,75 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
         request,
         limits.maximumSettlementBodyBytes,
       );
+      const settledAtMillis = yield* clock;
       const result = yield* providerBudgets.settleProvider({
         ...report,
         provider: caller.provider,
         credentialDomain: caller.credentialDomain,
-        settledAtMillis: yield* clock,
+        settledAtMillis,
+      });
+      return Response.json({
+        schemaVersion: 1,
+        decisionRef: result.decisionRef,
+        outcome: result.outcome,
+      });
+    },
+  );
+
+  const validate = Effect.fn("agentos.egressAuthz.validateProviderBudget")(
+    function*(request: Request) {
+      const bearerToken = settlementBearerToken(request.headers);
+      if (bearerToken === null) return unauthorizedResponse();
+      const caller = yield* settlementCallers.authenticate(bearerToken);
+      if (caller.provider !== "openai" || caller.credentialDomain !== "openai-responses") {
+        return forbiddenResponse();
+      }
+      const body = yield* readReservationValidationRequest(
+        request,
+        limits.maximumSettlementBodyBytes,
+      );
+      yield* providerBudgets.validateWorkload({
+        schemaVersion: 1,
+        decisionRef: body.grant.decisionRef,
+        correlationId: body.grant.correlationId,
+        principal: body.subject,
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        capability: body.grant.capability === "openai.responses.create"
+          ? "openai.responses.create"
+          : "openai.responses.compact",
+        resource: body.grant.resource,
+        model: body.grant.model,
+        rateClass: body.grant.rateClass,
+        limits: body.grant.limits,
+        pricing: body.grant.pricing,
+        requestedTokens: body.grant.requestedTokens,
+        requestedSpendMicros: body.grant.requestedSpendMicros,
+        expiresAtMillis: body.grant.expiresAtMillis,
+        nowMillis: yield* clock,
+      });
+      const acceptance = yield* Schema.decodeUnknownEffect(
+        ProviderBudgetReservationAcceptanceV1Schema,
+        { onExcessProperty: "error" },
+      )({ ...body, outcome: "reserved" });
+      return Response.json(acceptance);
+    },
+  );
+
+  const renew = Effect.fn("agentos.egressAuthz.renewProviderBudgetAttempt")(
+    function*(request: Request) {
+      const bearerToken = settlementBearerToken(request.headers);
+      if (bearerToken === null) return unauthorizedResponse();
+      const caller = yield* settlementCallers.authenticate(bearerToken);
+      const body = yield* readAttemptRenewalRequest(
+        request,
+        limits.maximumSettlementBodyBytes,
+      );
+      const result = yield* providerBudgets.renewProviderAttempt({
+        ...body,
+        provider: caller.provider,
+        credentialDomain: caller.credentialDomain,
+        renewedAtMillis: yield* clock,
       });
       return Response.json({
         schemaVersion: 1,
@@ -201,18 +269,62 @@ export const makeEgressAuthorizerRequestHandler = Effect.fn(
       }
       return yield* handleSettlementReadiness(request);
     }
-    if (url.pathname === "/authorize" || url.pathname === "/settle") {
+    if (
+      url.pathname === "/authorize" || url.pathname === "/settle" ||
+      url.pathname === "/validate" || url.pathname === "/renew"
+    ) {
       if (request.method !== "POST") return methodNotAllowedResponse();
       if (!headersWithinLimits(request.headers, limits)) {
         return invalidRequestResponse();
       }
-      return url.pathname === "/authorize"
-        ? yield* handleAuthorization(request)
-        : yield* handleSettlement(request);
+      if (url.pathname === "/authorize") return yield* handleAuthorization(request);
+      if (url.pathname === "/settle") return yield* handleSettlement(request);
+      if (url.pathname === "/renew") {
+        return yield* permits.withPermitsIfAvailable(1)(
+          renew(request).pipe(
+            Effect.catch((error) => Effect.succeed(responseForSettlementFailure(error))),
+            Effect.timeoutOption(limits.requestTimeoutMillis),
+          ),
+        ).pipe(Effect.map((result) => Option.isNone(result)
+          ? overloadedResponse()
+          : Option.match(result.value, {
+            onNone: unavailableResponse,
+            onSome: (response) => response,
+          })));
+      }
+      return yield* permits.withPermitsIfAvailable(1)(
+        validate(request).pipe(
+          Effect.catch((error) =>
+            Effect.succeed(responseForSettlementFailure(error))
+          ),
+          Effect.timeoutOption(limits.requestTimeoutMillis),
+        ),
+      ).pipe(Effect.map((result) => Option.isNone(result)
+        ? overloadedResponse()
+        : Option.match(result.value, {
+          onNone: unavailableResponse,
+          onSome: (response) => response,
+        })));
     }
     return notFoundResponse();
   });
   return handler;
+});
+
+const readReservationValidationRequest = Effect.fn(
+  "agentos.egressAuthz.readReservationValidationRequest",
+)(function*(request: Request, maximumBytes: number) {
+  const text = yield* Effect.tryPromise({
+    try: () => request.text(),
+    catch: () => InvalidSettlementRequest.make(),
+  });
+  if (new TextEncoder().encode(text).byteLength > maximumBytes) {
+    return yield* InvalidSettlementRequest.make();
+  }
+  return yield* Schema.decodeUnknownEffect(
+    Schema.fromJsonString(ProviderBudgetReservationRequestV1Schema),
+    { onExcessProperty: "error" },
+  )(text).pipe(Effect.mapError(() => InvalidSettlementRequest.make()));
 });
 
 export function makeEgressAuthorizerRoutesLayer(
@@ -322,6 +434,40 @@ const readSettlementReport = Effect.fn(
     ProviderBudgetSettlementReportV1Schema,
     { onExcessProperty: "error" },
   )(decoded).pipe(
+    Effect.mapError(() => InvalidSettlementRequest.make()),
+  );
+});
+
+const readAttemptRenewalRequest = Effect.fn(
+  "agentos.egressAuthz.readAttemptRenewalRequest",
+)(function*(request: Request, maximumBytes: number) {
+  const report = yield* readSettlementReportSource(request, maximumBytes);
+  return yield* Schema.decodeUnknownEffect(
+    Schema.Struct({
+      schemaVersion: Schema.Literal(1),
+      decisionRef: ProviderBudgetAttemptRenewalInputV1Schema.fields.decisionRef,
+    }),
+    { onExcessProperty: "error" },
+  )(report).pipe(Effect.mapError(() => InvalidSettlementRequest.make()));
+});
+
+const readSettlementReportSource = Effect.fn(
+  "agentos.egressAuthz.readSettlementReportSource",
+)(function*(request: Request, maximumBytes: number) {
+  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+  const declaredLength = request.headers.get("content-length");
+  if (!/^application\/json(?:\s*;.*)?$/.test(contentType) || declaredLength === null ||
+    !/^(?:0|[1-9][0-9]*)$/.test(declaredLength) || Number(declaredLength) > maximumBytes) {
+    return yield* InvalidSettlementRequest.make();
+  }
+  const source = yield* Effect.tryPromise({
+    try: () => request.text(),
+    catch: () => InvalidSettlementRequest.make(),
+  });
+  if (source.length === 0 || new TextEncoder().encode(source).byteLength > maximumBytes) {
+    return yield* InvalidSettlementRequest.make();
+  }
+  return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(source).pipe(
     Effect.mapError(() => InvalidSettlementRequest.make()),
   );
 });

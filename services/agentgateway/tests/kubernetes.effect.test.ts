@@ -23,6 +23,11 @@ const ProbeSchema = Schema.Struct({
     port: Schema.Union([Schema.String, Schema.Number]),
   }),
 });
+const ResourceListSchema = Schema.Struct({
+  cpu: Schema.String,
+  memory: Schema.String,
+  "ephemeral-storage": Schema.optional(Schema.String),
+});
 
 const ContainerSchema = Schema.Struct({
   name: Schema.String,
@@ -32,6 +37,21 @@ const ContainerSchema = Schema.Struct({
   livenessProbe: Schema.optional(ProbeSchema),
   readinessProbe: Schema.optional(ProbeSchema),
   startupProbe: Schema.optional(ProbeSchema),
+  resources: Schema.Struct({
+    requests: ResourceListSchema,
+    limits: ResourceListSchema,
+  }),
+  securityContext: Schema.Struct({
+    allowPrivilegeEscalation: Schema.Literal(false),
+    capabilities: Schema.Struct({ drop: Schema.Tuple([Schema.Literal("ALL")]) }),
+    readOnlyRootFilesystem: Schema.Literal(true),
+    runAsNonRoot: Schema.Literal(true),
+    runAsUser: Schema.optional(Schema.Number),
+    runAsGroup: Schema.optional(Schema.Number),
+    seccompProfile: Schema.optional(
+      Schema.Struct({ type: Schema.Literal("RuntimeDefault") }),
+    ),
+  }),
   volumeMounts: Schema.optional(Schema.Array(Schema.Struct({
     name: Schema.String,
     mountPath: Schema.String,
@@ -67,8 +87,58 @@ const DeploymentSpecSchema = Schema.Struct({
 
 const PdbSpecSchema = Schema.Struct({ minAvailable: Schema.Literal(1) });
 const NetworkPolicySpecSchema = Schema.Struct({
-  policyTypes: Schema.Tuple([Schema.Literal("Ingress")]),
+  policyTypes: Schema.Array(Schema.Literals(["Ingress", "Egress"])),
 });
+const LabelSelectorSchema = Schema.Struct({
+  matchLabels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  matchExpressions: Schema.optional(Schema.Array(Schema.Struct({
+    key: Schema.String,
+    operator: Schema.Literal("In"),
+    values: Schema.Array(Schema.String),
+  }))),
+});
+const OpenaiNetworkPolicySpecSchema = Schema.Struct({
+  policyTypes: Schema.Tuple([
+    Schema.Literal("Ingress"),
+    Schema.Literal("Egress"),
+  ]),
+  ingress: Schema.Tuple([Schema.Struct({
+    from: Schema.Tuple([
+      Schema.Struct({
+        namespaceSelector: LabelSelectorSchema,
+        podSelector: LabelSelectorSchema,
+      }),
+      Schema.Struct({
+        namespaceSelector: LabelSelectorSchema,
+        podSelector: LabelSelectorSchema,
+      }),
+    ]),
+    ports: Schema.Tuple([Schema.Struct({
+      protocol: Schema.Literal("TCP"),
+      port: Schema.Literal(4000),
+    })]),
+  })]),
+});
+
+const selectorMatches = (
+  selector: typeof LabelSelectorSchema.Type,
+  labels: Readonly<Record<string, string>>,
+) =>
+  Object.entries(selector.matchLabels ?? {}).every(
+    ([key, value]) => labels[key] === value,
+  ) && (selector.matchExpressions ?? []).every(
+    ({ key, values }) => labels[key] !== undefined && values.includes(labels[key]),
+  );
+
+const peerMatches = (
+  peer: {
+    readonly namespaceSelector: typeof LabelSelectorSchema.Type;
+    readonly podSelector: typeof LabelSelectorSchema.Type;
+  },
+  namespaceLabels: Readonly<Record<string, string>>,
+  podLabels: Readonly<Record<string, string>>,
+) => selectorMatches(peer.namespaceSelector, namespaceLabels) &&
+  selectorMatches(peer.podSelector, podLabels);
 const repositoryRoot = new URL("../../..", import.meta.url);
 
 const render = Effect.fn("test.agentgateway.renderKustomize")(function*() {
@@ -147,6 +217,23 @@ describe("owned agentgateway Kustomize workloads", () => {
             ? ["agentos-github-tls"]
             : [],
         );
+        for (const container of deployment.metadata.name === "agentgateway-openai"
+          ? spec.template.spec.containers
+          : []) {
+          assert.deepInclude(container.securityContext, {
+            allowPrivilegeEscalation: false,
+            capabilities: { drop: ["ALL"] },
+            readOnlyRootFilesystem: true,
+            runAsNonRoot: true,
+            seccompProfile: { type: "RuntimeDefault" },
+          });
+          assert.hasAllKeys(container.resources.requests, [
+            "cpu", "memory", "ephemeral-storage",
+          ]);
+          assert.hasAllKeys(container.resources.limits, [
+            "cpu", "memory", "ephemeral-storage",
+          ]);
+        }
       }
 
       const serviceAccounts = resources.filter(
@@ -171,8 +258,102 @@ describe("owned agentgateway Kustomize workloads", () => {
       assert.lengthOf(policies, 2);
       yield* Effect.forEach(policies, ({ spec }) =>
         Schema.decodeUnknownEffect(NetworkPolicySpecSchema)(spec));
-      assert.notInclude(manifest, "policyTypes:\n  - Egress");
+      const openaiPolicy = policies.find(({ metadata }) =>
+        metadata.name === "agentgateway-openai"
+      );
+      assert.deepStrictEqual(
+        yield* Schema.decodeUnknownEffect(OpenaiNetworkPolicySpecSchema)(
+          openaiPolicy?.spec,
+        ),
+        {
+          policyTypes: ["Ingress", "Egress"],
+          ingress: [{
+            from: [
+              {
+                namespaceSelector: {
+                  matchLabels: { "kubernetes.io/metadata.name": "agentos" },
+                },
+                podSelector: {
+                  matchLabels: {
+                    "agentos.akua.dev/agentgateway-client": "true",
+                  },
+                  matchExpressions: [{
+                    key: "app.kubernetes.io/name",
+                    operator: "In",
+                    values: [
+                      "agentos-crewmate",
+                      "agentos-firstmate",
+                      "agentos-secondmate",
+                    ],
+                  }],
+                },
+              },
+              {
+                namespaceSelector: {
+                  matchLabels: {
+                    "agentos.akua.dev/managed-by": "agentos-firstmate",
+                  },
+                },
+                podSelector: {
+                  matchLabels: {
+                    "agentos.akua.dev/agentgateway-client": "true",
+                    "app.kubernetes.io/name": "agentos-crewmate",
+                  },
+                },
+              },
+            ],
+            ports: [{ protocol: "TCP", port: 4000 }],
+          }],
+        },
+      );
+      const policy = yield* Schema.decodeUnknownEffect(
+        OpenaiNetworkPolicySpecSchema,
+      )(openaiPolicy?.spec);
+      const [agentosPeer, managedPeer] = policy.ingress[0].from;
+      const client = { "agentos.akua.dev/agentgateway-client": "true" };
+      for (const name of [
+        "agentos-crewmate",
+        "agentos-firstmate",
+        "agentos-secondmate",
+      ]) {
+        assert.isTrue(peerMatches(
+          agentosPeer,
+          { "kubernetes.io/metadata.name": "agentos" },
+          { ...client, "app.kubernetes.io/name": name },
+        ));
+      }
+      assert.isFalse(peerMatches(
+        agentosPeer,
+        { "kubernetes.io/metadata.name": "agentos" },
+        { ...client, "app.kubernetes.io/name": "unrelated" },
+      ));
+      assert.isFalse(peerMatches(
+        agentosPeer,
+        { "kubernetes.io/metadata.name": "agentos" },
+        { "app.kubernetes.io/name": "agentos-firstmate" },
+      ));
+      assert.isTrue(peerMatches(
+        managedPeer,
+        { "agentos.akua.dev/managed-by": "agentos-firstmate" },
+        { ...client, "app.kubernetes.io/name": "agentos-crewmate" },
+      ));
+      for (const name of ["agentos-firstmate", "agentos-secondmate"]) {
+        assert.isFalse(peerMatches(
+          managedPeer,
+          { "agentos.akua.dev/managed-by": "agentos-firstmate" },
+          { ...client, "app.kubernetes.io/name": name },
+        ));
+      }
+      assert.isFalse(peerMatches(
+        managedPeer,
+        { "agentos.akua.dev/managed-by": "agentos-firstmate" },
+        { "app.kubernetes.io/name": "agentos-crewmate" },
+      ));
       assert.notInclude(manifest, "kind: Secret");
+      assert.notInclude(manifest, "kind: Ingress");
+      assert.notInclude(manifest, "kind: PersistentVolumeClaim");
+      assert.notInclude(manifest, "type: LoadBalancer");
+      assert.notInclude(manifest, "type: NodePort");
     }).pipe(Effect.provide(BunServices.layer))));
 
   it.effect("rolls immutable route configuration through generated ConfigMaps", () =>

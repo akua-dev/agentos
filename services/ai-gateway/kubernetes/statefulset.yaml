@@ -124,8 +124,6 @@ spec:
               value: /opt/agentos
             - name: AI_GATEWAY_STATE_DIR
               value: /var/lib/ai-gateway
-            - name: AI_GATEWAY_CLIENT_AUTH_MODE
-              value: workload_identity
             - name: AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL
               value: http://agentos-egress-authz.agentos.svc.cluster.local:9001
             - name: AGENTOS_PROVIDER_BUDGET_SETTLEMENT_TOKEN_FILE

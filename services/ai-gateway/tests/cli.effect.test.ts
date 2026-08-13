@@ -41,8 +41,6 @@ function configuration(
     port: 8787,
     idleTimeoutSeconds: 255,
     gracefulShutdownMillis: 20_000,
-    clientAuthenticationMode: "shared_token",
-    clientToken: Redacted.make("fleet-secret"),
     operatorToken: Redacted.make(""),
     allowApiKeyFallback: false,
     openAIApiKey: Redacted.make(""),
@@ -161,20 +159,6 @@ describe("AI Gateway Effect CLI", () => {
       assert.notInclude(lines, "provider-a");
     }));
 
-  it.effect("fails closed before serving when shared client identity is absent", () =>
-    Effect.gen(function*() {
-      const harness = yield* makeHarness();
-      const exitCode = yield* runAIGatewayCli(
-        ["serve"],
-        configuration({ clientToken: Redacted.make("") }),
-      ).pipe(Effect.provide(harness.layer));
-      assert.strictEqual(exitCode, 1);
-      assert.deepStrictEqual(yield* Ref.get(harness.served), []);
-      assert.deepStrictEqual(yield* Ref.get(harness.errors), [
-        "AI_GATEWAY_TOKEN is required to serve",
-      ]);
-    }));
-
   it.effect("passes HTTP server settings to the Effect runtime", () =>
     Effect.gen(function*() {
       const harness = yield* makeHarness();
@@ -191,7 +175,7 @@ describe("AI Gateway Effect CLI", () => {
         hostname: "127.0.0.2",
         port: 9876,
         idleTimeoutSeconds: 120,
-        authentication: "shared_token",
+        authentication: "workload_identity",
       }]);
     }));
 
@@ -201,8 +185,6 @@ describe("AI Gateway Effect CLI", () => {
       const exitCode = yield* runAIGatewayCli(
         ["serve"],
         configuration({
-          clientAuthenticationMode: "workload_identity",
-          clientToken: Redacted.make(""),
           operatorToken: Redacted.make("operator-only"),
         }),
       ).pipe(Effect.provide(harness.layer));
@@ -224,29 +206,11 @@ describe("AI Gateway Effect CLI", () => {
             env: {
               HOME: "/home/agentos",
               AI_GATEWAY_PORT: "tcp://10.96.0.42:8787",
-              AI_GATEWAY_TOKEN: "fleet-secret",
             },
           }),
         ),
       );
       assert.strictEqual(config.port, 8787);
-    }));
-
-  it.effect("uses the client token for status without exposing it in output", () =>
-    Effect.gen(function*() {
-      const harness = yield* makeHarness();
-      assert.strictEqual(
-        yield* runAIGatewayCli(["status"], configuration()).pipe(
-          Effect.provide(harness.layer),
-        ),
-        0,
-      );
-      assert.deepStrictEqual(yield* Ref.get(harness.statusTokens), [
-        "fleet-secret",
-      ]);
-      assert.deepStrictEqual(yield* Ref.get(harness.output), [
-        '{"accounts":[],"apiKeyFallback":false}',
-      ]);
     }));
 
   it.effect("prefers the dedicated operator credential for status", () =>

@@ -19,6 +19,11 @@ import {
 } from "./identity.ts";
 import type { HermesProviderAuthorization } from "./hermes-authorizer.ts";
 import {
+  ProviderBudgetEnforcementError,
+  type ProviderBudgetEnforcer,
+} from "./provider-budget.ts";
+import {
+  HermesProviderAccessGrantV1Schema,
   HermesProviderLimitsV1Schema,
   HermesProviderModelIdSchema,
   normalizeHermesProviderModelId,
@@ -75,6 +80,9 @@ export const HermesProviderAuthorizationGrantV1Schema = Schema.Struct({
   identity: KubernetesWorkloadPrincipalV1Schema,
   model: HermesProviderModelIdSchema,
   limits: HermesProviderLimitsV1Schema,
+  pricing: HermesProviderAccessGrantV1Schema.fields.pricing,
+  requestedTokens: EpochMillis,
+  requestedSpendMicros: EpochMillis,
 });
 
 export const ProviderAuthorizationGrantV1Schema = Schema.Union([
@@ -238,6 +246,11 @@ export const PROVIDER_AUTHORIZATION_GRANT_HEADERS = Object.freeze([
   "x-agentos-authz-maximum-tokens",
   "x-agentos-authz-spend-window-millis",
   "x-agentos-authz-maximum-spend-micros",
+  "x-agentos-authz-pricing-version",
+  "x-agentos-authz-input-micros-per-million-tokens",
+  "x-agentos-authz-output-micros-per-million-tokens",
+  "x-agentos-authz-requested-tokens",
+  "x-agentos-authz-requested-spend-micros",
 ]);
 
 export function resolveProviderAuthorizationRoute(
@@ -313,6 +326,11 @@ export function providerAuthorizationGrantHeaders(
     headers.set("x-agentos-authz-maximum-tokens", String(grant.limits.maximumTokens));
     headers.set("x-agentos-authz-spend-window-millis", String(grant.limits.spendWindowMillis));
     headers.set("x-agentos-authz-maximum-spend-micros", String(grant.limits.maximumSpendMicros));
+    headers.set("x-agentos-authz-pricing-version", String(grant.pricing.version));
+    headers.set("x-agentos-authz-input-micros-per-million-tokens", String(grant.pricing.inputMicrosPerMillionTokens));
+    headers.set("x-agentos-authz-output-micros-per-million-tokens", String(grant.pricing.outputMicrosPerMillionTokens));
+    headers.set("x-agentos-authz-requested-tokens", String(grant.requestedTokens));
+    headers.set("x-agentos-authz-requested-spend-micros", String(grant.requestedSpendMicros));
   } else {
     headers.set("x-agentos-authz-principal-kind", "agentos");
     headers.set("x-agentos-authz-agent-id", grant.identity.agentId);
@@ -437,6 +455,7 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
   readonly id: Effect.Effect<string, ProviderPolicyDecisionError>;
   readonly telemetry?: ProviderAccessTelemetry["Service"];
   readonly hermes: HermesProviderAuthorization;
+  readonly budgets?: ProviderBudgetEnforcer["Service"];
 }) {
   const clock = options.clock ?? Clock.currentTimeMillis;
   const id = options.id;
@@ -504,8 +523,38 @@ export const createProviderAuthorizationHttpHandler = Effect.fn(
         rateClass: hermes.grant.rateClass,
         model: hermes.grant.model,
         limits: hermes.grant.limits,
+        pricing: hermes.grant.pricing,
+        requestedTokens: hermes.requestedTokens,
+        requestedSpendMicros: hermes.requestedSpendMicros,
       }).pipe(Effect.mapError(() => authorizerError("invalid_grant")));
       if (grant.expiresAtMillis <= issuedAtMillis) return forbiddenResponse();
+      if (
+        options.budgets?.reserveWorkload === undefined ||
+        hermes.workloadIdentity === undefined
+      ) {
+        return unavailableResponse();
+      }
+      yield* options.budgets.reserveWorkload({
+        schemaVersion: 1,
+        decisionRef: grant.decisionRef,
+        correlationId: grant.correlationId,
+        principal: { ...hermes.grant.principal, ...hermes.workloadIdentity },
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        capability: grant.capability === "openai.responses.create"
+          ? "openai.responses.create"
+          : "openai.responses.compact",
+        resource: grant.resource,
+        environment: "production",
+        model: hermes.grant.model,
+        rateClass: grant.rateClass,
+        limits: hermes.grant.limits,
+        pricing: hermes.grant.pricing,
+        policyExpiresAtMillis: grant.expiresAtMillis,
+        requestedTokens: hermes.requestedTokens,
+        requestedSpendMicros: hermes.requestedSpendMicros,
+        nowMillis: issuedAtMillis,
+      });
       if (telemetry !== undefined) yield* telemetry.correlate(grant);
       return new Response(null, {
         status: 200,
@@ -1224,6 +1273,22 @@ function authorizationPolicyFieldsFromHeaders(headers: Headers) {
           "x-agentos-authz-maximum-spend-micros",
         ),
       },
+      pricing: {
+        version: integerHeader(headers, "x-agentos-authz-pricing-version"),
+        inputMicrosPerMillionTokens: integerHeader(
+          headers,
+          "x-agentos-authz-input-micros-per-million-tokens",
+        ),
+        outputMicrosPerMillionTokens: integerHeader(
+          headers,
+          "x-agentos-authz-output-micros-per-million-tokens",
+        ),
+      },
+      requestedTokens: integerHeader(headers, "x-agentos-authz-requested-tokens"),
+      requestedSpendMicros: integerHeader(
+        headers,
+        "x-agentos-authz-requested-spend-micros",
+      ),
     };
   }
   return {
@@ -1255,6 +1320,14 @@ function authorizerError(code: ProviderAuthorizationError["code"]) {
 }
 
 function responseForAuthorizationFailure(error: unknown): Response {
+  if (error instanceof ProviderBudgetEnforcementError) {
+    if (error.outcome === "rate_limited" || error.outcome === "budget_exhausted") {
+      return quotaDeniedResponse(error.outcome);
+    }
+    return error.outcome === "rate_class_disabled"
+      ? forbiddenResponse()
+      : unavailableResponse();
+  }
   if (error instanceof ProviderPolicyDecisionError) {
     switch (error.outcome) {
       case "database_unavailable":

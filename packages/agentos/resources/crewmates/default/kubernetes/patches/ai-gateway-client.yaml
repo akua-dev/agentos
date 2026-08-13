@@ -4,9 +4,6 @@ metadata:
   name: agentos-crewmate
 spec:
   template:
-    metadata:
-      labels:
-        agentos.akua.dev/agentgateway-client: "true"
     spec:
       initContainers:
         - name: install-tools
@@ -14,18 +11,14 @@ spec:
           env:
             - name: AGENTOS_CODEX_PROVIDER_MODE
               value: ai-gateway
-            - name: AGENTOS_EGRESS_TOKEN_FILE
-              value: /var/run/secrets/agentos-egress/token
             - name: AI_GATEWAY_URL
-              value: http://agentgateway-openai.agentos.svc.cluster.local:8788
+              value: http://127.0.0.1:8790
       containers:
         - name: crewmate
           env:
             - name: AGENTOS_CODEX_PROVIDER_MODE
               value: ai-gateway
-            - name: AGENTOS_EGRESS_TOKEN_FILE
-              value: /var/run/secrets/agentos-egress/token
             - name: AGENTOS_PROVIDER_CREDENTIAL_KIND
               value: ai_gateway
             - name: AI_GATEWAY_URL
-              value: http://agentgateway-openai.agentos.svc.cluster.local:8788
+              value: http://127.0.0.1:8790

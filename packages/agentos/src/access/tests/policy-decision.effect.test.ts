@@ -139,6 +139,8 @@ function decisionLayer(input?: {
       next: Effect.succeed("44444444444444444444444444444444"),
     }),
     Layer.succeed(ProviderBudgetEnforcer, {
+      validateWorkload: () => Effect.die("workload validation not expected in legacy PDP"),
+      reserveWorkload: () => Effect.die("workload reservation not expected in legacy PDP"),
       reserve: input?.reserve ?? ((reservation) => Effect.succeed({
         schemaVersion: 1,
         decisionRef: reservation.decisionRef,
@@ -153,6 +155,8 @@ function decisionLayer(input?: {
       settle: () => Effect.die("settlement not expected in PDP"),
       settleProvider: () =>
         Effect.die("provider settlement not expected in PDP"),
+      renewProviderAttempt: () =>
+        Effect.die("provider renewal not expected in PDP"),
     }),
   );
   return makeProviderPolicyDecisionPointLayer({

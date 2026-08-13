@@ -31,7 +31,16 @@ const Container = Schema.Struct({
     limits: Schema.Record(Schema.String, Schema.String),
     requests: Schema.Record(Schema.String, Schema.String),
   })),
+  livenessProbe: Schema.optional(Schema.Unknown),
+  readinessProbe: Schema.optional(Schema.Unknown),
+  securityContext: Schema.optional(Schema.Unknown),
   volumeMounts: Schema.optional(Schema.Array(VolumeMount)),
+});
+const Volume = Schema.Struct({
+  name: Schema.String,
+  projected: Schema.optional(Schema.Unknown),
+  secret: Schema.optional(Schema.Unknown),
+  emptyDir: Schema.optional(Schema.Unknown),
 });
 const Metadata = Schema.Struct({
   labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
@@ -54,6 +63,7 @@ const Subject = Schema.Struct({
   namespace: Schema.optional(Schema.String),
 });
 const Resource = Schema.Struct({
+  automountServiceAccountToken: Schema.optional(Schema.Boolean),
   kind: Schema.String,
   metadata: Metadata,
   roleRef: Schema.optional(RoleReference),
@@ -79,7 +89,7 @@ const StatefulSet = Schema.Struct({
         serviceAccountName: Schema.String,
         automountServiceAccountToken: Schema.Boolean,
         securityContext: Schema.Unknown,
-        volumes: Schema.Unknown,
+        volumes: Schema.Array(Volume),
         initContainers: Schema.Array(Container),
         containers: Schema.Array(Container),
       }),
@@ -176,7 +186,9 @@ describe("Second Mate Kubernetes base", () => {
       );
       const pod = workload.spec.template.spec;
       assert.strictEqual(pod.serviceAccountName, "agentos-secondmate");
-      assert.isTrue(pod.automountServiceAccountToken);
+      assert.isFalse(pod.automountServiceAccountToken);
+      assert.isFalse((yield* namedResource(resources, "ServiceAccount", "agentos-secondmate"))
+        .automountServiceAccountToken ?? true);
       assert.deepStrictEqual(pod.securityContext, {
         fsGroup: 1000,
         fsGroupChangePolicy: "OnRootMismatch",
@@ -193,29 +205,9 @@ describe("Second Mate Kubernetes base", () => {
             secretName: "agentos-secondmate-postgres",
           },
         },
-        {
-          name: "agentos-egress-identity",
-          projected: {
-            defaultMode: 288,
-            sources: [{
-              serviceAccountToken: {
-                audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
-                expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
-                path: "token",
-              },
-            }],
-          },
-        },
-        {
-          name: "agentos-github-ca",
-          configMap: {
-            defaultMode: 292,
-            items: [{ key: "ca.pem", path: "ca.pem" }],
-            name: "agentos-github-ca",
-          },
-        },
+        { name: "tmp", emptyDir: { sizeLimit: "256Mi" } },
       ]);
-      assert.lengthOf(pod.initContainers, 3);
+      assert.lengthOf(pod.initContainers, 2);
       assert.lengthOf(pod.containers, 1);
       const container = yield* required(
         pod.containers[0],
@@ -226,24 +218,12 @@ describe("Second Mate Kubernetes base", () => {
         "agentos:dev",
         "agentos:dev",
         "agentos:dev",
-        "agentos:dev",
       ]);
-      const githubProvider = yield* required(
-        pod.initContainers.find(({ name }) =>
-          name === "prepare-github-provider"
-        ),
-        "Missing GitHub provider preparation container",
-      );
-      assert.deepStrictEqual(githubProvider.resources, {
-        limits: { cpu: "250m", memory: "128Mi" },
-        requests: { cpu: "25m", memory: "64Mi" },
-      });
       assert.deepStrictEqual(
         allContainers.map(({ workingDir }) => workingDir),
         [
           "/opt/agentos/packages/agentos/resources/roles/secondmate",
           "/opt/agentos/packages/agentos/resources/roles/secondmate",
-          undefined,
           "/opt/agentos/packages/agentos/resources/roles/secondmate",
         ],
       );
@@ -271,11 +251,10 @@ describe("Second Mate Kubernetes base", () => {
       );
       assert.isUndefined(variables.AGENTOS_MODEL);
       assert.isUndefined(variables.AGENTOS_THINKING);
-      assert.deepInclude(container.volumeMounts ?? [], {
-        mountPath: "/var/run/secrets/agentos-egress",
-        name: "agentos-egress-identity",
-        readOnly: true,
-      });
+      assert.isFalse((container.volumeMounts ?? []).some(({ name }) =>
+        name === "agentos-egress-identity"
+      ));
+      assert.isFalse(JSON.stringify(pod).includes("AGENTOS_GITHUB_"));
       for (const initContainer of pod.initContainers) {
         assert.isFalse(
           (initContainer.volumeMounts ?? []).some(({ name }) =>
@@ -314,33 +293,77 @@ describe("Second Mate Kubernetes base", () => {
       assert.deepStrictEqual(pod.initContainers.map(({ name }) => name), [
         "install-tools",
         "prepare-home",
-        "prepare-github-provider",
       ]);
       assert.deepInclude(spec.template.metadata.labels, {
         "agentos.akua.dev/agentgateway-client": "true",
       });
       assert.strictEqual(
         variables.AI_GATEWAY_URL,
-        "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+        "http://127.0.0.1:8790",
       );
       assert.isUndefined(variables.AI_GATEWAY_TOKEN);
-      assert.strictEqual(
-        variables.AGENTOS_EGRESS_TOKEN_FILE,
-        "/var/run/secrets/agentos-egress/token",
-      );
+      assert.isUndefined(variables.AGENTOS_EGRESS_TOKEN_FILE);
       assert.strictEqual(variables.AGENTOS_PI_PROVIDER_MODE, "ai-gateway");
       assert.strictEqual(variables.AGENTOS_PROVIDER_CREDENTIAL_KIND, "ai_gateway");
       assert.deepInclude(prepareVariables, {
         AGENTOS_PI_PROVIDER_MODE: "ai-gateway",
-        AI_GATEWAY_URL:
-          "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+        AI_GATEWAY_URL: "http://127.0.0.1:8790",
       });
       assert.isUndefined(prepareVariables.AI_GATEWAY_TOKEN);
+      assert.isUndefined(prepareVariables.AGENTOS_EGRESS_TOKEN_FILE);
       assert.isUndefined(variables.AGENTOS_MODEL);
       assert.isUndefined(variables.AGENTOS_THINKING);
       assert.isUndefined(prepareVariables.AGENTOS_MODEL);
       assert.isUndefined(prepareVariables.AGENTOS_THINKING);
       assert.strictEqual(pod.serviceAccountName, "agentos-secondmate");
+      const proxy = yield* required(
+        pod.containers.find(({ name }) => name === "ai-gateway-workload-proxy"),
+        "Missing workload proxy",
+      );
+      assert.deepStrictEqual(proxy.volumeMounts, [{
+        mountPath: "/var/run/secrets/agentos-egress",
+        name: "agentos-egress-identity",
+        readOnly: true,
+      }]);
+      assert.deepStrictEqual(environment(proxy.env ?? []), {
+        AGENTOS_EGRESS_TOKEN_FILE: "/var/run/secrets/agentos-egress/token",
+        AI_GATEWAY_GRACEFUL_SHUTDOWN_MILLIS: "20000",
+        AI_GATEWAY_IDLE_TIMEOUT_SECONDS: "255",
+        AI_GATEWAY_URL: "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+      });
+      assert.deepStrictEqual(proxy.securityContext, {
+        allowPrivilegeEscalation: false,
+        capabilities: { drop: ["ALL"] },
+        readOnlyRootFilesystem: true,
+        runAsGroup: 1000,
+        runAsNonRoot: true,
+        runAsUser: 1000,
+        seccompProfile: { type: "RuntimeDefault" },
+      });
+      assert.deepStrictEqual(proxy.resources, {
+        limits: { cpu: "250m", memory: "256Mi", "ephemeral-storage": "128Mi" },
+        requests: { cpu: "25m", memory: "64Mi", "ephemeral-storage": "32Mi" },
+      });
+      assert.deepStrictEqual(
+        pod.volumes.filter(({ name }) =>
+          name === "agentos-egress-identity"
+        ),
+        [{
+          name: "agentos-egress-identity",
+          projected: {
+            defaultMode: 288,
+            sources: [{ serviceAccountToken: {
+              audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
+              expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
+              path: "token",
+            } }],
+          },
+        }],
+      );
+      for (const candidate of [...pod.initContainers, container]) {
+        assert.isFalse(JSON.stringify(candidate).includes("agentos-egress-identity"));
+        assert.isFalse(JSON.stringify(candidate).includes("AGENTOS_EGRESS_TOKEN_FILE"));
+      }
       assert.strictEqual(spec.volumeClaimTemplates[0]?.metadata.name, "home");
     })));
 
@@ -367,7 +390,6 @@ describe("Second Mate Kubernetes base", () => {
       assert.deepStrictEqual(pod.initContainers.map(({ name }) => name), [
         "install-tools",
         "prepare-home",
-        "prepare-github-provider",
       ]);
       assert.strictEqual(prepareVariables.AGENTOS_PI_PROVIDER_MODE, "direct");
       assert.isUndefined(prepareVariables.AI_GATEWAY_URL);

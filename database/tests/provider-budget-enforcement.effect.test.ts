@@ -2,7 +2,7 @@ import * as BunFileSystem from "@effect/platform-bun/BunFileSystem";
 import * as BunPath from "@effect/platform-bun/BunPath";
 import { PGlite } from "@electric-sql/pglite";
 import { assert, layer } from "@effect/vitest";
-import { Context, Effect, FileSystem, Layer, Path } from "effect";
+import { Context, Effect, Exit, FileSystem, Layer, Path } from "effect";
 import { fileURLToPath } from "node:url";
 
 const migrationsDirectory = fileURLToPath(
@@ -232,6 +232,11 @@ const settleProvider = Effect.fn("test.providerBudget.settleProvider")(
     readonly atMillis?: number;
   }) {
     const database = yield* TestDatabase;
+    yield* database.exec(`
+      UPDATE agentos.provider_budget_reservations SET attempted_at_millis = ${input.atMillis ?? now}
+       WHERE decision_ref = '${input.decision}'
+         AND workload_principal IS NOT NULL AND state = 'active'
+    `);
     return yield* database.query<{
       readonly outcome: string;
       readonly forwardOutcome: string;
@@ -253,7 +258,503 @@ const settleProvider = Effect.fn("test.providerBudget.settleProvider")(
   },
 );
 
+const renewProviderAttempt = Effect.fn("test.providerBudget.renewProviderAttempt")(
+  function*(decision: string, provider: string, credentialDomain: string, atMillis: number) {
+    const database = yield* TestDatabase;
+    return yield* database.query<{
+      readonly outcome: string;
+      readonly leaseExpiresAtMillis: number;
+    }>(`
+      SELECT * FROM agentos.renew_workload_provider_attempt(
+        '${decision}', '${provider}', '${credentialDomain}', ${atMillis}
+      )
+    `);
+  },
+);
+
+const workloadPrincipal = {
+  kind: "kubernetes_workload",
+  namespace: "hermes-workers",
+  serviceAccountName: "hermes-codex",
+  serviceAccountUid: "11111111-1111-4111-8111-111111111111",
+  podName: "hermes-0",
+  podUid: "22222222-2222-4222-8222-222222222222",
+  policyRevision: 7,
+  policyResourceVersion: "18422",
+  hermesProfile: "fleet-codex",
+};
+const workloadLimits = {
+  requestWindowMillis: 60_000,
+  maximumRequests: 2,
+  maximumConcurrent: 1,
+  tokenWindowMillis: 60_000,
+  maximumTokens: 1_000,
+  spendWindowMillis: 3_600_000,
+  maximumSpendMicros: 100_000,
+};
+const workloadPricing = {
+  version: 1,
+  inputMicrosPerMillionTokens: 1_000_000,
+  outputMicrosPerMillionTokens: 1_000_000,
+};
+const reserveWorkload = Effect.fn("test.providerBudget.reserveWorkload")(
+  function*(input: {
+    readonly decision: string;
+    readonly budgetKey?: string;
+    readonly principal?: object;
+    readonly limits?: object;
+    readonly rateClass?: string;
+    readonly requestedTokens?: number;
+    readonly requestedSpendMicros?: number;
+    readonly atMillis?: number;
+  }) {
+    const database = yield* TestDatabase;
+    const rows = yield* database.query<ReservationRow>(`
+      SELECT * FROM agentos.reserve_workload_provider_budget(
+        '${input.decision}', '${input.budgetKey ?? `budget_${"9".repeat(64)}`}',
+        'corr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        '${JSON.stringify(input.principal ?? workloadPrincipal)}'::jsonb,
+        'openai', 'openai-responses', 'openai.responses.create',
+        '{"kind":"provider_service","provider":"openai","service":"responses"}'::jsonb,
+        'production', 'gpt-5.6-sol', '${input.rateClass ?? "low"}',
+        '${JSON.stringify(input.limits ?? workloadLimits)}'::jsonb,
+        '${JSON.stringify(workloadPricing)}'::jsonb,
+        ${(input.atMillis ?? now) + 15_000},
+        ${input.requestedTokens ?? 1_000}, ${input.requestedSpendMicros ?? 100_000},
+        ${input.atMillis ?? now}
+      )
+    `);
+    return rows[0]!;
+  },
+);
+
+const claimWorkload = Effect.fn("test.providerBudget.claimWorkload")(
+  function*(input: { readonly decision: string; readonly atMillis?: number; readonly requestedTokens?: number; readonly requestedSpendMicros?: number }) {
+    const database = yield* TestDatabase;
+    const principal = {
+      kind: workloadPrincipal.kind,
+      namespace: workloadPrincipal.namespace,
+      serviceAccountName: workloadPrincipal.serviceAccountName,
+      policyRevision: workloadPrincipal.policyRevision,
+      policyResourceVersion: workloadPrincipal.policyResourceVersion,
+      hermesProfile: workloadPrincipal.hermesProfile,
+    };
+    return yield* database.query<{ readonly outcome: string }>(`
+      SELECT * FROM agentos.validate_workload_provider_budget(
+        '${input.decision}', 'corr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        '${JSON.stringify(principal)}'::jsonb, 'openai', 'openai-responses',
+        'openai.responses.create',
+        '{"kind":"provider_service","provider":"openai","service":"responses"}'::jsonb,
+        'gpt-5.6-sol', 'low', '${JSON.stringify(workloadLimits)}'::jsonb,
+        '${JSON.stringify(workloadPricing)}'::jsonb, ${input.requestedTokens ?? 1000}, ${input.requestedSpendMicros ?? 100000},
+        ${(input.atMillis ?? now) + 15_000}, ${input.atMillis ?? now}
+      )
+    `).pipe(Effect.map((rows) => rows[0]!));
+  },
+);
+
 layer(databaseLayer)("durable provider budgets", (it) => {
+  it.effect("renews only an active attempted reservation bound to the provider domain", () =>
+    Effect.gen(function*() {
+      const decision = `decision_${"e1".repeat(16)}`;
+      yield* reserveWorkload({
+        decision,
+        budgetKey: `budget_${"e1".repeat(32)}`,
+        atMillis: now,
+      });
+      yield* claimWorkload({ decision, atMillis: now });
+      const renewed = yield* renewProviderAttempt(
+        decision,
+        "openai",
+        "openai-responses",
+        now + 1_000,
+      );
+      assert.strictEqual(renewed[0]?.outcome, "renewed");
+      assert.strictEqual(renewed[0]?.leaseExpiresAtMillis, now + 61_000);
+      const mismatch = yield* Effect.flip(
+        renewProviderAttempt(decision, "openai", "other-domain", now + 2_000),
+      );
+      assert.match(mismatch.message, /attempt lease unavailable/);
+    }));
+
+  it.effect("claims one provider attempt and rejects replay while retaining expired attempted liability", () =>
+    Effect.gen(function*() {
+      const budgetKey = `budget_${"a1".repeat(32)}`;
+      const decision = `decision_${"a1".repeat(16)}`;
+      assert.strictEqual((yield* reserveWorkload({ decision, budgetKey })).outcome, "reserved");
+      assert.strictEqual((yield* claimWorkload({ decision })).outcome, "attempted");
+      const replay = yield* Effect.flip(claimWorkload({ decision }));
+      assert.match(replay.message, /reservation unavailable/);
+      const denied = yield* reserveWorkload({
+        decision: `decision_${"a2".repeat(16)}`,
+        budgetKey,
+        atMillis: now + 15_001,
+        requestedTokens: 1,
+        requestedSpendMicros: 1,
+      });
+      assert.strictEqual(denied.outcome, "budget_exhausted");
+    }));
+
+  it.effect("charges settlement to the reservation windows across a boundary", () =>
+    Effect.gen(function*() {
+      const database = yield* TestDatabase;
+      const budgetKey = `budget_${"b1".repeat(32)}`;
+      const oldDecision = `decision_${"b1".repeat(16)}`;
+      const newDecision = `decision_${"b2".repeat(16)}`;
+      const limits = { ...workloadLimits, maximumConcurrent: 2 };
+      yield* reserveWorkload({ decision: oldDecision, budgetKey, limits, atMillis: now + 59_000, requestedTokens: 50, requestedSpendMicros: 50 });
+      yield* reserveWorkload({ decision: newDecision, budgetKey, limits, atMillis: now + 61_000, requestedTokens: 50, requestedSpendMicros: 50 });
+      yield* settleProvider({ decision: oldDecision, provider: "openai", credentialDomain: "openai-responses", inputTokens: 50, spendMicros: 50, atMillis: now + 62_000 });
+      const counters = yield* database.query<{ readonly window: number; readonly consumed: number }>(`
+        SELECT window_started_at_millis::double precision AS window,
+               consumed::double precision AS consumed
+          FROM agentos.provider_budget_counters
+         WHERE budget_key = '${budgetKey}' AND dimension = 'token'
+         ORDER BY window_started_at_millis
+      `);
+      assert.deepStrictEqual(counters.map(({ consumed }) => consumed), [50, 0]);
+    }));
+
+  it.effect("rejects zero and over-maximum exact reservation quantities", () =>
+    Effect.gen(function*() {
+      for (const [requestedTokens, requestedSpendMicros] of [[0, 1], [1, 0], [1_001, 1], [1, 100_001]]) {
+        const failure = yield* Effect.flip(reserveWorkload({
+          decision: `decision_${String(requestedTokens).padStart(16, "0")}${String(requestedSpendMicros).padStart(16, "0")}`,
+          budgetKey: `budget_${"c1".repeat(32)}`,
+          requestedTokens,
+          requestedSpendMicros,
+        }));
+        assert.match(failure.message, /invalid workload provider budget reservation/);
+      }
+    }));
+
+  it.effect("reserves only an exact modern workload decision and reclaims expired concurrency", () =>
+    Effect.gen(function*() {
+      const decision = `decision_${"ab".repeat(16)}`;
+      assert.strictEqual((yield* reserveWorkload({ decision })).outcome, "reserved");
+      assert.strictEqual((yield* reserveWorkload({ decision })).outcome, "reserved");
+      const conflict = yield* Effect.flip(reserveWorkload({
+        decision,
+        principal: { ...workloadPrincipal, podUid: "different-pod-uid" },
+      }));
+      assert.match(conflict.message, /decision reference conflicts/);
+      assert.strictEqual((yield* reserveWorkload({
+        decision: `decision_${"bc".repeat(16)}`,
+      })).outcome, "budget_exhausted");
+      assert.strictEqual((yield* reserveWorkload({
+        decision: `decision_${"cd".repeat(16)}`,
+        atMillis: now + 15_001,
+      })).outcome, "reserved");
+    }));
+
+  it.effect("settles modern usage exactly once and rejects a conflict", () =>
+    Effect.gen(function*() {
+      const decision = `decision_${"de".repeat(16)}`;
+      yield* reserveWorkload({ decision, budgetKey: `budget_${"8".repeat(64)}` });
+      const first = yield* settleProvider({
+        decision,
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        inputTokens: 80,
+        outputTokens: 20,
+        cachedInputTokens: 10,
+        spendMicros: 100,
+      });
+      assert.deepStrictEqual(
+        [first.outcome, first.inputTokens, first.outputTokens, first.spendMicros],
+        ["settled", 80, 20, 100],
+      );
+      assert.strictEqual((yield* settleProvider({
+        decision,
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        inputTokens: 80,
+        outputTokens: 20,
+        cachedInputTokens: 10,
+        spendMicros: 100,
+      })).outcome, "settled");
+      const conflict = yield* Effect.flip(settleProvider({
+        decision,
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        inputTokens: 81,
+        outputTokens: 20,
+        spendMicros: 101,
+      }));
+      assert.match(conflict.message, /settlement conflicts/);
+    }));
+
+  it.effect("returns the canonical committed settlement when an HTTP retry changes only transport time", () =>
+    Effect.gen(function*() {
+      const decision = `decision_${"d0".repeat(16)}`;
+      yield* reserveWorkload({ decision, budgetKey: `budget_${"d0".repeat(32)}`, requestedTokens: 100, requestedSpendMicros: 100 });
+      yield* claimWorkload({ decision, requestedTokens: 100, requestedSpendMicros: 100 });
+      const first = yield* settleProvider({
+        decision,
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        inputTokens: 50,
+        outputTokens: 50,
+        spendMicros: 100,
+        atMillis: now + 1_000,
+      });
+      const replay = yield* settleProvider({
+        decision,
+        provider: "openai",
+        credentialDomain: "openai-responses",
+        inputTokens: 50,
+        outputTokens: 50,
+        spendMicros: 100,
+        atMillis: now + 2_000,
+      });
+      assert.deepStrictEqual(replay, first);
+    }));
+
+  it.effect("recovers an expired claimed attempt conservatively and releases later-window concurrency", () =>
+    Effect.gen(function*() {
+      const database = yield* TestDatabase;
+      const budgetKey = `budget_${"d1".repeat(32)}`;
+      const decision = `decision_${"d1".repeat(16)}`;
+      yield* reserveWorkload({ decision, budgetKey, requestedTokens: 100, requestedSpendMicros: 100 });
+      yield* claimWorkload({ decision, requestedTokens: 100, requestedSpendMicros: 100 });
+      const recovered = yield* database.query<{ readonly outcome: string }>(`
+        SELECT * FROM agentos.recover_expired_workload_provider_attempts(${now + 1_000_000}, 100)
+      `);
+      assert.deepStrictEqual(recovered, [{ outcome: "recovered" }]);
+      const row = yield* database.query<{ readonly state: string; readonly tokens: number; readonly spend: number }>(`
+        SELECT state, (input_tokens + output_tokens)::double precision AS tokens,
+               spend_micros::double precision AS spend
+          FROM agentos.provider_budget_reservations WHERE decision_ref = '${decision}'
+      `);
+      assert.deepStrictEqual(row, [{ state: "settled", tokens: 100, spend: 100 }]);
+      assert.deepStrictEqual(
+        yield* database.query<{ readonly dimension: string; readonly consumed: number }>(`
+          SELECT dimension, consumed::double precision AS consumed
+            FROM agentos.provider_budget_counters
+           WHERE budget_key = '${budgetKey}' AND dimension IN ('token', 'spend')
+           ORDER BY dimension
+        `),
+        [{ dimension: "spend", consumed: 100 }, { dimension: "token", consumed: 100 }],
+      );
+      assert.deepStrictEqual(
+        yield* database.query<{ readonly outcome: string }>(`
+          SELECT * FROM agentos.recover_expired_workload_provider_attempts(${now + 1_000_001}, 100)
+        `),
+        [{ outcome: "unchanged" }],
+      );
+      const later = yield* reserveWorkload({
+        decision: `decision_${"d2".repeat(16)}`,
+        budgetKey,
+        requestedTokens: 1,
+        requestedSpendMicros: 1,
+        atMillis: now + 1_000_000,
+      });
+      assert.strictEqual(later.outcome, "reserved");
+    }));
+
+  it.effect("conservatively recovers a legacy attempted row with a null attempt lease", () =>
+    Effect.gen(function*() {
+      const database = yield* TestDatabase;
+      const decision = `decision_${"d3".repeat(16)}`;
+      yield* reserveWorkload({
+        decision,
+        budgetKey: `budget_${"d3".repeat(32)}`,
+        requestedTokens: 100,
+        requestedSpendMicros: 100,
+      });
+      yield* claimWorkload({ decision, requestedTokens: 100, requestedSpendMicros: 100 });
+      yield* database.query(`
+        UPDATE agentos.provider_budget_reservations
+           SET attempt_lease_expires_at_millis = NULL
+         WHERE decision_ref = '${decision}'
+      `);
+      assert.deepStrictEqual(
+        yield* database.query<{ readonly outcome: string }>(`
+          SELECT * FROM agentos.recover_expired_workload_provider_attempts(${now + 1_000_000}, 100)
+        `),
+        [{ outcome: "recovered" }],
+      );
+      assert.deepStrictEqual(
+        yield* database.query<{ readonly state: string; readonly tokens: number; readonly spend: number }>(`
+          SELECT state, (input_tokens + output_tokens)::double precision AS tokens,
+                 spend_micros::double precision AS spend
+            FROM agentos.provider_budget_reservations WHERE decision_ref = '${decision}'
+        `),
+        [{ state: "settled", tokens: 100, spend: 100 }],
+      );
+    }));
+
+  it.effect("linearizes concurrent attempt renewal and expiry recovery without double charge", () =>
+    Effect.gen(function*() {
+      const database = yield* TestDatabase;
+      let renewWins = 0;
+      let recoveryWins = 0;
+      for (let repetition = 0; repetition < 12; repetition += 1) {
+        const suffix = `f${repetition.toString(16).padStart(3, "0")}`;
+        const decision = `decision_${suffix.repeat(8)}`;
+        const budgetKey = `budget_${suffix.repeat(16)}`;
+        const expiryAt = now + 899_999;
+        const renewAt = expiryAt - 1;
+        yield* reserveWorkload({
+          decision,
+          budgetKey,
+          requestedTokens: 100,
+          requestedSpendMicros: 100,
+        });
+        yield* claimWorkload({
+          decision,
+          requestedTokens: 100,
+          requestedSpendMicros: 100,
+        });
+        yield* database.query(`
+          UPDATE agentos.provider_budget_reservations
+             SET attempt_lease_expires_at_millis = ${expiryAt}
+           WHERE decision_ref = '${decision}'
+        `);
+        const renew = Effect.exit(renewProviderAttempt(
+          decision,
+          "openai",
+          "openai-responses",
+          renewAt,
+        ));
+        const recover = Effect.exit(database.query<{ readonly outcome: string }>(`
+          SELECT * FROM agentos.recover_expired_workload_provider_attempts(${expiryAt}, 100)
+        `));
+        const [first, second] = yield* Effect.all(
+          repetition % 2 === 0 ? [renew, recover] : [recover, renew],
+          { concurrency: "unbounded" },
+        );
+        const [renewResult, recoverResult] = repetition % 2 === 0
+          ? [first, second]
+          : [second, first];
+        const row = (yield* database.query<{
+          readonly state: string;
+          readonly lease: number | null;
+          readonly tokenWindow: number;
+          readonly spendWindow: number;
+          readonly tokens: number;
+          readonly spend: number;
+        }>(`
+          SELECT state, attempt_lease_expires_at_millis::double precision AS lease,
+                 token_window_started_at_millis::double precision AS "tokenWindow",
+                 spend_window_started_at_millis::double precision AS "spendWindow",
+                 (input_tokens + output_tokens)::double precision AS tokens,
+                 spend_micros::double precision AS spend
+            FROM agentos.provider_budget_reservations
+           WHERE decision_ref = '${decision}'
+        `))[0];
+        assert.isDefined(row);
+        const renewed = Exit.isSuccess(renewResult);
+        assert.strictEqual(row?.state, renewed ? "active" : "settled");
+        assert.deepStrictEqual(
+          { tokens: row?.tokens, spend: row?.spend },
+          renewed ? { tokens: null, spend: null } : { tokens: 100, spend: 100 },
+        );
+        if (renewed) {
+          renewWins += 1;
+          assert.strictEqual(renewResult.value[0]?.outcome, "renewed");
+          assert.strictEqual(row?.lease, now + 900_000);
+          assert.isAbove(row?.lease ?? 0, expiryAt);
+          assert.isTrue(Exit.isSuccess(recoverResult));
+          if (Exit.isSuccess(recoverResult)) {
+            assert.strictEqual(recoverResult.value[0]?.outcome, "unchanged");
+          }
+        } else {
+          recoveryWins += 1;
+          assert.isTrue(Exit.isSuccess(recoverResult));
+          if (Exit.isSuccess(recoverResult)) {
+            assert.strictEqual(recoverResult.value[0]?.outcome, "recovered");
+          }
+          const laterRenew = yield* Effect.exit(renewProviderAttempt(
+            decision,
+            "openai",
+            "openai-responses",
+            renewAt,
+          ));
+          assert.isTrue(Exit.isFailure(laterRenew));
+        }
+        const counters = yield* database.query<{
+          readonly dimension: string;
+          readonly consumed: number;
+          readonly window: number;
+        }>(`
+          SELECT dimension, consumed::double precision AS consumed,
+                 window_started_at_millis::double precision AS window
+            FROM agentos.provider_budget_counters
+           WHERE budget_key = '${budgetKey}' AND dimension IN ('token', 'spend')
+           ORDER BY dimension
+        `);
+        assert.deepStrictEqual(
+          counters.map(({ dimension, consumed }) => ({ dimension, consumed })),
+          renewed
+            ? [{ dimension: "spend", consumed: 0 }, { dimension: "token", consumed: 0 }]
+            : [{ dimension: "spend", consumed: 100 }, { dimension: "token", consumed: 100 }],
+        );
+        assert.isTrue(counters.every(({ window, dimension }) =>
+          window === (dimension === "token" ? row?.tokenWindow : row?.spendWindow)
+        ));
+        assert.deepStrictEqual(
+          yield* database.query<{ readonly outcome: string }>(`
+            SELECT * FROM agentos.recover_expired_workload_provider_attempts(${expiryAt}, 100)
+          `),
+          [{ outcome: "unchanged" }],
+        );
+        if (renewed) {
+          const blocked = yield* reserveWorkload({
+            decision: `decision_${suffix.repeat(7)}eeee`,
+            budgetKey,
+            requestedTokens: 1,
+            requestedSpendMicros: 1,
+            atMillis: expiryAt,
+          });
+          assert.strictEqual(blocked.outcome, "rate_limited");
+          assert.deepStrictEqual(
+            yield* database.query<{ readonly outcome: string }>(`
+              SELECT * FROM agentos.recover_expired_workload_provider_attempts(${now + 900_000}, 100)
+            `),
+            [{ outcome: "recovered" }],
+          );
+        }
+        const later = yield* reserveWorkload({
+          decision: `decision_${suffix.repeat(7)}ffff`,
+          budgetKey,
+          requestedTokens: 1,
+          requestedSpendMicros: 1,
+          atMillis: now + 1_000_000,
+        });
+        assert.strictEqual(later.outcome, "reserved");
+      }
+      assert.strictEqual(renewWins, 6);
+      assert.strictEqual(recoveryWins, 6);
+    }));
+
+  it.effect("atomically fits exact concurrent reservations and releases only unused capacity", () =>
+    Effect.gen(function*() {
+      const budgetKey = `budget_${"7".repeat(64)}`;
+      const limits = { ...workloadLimits, maximumRequests: 4, maximumConcurrent: 2, maximumTokens: 100, maximumSpendMicros: 100 };
+      const firstDecision = `decision_${"71".repeat(16)}`;
+      const secondDecision = `decision_${"72".repeat(16)}`;
+      assert.strictEqual((yield* reserveWorkload({ decision: firstDecision, budgetKey, limits, requestedTokens: 60, requestedSpendMicros: 60 })).outcome, "reserved");
+      assert.strictEqual((yield* reserveWorkload({ decision: secondDecision, budgetKey, limits, requestedTokens: 40, requestedSpendMicros: 40 })).outcome, "reserved");
+      assert.strictEqual((yield* reserveWorkload({ decision: `decision_${"73".repeat(16)}`, budgetKey, limits, requestedTokens: 1, requestedSpendMicros: 1 })).outcome, "budget_exhausted");
+      yield* settleProvider({ decision: firstDecision, provider: "openai", credentialDomain: "openai-responses", inputTokens: 10, spendMicros: 10 });
+      assert.strictEqual((yield* reserveWorkload({ decision: `decision_${"74".repeat(16)}`, budgetKey, limits, requestedTokens: 50, requestedSpendMicros: 50 })).outcome, "reserved");
+      const replay = yield* Effect.flip(reserveWorkload({ decision: firstDecision, budgetKey, limits, requestedTokens: 60, requestedSpendMicros: 60 }));
+      assert.match(replay.message, /reservation is not active/);
+    }));
+
+  it.effect("rejects settlement larger than the exact token or spend reservation", () =>
+    Effect.gen(function*() {
+      const budgetKey = `budget_${"6".repeat(64)}`;
+      const limits = { ...workloadLimits, maximumTokens: 100, maximumSpendMicros: 100 };
+      const decision = `decision_${"61".repeat(16)}`;
+      yield* reserveWorkload({ decision, budgetKey, limits, requestedTokens: 100, requestedSpendMicros: 100 });
+      const tokenOverage = yield* Effect.flip(settleProvider({ decision, provider: "openai", credentialDomain: "openai-responses", inputTokens: 101, spendMicros: 101 }));
+      assert.match(tokenOverage.message, /exceeds reservation/);
+      const spendOverage = yield* Effect.flip(settleProvider({ decision, provider: "openai", credentialDomain: "openai-responses", outputTokens: 101, spendMicros: 101 }));
+      assert.match(spendOverage.message, /exceeds reservation/);
+    }));
+
   it.effect("isolates request and concurrency capacity by durable subject", () =>
     Effect.gen(function*() {
       const first = yield* reserve({
@@ -469,7 +970,9 @@ layer(databaseLayer)("durable provider budgets", (it) => {
       const database = yield* TestDatabase;
       yield* database.exec(`
         CREATE ROLE provider_budget_egress LOGIN;
+        CREATE ROLE provider_budget_unprivileged LOGIN;
         GRANT USAGE ON SCHEMA agentos TO provider_budget_egress;
+        GRANT USAGE ON SCHEMA agentos TO provider_budget_unprivileged;
         GRANT SELECT ON ALL TABLES IN SCHEMA agentos TO provider_budget_egress;
         GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA agentos
           TO provider_budget_egress;
@@ -478,6 +981,8 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         );
       `);
       const privileges = yield* database.query<{
+        readonly unprivilegedReserveExecute: boolean;
+        readonly unprivilegedProviderSettleExecute: boolean;
         readonly countersSelect: boolean;
         readonly reserveExecute: boolean;
         readonly providerSettleExecute: boolean;
@@ -485,13 +990,23 @@ layer(databaseLayer)("durable provider budgets", (it) => {
         readonly overrideExecute: boolean;
       }>(`
         SELECT
+          has_function_privilege(
+            'provider_budget_unprivileged',
+            'agentos.reserve_workload_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,jsonb,bigint,bigint,bigint,bigint)',
+            'EXECUTE'
+          ) AS "unprivilegedReserveExecute",
+          has_function_privilege(
+            'provider_budget_unprivileged',
+            'agentos.settle_provider_budget_for_provider(text,text,text,text,bigint,bigint,bigint,bigint,bigint)',
+            'EXECUTE'
+          ) AS "unprivilegedProviderSettleExecute",
           has_table_privilege(
             'provider_budget_egress',
             'agentos.provider_budget_counters', 'SELECT'
           ) AS "countersSelect",
           has_function_privilege(
             'provider_budget_egress',
-            'agentos.reserve_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,bigint)',
+            'agentos.reserve_workload_provider_budget(text,text,text,jsonb,text,text,text,jsonb,text,text,text,jsonb,jsonb,bigint,bigint,bigint,bigint)',
             'EXECUTE'
           ) AS "reserveExecute",
           has_function_privilege(
@@ -510,13 +1025,50 @@ layer(databaseLayer)("durable provider budgets", (it) => {
             'EXECUTE'
           ) AS "overrideExecute"
       `);
+      yield* database.exec("SET ROLE provider_budget_unprivileged");
+      const unprivilegedReserve = yield* Effect.exit(database.exec(`
+        SELECT * FROM agentos.reserve_workload_provider_budget(
+          'decision_${"ef".repeat(16)}', 'budget_${"ef".repeat(32)}',
+          'corr_efefefefefefefefefefefefefefefef',
+          '${JSON.stringify(workloadPrincipal)}'::jsonb,
+          'openai', 'openai-responses', 'openai.responses.create',
+          '{"kind":"provider_service","provider":"openai","service":"responses"}'::jsonb,
+          'production', 'gpt-5.6-sol', 'low',
+          '${JSON.stringify(workloadLimits)}'::jsonb,
+          '${JSON.stringify(workloadPricing)}'::jsonb,
+          ${now + 15_000}, 1, 1, ${now}
+        )
+      `));
+      const unprivilegedSettlement = yield* Effect.exit(database.exec(`
+        SELECT * FROM agentos.settle_provider_budget_for_provider(
+          'decision_${"f".repeat(32)}', 'openai', 'openai-responses',
+          'transport_failed', 0, 0, 0, 0, ${now}
+        )
+      `));
+      yield* database.exec("RESET ROLE");
+      assert.isTrue(Exit.isFailure(unprivilegedReserve));
       assert.deepStrictEqual(privileges, [{
+        unprivilegedReserveExecute: false,
+        unprivilegedProviderSettleExecute: false,
         countersSelect: false,
         reserveExecute: true,
         providerSettleExecute: true,
         subjectSettleExecute: false,
         overrideExecute: false,
       }]);
+      if (Exit.isFailure(unprivilegedReserve)) {
+        assert.include(
+          String(unprivilegedReserve.cause),
+          "permission denied for function reserve_workload_provider_budget",
+        );
+      }
+      assert.isTrue(Exit.isFailure(unprivilegedSettlement));
+      if (Exit.isFailure(unprivilegedSettlement)) {
+        assert.include(
+          String(unprivilegedSettlement.cause),
+          "permission denied for function settle_provider_budget_for_provider",
+        );
+      }
     }));
 
   it.effect("authorizes the explicit null environment as its own route", () =>

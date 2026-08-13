@@ -2,6 +2,7 @@ import { layer as BunCryptoLayer } from "@effect/platform-bun/BunCrypto";
 import { assert, describe, layer } from "@effect/vitest";
 import {
   ProviderBudgetSettlementReporter,
+  ProviderBudgetAttemptRenewalReporter,
   ProviderBudgetSettlementHttpError,
   providerAuthorizationGrantHeaders,
   type ProviderAuthorizationGrantV1,
@@ -73,6 +74,8 @@ function workloadGrant(): Extract<
   ProviderAuthorizationGrantV1,
   { readonly model: string }
 > {
+  const body = JSON.stringify({ model: "gpt-policy", stream: true, max_output_tokens: 100 });
+  const inputTokens = new TextEncoder().encode(body).byteLength;
   return {
     schemaVersion: 1,
     correlationId: "corr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -104,6 +107,9 @@ function workloadGrant(): Extract<
       spendWindowMillis: 3_600_000,
       maximumSpendMicros: 2_000_000,
     },
+    pricing: { version: 1, inputMicrosPerMillionTokens: 2_000_000, outputMicrosPerMillionTokens: 8_000_000 },
+    requestedTokens: inputTokens + 100,
+    requestedSpendMicros: Math.ceil((inputTokens * 2_000_000 + 100 * 8_000_000) / 1_000_000),
   };
 }
 
@@ -119,7 +125,7 @@ function gatewayRequest(
   return new Request("http://ai-gateway.test/v1/responses", {
     method: "POST",
     headers,
-    body: JSON.stringify({ model: "gpt-test", stream: true }),
+    body: JSON.stringify({ model: "gpt-test", stream: true, max_output_tokens: 100 }),
   });
 }
 
@@ -328,9 +334,8 @@ describe("Effect AI Gateway forwarding", () => {
       ]);
     }));
 
-  it.effect("traces a successful non-streaming response through lease release", () =>
+  it.effect("rejects a non-streaming workload before credential or provider access", () =>
     Effect.gen(function*() {
-      const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
       const spans: Array<Tracer.NativeSpan> = [];
       const tracer = Tracer.make({
@@ -343,44 +348,26 @@ describe("Effect AI Gateway forwarding", () => {
       const telemetry = yield* makeAIGatewayTelemetry();
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
-        acquire: acquireLease(route.lease),
+        acquire: () => Effect.die("non-streaming request must not acquire credentials"),
         provider: AIProviderHttp.of({
-          execute: () => Effect.succeed({
-            status: 200,
-            headers: { "content-type": "application/json" },
-            body: Stream.make(encoder.encode('{"id":"response-safe"}')),
-          }),
+          execute: () => Effect.die("non-streaming request must not reach provider"),
         }),
         settlements: settlement.settlements,
         now: Effect.succeed(now),
         heartbeatMillis: 40_000,
         maximumUsageEventBytes: 4_096,
       }).pipe(Effect.provideService(AIGatewayTelemetry, telemetry));
-      const base = gatewayRequest();
+      const base = gatewayRequest(workloadGrant());
       const headers = new Headers(base.headers);
       headers.set("x-agentos-stream-mode", "non_streaming");
       const request = new Request(base.url, {
         method: "POST",
         headers,
-        body: JSON.stringify({ model: "gpt-test", stream: false }),
+        body: JSON.stringify({ model: "gpt-policy", stream: false, max_output_tokens: 100 }),
       });
       const response = yield* handler(request).pipe(Effect.withTracer(tracer));
-      assert.strictEqual(
-        yield* Effect.tryPromise(() => response.text()),
-        '{"id":"response-safe"}',
-      );
-      assert.strictEqual(yield* Ref.get(route.releases), 1);
-      assert.include(spans.map(({ name }) => name), "ai-gateway.route.release");
-      assert.strictEqual(
-        spans.find(({ name }) => name === "ai-gateway.request")
-          ?.attributes.get("agentos.ai.stream.mode"),
-        "non_streaming",
-      );
-      assert.strictEqual(
-        spans.find(({ name }) => name === "ai-gateway.stream")
-          ?.attributes.get("agentos.ai.stream.outcome"),
-        "completed",
-      );
+      assert.strictEqual(response.status, 403);
+      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
     }));
 
   it.effect("ends telemetry at authentication rejection without starting a route", () =>
@@ -442,48 +429,36 @@ describe("Effect AI Gateway forwarding", () => {
       assert.strictEqual((yield* handler(gatewayRequest(workloadGrant()))).status, 403);
     }));
 
-  it.effect("ends telemetry for an authenticated unsupported route", () =>
+  it.effect("revalidates the exact modern ceiling and settles policy-priced usage", () =>
     Effect.gen(function*() {
+      const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
-      const telemetry = yield* makeTelemetryRecorder();
+      const authorization = workloadGrant();
+      const headers = providerAuthorizationGrantHeaders(authorization);
+      headers.set("authorization", "Bearer projected-workload-token");
+      headers.set("content-type", "application/json");
+      const request = new Request("http://ai-gateway.test/v1/responses", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ model: "gpt-policy", stream: true, max_output_tokens: 100 }),
+      });
       const handler = yield* makeAIForwardHandler({
-        authentication: { kind: "shared_token", token: "client-secret" },
-        acquire: acquireLease(undefined),
-        provider: AIProviderHttp.of({
-          execute: () => Effect.succeed({ status: 500, headers: {}, body: null }),
-        }),
+        authentication: { kind: "workload_identity" },
+        acquire: acquireLease(route.lease),
+        provider: AIProviderHttp.of({ execute: () => Effect.succeed({
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+          body: Stream.make(encoder.encode(completedEvent)),
+        }) }),
         settlements: settlement.settlements,
         now: Effect.succeed(now),
         heartbeatMillis: 40_000,
         maximumUsageEventBytes: 4_096,
-      }).pipe(
-        Effect.provideService(AIGatewayTelemetry, telemetry.telemetry),
-      );
-      const response = yield* handler(new Request(
-        "http://ai-gateway.test/v1/unsupported",
-        {
-          method: "POST",
-          headers: { "x-ai-gateway-token": "client-secret" },
-        },
-      ));
-      assert.strictEqual(response.status, 404);
-      assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
-        "start",
-        {
-          authenticated: true,
-          authorized: false,
-          failureStatus: undefined,
-          kind: "authenticate",
-        },
-        {
-          kind: "end",
-          outcome: {
-            failed: false,
-            status: 404,
-            streamOutcome: "not_streamed",
-          },
-        },
-      ]);
+      });
+      const response = yield* handler(request);
+      yield* Effect.tryPromise(() => response.arrayBuffer());
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.spendMicros, 134);
     }));
 
   it.effect("ends telemetry for an invalid explicit session before acquisition", () =>
@@ -727,7 +702,7 @@ describe("Effect AI Gateway forwarding", () => {
       }]);
     }));
 
-  it.effect("fails closed without settlement when a successful stream lacks terminal usage", () =>
+  it.effect("fails a nominally successful stream closed when terminal usage is unavailable", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
@@ -749,7 +724,8 @@ describe("Effect AI Gateway forwarding", () => {
         maximumUsageEventBytes: 4_096,
       });
       const response = yield* handler(gatewayRequest());
-      yield* Effect.tryPromise(() => response.arrayBuffer());
+      const read = yield* Effect.exit(Effect.tryPromise(() => response.arrayBuffer()));
+      assert.strictEqual(read._tag, "Failure");
       assert.strictEqual(yield* Ref.get(route.releases), 1);
       assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
     }));
@@ -1000,7 +976,7 @@ describe("Effect AI Gateway forwarding", () => {
       );
       const response = yield* handler(gatewayRequest());
       assert.strictEqual(response.status, 502);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "transport_failed");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1051,7 +1027,7 @@ describe("Effect AI Gateway forwarding", () => {
       );
       const response = yield* handler(gatewayRequest());
       assert.strictEqual(response.status, 502);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "transport_failed");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1102,7 +1078,7 @@ describe("Effect AI Gateway forwarding", () => {
       );
       const response = yield* handler(gatewayRequest());
       assert.strictEqual(response.status, 502);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "transport_failed");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1180,7 +1156,7 @@ describe("Effect AI Gateway forwarding", () => {
       const response = yield* handler(gatewayRequest());
       assert.strictEqual(response.status, 502);
       assert.strictEqual(yield* Ref.get(route.releases), 1);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "transport_failed");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1258,7 +1234,7 @@ describe("Effect AI Gateway forwarding", () => {
       ]);
     }));
 
-  it.effect("releases an interrupted downstream stream without releasing an unmeasured budget", () =>
+  it.effect("settles an interrupted downstream stream as cancelled", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
@@ -1287,7 +1263,7 @@ describe("Effect AI Gateway forwarding", () => {
         yield* Effect.tryPromise(() => reader.cancel("client disconnected"));
       }
       assert.strictEqual(yield* Ref.get(route.releases), 1);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "cancelled");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1313,7 +1289,7 @@ describe("Effect AI Gateway forwarding", () => {
       ]);
     }));
 
-  it.effect("keeps a provider stream failure distinct and does not settle unknown usage", () =>
+  it.effect("settles a provider stream failure as transport failed", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
@@ -1343,7 +1319,7 @@ describe("Effect AI Gateway forwarding", () => {
       );
       assert.notInclude(String(failure), "provider-secret");
       assert.strictEqual(yield* Ref.get(route.releases), 1);
-      assert.deepStrictEqual(yield* Ref.get(settlement.reports), []);
+      assert.strictEqual((yield* Ref.get(settlement.reports))[0]?.forwardOutcome, "transport_failed");
       assert.deepStrictEqual(yield* Ref.get(telemetry.events), [
         "start",
         {
@@ -1369,7 +1345,45 @@ describe("Effect AI Gateway forwarding", () => {
       ]);
     }));
 
-  it.effect("never replaces a completed provider stream with settlement failure", () =>
+  it.effect("settles an unusable claimed credential before provider contact", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const providerCalls = yield* Ref.make(0);
+      const settlement = yield* makeSettlementRecorder();
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: acquireLease({
+          ...route.lease,
+          kind: "codex_oauth",
+        }),
+        provider: AIProviderHttp.of({
+          execute: () => Ref.update(providerCalls, (count) => count + 1).pipe(
+            Effect.andThen(Effect.die("provider must not be contacted")),
+          ),
+        }),
+        settlements: settlement.settlements,
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const response = yield* handler(gatewayRequest());
+      assert.strictEqual(response.status, 400);
+      assert.strictEqual(yield* Ref.get(providerCalls), 0);
+      assert.deepStrictEqual(yield* Ref.get(settlement.reports), [
+        {
+          schemaVersion: 1,
+          decisionRef,
+          forwardOutcome: "transport_failed",
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedInputTokens: 0,
+          spendMicros: 0,
+        },
+      ]);
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+    }));
+
+  it.effect("fails the client stream closed when settlement fails after every retry", () =>
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlementAttempts = yield* Ref.make(0);
@@ -1399,11 +1413,9 @@ describe("Effect AI Gateway forwarding", () => {
         maximumUsageEventBytes: 4_096,
       });
       const response = yield* handler(gatewayRequest());
-      assert.strictEqual(
-        yield* Effect.tryPromise(() => response.text()),
-        completedEvent,
-      );
-      assert.strictEqual(yield* Ref.get(settlementAttempts), 1);
+      const read = yield* Effect.exit(Effect.tryPromise(() => response.text()));
+      assert.strictEqual(read._tag, "Failure");
+      assert.strictEqual(yield* Ref.get(settlementAttempts), 3);
       assert.strictEqual(yield* Ref.get(route.releases), 1);
     }));
 
@@ -1442,6 +1454,7 @@ describe("Effect AI Gateway forwarding", () => {
     Effect.gen(function*() {
       const route = yield* makeLease();
       const settlement = yield* makeSettlementRecorder();
+      const attemptRenewals = yield* Ref.make(0);
       const handler = yield* makeAIForwardHandler({
         authentication: { kind: "workload_identity" },
         acquire: acquireLease(route.lease),
@@ -1453,6 +1466,11 @@ describe("Effect AI Gateway forwarding", () => {
           }),
         }),
         settlements: settlement.settlements,
+        attemptRenewals: ProviderBudgetAttemptRenewalReporter.of({
+          renew: (request) => Ref.updateAndGet(attemptRenewals, (count) => count + 1).pipe(
+            Effect.map(() => ({ schemaVersion: 1, decisionRef: request.decisionRef, outcome: "renewed" })),
+          ),
+        }),
         now: Effect.succeed(now),
         heartbeatMillis: 40_000,
         maximumUsageEventBytes: 4_096,
@@ -1467,11 +1485,141 @@ describe("Effect AI Gateway forwarding", () => {
         yield* TestClock.adjust(40_000);
         yield* Effect.yieldNow;
         assert.strictEqual(yield* Ref.get(route.renewals), 1);
+        assert.strictEqual(yield* Ref.get(attemptRenewals), 1);
         yield* Effect.tryPromise(() => reader.cancel("test complete"));
         yield* Fiber.interrupt(pending);
         yield* TestClock.adjust(80_000);
         assert.strictEqual(yield* Ref.get(route.renewals), 1);
+        assert.strictEqual(yield* Ref.get(attemptRenewals), 1);
       }
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+    }));
+
+  it.effect("fails the active provider stream when routing lease renewal is refused", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const settlement = yield* makeSettlementRecorder();
+      const terminalEmissions = yield* Ref.make(0);
+      const lease: AIForwardLease = {
+        ...route.lease,
+        renew: Ref.update(route.renewals, (count) => count + 1).pipe(
+          Effect.as(false),
+        ),
+      };
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: acquireLease(lease),
+        provider: AIProviderHttp.of({
+          execute: () => Effect.succeed({
+            status: 200,
+            headers: { "content-type": "text/event-stream" },
+            body: Stream.never.pipe(Stream.concat(
+              Ref.update(terminalEmissions, (count) => count + 1).pipe(
+                Effect.as(encoder.encode(completedEvent)),
+                Stream.fromEffect,
+              ),
+            )),
+          }),
+        }),
+        settlements: settlement.settlements,
+        attemptRenewals: ProviderBudgetAttemptRenewalReporter.of({
+          renew: (request) => Effect.succeed({
+            schemaVersion: 1,
+            decisionRef: request.decisionRef,
+            outcome: "renewed",
+          }),
+        }),
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const response = yield* handler(gatewayRequest());
+      const reader = response.body?.getReader();
+      assert.isDefined(reader);
+      if (reader === undefined) return;
+      const pending = yield* Effect.forkChild(Effect.tryPromise(() => reader.read()));
+      yield* TestClock.adjust(40_000);
+      const readExit = yield* Fiber.await(pending);
+      assert.strictEqual(readExit._tag, "Success");
+      if (Exit.isSuccess(readExit)) assert.isTrue(readExit.value.done);
+      assert.strictEqual(yield* Ref.get(route.renewals), 1);
+      assert.strictEqual(yield* Ref.get(terminalEmissions), 0);
+      assert.deepStrictEqual(yield* Ref.get(settlement.reports), [{
+        schemaVersion: 1,
+        decisionRef,
+        forwardOutcome: "transport_failed",
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedInputTokens: 0,
+        spendMicros: 0,
+      }]);
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+      yield* TestClock.adjust(120_000);
+      assert.strictEqual(yield* Ref.get(route.renewals), 1);
+      assert.strictEqual((yield* Ref.get(settlement.reports)).length, 1);
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+    }));
+
+  it.effect("fails the active provider stream when durable attempt renewal is unavailable", () =>
+    Effect.gen(function*() {
+      const route = yield* makeLease();
+      const settlement = yield* makeSettlementRecorder();
+      const attemptRenewals = yield* Ref.make(0);
+      const terminalEmissions = yield* Ref.make(0);
+      const handler = yield* makeAIForwardHandler({
+        authentication: { kind: "workload_identity" },
+        acquire: acquireLease(route.lease),
+        provider: AIProviderHttp.of({
+          execute: () => Effect.succeed({
+            status: 200,
+            headers: { "content-type": "text/event-stream" },
+            body: Stream.never.pipe(Stream.concat(
+              Ref.update(terminalEmissions, (count) => count + 1).pipe(
+                Effect.as(encoder.encode(completedEvent)),
+                Stream.fromEffect,
+              ),
+            )),
+          }),
+        }),
+        settlements: settlement.settlements,
+        attemptRenewals: ProviderBudgetAttemptRenewalReporter.of({
+          renew: () => Ref.update(attemptRenewals, (count) => count + 1).pipe(
+            Effect.andThen(Effect.fail(ProviderBudgetSettlementHttpError.make({
+              code: "dependency_unavailable",
+              status: 503,
+            }))),
+          ),
+        }),
+        now: Effect.succeed(now),
+        heartbeatMillis: 40_000,
+        maximumUsageEventBytes: 4_096,
+      });
+      const response = yield* handler(gatewayRequest());
+      const reader = response.body?.getReader();
+      assert.isDefined(reader);
+      if (reader === undefined) return;
+      const pending = yield* Effect.forkChild(Effect.tryPromise(() => reader.read()));
+      yield* TestClock.adjust(40_000);
+      const readExit = yield* Fiber.await(pending);
+      assert.strictEqual(readExit._tag, "Success");
+      if (Exit.isSuccess(readExit)) assert.isTrue(readExit.value.done);
+      assert.strictEqual(yield* Ref.get(route.renewals), 1);
+      assert.strictEqual(yield* Ref.get(attemptRenewals), 1);
+      assert.strictEqual(yield* Ref.get(terminalEmissions), 0);
+      assert.deepStrictEqual(yield* Ref.get(settlement.reports), [{
+        schemaVersion: 1,
+        decisionRef,
+        forwardOutcome: "transport_failed",
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedInputTokens: 0,
+        spendMicros: 0,
+      }]);
+      assert.strictEqual(yield* Ref.get(route.releases), 1);
+      yield* TestClock.adjust(120_000);
+      assert.strictEqual(yield* Ref.get(route.renewals), 1);
+      assert.strictEqual(yield* Ref.get(attemptRenewals), 1);
+      assert.strictEqual((yield* Ref.get(settlement.reports)).length, 1);
       assert.strictEqual(yield* Ref.get(route.releases), 1);
     }));
   });
