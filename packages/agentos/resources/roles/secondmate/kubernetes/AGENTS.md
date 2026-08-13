@@ -11,10 +11,9 @@ and its reviewed managed-domain composition.
   working directory, tasks and credentials here.
 - Require a distinct ServiceAccount, retained home PVC, database identity and
   Herdr session for each Second Mate.
-- Explicitly mount the kubelet-rotated projected ServiceAccount identity in
-  every persistent Second-Mate Pod. Native in-cluster `kubectl` must use that
-  identity; never substitute a separately minted bearer token as steady-state
-  supervision authentication.
+- Disable default ServiceAccount token automount for every persistent
+  Second-Mate Pod and ServiceAccount. Hermes is the control plane; do not
+  preserve a Kubernetes API token in the Mate workload as a supervision path.
 - Keep child authority out of `base/`. The `domain/` composition binds the
   Second Mate to namespaced Crewmate workload operations while withholding
   Namespace, Secret, RBAC, quota, LimitRange, NetworkPolicy and cluster-scoped

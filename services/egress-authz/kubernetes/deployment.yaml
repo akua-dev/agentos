@@ -129,15 +129,22 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
+              ephemeral-storage: 64Mi
             limits:
               cpu: "1"
               memory: 512Mi
+              ephemeral-storage: 256Mi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
             capabilities:
               drop:
                 - ALL
+            seccompProfile:
+              type: RuntimeDefault
           volumeMounts:
             - name: database
               mountPath: /var/run/secrets/agentos-database

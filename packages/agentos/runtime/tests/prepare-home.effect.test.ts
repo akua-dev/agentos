@@ -51,7 +51,7 @@ const CodexConfig = Schema.Struct({
   model_providers: Schema.Record(Schema.String, Schema.Struct({
     base_url: Schema.String,
     wire_api: Schema.String,
-    auth: Schema.Struct({ refresh_interval_ms: Schema.Number }),
+    requires_openai_auth: Schema.Boolean,
   })),
   otel: Schema.Struct({
     log_user_prompt: Schema.Boolean,
@@ -190,10 +190,9 @@ layer(platform)("Mate home preparation", (it) => {
         AGENTOS_ASSIGNMENT_ID: "20000000-0000-4000-8000-000000000001",
         AGENTOS_AGENT_ROLE: "crewmate",
         AGENTOS_CODEX_PROVIDER_MODE: "ai-gateway",
-        AGENTOS_EGRESS_TOKEN_FILE: "/var/run/secrets/agentos-egress/token",
         AGENTOS_RELEASE_ROOT: repository,
         AI_GATEWAY_URL:
-          "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+          "http://127.0.0.1:8790",
         HOME: home,
         MISE_SYSTEM_CONFIG_FILE: paths.join(repository, "mise.toml"),
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://agentos-otel-collector:4318",
@@ -214,9 +213,9 @@ layer(platform)("Mate home preparation", (it) => {
       );
       assert.strictEqual(config.model_provider, "agentos-gateway");
       assert.deepInclude(config.model_providers["agentos-gateway"], {
-        base_url: "http://agentgateway-openai.agentos.svc.cluster.local:8788",
+        base_url: "http://127.0.0.1:8790",
         wire_api: "responses",
-        auth: { refresh_interval_ms: 60_000 },
+        requires_openai_auth: false,
       });
       assert.isFalse(config.otel.log_user_prompt);
       assert.strictEqual(config.otel.environment, "test");

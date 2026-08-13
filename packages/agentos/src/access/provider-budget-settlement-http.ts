@@ -16,11 +16,31 @@ import {
   ProviderBudgetSettlementReportV1Schema,
   type ProviderBudgetSettlementReportV1,
 } from "./provider-budget.ts";
+import {
+  ProviderBudgetReservationAcceptanceV1Schema,
+  ProviderBudgetReservationRequestError,
+  ProviderBudgetReservationRequestV1Schema,
+  ProviderBudgetReservationRequester,
+} from "./http-authorizer.ts";
 
 const PositiveInteger = Schema.Number.pipe(
   Schema.check(Schema.isInt(), Schema.isGreaterThan(0)),
 );
 const DecisionRef = ProviderBudgetSettlementReportV1Schema.fields.decisionRef;
+
+export const ProviderBudgetAttemptRenewalRequestV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  decisionRef: DecisionRef,
+});
+export const ProviderBudgetAttemptRenewalReceiptV1Schema = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  decisionRef: DecisionRef,
+  outcome: Schema.Literal("renewed"),
+});
+export type ProviderBudgetAttemptRenewalRequestV1 =
+  typeof ProviderBudgetAttemptRenewalRequestV1Schema.Type;
+export type ProviderBudgetAttemptRenewalReceiptV1 =
+  typeof ProviderBudgetAttemptRenewalReceiptV1Schema.Type;
 
 export const AGENTOS_PROVIDER_BUDGET_SETTLEMENT_BASE_URL =
   "http://agentos-egress-authz.agentos.svc.cluster.local:9001";
@@ -87,6 +107,15 @@ export class ProviderBudgetSettlementReporter extends Context.Service<
     >;
   }
 >()("agentos/access/ProviderBudgetSettlementReporter") {}
+
+export class ProviderBudgetAttemptRenewalReporter extends Context.Service<
+  ProviderBudgetAttemptRenewalReporter,
+  {
+    readonly renew: (
+      request: ProviderBudgetAttemptRenewalRequestV1,
+    ) => Effect.Effect<ProviderBudgetAttemptRenewalReceiptV1, ProviderBudgetSettlementHttpError>;
+  }
+>()("agentos/access/ProviderBudgetAttemptRenewalReporter") {}
 
 export class ProviderBudgetSettlementReadiness extends Context.Service<
   ProviderBudgetSettlementReadiness,
@@ -163,6 +192,96 @@ export function makeProviderBudgetSettlementHttpLayer(
         },
       );
 
+      const validate = Effect.fn("agentos.providerBudgetReservation.validate")(
+        function*(untrusted: unknown) {
+          const body = yield* Schema.decodeUnknownEffect(
+            ProviderBudgetReservationRequestV1Schema,
+            { onExcessProperty: "error" },
+          )(untrusted).pipe(Effect.mapError(() =>
+            ProviderBudgetReservationRequestError.make({ code: "rejected" })
+          ));
+          const token = yield* fileSystem.readFileString(options.tokenPath).pipe(
+            Effect.flatMap(validateProjectedToken),
+            Effect.mapError(() =>
+              ProviderBudgetReservationRequestError.make({ code: "unavailable" })
+            ),
+          );
+          let request = HttpClientRequest.post(endpoints.validation).pipe(
+            HttpClientRequest.acceptJson,
+            HttpClientRequest.setHeader("authorization", `Bearer ${token}`),
+          );
+          request = yield* HttpClientRequest.bodyJson(request, body).pipe(
+            Effect.mapError(() =>
+              ProviderBudgetReservationRequestError.make({ code: "rejected" })
+            ),
+          );
+          return yield* client.execute(request).pipe(
+            Effect.flatMap((response) =>
+              response.status >= 200 && response.status < 300
+                ? readBoundedReservationAcceptance(
+                  response,
+                  options.maximumResponseBytes,
+                )
+                : Effect.fail(ProviderBudgetReservationRequestError.make({
+                  code: response.status >= 500 ? "unavailable" : "rejected",
+                }))
+            ),
+            Effect.timeoutOrElse({
+              duration: options.timeoutMillis,
+              orElse: () => ProviderBudgetReservationRequestError.make({
+                code: "unavailable",
+              }),
+            }),
+            Effect.mapError((error) =>
+              error instanceof ProviderBudgetReservationRequestError
+                ? error
+                : ProviderBudgetReservationRequestError.make({
+                  code: "invalid_response",
+                })
+            ),
+            Effect.scoped,
+          );
+        },
+      );
+
+      const renew = Effect.fn("agentos.providerBudgetAttempt.renew")(
+        function*(untrusted: ProviderBudgetAttemptRenewalRequestV1) {
+          const body = yield* Schema.decodeUnknownEffect(
+            ProviderBudgetAttemptRenewalRequestV1Schema,
+            { onExcessProperty: "error" },
+          )(untrusted).pipe(Effect.mapError(() => settlementHttpError("invalid_report")));
+          const token = yield* fileSystem.readFileString(options.tokenPath).pipe(
+            Effect.mapError(() => settlementHttpError("credential_unavailable")),
+            Effect.flatMap(validateProjectedToken),
+          );
+          let request = HttpClientRequest.post(endpoints.renewal).pipe(
+            HttpClientRequest.acceptJson,
+            HttpClientRequest.setHeader("authorization", `Bearer ${token}`),
+          );
+          request = yield* HttpClientRequest.bodyJson(request, body).pipe(
+            Effect.mapError(() => settlementHttpError("invalid_report")),
+          );
+          const receipt = yield* client.execute(request).pipe(
+            Effect.flatMap((response) => response.status >= 200 && response.status < 300
+              ? readBoundedResponseSource(response, options.maximumResponseBytes).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(
+                  Schema.fromJsonString(ProviderBudgetAttemptRenewalReceiptV1Schema),
+                  { onExcessProperty: "error" },
+                )),
+                Effect.mapError(() => settlementHttpError("invalid_response", response.status)),
+              )
+              : settlementStatusError(response.status)),
+            Effect.mapError((error) => error instanceof ProviderBudgetSettlementHttpError
+              ? error
+              : settlementHttpError("request_failed")),
+            Effect.timeoutOrElse({ duration: options.timeoutMillis, orElse: () => settlementHttpError("timeout") }),
+            Effect.scoped,
+          );
+          if (receipt.decisionRef !== body.decisionRef) return yield* settlementHttpError("invalid_response");
+          return receipt;
+        },
+      );
+
       const check = Effect.fn("agentos.providerBudgetSettlement.readiness")(
         function*() {
           const token = yield* fileSystem.readFileString(options.tokenPath).pipe(
@@ -199,9 +318,14 @@ export function makeProviderBudgetSettlementHttpLayer(
         ProviderBudgetSettlementReporter,
         ProviderBudgetSettlementReporter.of({ report }),
       ).pipe(
+        Context.add(ProviderBudgetAttemptRenewalReporter, ProviderBudgetAttemptRenewalReporter.of({ renew })),
         Context.add(
           ProviderBudgetSettlementReadiness,
           ProviderBudgetSettlementReadiness.of({ check }),
+        ),
+        Context.add(
+          ProviderBudgetReservationRequester,
+          ProviderBudgetReservationRequester.of({ request: validate }),
         ),
       );
     }),
@@ -226,6 +350,8 @@ function settlementEndpoints(baseUrl: string) {
     }
     return {
       settlement: new URL("/settle", base),
+      renewal: new URL("/renew", base),
+      validation: new URL("/validate", base),
       readiness: new URL("/readyz/settlement", base),
     };
   });
@@ -321,6 +447,23 @@ function readBoundedSettlementReadiness(
         : settlementHttpError("invalid_response", response.status)
     ),
     Effect.asVoid,
+  );
+}
+
+function readBoundedReservationAcceptance(
+  response: HttpClientResponse.HttpClientResponse,
+  maximumResponseBytes: number,
+) {
+  return readBoundedResponseSource(response, maximumResponseBytes).pipe(
+    Effect.flatMap((source) =>
+      Schema.decodeUnknownEffect(
+        Schema.fromJsonString(ProviderBudgetReservationAcceptanceV1Schema),
+        { onExcessProperty: "error" },
+      )(source)
+    ),
+    Effect.mapError(() => ProviderBudgetReservationRequestError.make({
+      code: "invalid_response",
+    })),
   );
 }
 

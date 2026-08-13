@@ -104,9 +104,11 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
+              ephemeral-storage: 1Gi
             requests:
               cpu: 250m
               memory: 512Mi
+              ephemeral-storage: 128Mi
         - name: prepare-home
           image: agentos:dev
           imagePullPolicy: Never
@@ -123,13 +125,17 @@ spec:
             capabilities:
               drop:
                 - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
           resources:
             limits:
               cpu: "2"
               memory: 2Gi
+              ephemeral-storage: 1Gi
             requests:
               cpu: 250m
               memory: 512Mi
+              ephemeral-storage: 128Mi
           volumeMounts:
             - name: home
               mountPath: /home/agent
@@ -168,9 +174,11 @@ spec:
             limits:
               cpu: "2"
               memory: 4Gi
+              ephemeral-storage: 1Gi
             requests:
               cpu: 250m
               memory: 512Mi
+              ephemeral-storage: 128Mi
       volumes:
         - name: database-credentials
           secret:

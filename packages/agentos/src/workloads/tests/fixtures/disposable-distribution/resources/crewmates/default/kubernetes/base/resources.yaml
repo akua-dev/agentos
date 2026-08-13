@@ -67,11 +67,6 @@ spec:
           command: ["sh", "-c", "exit 0"]
           securityContext: *container-security
           resources: *small-resources
-        - name: prepare-github-provider
-          image: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
-          command: ["sh", "-c", "exit 0"]
-          securityContext: *container-security
-          resources: *small-resources
       containers:
         - name: crewmate
           image: docker.io/library/busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
@@ -99,18 +94,6 @@ spec:
           volumeMounts:
             - name: home
               mountPath: /home/agent
-            - name: agentos-egress-identity
-              mountPath: /var/run/secrets/agentos-egress
-              readOnly: true
-      volumes:
-        - name: agentos-egress-identity
-          projected:
-            defaultMode: 0440
-            sources:
-              - serviceAccountToken:
-                  audience: agentos-egress-authz
-                  expirationSeconds: 600
-                  path: token
   volumeClaimTemplates:
     - metadata:
         name: home

@@ -4,10 +4,6 @@ import { Effect, Schema } from "effect";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  AGENTOS_EGRESS_TOKEN_AUDIENCE,
-  AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
-} from "../../src/access/identity.ts";
 import { renderKustomize } from "../../../../tooling/testing/kubernetes.ts";
 
 const EnvironmentEntry = Schema.Struct({
@@ -126,31 +122,20 @@ describe("persistent Agent Kubernetes runtime", () => {
       assert.deepStrictEqual(agent.securityContext, {
         allowPrivilegeEscalation: false,
         capabilities: { drop: ["ALL"] },
+        readOnlyRootFilesystem: true,
+        runAsNonRoot: true,
       });
       assert.deepStrictEqual(agent.volumeMounts, [
         { mountPath: "/home/agent", name: "home" },
-        {
-          mountPath: "/var/run/secrets/agentos-egress",
-          name: "agentos-egress-identity",
-          readOnly: true,
-        },
+        { mountPath: "/tmp", name: "tmp" },
       ]);
       assert.deepStrictEqual(install.volumeMounts, [
         { mountPath: "/home/agent", name: "home" },
+        { mountPath: "/tmp", name: "tmp" },
       ]);
-      assert.deepStrictEqual(pod.volumes, [{
-        name: "agentos-egress-identity",
-        projected: {
-          defaultMode: 288,
-          sources: [{
-            serviceAccountToken: {
-              audience: AGENTOS_EGRESS_TOKEN_AUDIENCE,
-              expirationSeconds: AGENTOS_EGRESS_TOKEN_EXPIRATION_SECONDS,
-              path: "token",
-            },
-          }],
-        },
-      }]);
+      assert.deepStrictEqual(pod.volumes, [
+        { name: "tmp", emptyDir: { sizeLimit: "256Mi" } },
+      ]);
     }).pipe(Effect.provide(BunServices.layer)));
 
   it.effect("adds the persistent Pi lifecycle only in the Mate layer", () =>

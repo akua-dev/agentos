@@ -97,9 +97,11 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
+              ephemeral-storage: 64Mi
             limits:
               cpu: "1"
               memory: 512Mi
+              ephemeral-storage: 256Mi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -107,6 +109,10 @@ spec:
                 - ALL
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+            runAsUser: 2000
+            runAsGroup: 2000
+            seccompProfile:
+              type: RuntimeDefault
           volumeMounts:
             - name: config
               mountPath: /config
@@ -147,9 +153,11 @@ spec:
             requests:
               cpu: 25m
               memory: 32Mi
+              ephemeral-storage: 32Mi
             limits:
               cpu: 250m
               memory: 128Mi
+              ephemeral-storage: 128Mi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -159,6 +167,8 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
       volumes:
         - name: config
           configMap:
@@ -188,22 +198,63 @@ spec:
       app.kubernetes.io/name: agentgateway-openai
   policyTypes:
     - Ingress
+    - Egress
   ingress:
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: agentos
           podSelector:
+            matchLabels:
+              agentos.akua.dev/agentgateway-client: "true"
             matchExpressions:
-              - key: agentos.akua.dev/agent
-                operator: Exists
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - agentos-crewmate
+                  - agentos-firstmate
+                  - agentos-secondmate
         - namespaceSelector:
             matchLabels:
               agentos.akua.dev/managed-by: agentos-firstmate
           podSelector:
-            matchExpressions:
-              - key: agentos.akua.dev/agent
-                operator: Exists
+            matchLabels:
+              agentos.akua.dev/agentgateway-client: "true"
+              app.kubernetes.io/name: agentos-crewmate
       ports:
         - protocol: TCP
           port: 4000
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agentos-egress-authz
+      ports:
+        - protocol: TCP
+          port: 8787
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ai-gateway
+      ports:
+        - protocol: TCP
+          port: 8787
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agentos-otel-collector
+      ports:
+        - protocol: TCP
+          port: 4317

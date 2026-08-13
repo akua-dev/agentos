@@ -230,17 +230,12 @@ update this integration while that gate is unmet; auxiliary requests remain out
 of scope until the selected revision satisfies the contract's no-retry,
 no-redirect and no-fallback requirements.
 
-For the live v0.1.24 Hermes topology, the observed pre-migration state uses one
-`ai-gateway` replica with a shared `AI_GATEWAY_TOKEN`, while Hermes uses direct
-in-Pod provider authentication and has no projected egress identity. Do not
-mutate it in place.
-
 1. Keep Hermes on verified direct OAuth while deploying the reviewed
    Agentgateway plus `agentos-egress-authz` topology and registering the Hermes
    workload identity/access profile.
 2. Build and publish the reviewed AgentOS revision, then update the Hermes
    manifest with the exact immutable adapter image digest and projected token
-   wiring. Do not copy the legacy shared token or any `ai-gateway-client` Secret.
+   wiring. Do not copy any client credential into the workload.
 3. Render and review the StatefulSet and NetworkPolicies. Confirm the proxy is
    loopback-only, Agentgateway is the only AI Gateway ingress, and ordinary
    Internet egress is unchanged.
@@ -251,10 +246,9 @@ mutate it in place.
 5. Keep direct OAuth intact until that evidence is accepted. Roll back by
    restoring the prior Hermes config/workload revision; do not delete provider
    auth or retained homes as part of route rollback.
-6. Retire the legacy shared-token request path only after every selected client
-   has either passed the workload-identity route or returned to verified direct
-   authentication. Secret removal, deployment, restart, and provider login are
-   separate human approval gates.
+6. Keep every selected client either on the workload-identity route or verified
+   direct authentication. Secret removal, deployment, restart, and provider
+   login are separate human approval gates.
 
 For First and Second Mate, the additive client patch sets
 `AGENTOS_PI_PROVIDER_MODE=ai-gateway` on `prepare-home`. Before Pi can start,

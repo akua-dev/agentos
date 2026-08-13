@@ -840,7 +840,7 @@ layer(platform)("disposable typed workload recovery", (it) => {
           "/ready",
         );
       }
-      assert.isTrue(
+      assert.isFalse(
         persistent.spec.template.spec.automountServiceAccountToken,
       );
       assert.isFalse(
