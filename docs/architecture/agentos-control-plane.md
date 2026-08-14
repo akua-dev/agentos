@@ -190,6 +190,12 @@ A capability only gives technical access. It never replaces business approval:
 customer-impacting CRM writes, outreach and other external effects retain their
 applicable Hermes Assignment and human gates.
 
+The Access Plane validates an Hermes-issued, expiring authorization and may
+retain only bounded technical policy, revocation, budget and secret-free audit
+evidence. It must not persist a remote-run ledger, derive lifecycle transitions,
+infer a retry, or treat adapter settlement/result evidence as Task acceptance.
+Hermes Kanban remains the only durable interpretation of a task/run reference.
+
 ### 7.3 Common contract, separate adapters
 
 ```text
@@ -202,7 +208,7 @@ lifecycle and narrow blast radius.
 
 | Adapter | Backend | Primary constraint |
 |---|---|---|
-| GitHub adapter | GitHub REST, GraphQL and Smart HTTP | repository/action and eventually task-bound ref restriction |
+| GitHub adapter | GitHub REST, GraphQL and Smart HTTP | repository/action; worker write remains disabled until task-bound ref restriction is proven |
 | internal Git adapter | self-hosted Git service/forge | repository/fork/ref ACL and candidate-source custody |
 | CRM adapter | approved CRM API | account/object/field/action scope plus human/CRM gates |
 | AI provider adapter | approved provider or Fleet AI Gateway | model/account/budget policy; no worker provider credential |
@@ -255,7 +261,7 @@ OpenFGA/A2A behavior is outside that candidate's bounded scope.
 
 ## 9. Git and source delivery
 
-### 9.1 Worker delivery path
+### 9.1 Target worker delivery path — not yet enabled for GitHub writes
 
 ```text
 Remote code worker
@@ -281,16 +287,24 @@ checkpoint/artifact references
 blockers or requested steering
 ```
 
-### 9.2 Worker rights
+### 9.2 Worker rights and write gate
 
 | Action | Remote worker | Hermes First-Mate |
 |---|---|---|
 | read approved source/dependency repo | only through Proxy capability | yes, through reviewed access path |
-| write candidate ref | only exact Assignment-bound repo/fork/ref | decides whether candidate is promoted |
+| GitHub-backed candidate write | **disabled** until protocol-aware or backend-native task/run/ref enforcement passes adversarial review | decides whether a verified candidate is promoted |
+| internal-Git candidate write | **disabled** until its exact per-assignment repository/fork/ref ACL is implemented and adversarially verified | decides whether a verified candidate is promoted |
 | force push / tags / hooks / server admin | no | no unless separately authorized admin operation |
-| create/update Draft PR | only when assignment capability explicitly permits it | may promote and create/update exact verified candidate PR |
+| create/update Draft PR | **disabled** for remote workers until the corresponding write/ref gate is accepted | may promote and create/update exact verified candidate PR |
 | merge / release / deployment | no | separate review and applicable authorization only |
 | GitHub App credential | never | normal path remains mediated; privileged exception stays First-Mate-only |
+
+The future worker-write acceptance condition is not satisfied by a
+repository-scoped GitHub App token. It requires a verified path that rejects a
+forged or unintended ref update before the backend accepts it, binds the exact
+repository/fork/ref to the Hermes-authorized task/run, and preserves that
+binding through retries and restarts. Until then a remote worker is read-only;
+candidate publication and Draft-PR creation remain First-Mate operations.
 
 ### 9.3 Git backend choice
 
@@ -321,6 +335,26 @@ This is not equivalent to a local short-lived subagent process. A2A is the
 candidate conversation/transport layer across process, machine and harness
 boundaries. Hermes Kanban remains the durable authority.
 
+### 10.1 Existing AgentOS A2A service is excluded from the Akua remote-worker path
+
+The existing `agentos-a2a` service is intentionally **not** the Akua remote
+subagent adapter. Its current contract is coupled to AgentOS PostgreSQL Inbox,
+Task and Assignment records, verifies active AgentOS Assignment state, and
+uses that state for delivery. Connecting a remote Akua worker to it would create
+the prohibited second custody path.
+
+```text
+Akua remote worker must not call:
+  agentos-a2a
+  AgentOS PostgreSQL
+  AgentOS Task / Assignment / Inbox APIs
+
+Any future Akua A2A adapter must be stateless with respect to custody:
+  it validates only bounded Hermes-issued references/capabilities,
+  transports communication/artifacts,
+  and never creates, verifies or advances AgentOS Task/Assignment/Inbox state.
+```
+
 ### Context and artifacts
 
 ```text
@@ -328,7 +362,8 @@ Repository/workspace needed for work
 → materialize an authorized checkout/workspace in the workload
 
 Large document, checkpoint, test artifact or bundle
-→ A2A Artifact with URL/provenance/digest where supported
+→ A2A Artifact with URL/provenance/digest where supported; retrieval uses a
+  named Access-Proxy artifact capability route
 
 Small self-contained file
 → bounded A2A raw artifact only where implementation supports it
@@ -338,8 +373,10 @@ Status, question, steer, block
 ```
 
 Large bytes are not inserted into prompts by default. Every artifact route needs
-access control, integrity/provenance, retention and redaction rules. No secret
-belongs in an A2A artifact, A2A message, task evidence or telemetry.
+access control, integrity/provenance, retention, revocation and redaction rules.
+Bearer credentials, signed URLs and credential-bearing query strings must not
+appear in A2A messages, artifacts, task evidence or telemetry. No secret belongs
+in an A2A artifact, A2A message, task evidence or telemetry.
 
 ### Lifecycle
 
@@ -348,7 +385,7 @@ belongs in an A2A artifact, A2A message, task evidence or telemetry.
 | start | read materialized authorized inputs | whether to dispatch |
 | progress | report bounded status/checkpoint | whether to continue/steer |
 | question/block | request missing authorized context | Kanban comment/block and human escalation |
-| candidate | commit/test/publish allowed candidate ref | whether evidence is sufficient |
+| candidate | test and prepare evidence; publish only after the relevant write/ref gate is accepted | whether evidence is sufficient |
 | result | return PR/ref/test/artifact evidence | accept, request review, retry or block |
 | interrupt/cleanup | stop cooperatively and publish final evidence | durable interrupt/retry/cleanup decision |
 
@@ -393,6 +430,7 @@ No implementation is accepted without an adversarial matrix covering at least:
 | GitHub/internal Git/CRM outage | no credential fallback or false success; candidate/evidence preserved |
 | Hermes crash with live Pod | reconcile before resume/retry/cleanup/acceptance |
 | A2A outage | no loss of Kanban custody; checkpoint/result handling remains bounded |
+| call to AgentOS A2A/Task/Assignment/Inbox path | denied for Akua remote workers; no shadow custody path |
 | forged PR/CI/exit success | evidence is reread against exact source and Assignment intent |
 | secret/prompt/payload in logs/artifacts | rejected/redacted before durable evidence/export |
 | CRM/outbound write | applicable human and CRM gates remain binding |
@@ -414,7 +452,9 @@ No implementation is accepted without an adversarial matrix covering at least:
    standards-compatible Artifact publisher?
 7. What is the exact recovery algorithm for Hermes restart while a remote
    child, candidate branch or Artifact publication is still live?
-8. Which parts of existing AgentOS Assignment/Postgres material are retained
+8. What stateless A2A adapter contract can serve Akua without calling the
+   existing AgentOS A2A/Task/Assignment/Inbox/PostgreSQL path?
+9. Which parts of existing AgentOS Assignment/Postgres material are retained
    for non-Akua product contexts, deprecated, or removed after an independent
    source inventory and migration plan?
 
@@ -448,6 +488,9 @@ This PR intentionally remains the one review surface while the system evolves.
 - [ ] Internal Git is understood as optional backend infrastructure behind the
       same Proxy.
 - [ ] Git ref-level enforcement and hard egress non-bypass are recognized as
-      open implementation gates, not assumed complete.
-- [ ] A2A is understood as transport/artifact interaction, not custody truth.
+      open implementation gates; remote Git write/PR creation remain disabled.
+- [ ] Existing AgentOS A2A/Task/Assignment/Inbox/PostgreSQL paths are excluded
+      from Akua remote workers.
+- [ ] A2A is understood as transport/artifact interaction, not custody truth,
+      and any Akua adapter is stateless with respect to custody.
 - [ ] No implementation/deploy/remove action is inferred from this design review.
