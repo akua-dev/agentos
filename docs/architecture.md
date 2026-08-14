@@ -9,6 +9,7 @@ The consolidated Draft architecture decision pack for Hermes, remote subagents,
 Access Proxy routes, Git delivery and Akua custody boundaries is documented in:
 
 - [AgentOS Control Plane](./architecture/agentos-control-plane.md)
+- [AgentOS reference stack](./architecture/agentos-reference-stack/README.md)
 
 Executable architecture conformance is documented in:
 

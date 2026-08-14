@@ -9,12 +9,15 @@
 Accept or request changes to this unified direction:
 
 ```text
-Hermes First-Mate is part of the AgentOS reference stack and is the recommended
-starting profile for a company.
+Hermes First-Mate plus Hermes Kanban is the recommended Akua reference starting
+point for a company.
 
-Hermes Kanban is the only durable Akua authority for Task, Assignment intent,
-human gates, dispatch, retry, interrupt, result, acceptance, settlement and
-cleanup.
+Each deployment selects exactly one durable custody authority for Task and
+Assignment intent, human gates, dispatch, retry, interrupt, result review,
+acceptance, settlement and cleanup. In the current Akua reference stack that
+authority is Hermes Kanban. A future replacement is possible only by an
+explicitly selected implementation that preserves the same custody guarantees;
+parallel or shadow custody is prohibited.
 
 AgentOS provides the runtime/access substrate: Kubernetes execution, workload
 identity, bounded policy/capability mediation, protocol-aware service adapters,
@@ -29,7 +32,36 @@ The document intentionally keeps the system in one place while decisions are
 fluid. Every accepted modification is made as a commit to this same Draft PR
 until the whole direction is ready for final review.
 
-## 2. Scope and non-goals
+## 2. Accepted decisions
+
+### AD-1 — Selected custody boundary — **Accepted 2026-08-14**
+
+> Each Akua deployment selects exactly one durable work/acceptance custody
+> authority. Hermes First-Mate/Kanban is the recommended reference
+> implementation, not a technically mandatory forever-only implementation. A
+> replacement requires explicit selection and equivalent Task, evidence,
+> human-gate and recovery guarantees. AgentOS owns no parallel Task,
+> Assignment, Result, Retry, Approval or Acceptance control plane; Kubernetes
+> owns execution and technical enforcement, not business completion or Task
+> acceptance.
+
+### AD-3 — A2A transport boundary — **Accepted 2026-08-14**
+
+> A2A is an outer remote-agent transport/delegation boundary for messages,
+> steering, status and artifact references. It is never a second durable truth
+> for task lifecycle, approval, session, retry or acceptance.
+
+### AD-4 — Worker capability boundary — **Accepted 2026-08-14**
+
+> A remote worker may work broadly and autonomously inside its isolated
+> environment to the full extent of its explicit Assignment and technical
+> capabilities. This does not grant custody, broad credentials, merge, release
+> or production authority.
+
+For the live status, exact evidence and remaining choices, see the
+[reference-stack decision register](./agentos-reference-stack/review/decision-register.md).
+
+## 3. Scope and non-goals
 
 ### In scope
 
@@ -50,7 +82,7 @@ until the whole direction is ready for final review.
   all-traffic CONNECT proxy.
 - A shared all-provider credential vault or credential-returning API for Pods.
 - An AgentOS Task/Assignment scheduler, result store, retry engine, approval
-  store or acceptance database beside Hermes Kanban.
+  store or acceptance database beside the selected custody authority.
 - Direct Kanban, Discord, GitHub App or broad Kubernetes credentials in a
   remote worker.
 - Implementing, deploying, migrating, deleting or merging any component from
@@ -61,7 +93,7 @@ until the whole direction is ready for final review.
 | System | Owns | Does not own |
 |---|---|---|
 | Human / Captain | purpose, risk, consequential approval and ultimate accountability | operational toil or per-request credentials |
-| Hermes First-Mate / Kanban | work selection, Assignment intent, human gates, dispatch decision, retry, interrupt, result review, acceptance, settlement and cleanup decision | provider credentials in workers; Kubernetes as a business completion oracle |
+| Selected custody authority (Hermes First-Mate/Kanban in the current reference stack) | work selection, Assignment intent, human gates, dispatch decision, retry, interrupt, result review, acceptance, settlement and cleanup decision | provider credentials in workers; Kubernetes as a business completion oracle |
 | AgentOS Access Plane | runtime integration, identity verification, bounded grants, route policy, credential mediation, budgets and security audit evidence | Task ownership, acceptance, human approval, retry or result truth |
 | Kubernetes | workload execution, admission, RBAC, network enforcement, resource limits and workload identity issuance | Task completion or product acceptance |
 | Remote subagent | bounded code/research/test execution, checkpoints and evidence | global custody, merge, release, deployment, direct provider administration |
@@ -102,9 +134,9 @@ coordination. That model is not used for Akua remote subagents.
 ```text
 Akua target
 
-Hermes Kanban
-  = sole durable Task / Assignment / approval / dispatch / retry / result /
-    acceptance / settlement / cleanup authority
+Hermes Kanban (the current selected reference custody)
+  = durable Task / Assignment / approval / dispatch / retry / result /
+    acceptance / settlement / cleanup authority for this deployment
 
 AgentOS
   = identity / policy / capability route / runtime / credential mediation /
@@ -190,11 +222,13 @@ A capability only gives technical access. It never replaces business approval:
 customer-impacting CRM writes, outreach and other external effects retain their
 applicable Hermes Assignment and human gates.
 
-The Access Plane validates an Hermes-issued, expiring authorization and may
+The Access Plane validates a selected-custody-issued, expiring authorization and may
 retain only bounded technical policy, revocation, budget and secret-free audit
 evidence. It must not persist a remote-run ledger, derive lifecycle transitions,
 infer a retry, or treat adapter settlement/result evidence as Task acceptance.
-Hermes Kanban remains the only durable interpretation of a task/run reference.
+The selected custody authority remains the only durable interpretation of a
+task/run reference; Hermes Kanban fills that role in the current reference
+stack.
 
 ### 7.3 Common contract, separate adapters
 
@@ -268,7 +302,7 @@ Remote code worker
 → Access Proxy
 → selected Git backend
 → candidate commit/ref
-→ Hermes validates evidence and source state
+→ selected custody validates evidence and source state
 → Access Proxy
 → GitHub task branch + Draft PR
 → normal code review / CI
@@ -327,13 +361,14 @@ approval system.
 The product model is:
 
 ```text
-Hermes Parent-Agent / Kanban custody
+Selected Parent-Agent / custody (Hermes Kanban in the reference stack)
 → Remote Child-Agent in Kubernetes
 ```
 
 This is not equivalent to a local short-lived subagent process. A2A is the
 candidate conversation/transport layer across process, machine and harness
-boundaries. Hermes Kanban remains the durable authority.
+boundaries. The selected custody authority remains durable; Hermes Kanban is
+the current reference implementation.
 
 ### 10.1 Existing AgentOS A2A service is excluded from the Akua remote-worker path
 
@@ -350,7 +385,7 @@ Akua remote worker must not call:
   AgentOS Task / Assignment / Inbox APIs
 
 Any future Akua A2A adapter must be stateless with respect to custody:
-  it validates only bounded Hermes-issued references/capabilities,
+  it validates only bounded selected-custody-issued references/capabilities,
   transports communication/artifacts,
   and never creates, verifies or advances AgentOS Task/Assignment/Inbox state.
 ```
@@ -380,7 +415,7 @@ in an A2A artifact, A2A message, task evidence or telemetry.
 
 ### Lifecycle
 
-| Stage | Remote child may do | Hermes must decide |
+| Stage | Remote child may do | Selected custody must decide |
 |---|---|---|
 | start | read materialized authorized inputs | whether to dispatch |
 | progress | report bounded status/checkpoint | whether to continue/steer |
@@ -389,9 +424,9 @@ in an A2A artifact, A2A message, task evidence or telemetry.
 | result | return PR/ref/test/artifact evidence | accept, request review, retry or block |
 | interrupt/cleanup | stop cooperatively and publish final evidence | durable interrupt/retry/cleanup decision |
 
-A Pod surviving a Hermes restart is execution evidence. Recovery must reconcile
-the live workload, exact candidate source, Artifact availability and Kanban
-intent before any resume, retry, cleanup or acceptance action.
+A Pod surviving a parent/custody restart is execution evidence. Recovery must
+reconcile the live workload, exact candidate source, Artifact availability and
+selected-custody intent before any resume, retry, cleanup or acceptance action.
 
 ## 11. Kubernetes and credentials
 
@@ -437,33 +472,28 @@ No implementation is accepted without an adversarial matrix covering at least:
 
 ## 13. Open decisions requiring explicit review
 
-1. What is the canonical capability-policy evaluator after reconciling current
-   OpenFGA material with the modern egress-authorizer direction?
-2. Which exact service classes must have hard technical non-bypass enforcement,
-   and what NetworkPolicy/CNI/FQDN mechanism proves it?
-3. What task/run/ref-level enforcement mechanism is mandatory for Git Smart
-   HTTP writes before a remote coding worker receives write capability?
-4. Is an internal Git candidate backend required in the first release, or is a
-   proxy-mediated GitHub backend sufficient initially?
-5. Which CRM is the first supported non-Git adapter, and which object/field/
-   outbound gates are required?
-6. Does current Hermes A2A implementation support the required artifact
-   direction end-to-end, or does the Remote Agent adapter need a bounded
-   standards-compatible Artifact publisher?
-7. What is the exact recovery algorithm for Hermes restart while a remote
-   child, candidate branch or Artifact publication is still live?
-8. What stateless A2A adapter contract can serve Akua without calling the
-   existing AgentOS A2A/Task/Assignment/Inbox/PostgreSQL path?
-9. Which parts of existing AgentOS Assignment/Postgres material are retained
-   for non-Akua product contexts, deprecated, or removed after an independent
-   source inventory and migration plan?
+The [reference-stack decision register](./agentos-reference-stack/review/decision-register.md)
+is the canonical status/count source. The current six open decisions are:
+
+1. What provider-neutral custody interface and equivalence proof are required
+   before a future Hermes replacement can be selected?
+2. What exactly is retained, exported, migrated or removed when the current
+   AgentOS PostgreSQL custody path is decommissioned?
+3. Which one policy/capability evaluator is canonical after reconciling current
+   OpenFGA and egress-authorizer designs, including hard non-bypass scope?
+4. Which protocol-aware mechanism proves task/run/ref enforcement before remote
+   Git write or worker-created PR capability is issued?
+5. Which artifact backend and retrieval, revocation, retention, integrity and
+   audit contract sits behind A2A artifact references?
+6. What exact parent-restart/remote-Pod recovery algorithm and acceptance
+   evidence are required?
 
 ## 14. Consolidation protocol for this Draft PR
 
 This PR intentionally remains the one review surface while the system evolves.
 
 1. Robin comments on the exact section or adds a top-level decision comment.
-2. Hermes answers with a commit that changes this document, including the
+2. The selected First Mate answers with a commit that changes this document, including the
    consequence and any new open question.
 3. A resolved decision moves from this section into the relevant section's
    **Accepted decision** callout with commit/PR evidence; it is not copied into
@@ -478,7 +508,9 @@ This PR intentionally remains the one review surface while the system evolves.
 ## 15. Review checklist
 
 - [ ] Hermes is accepted as the initial AgentOS First-Mate profile.
-- [ ] Hermes Kanban is accepted as Akua's sole durable custody authority.
+- [ ] Hermes First-Mate/Kanban is accepted as the current reference custody
+      implementation; exactly one selected custody authority exists per
+      deployment and any replacement must be explicit and equivalent.
 - [ ] AgentOS Assignment/Postgres control-plane behavior is excluded from the
       Akua remote-subagent path and is not a fallback.
 - [ ] Access Proxy is accepted as the common governed-service access contract.
