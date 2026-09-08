@@ -12,10 +12,10 @@
     "typecheck": "tsc --project ../../tsconfig.json"
   },
   "dependencies": {
-    "@effect/platform-bun": "4.0.0-beta.102",
-    "@effect/sql-pg": "4.0.0-beta.102",
+    "@effect/platform-bun": "4.0.0-rc.112",
+    "@effect/sql-pg": "4.0.0-rc.112",
     "@akua-dev/agentos": "workspace:*",
-    "effect": "4.0.0-beta.102"
+    "effect": "4.0.0-rc.112"
   },
   "devDependencies": {
     "yaml": "2.9.0"

@@ -10,13 +10,13 @@
     "migrate": "bun runtime/drizzle.ts migrate --config=drizzle.config.ts"
   },
   "dependencies": {
-    "@effect/platform-bun": "4.0.0-beta.102",
+    "@effect/platform-bun": "4.0.0-rc.112",
     "drizzle-kit": "0.31.10",
     "drizzle-orm": "0.45.2",
-    "effect": "4.0.0-beta.102",
-    "pg": "8.22.0"
+    "effect": "4.0.0-rc.112",
+    "pg": "8.23.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.4"
+    "@electric-sql/pglite": "0.5.8"
   }
 }

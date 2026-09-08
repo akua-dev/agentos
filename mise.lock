@@ -383,27 +383,27 @@ checksum = "sha256:edaca9bd58ec8e92037dac4e877d52f6b8f430b81c18b57e264b4e2fb111c
 url = "https://nodejs.org/dist/v24.16.0/node-v24.16.0-win-x64.zip"
 
 [[tools."npm:@earendil-works/pi-coding-agent"]]
-version = "0.81.1"
+version = "0.85.1"
 backend = "npm:@earendil-works/pi-coding-agent"
 
 [[tools."npm:@openai/codex"]]
-version = "0.144.5"
+version = "0.153.4"
 backend = "npm:@openai/codex"
 
 [[tools."npm:chrome-devtools-axi"]]
-version = "0.1.26"
+version = "0.1.34"
 backend = "npm:chrome-devtools-axi"
 
 [[tools."npm:gh-axi"]]
-version = "0.1.27"
+version = "0.1.35"
 backend = "npm:gh-axi"
 
 [[tools."npm:lavish-axi"]]
-version = "0.1.42"
+version = "0.1.67"
 backend = "npm:lavish-axi"
 
 [[tools."npm:quota-axi"]]
-version = "0.1.5"
+version = "0.1.40"
 backend = "npm:quota-axi"
 
 [[tools.ripgrep]]

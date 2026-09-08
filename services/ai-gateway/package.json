@@ -13,13 +13,13 @@
     "typecheck": "tsc --project ../../tsconfig.json"
   },
   "dependencies": {
-    "@effect/platform-bun": "4.0.0-beta.102",
+    "@effect/platform-bun": "4.0.0-rc.112",
     "@akua-dev/agentos": "workspace:*",
     "@akua-dev/codex-router": "github:akua-dev/codex-router#489557ad72774fd0dd67f3fdec402fc246d5256e",
-    "@earendil-works/pi-ai": "0.81.1",
-    "effect": "4.0.0-beta.102",
+    "@earendil-works/pi-ai": "0.85.1",
+    "effect": "4.0.0-rc.112",
     "proper-lockfile": "4.1.2",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@types/proper-lockfile": "4.1.4",
