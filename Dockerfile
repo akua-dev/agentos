@@ -1,4 +1,4 @@
-FROM debian:13-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd AS agentos-base
+FROM debian:13-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132 AS agentos-base
 
 ARG TARGETARCH
 ARG MISE_VERSION=2026.4.25
